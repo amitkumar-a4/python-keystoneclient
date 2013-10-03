@@ -169,7 +169,7 @@ class ExtensionManager(object):
     def __init__(self):
         LOG.audit(_('Initializing extension manager.'))
 
-        self.cls_list = FLAGS.osapi_dpaas_extension
+        self.cls_list = FLAGS.osapi_workloadmanager_extension
         self.extensions = {}
         self._load_extensions()
 

@@ -1,22 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2010 United States Government as represented by the
-# Administrator of the National Aeronautics and Space Administration.
+# Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
-# Copyright 2012 Red Hat, Inc.
-# Copyright (c) 2013 TrilioData Inc.
-#
-#    Licensed under the Apache License, Version 2.0 (the "License"); you may
-#    not use this file except in compliance with the License. You may obtain
-#    a copy of the License at
-#
-#         http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-#    License for the specific language governing permissions and limitations
-#    under the License.
 
 """Command-line flag library.
 
@@ -124,14 +109,14 @@ global_opts = [
     cfg.BoolOpt('api_rate_limit',
                 default=True,
                 help='whether to rate limit the api'),
-    cfg.ListOpt('osapi_dpaas_ext_list',
+    cfg.ListOpt('osapi_workloadmanager_ext_list',
                 default=[],
                 help='Specify list of extensions to load when using osapi_'
                      '_extension option with workloadmanager.api.contrib.'
                      'select_extensions'),
-    cfg.MultiStrOpt('osapi_dpaas_extension',
+    cfg.MultiStrOpt('osapi_workloadmanager_extension',
                     default=['workloadmanager.api.contrib.standard_extensions'],
-                    help='osapi dpaas extension to load'),
+                    help='osapi workloadmanager extension to load'),
     cfg.StrOpt('workloadmanager_base_URL',
                default=None,
                help='Base URL that will be presented to users in links '
@@ -173,13 +158,6 @@ global_opts = [
     cfg.ListOpt('memcached_servers',
                 default=None,
                 help='Memcached servers or None for in process cache.'),
-    cfg.StrOpt('default_volume_type',
-               default=None,
-               help='default volume type to use'),
-    cfg.StrOpt('volume_usage_audit_period',
-               default='month',
-               help='time period to generate volume usages for.  '
-                    'Time period must be hour, day, month or year'),
     cfg.StrOpt('root_helper',
                default='sudo',
                help='Deprecated: command to use for running commands as root'),
@@ -196,9 +174,9 @@ global_opts = [
     cfg.IntOpt('service_down_time',
                default=60,
                help='maximum time since last check-in for up service'),
-    cfg.StrOpt('backupjobs_api_class',
-               default='workloadmanager.backupjobs.api.API',
-               help='The full class name of the volume API class to use'),
+    cfg.StrOpt('workloads_api_class',
+               default='workloadmanager.workloads.api.API',
+               help='The full class name of the workloads API class to use'),
     cfg.StrOpt('auth_strategy',
                default='noauth',
                help='The strategy to use for auth. Supports noauth, keystone, '
