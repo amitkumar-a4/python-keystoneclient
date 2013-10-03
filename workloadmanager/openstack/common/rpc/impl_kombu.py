@@ -30,10 +30,10 @@ import kombu.entity
 import kombu.messaging
 from oslo.config import cfg
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import network_utils
-from raksha.openstack.common.rpc import amqp as rpc_amqp
-from raksha.openstack.common.rpc import common as rpc_common
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import network_utils
+from workloadmanager.openstack.common.rpc import amqp as rpc_amqp
+from workloadmanager.openstack.common.rpc import common as rpc_common
 
 kombu_opts = [
     cfg.StrOpt('kombu_ssl_version',

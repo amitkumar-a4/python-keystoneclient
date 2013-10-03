@@ -43,7 +43,7 @@ import xmlrpclib
 
 import six
 
-from raksha.openstack.common import timeutils
+from workloadmanager.openstack.common import timeutils
 
 
 _nasty_type_tests = [inspect.ismodule, inspect.isclass, inspect.ismethod,

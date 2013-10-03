@@ -24,8 +24,8 @@ import math
 
 from oslo.config import cfg
 
-from raksha import flags
-from raksha.openstack.common.scheduler import weights
+from workloadmanager import flags
+from workloadmanager.openstack.common.scheduler import weights
 
 capacity_weight_opts = [
         cfg.FloatOpt('capacity_weight_multiplier',

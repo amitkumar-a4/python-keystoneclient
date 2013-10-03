@@ -15,8 +15,8 @@
 
 from oslo.config import cfg
 
-from raksha.openstack.common import jsonutils
-from raksha.openstack.common import log as logging
+from workloadmanager.openstack.common import jsonutils
+from workloadmanager.openstack.common import log as logging
 
 
 CONF = cfg.CONF
@@ -30,6 +30,6 @@ def notify(_context, message):
                            CONF.default_notification_level)
     priority = priority.lower()
     logger = logging.getLogger(
-        'raksha.openstack.common.notification.%s' %
+        'workloadmanager.openstack.common.notification.%s' %
         message['event_type'])
     getattr(logger, priority)(jsonutils.dumps(message))

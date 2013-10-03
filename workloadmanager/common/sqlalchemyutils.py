@@ -7,8 +7,8 @@
 
 import sqlalchemy
 
-from raksha import exception
-from raksha.openstack.common import log as logging
+from workloadmanager import exception
+from workloadmanager.openstack.common import log as logging
 
 
 LOG = logging.getLogger(__name__)

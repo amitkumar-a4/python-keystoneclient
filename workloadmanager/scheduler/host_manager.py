@@ -21,14 +21,14 @@ import UserDict
 
 from oslo.config import cfg
 
-from raksha import db
-from raksha import exception
-from raksha import flags
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.scheduler import filters
-from raksha.openstack.common.scheduler import weights
-from raksha.openstack.common import timeutils
-from raksha import utils
+from workloadmanager import db
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.scheduler import filters
+from workloadmanager.openstack.common.scheduler import weights
+from workloadmanager.openstack.common import timeutils
+from workloadmanager import utils
 
 host_manager_opts = [
     cfg.ListOpt('scheduler_default_filters',
@@ -158,10 +158,10 @@ class HostManager(object):
     def __init__(self):
         self.service_states = {}  # { <host>: {<service>: {cap k : v}}}
         self.host_state_map = {}
-        self.filter_handler = filters.HostFilterHandler('raksha.scheduler.'
+        self.filter_handler = filters.HostFilterHandler('workloadmanager.scheduler.'
                                                         'filters')
         self.filter_classes = self.filter_handler.get_all_classes()
-        self.weight_handler = weights.HostWeightHandler('raksha.scheduler.'
+        self.weight_handler = weights.HostWeightHandler('workloadmanager.scheduler.'
                                                         'weights')
         self.weight_classes = self.weight_handler.get_all_classes()
 

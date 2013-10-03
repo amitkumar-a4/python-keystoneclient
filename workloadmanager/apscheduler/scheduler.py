@@ -11,21 +11,21 @@ import os
 import sys
 
 from oslo.config import cfg
-from raksha import context as ctx
+from workloadmanager import context as ctx
 
-from raksha import flags
-from raksha.openstack.common import importutils
+from workloadmanager import flags
+from workloadmanager.openstack.common import importutils
 
-from raksha.apscheduler.util import *
-from raksha.apscheduler.triggers import SimpleTrigger, IntervalTrigger, CronTrigger
-from raksha.apscheduler.job import Job, MaxInstancesReachedError
-from raksha.apscheduler.events import *
-from raksha.apscheduler.threadpool import ThreadPool
+from workloadmanager.apscheduler.util import *
+from workloadmanager.apscheduler.triggers import SimpleTrigger, IntervalTrigger, CronTrigger
+from workloadmanager.apscheduler.job import Job, MaxInstancesReachedError
+from workloadmanager.apscheduler.events import *
+from workloadmanager.apscheduler.threadpool import ThreadPool
 
 logger = getLogger(__name__)
 
 db_driver_opt = cfg.StrOpt('db_driver',
-                           default='raksha.db',
+                           default='workloadmanager.db',
                            help='driver to use for database access')
 
 FLAGS = flags.FLAGS

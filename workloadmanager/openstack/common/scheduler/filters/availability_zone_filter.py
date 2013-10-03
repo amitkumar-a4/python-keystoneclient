@@ -14,7 +14,7 @@
 #    under the License.
 
 
-from raksha.openstack.common.scheduler import filters
+from workloadmanager.openstack.common.scheduler import filters
 
 
 class AvailabilityZoneFilter(filters.BaseHostFilter):

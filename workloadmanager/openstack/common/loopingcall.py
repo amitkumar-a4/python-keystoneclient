@@ -22,9 +22,9 @@ import sys
 from eventlet import event
 from eventlet import greenthread
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import timeutils
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import timeutils
 
 LOG = logging.getLogger(__name__)
 

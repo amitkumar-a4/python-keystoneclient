@@ -24,10 +24,10 @@
 import os
 
 from oslo.config import cfg
-from raksha import exception
-from raksha.openstack.common import log as logging
-from raksha import utils
-from raksha.virt import images
+from workloadmanager import exception
+from workloadmanager.openstack.common import log as logging
+from workloadmanager import utils
+from workloadmanager.virt import images
 
 libvirt_opts = [
 

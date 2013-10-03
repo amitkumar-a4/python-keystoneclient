@@ -27,8 +27,8 @@ import signal
 from eventlet.green import subprocess
 from eventlet import greenthread
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import log as logging
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import log as logging
 
 
 LOG = logging.getLogger(__name__)

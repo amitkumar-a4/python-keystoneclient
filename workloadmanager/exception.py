@@ -17,9 +17,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-"""Raksha base exception handling.
+"""WorkloadManager base exception handling.
 
-Includes decorator for re-raising Raksha-type exceptions.
+Includes decorator for re-raising WorkloadManager-type exceptions.
 
 SHOULD include dedicated exception logging.
 
@@ -28,8 +28,8 @@ SHOULD include dedicated exception logging.
 from oslo.config import cfg
 import webob.exc
 
-from raksha import flags
-from raksha.openstack.common import log as logging
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
 
 LOG = logging.getLogger(__name__)
 
@@ -135,8 +135,8 @@ def wrap_exception(notifier=None, publisher_id=None, event_type=None,
     return inner
 
 
-class RakshaException(Exception):
-    """Base Raksha Exception
+class WorkloadManagerException(Exception):
+    """Base WorkloadManager Exception
 
     To correctly use this class, inherit from it and define
     a 'message' property. That message will get printf'd
@@ -173,14 +173,14 @@ class RakshaException(Exception):
                     # at least get the core message out if something happened
                     message = self.message
 
-        super(RakshaException, self).__init__(message)
+        super(WorkloadManagerException, self).__init__(message)
 
 
-class GlanceConnectionFailed(RakshaException):
+class GlanceConnectionFailed(WorkloadManagerException):
     message = _("Connection to glance failed") + ": %(reason)s"
 
 
-class NotAuthorized(RakshaException):
+class NotAuthorized(WorkloadManagerException):
     message = _("Not authorized.")
     code = 403
 
@@ -193,11 +193,11 @@ class PolicyNotAuthorized(NotAuthorized):
     message = _("Policy doesn't allow %(action)s to be performed.")
 
 
-class ImageNotAuthorized(RakshaException):
+class ImageNotAuthorized(WorkloadManagerException):
     message = _("Not authorized for image %(image_id)s.")
 
 
-class Invalid(RakshaException):
+class Invalid(WorkloadManagerException):
     message = _("Unacceptable parameters.")
     code = 400
 
@@ -210,7 +210,7 @@ class VolumeAttached(Invalid):
     message = _("Volume %(volume_id)s is still attached, detach volume first.")
 
 
-class SfJsonEncodeFailure(RakshaException):
+class SfJsonEncodeFailure(WorkloadManagerException):
     message = _("Failed to load data into json format")
 
 
@@ -261,7 +261,7 @@ class InvalidUUID(Invalid):
     message = _("Expected a uuid but received %(uuid).")
 
 
-class NotFound(RakshaException):
+class NotFound(WorkloadManagerException):
     message = _("Resource could not be found.")
     code = 404
     safe = True
@@ -328,11 +328,11 @@ class SnapshotNotFound(NotFound):
     message = _("Snapshot %(snapshot_id)s could not be found.")
 
 
-class VolumeIsBusy(RakshaException):
+class VolumeIsBusy(WorkloadManagerException):
     message = _("deleting volume %(volume_name)s that has snapshot")
 
 
-class SnapshotIsBusy(RakshaException):
+class SnapshotIsBusy(WorkloadManagerException):
     message = _("deleting snapshot %(snapshot_name)s that has "
                 "dependent volumes")
 
@@ -341,15 +341,15 @@ class ISCSITargetNotFoundForVolume(NotFound):
     message = _("No target id found for volume %(volume_id)s.")
 
 
-class ISCSITargetCreateFailed(RakshaException):
+class ISCSITargetCreateFailed(WorkloadManagerException):
     message = _("Failed to create iscsi target for volume %(volume_id)s.")
 
 
-class ISCSITargetAttachFailed(RakshaException):
+class ISCSITargetAttachFailed(WorkloadManagerException):
     message = _("Failed to attach iSCSI target for volume %(volume_id)s.")
 
 
-class ISCSITargetRemoveFailed(RakshaException):
+class ISCSITargetRemoveFailed(WorkloadManagerException):
     message = _("Failed to remove iscsi target for volume %(volume_id)s.")
 
 
@@ -418,7 +418,7 @@ class ReservationNotFound(QuotaNotFound):
     message = _("Quota reservation %(uuid)s could not be found.")
 
 
-class OverQuota(RakshaException):
+class OverQuota(WorkloadManagerException):
     message = _("Quota exceeded for resources: %(overs)s")
 
 
@@ -439,12 +439,12 @@ class ClassNotFound(NotFound):
     message = _("Class %(class_name)s could not be found: %(exception)s")
 
 
-class NotAllowed(RakshaException):
+class NotAllowed(WorkloadManagerException):
     message = _("Action not allowed.")
 
 
 #TODO(bcwaldon): EOL this exception!
-class Duplicate(RakshaException):
+class Duplicate(WorkloadManagerException):
     pass
 
 
@@ -456,11 +456,11 @@ class VolumeTypeExists(Duplicate):
     message = _("Volume Type %(id)s already exists.")
 
 
-class MigrationError(RakshaException):
+class MigrationError(WorkloadManagerException):
     message = _("Migration error") + ": %(reason)s"
 
 
-class MalformedRequestBody(RakshaException):
+class MalformedRequestBody(WorkloadManagerException):
     message = _("Malformed message body: %(reason)s")
 
 
@@ -472,15 +472,15 @@ class PasteAppNotFound(NotFound):
     message = _("Could not load paste app '%(name)s' from %(path)s")
 
 
-class NoValidHost(RakshaException):
+class NoValidHost(WorkloadManagerException):
     message = _("No valid host was found. %(reason)s")
 
 
-class WillNotSchedule(RakshaException):
+class WillNotSchedule(WorkloadManagerException):
     message = _("Host %(host)s is not up or doesn't exist.")
 
 
-class QuotaError(RakshaException):
+class QuotaError(WorkloadManagerException):
     message = _("Quota exceeded") + ": code=%(code)s"
     code = 413
     headers = {'Retry-After': 0}
@@ -508,20 +508,20 @@ class DuplicateSfVolumeNames(Duplicate):
     message = _("Detected more than one volume with name %(vol_name)s")
 
 
-class Duplicate3PARHost(RakshaException):
+class Duplicate3PARHost(WorkloadManagerException):
     message = _("3PAR Host already exists: %(err)s.  %(info)s")
 
 
-class Invalid3PARDomain(RakshaException):
+class Invalid3PARDomain(WorkloadManagerException):
     message = _("Invalid 3PAR Domain: %(err)s")
 
 
-class VolumeTypeCreateFailed(RakshaException):
+class VolumeTypeCreateFailed(WorkloadManagerException):
     message = _("Cannot create volume_type with "
                 "name %(name)s and specs %(extra_specs)s")
 
 
-class SolidFireAPIException(RakshaException):
+class SolidFireAPIException(WorkloadManagerException):
     message = _("Bad response from SolidFire API")
 
 
@@ -537,15 +537,15 @@ class MalformedResponse(Invalid):
     message = _("Malformed response to command %(cmd)s: %(reason)s")
 
 
-class BadHTTPResponseStatus(RakshaException):
+class BadHTTPResponseStatus(WorkloadManagerException):
     message = _("Bad HTTP response status %(status)s")
 
 
-class FailedCmdWithDump(RakshaException):
+class FailedCmdWithDump(WorkloadManagerException):
     message = _("Operation failed with status=%(status)s. Full dump: %(data)s")
 
 
-class ZadaraServerCreateFailure(RakshaException):
+class ZadaraServerCreateFailure(WorkloadManagerException):
     message = _("Unable to create server object for initiator %(name)s")
 
 
@@ -553,7 +553,7 @@ class ZadaraServerNotFound(NotFound):
     message = _("Unable to find server object for initiator %(name)s")
 
 
-class ZadaraVPSANoActiveController(RakshaException):
+class ZadaraVPSANoActiveController(WorkloadManagerException):
     message = _("Unable to find any active VPSA controller")
 
 
@@ -569,12 +569,12 @@ class InstanceNotFound(NotFound):
     message = _("Instance %(instance_id)s could not be found.")
 
 
-class VolumeBackendAPIException(RakshaException):
+class VolumeBackendAPIException(WorkloadManagerException):
     message = _("Bad or unexpected response from the storage volume "
                 "backend API: %(data)s")
 
 
-class NfsException(RakshaException):
+class NfsException(WorkloadManagerException):
     message = _("Unknown NFS exception")
 
 
@@ -586,7 +586,7 @@ class NfsNoSuitableShareFound(NotFound):
     message = _("There is no share which can host %(volume_size)sG")
 
 
-class GlusterfsException(RakshaException):
+class GlusterfsException(WorkloadManagerException):
     message = _("Unknown Gluster exception")
 
 
@@ -619,7 +619,7 @@ class SwiftObjectNotFound(NotFound):
 class InvalidBackupJob(Invalid):
     message = _("Invalid backupjob: %(reason)s")
 
-class SwiftConnectionFailed(RakshaException):
+class SwiftConnectionFailed(WorkloadManagerException):
     message = _("Connection to swift failed") + ": %(reason)s"
 
 class VMsofBackupJobNotFound(NotFound):

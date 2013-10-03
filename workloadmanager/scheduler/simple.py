@@ -23,12 +23,12 @@ Simple Scheduler
 
 from oslo.config import cfg
 
-from raksha import db
-from raksha import exception
-from raksha import flags
-from raksha.scheduler import chance
-from raksha.scheduler import driver
-from raksha import utils
+from workloadmanager import db
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager.scheduler import chance
+from workloadmanager.scheduler import driver
+from workloadmanager import utils
 
 simple_scheduler_opts = [
     cfg.IntOpt("max_gigabytes",

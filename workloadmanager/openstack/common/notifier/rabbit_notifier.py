@@ -14,9 +14,9 @@
 #    under the License.
 
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.notifier import rpc_notifier
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.notifier import rpc_notifier
 
 LOG = logging.getLogger(__name__)
 

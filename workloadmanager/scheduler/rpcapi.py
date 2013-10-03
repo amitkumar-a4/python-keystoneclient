@@ -18,15 +18,15 @@
 Client side of the scheduler manager RPC API.
 """
 
-from raksha import flags
-from raksha.openstack.common import jsonutils
-import raksha.openstack.common.rpc.proxy
+from workloadmanager import flags
+from workloadmanager.openstack.common import jsonutils
+import workloadmanager.openstack.common.rpc.proxy
 
 
 FLAGS = flags.FLAGS
 
 
-class SchedulerAPI(raksha.openstack.common.rpc.proxy.RpcProxy):
+class SchedulerAPI(workloadmanager.openstack.common.rpc.proxy.RpcProxy):
     '''Client side of the scheduler rpc API.
 
     API version history:

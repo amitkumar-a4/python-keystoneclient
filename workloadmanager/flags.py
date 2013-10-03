@@ -33,13 +33,13 @@ import sys
 
 from oslo.config import cfg
 
-from raksha import version
+from workloadmanager import version
 
 FLAGS = cfg.CONF
 
 
 def parse_args(argv, default_config_files=None):
-    FLAGS(argv[1:], project='raksha',
+    FLAGS(argv[1:], project='workloadmanager',
           version=version.version_string(),
           default_config_files=default_config_files)
 
@@ -90,17 +90,17 @@ core_opts = [
                     '100=Everything'),
     cfg.StrOpt('api_paste_config',
                default="api-paste.ini",
-               help='File name for the paste.deploy config for raksha-api'),
+               help='File name for the paste.deploy config for workloadmanager-api'),
     cfg.StrOpt('pybasedir',
                default=os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                     '../')),
-               help='Directory where the raksha python module is installed'),
+               help='Directory where the workloadmanager python module is installed'),
     cfg.StrOpt('bindir',
                default='$pybasedir/bin',
-               help='Directory where raksha binaries are installed'),
+               help='Directory where workloadmanager binaries are installed'),
     cfg.StrOpt('state_path',
                default='$pybasedir',
-               help="Top-level directory for maintaining raksha's state"), ]
+               help="Top-level directory for maintaining workloadmanager's state"), ]
 
 debug_opts = [
 ]
@@ -113,24 +113,24 @@ global_opts = [
                default=_get_my_ip(),
                help='ip address of this host'),
     cfg.StrOpt('scheduler_topic',
-               default='raksha-scheduler',
+               default='workloadmanager-scheduler',
                help='the topic scheduler nodes listen on'),
     cfg.StrOpt('backupjobs_topic',
-               default='raksha-backupjobs',
+               default='workloadmanager-backupjobs',
                help='the topic backup job nodes listen on'),
     cfg.BoolOpt('enable_v1_api',
                 default=True,
-                help=_("Deploy v1 of the Raksha API. ")),
+                help=_("Deploy v1 of the WorkloadManager API. ")),
     cfg.BoolOpt('api_rate_limit',
                 default=True,
                 help='whether to rate limit the api'),
     cfg.ListOpt('osapi_dpaas_ext_list',
                 default=[],
                 help='Specify list of extensions to load when using osapi_'
-                     '_extension option with raksha.api.contrib.'
+                     '_extension option with workloadmanager.api.contrib.'
                      'select_extensions'),
     cfg.MultiStrOpt('osapi_dpaas_extension',
-                    default=['raksha.api.contrib.standard_extensions'],
+                    default=['workloadmanager.api.contrib.standard_extensions'],
                     help='osapi dpaas extension to load'),
     cfg.StrOpt('workloadmanager_base_URL',
                default=None,
@@ -141,7 +141,7 @@ global_opts = [
                help='the maximum number of items returned in a single '
                     'response from a collection resource'),
     cfg.StrOpt('sqlite_db',
-               default='raksha.sqlite',
+               default='workloadmanager.sqlite',
                help='the filename to use with sqlite'),
     cfg.BoolOpt('sqlite_synchronous',
                 default=True,
@@ -157,10 +157,10 @@ global_opts = [
                default=10,
                help='interval between retries of opening a sql connection'),
     cfg.StrOpt('backupjobs_manager',
-               default='raksha.backupjobs.manager.BackupJobManager',
+               default='workloadmanager.backupjobs.manager.BackupJobManager',
                help='full class name for the Manager for backup jobs'),
     cfg.StrOpt('scheduler_manager',
-               default='raksha.scheduler.manager.SchedulerManager',
+               default='workloadmanager.scheduler.manager.SchedulerManager',
                help='full class name for the Manager for scheduler'),
     cfg.StrOpt('host',
                default=socket.gethostname(),
@@ -197,7 +197,7 @@ global_opts = [
                default=60,
                help='maximum time since last check-in for up service'),
     cfg.StrOpt('backupjobs_api_class',
-               default='raksha.backupjobs.api.API',
+               default='workloadmanager.backupjobs.api.API',
                help='The full class name of the volume API class to use'),
     cfg.StrOpt('auth_strategy',
                default='noauth',

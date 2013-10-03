@@ -30,9 +30,9 @@ import logging
 
 from oslo.config import cfg
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import importutils
-from raksha.openstack.common import local
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import local
 
 
 LOG = logging.getLogger(__name__)
@@ -56,9 +56,9 @@ rpc_opts = [
                help='Seconds to wait before a cast expires (TTL). '
                     'Only supported by impl_zmq.'),
     cfg.ListOpt('allowed_rpc_exception_modules',
-                default=['raksha.openstack.common.exception',
+                default=['workloadmanager.openstack.common.exception',
                          'nova.exception',
-                         'raksha.exception',
+                         'workloadmanager.exception',
                          'exceptions',
                          ],
                 help='Modules of exceptions that are permitted to be recreated'

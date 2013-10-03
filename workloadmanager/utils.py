@@ -294,7 +294,7 @@ class SSHPool(pools.Pool):
                             timeout=self.conn_timeout)
             else:
                 msg = _("Specify a password or private_key")
-                raise exception.RakshaException(msg)
+                raise exception.WorkloadManagerException(msg)
 
             # Paramiko by default sets the socket timeout to 0.1 seconds,
             # ignoring what we set thru the sshclient. This doesn't help for

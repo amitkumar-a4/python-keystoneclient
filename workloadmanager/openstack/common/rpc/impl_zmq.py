@@ -26,12 +26,12 @@ import eventlet
 import greenlet
 from oslo.config import cfg
 
-from raksha.openstack.common import excutils
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import importutils
-from raksha.openstack.common import jsonutils
-from raksha.openstack.common import processutils as utils
-from raksha.openstack.common.rpc import common as rpc_common
+from workloadmanager.openstack.common import excutils
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import jsonutils
+from workloadmanager.openstack.common import processutils as utils
+from workloadmanager.openstack.common.rpc import common as rpc_common
 
 zmq = importutils.try_import('eventlet.green.zmq')
 

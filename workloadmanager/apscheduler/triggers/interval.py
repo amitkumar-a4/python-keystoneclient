@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from math import ceil
 
-from raksha.apscheduler.util import convert_to_datetime, timedelta_seconds
+from workloadmanager.apscheduler.util import convert_to_datetime, timedelta_seconds
 
 
 class IntervalTrigger(object):

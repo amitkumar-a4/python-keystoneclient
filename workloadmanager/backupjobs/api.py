@@ -21,11 +21,11 @@ import socket
 
 from eventlet import greenthread
 
-from raksha.backupjobs import rpcapi as backupjobs_rpcapi
-from raksha.db import base
-from raksha import exception
-from raksha import flags
-from raksha.openstack.common import log as logging
+from workloadmanager.backupjobs import rpcapi as backupjobs_rpcapi
+from workloadmanager.db import base
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
 
 
 FLAGS = flags.FLAGS
@@ -34,7 +34,7 @@ LOG = logging.getLogger(__name__)
 
 
 class API(base.Base):
-    """API for interacting with the DPaaS manager."""
+    """API for interacting with the workloadmanager."""
 
     def __init__(self, db_driver=None):
         self.backupjobs_rpcapi = backupjobs_rpcapi.BackupJobAPI()

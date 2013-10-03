@@ -18,15 +18,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-"""RequestContext: context for requests that persist through all of raksha."""
+"""RequestContext: context for requests that persist through all of workloadmanager."""
 
 import copy
 import uuid
 
-from raksha.openstack.common import local
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import timeutils
-from raksha import policy
+from workloadmanager.openstack.common import local
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import timeutils
+from workloadmanager import policy
 
 
 LOG = logging.getLogger(__name__)

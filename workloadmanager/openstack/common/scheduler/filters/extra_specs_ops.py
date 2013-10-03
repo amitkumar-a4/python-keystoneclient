@@ -15,7 +15,7 @@
 
 import operator
 
-from raksha.openstack.common import strutils
+from workloadmanager.openstack.common import strutils
 
 # 1. The following operations are supported:
 #   =, s==, s!=, s>=, s>, s<=, s<, <in>, <is>, <or>, ==, !=, >=, <=

@@ -18,8 +18,8 @@ from eventlet import greenlet
 from eventlet import greenpool
 from eventlet import greenthread
 
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import loopingcall
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import loopingcall
 
 
 LOG = logging.getLogger(__name__)

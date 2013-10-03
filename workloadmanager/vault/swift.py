@@ -41,11 +41,11 @@ import time
 import eventlet
 from oslo.config import cfg
 
-from raksha.db import base
-from raksha import exception
-from raksha import flags
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import timeutils
+from workloadmanager.db import base
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import timeutils
 from swiftclient import client as swift
 
 LOG = logging.getLogger(__name__)

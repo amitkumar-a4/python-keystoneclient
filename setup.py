@@ -61,8 +61,8 @@ setuptools.setup(
     setup_requires=['setuptools_git>=0.4'],
     scripts=['bin/workloadmanager-all',
              'bin/workloadmanager-api',
-             'bin/raksha-clear-rabbit-queues',
-             'bin/raksha-rootwrap',
-             'bin/raksha-scheduler',
-             'bin/raksha-rpc-zmq-receiver'],
+             'bin/workloadmanager-clear-rabbit-queues',
+             'bin/workloadmanager-rootwrap',
+             'bin/workloadmanager-scheduler',
+             'bin/workloadmanager-rpc-zmq-receiver'],
     py_modules=[])

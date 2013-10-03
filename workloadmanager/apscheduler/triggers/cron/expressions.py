@@ -5,7 +5,7 @@ This module contains the expressions applicable for CronTrigger's fields.
 from calendar import monthrange
 import re
 
-from raksha.apscheduler.util import asint
+from workloadmanager.apscheduler.util import asint
 
 __all__ = ('AllExpression', 'RangeExpression', 'WeekdayRangeExpression',
            'WeekdayPositionExpression', 'LastDayOfMonthExpression')

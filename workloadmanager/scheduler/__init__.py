@@ -15,10 +15,10 @@
 #    under the License.
 
 """
-:mod:`raksha.scheduler` -- Scheduler Nodes
+:mod:`workloadmanager.scheduler` -- Scheduler Nodes
 =====================================================
 
-.. automodule:: raksha.scheduler
+.. automodule:: workloadmanager.scheduler
    :platform: Unix
    :synopsis: Module that picks a backup job node to create a backup job.
 .. moduleauthor:: Sandy Walsh <sandy.walsh@rackspace.com>

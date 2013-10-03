@@ -14,10 +14,10 @@
 #    under the License.
 
 # Importing full names to not pollute the namespace and cause possible
-# collisions with use of 'from raksha.backup import <foo>' elsewhere.
+# collisions with use of 'from workloadmanager.backup import <foo>' elsewhere.
 
-import raksha.flags
-import raksha.openstack.common.importutils
+import workloadmanager.flags
+import workloadmanager.openstack.common.importutils
 
-API = raksha.openstack.common.importutils.import_class(
-        raksha.flags.FLAGS.backupjobs_api_class)
+API = workloadmanager.openstack.common.importutils.import_class(
+        workloadmanager.flags.FLAGS.backupjobs_api_class)

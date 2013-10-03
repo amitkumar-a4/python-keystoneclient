@@ -8,8 +8,8 @@
 
 from oslo.config import cfg
 
-from raksha import flags
-from raksha.openstack.common import importutils
+from workloadmanager import flags
+from workloadmanager.openstack.common import importutils
 
 db_driver_opt = cfg.StrOpt('db_driver',
                            default='workloadmanager.db',

@@ -21,10 +21,10 @@ Backup job scheduler manages backup jobs
 **Related Flags**
 
 :backupjobs_topic:  What :mod:`rpc` topic to listen to (default:
-                        `raksha-backupjobs`).
+                        `workloadmanager-backupjobs`).
 :backupjobs_manager:  The module name of a class derived from
                           :class:`manager.Manager` (default:
-                          :class:`raksha.backupjob.manager.Manager`).
+                          :class:`workloadmanager.backupjob.manager.Manager`).
 
 """
 
@@ -35,23 +35,23 @@ import uuid
 
 from oslo.config import cfg
 
-from raksha import context
-from raksha import exception
-from raksha import flags
-from raksha import manager
-from raksha.virt import driver
-from raksha.openstack.common import excutils
-from raksha.openstack.common import importutils
-from raksha.openstack.common import log as logging
-from raksha.apscheduler.scheduler import Scheduler
+from workloadmanager import context
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager import manager
+from workloadmanager.virt import driver
+from workloadmanager.openstack.common import excutils
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.apscheduler.scheduler import Scheduler
 
-from raksha.vault import swift
+from workloadmanager.vault import swift
 
 LOG = logging.getLogger(__name__)
 
 backupjobs_manager_opts = [
     cfg.StrOpt('vault_service',
-               default='raksha.vault.swift',
+               default='workloadmanager.vault.swift',
                help='Vault to use for backup jobs.'),
 ]
 

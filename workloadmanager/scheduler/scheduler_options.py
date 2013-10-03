@@ -28,9 +28,9 @@ import os
 
 from oslo.config import cfg
 
-from raksha import flags
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import timeutils
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import timeutils
 
 scheduler_json_config_location_opt = cfg.StrOpt(
         'scheduler_json_config_location',

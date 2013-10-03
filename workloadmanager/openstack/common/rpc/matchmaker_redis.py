@@ -20,9 +20,9 @@ return keys for direct exchanges, per (approximate) AMQP parlance.
 
 from oslo.config import cfg
 
-from raksha.openstack.common import importutils
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.rpc import matchmaker as mm_common
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.rpc import matchmaker as mm_common
 
 redis = importutils.try_import('redis')
 

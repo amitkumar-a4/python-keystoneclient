@@ -18,8 +18,8 @@
 
 import math
 
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.scheduler import filters
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.scheduler import filters
 
 
 LOG = logging.getLogger(__name__)

@@ -23,9 +23,9 @@ Chance (Random) Scheduler implementation
 
 import random
 
-from raksha import exception
-from raksha import flags
-from raksha.scheduler import driver
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager.scheduler import driver
 
 
 FLAGS = flags.FLAGS

@@ -28,9 +28,9 @@ from cinderclient import service_catalog
 from cinderclient.v1 import client as cinder_client
 from oslo.config import cfg
 
-from raksha.db import base
-from raksha import exception
-from raksha.openstack.common import log as logging
+from workloadmanager.db import base
+from workloadmanager import exception
+from workloadmanager.openstack.common import log as logging
 
 cinder_opts = [
     cfg.StrOpt('cinder_catalog_info',

@@ -7,7 +7,7 @@ import uuid
 from threading import Lock
 from datetime import timedelta
 
-from raksha.apscheduler.util import to_unicode, ref_to_obj, get_callable_name,\
+from workloadmanager.apscheduler.util import to_unicode, ref_to_obj, get_callable_name,\
     obj_to_ref
 
 

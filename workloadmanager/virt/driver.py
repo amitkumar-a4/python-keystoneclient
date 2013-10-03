@@ -24,10 +24,10 @@ import sys
 
 from oslo.config import cfg
 
-from raksha.openstack.common import importutils
-from raksha.openstack.common import log as logging
-from raksha import utils
-from raksha.virt import event as virtevent
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager import utils
+from workloadmanager.virt import event as virtevent
 
 driver_opts = [
     cfg.StrOpt('compute_driver',
@@ -127,7 +127,7 @@ class ComputeDriver(object):
         Dispatches an event to the compute manager.
 
         Invokes the event callback registered by the
-        raksha manager to dispatch the event. This
+        workloadmanager manager to dispatch the event. This
         must only be invoked from a green thread.
         """
         #TODO(gbasava):Implementation
@@ -158,7 +158,7 @@ def load_compute_driver(virtapi, compute_driver=None):
 
     LOG.info(_("Loading compute driver '%s'") % compute_driver)
     try:
-        driver = importutils.import_object_ns('raksha.virt',
+        driver = importutils.import_object_ns('workloadmanager.virt',
                                               compute_driver,
                                               virtapi)
         return utils.check_isinstance(driver, ComputeDriver)

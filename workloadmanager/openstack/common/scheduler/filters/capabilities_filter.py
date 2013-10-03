@@ -13,9 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.scheduler import filters
-from raksha.openstack.common.scheduler.filters import extra_specs_ops
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.scheduler import filters
+from workloadmanager.openstack.common.scheduler.filters import extra_specs_ops
 
 
 LOG = logging.getLogger(__name__)

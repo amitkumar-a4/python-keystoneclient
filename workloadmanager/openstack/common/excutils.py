@@ -24,7 +24,7 @@ import logging
 import sys
 import traceback
 
-from raksha.openstack.common.gettextutils import _
+from workloadmanager.openstack.common.gettextutils import _
 
 
 @contextlib.contextmanager

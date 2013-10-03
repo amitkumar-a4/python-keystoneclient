@@ -18,7 +18,7 @@ Scheduler host weights
 """
 
 
-from raksha.openstack.common.scheduler import weight
+from workloadmanager.openstack.common.scheduler import weight
 
 
 class WeighedHost(weight.WeighedObject):

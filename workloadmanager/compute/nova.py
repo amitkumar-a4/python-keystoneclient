@@ -29,9 +29,9 @@ from novaclient import service_catalog
 from novaclient.v1_1 import client as nova_client
 from oslo.config import cfg
 
-from raksha.db import base
-from raksha import exception
-from raksha.openstack.common import log as logging
+from workloadmanager.db import base
+from workloadmanager import exception
+from workloadmanager.openstack.common import log as logging
 
 nova_opts = [
     cfg.StrOpt('nova_catalog_info',

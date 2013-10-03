@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
-from raksha.apscheduler.triggers.cron.fields import *
-from raksha.apscheduler.util import datetime_ceil, convert_to_datetime, iteritems
+from workloadmanager.apscheduler.triggers.cron.fields import *
+from workloadmanager.apscheduler.util import datetime_ceil, convert_to_datetime, iteritems
 
 
 class CronTrigger(object):

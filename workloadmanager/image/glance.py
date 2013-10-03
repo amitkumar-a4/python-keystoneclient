@@ -31,10 +31,10 @@ import glanceclient
 import glanceclient.exc
 from oslo.config import cfg
 
-from raksha import exception
-from raksha.openstack.common import jsonutils
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import timeutils
+from workloadmanager import exception
+from workloadmanager.openstack.common import jsonutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import timeutils
 
 glance_opts = [
     cfg.StrOpt('glance_host',
@@ -45,7 +45,7 @@ glance_opts = [
                help='default glance port'),
     cfg.ListOpt('glance_api_servers',
                 default=['$glance_host:$glance_port'],
-                help='A list of the glance api servers available to raksha '
+                help='A list of the glance api servers available to workloadmanager '
                      '([hostname|ip]:port)'),
     cfg.StrOpt('glance_protocol',
                 default='http',
@@ -73,7 +73,7 @@ glance_opts = [
                help='default glance port'),
     cfg.ListOpt('glance_api_servers',
                 default=['$glance_host:$glance_port'],
-                help='A list of the glance api servers available to raksha '
+                help='A list of the glance api servers available to workloadmanager '
                      '([hostname|ip]:port)'),
     cfg.IntOpt('glance_api_version',
                default=1,

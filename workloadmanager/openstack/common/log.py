@@ -42,10 +42,10 @@ import traceback
 
 from oslo.config import cfg
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import importutils
-from raksha.openstack.common import jsonutils
-from raksha.openstack.common import local
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import jsonutils
+from workloadmanager.openstack.common import local
 
 
 _DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -418,7 +418,7 @@ def _setup_logging_from_conf():
 
     if CONF.publish_errors:
         handler = importutils.import_object(
-            "raksha.openstack.common.log_handler.PublishErrorsHandler",
+            "workloadmanager.openstack.common.log_handler.PublishErrorsHandler",
             logging.ERROR)
         log_root.addHandler(handler)
 

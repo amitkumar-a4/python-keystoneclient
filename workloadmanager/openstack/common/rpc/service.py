@@ -17,11 +17,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import rpc
-from raksha.openstack.common.rpc import dispatcher as rpc_dispatcher
-from raksha.openstack.common import service
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import rpc
+from workloadmanager.openstack.common.rpc import dispatcher as rpc_dispatcher
+from workloadmanager.openstack.common import service
 
 
 LOG = logging.getLogger(__name__)

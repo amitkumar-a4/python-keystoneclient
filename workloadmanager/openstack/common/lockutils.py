@@ -27,10 +27,10 @@ import weakref
 from eventlet import semaphore
 from oslo.config import cfg
 
-from raksha.openstack.common import fileutils
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import local
-from raksha.openstack.common import log as logging
+from workloadmanager.openstack.common import fileutils
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import local
+from workloadmanager.openstack.common import log as logging
 
 
 LOG = logging.getLogger(__name__)

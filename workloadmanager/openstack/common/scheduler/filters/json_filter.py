@@ -16,8 +16,8 @@
 
 import operator
 
-from raksha.openstack.common import jsonutils
-from raksha.openstack.common.scheduler import filters
+from workloadmanager.openstack.common import jsonutils
+from workloadmanager.openstack.common.scheduler import filters
 
 
 class JsonFilter(filters.BaseHostFilter):

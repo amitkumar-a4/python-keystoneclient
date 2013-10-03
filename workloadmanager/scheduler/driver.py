@@ -23,15 +23,15 @@ Scheduler base class that all Schedulers should inherit from
 
 from oslo.config import cfg
 
-from raksha import db
-from raksha import flags
-from raksha.openstack.common import importutils
-from raksha.openstack.common import timeutils
-from raksha import utils
+from workloadmanager import db
+from workloadmanager import flags
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import timeutils
+from workloadmanager import utils
 
 scheduler_driver_opts = [
     cfg.StrOpt('scheduler_host_manager',
-               default='raksha.scheduler.host_manager.HostManager',
+               default='workloadmanager.scheduler.host_manager.HostManager',
                help='The scheduler host manager class to use'),
     cfg.IntOpt('scheduler_max_attempts',
                default=3,

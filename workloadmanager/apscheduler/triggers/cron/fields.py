@@ -5,7 +5,7 @@ fields.
 
 from calendar import monthrange
 
-from raksha.apscheduler.triggers.cron.expressions import *
+from workloadmanager.apscheduler.triggers.cron.expressions import *
 
 __all__ = ('MIN_VALUES', 'MAX_VALUES', 'DEFAULT_VALUES', 'BaseField',
            'WeekField', 'DayOfMonthField', 'DayOfWeekField')

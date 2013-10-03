@@ -42,7 +42,7 @@ For example, in Bash you'd use::
 
 From there, all shell commands take the form::
 
-    raksha <command> [arguments...]
+    workloadmanager <command> [arguments...]
 
 Run :program:`workloadmanager help` to get a full list of all possible commands,
 and run :program:`workloadmanager help <command>` to get detailed help for that

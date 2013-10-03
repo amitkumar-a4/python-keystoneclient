@@ -22,12 +22,12 @@ Weighing Functions.
 
 import operator
 
-from raksha import exception
-from raksha import flags
-from raksha.openstack.common import importutils
-from raksha.openstack.common import log as logging
-from raksha.scheduler import driver
-from raksha.scheduler import scheduler_options
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.scheduler import driver
+from workloadmanager.scheduler import scheduler_options
 
 
 FLAGS = flags.FLAGS

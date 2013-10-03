@@ -20,10 +20,10 @@
 Client side of the backup job scheduler RPC API.
 """
 
-from raksha import flags
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import rpc
-import raksha.openstack.common.rpc.proxy
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import rpc
+import workloadmanager.openstack.common.rpc.proxy
 
 
 LOG = logging.getLogger(__name__)
@@ -31,8 +31,8 @@ LOG = logging.getLogger(__name__)
 FLAGS = flags.FLAGS
 
 
-class BackupJobAPI(raksha.openstack.common.rpc.proxy.RpcProxy):
-    '''Client side of the raksha rpc API.
+class BackupJobAPI(workloadmanager.openstack.common.rpc.proxy.RpcProxy):
+    '''Client side of the workloadmanager rpc API.
 
     API version history:
 

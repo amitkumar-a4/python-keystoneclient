@@ -23,9 +23,9 @@ import sys
 
 from oslo.config import cfg
 
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import rpc
-from raksha.openstack.common.rpc import impl_zmq
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import rpc
+from workloadmanager.openstack.common.rpc import impl_zmq
 
 CONF = cfg.CONF
 CONF.register_opts(rpc.rpc_opts)

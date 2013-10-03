@@ -22,7 +22,7 @@ For more information about rpc API version numbers, see:
 """
 
 
-from raksha.openstack.common import rpc
+from workloadmanager.openstack.common import rpc
 
 
 class RpcProxy(object):

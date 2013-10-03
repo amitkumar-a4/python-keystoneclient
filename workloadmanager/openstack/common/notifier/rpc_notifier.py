@@ -15,10 +15,10 @@
 
 from oslo.config import cfg
 
-from raksha.openstack.common import context as req_context
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import rpc
+from workloadmanager.openstack.common import context as req_context
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import rpc
 
 LOG = logging.getLogger(__name__)
 

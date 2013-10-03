@@ -21,7 +21,7 @@ System-level utilities and helper functions.
 
 import sys
 
-from raksha.openstack.common.gettextutils import _
+from workloadmanager.openstack.common.gettextutils import _
 
 
 TRUE_STRINGS = ('1', 't', 'true', 'on', 'y', 'yes')

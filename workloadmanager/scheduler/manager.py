@@ -23,20 +23,20 @@ Scheduler Service
 
 from oslo.config import cfg
 
-from raksha import context
-from raksha import db
-from raksha import exception
-from raksha import flags
-from raksha import manager
-from raksha.openstack.common import excutils
-from raksha.openstack.common import importutils
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.notifier import api as notifier
+from workloadmanager import context
+from workloadmanager import db
+from workloadmanager import exception
+from workloadmanager import flags
+from workloadmanager import manager
+from workloadmanager.openstack.common import excutils
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.notifier import api as notifier
 
 LOG = logging.getLogger(__name__)
 
 scheduler_driver_opt = cfg.StrOpt('scheduler_driver',
-                                  default='raksha.scheduler.filter_scheduler.'
+                                  default='workloadmanager.scheduler.filter_scheduler.'
                                           'FilterScheduler',
                                   help='Default scheduler driver to use')
 

@@ -35,7 +35,7 @@ def patched_with_engine(f, *a, **kw):
             engine.dispose()
 
 
-# TODO(gbasava) When migrate 0.7.3 is released and raksha depends
+# TODO(gbasava) When migrate 0.7.3 is released and workloadmanager depends
 #                on that version or higher, this can be removed
 MIN_PKG_VERSION = dist_version.StrictVersion('0.7.3')
 if (not hasattr(migrate, '__version__') or

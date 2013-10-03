@@ -27,7 +27,7 @@ import time
 
 import eventlet
 
-from raksha.openstack.common.rpc import common as rpc_common
+from workloadmanager.openstack.common.rpc import common as rpc_common
 
 CONSUMERS = {}
 

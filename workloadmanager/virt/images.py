@@ -26,10 +26,10 @@ import re
 
 from oslo.config import cfg
 
-from raksha import exception
-from raksha.image import glance
-from raksha.openstack.common import log as logging
-from raksha import utils
+from workloadmanager import exception
+from workloadmanager.image import glance
+from workloadmanager.openstack.common import log as logging
+from workloadmanager import utils
 
 LOG = logging.getLogger(__name__)
 

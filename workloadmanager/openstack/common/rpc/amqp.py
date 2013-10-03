@@ -39,11 +39,11 @@ from eventlet import semaphore
 # option is removed.
 from oslo.config import cfg
 
-from raksha.openstack.common import excutils
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import local
-from raksha.openstack.common import log as logging
-from raksha.openstack.common.rpc import common as rpc_common
+from workloadmanager.openstack.common import excutils
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import local
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common.rpc import common as rpc_common
 
 
 # TODO(pekowski): Remove this option in Havana.

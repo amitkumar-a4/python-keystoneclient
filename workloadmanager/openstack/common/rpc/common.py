@@ -23,11 +23,11 @@ import traceback
 
 from oslo.config import cfg
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import importutils
-from raksha.openstack.common import jsonutils
-from raksha.openstack.common import local
-from raksha.openstack.common import log as logging
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import jsonutils
+from workloadmanager.openstack.common import local
+from workloadmanager.openstack.common import log as logging
 
 
 CONF = cfg.CONF

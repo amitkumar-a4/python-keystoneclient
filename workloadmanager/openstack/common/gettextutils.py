@@ -20,14 +20,14 @@ gettext for openstack-common modules.
 
 Usual usage in an openstack.common module:
 
-    from raksha.openstack.common.gettextutils import _
+    from workloadmanager.openstack.common.gettextutils import _
 """
 
 import gettext
 import os
 
-_localedir = os.environ.get('raksha'.upper() + '_LOCALEDIR')
-_t = gettext.translation('raksha', localedir=_localedir, fallback=True)
+_localedir = os.environ.get('workloadmanager'.upper() + '_LOCALEDIR')
+_t = gettext.translation('workloadmanager', localedir=_localedir, fallback=True)
 
 
 def _(msg):

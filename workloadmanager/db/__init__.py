@@ -8,4 +8,4 @@
 DB abstraction for workloadmanager
 """
 
-from raksha.db.api import *
+from workloadmanager.db.api import *

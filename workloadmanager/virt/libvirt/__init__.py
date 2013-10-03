@@ -14,6 +14,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from raksha.virt.libvirt import driver
+from workloadmanager.virt.libvirt import driver
 
 LibvirtDriver = driver.LibvirtDriver

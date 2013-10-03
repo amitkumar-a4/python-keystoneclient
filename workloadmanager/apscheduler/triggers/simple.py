@@ -1,4 +1,4 @@
-from raksha.apscheduler.util import convert_to_datetime
+from workloadmanager.apscheduler.util import convert_to_datetime
 
 
 class SimpleTrigger(object):

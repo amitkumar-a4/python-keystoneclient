@@ -50,17 +50,17 @@ from lxml import etree
 from oslo.config import cfg
 
 
-from raksha import utils
-from raksha import exception
-from raksha.virt import event as virtevent
-from raksha.virt.libvirt import utils as libvirt_utils
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import fileutils
+from workloadmanager import utils
+from workloadmanager import exception
+from workloadmanager.virt import event as virtevent
+from workloadmanager.virt.libvirt import utils as libvirt_utils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import fileutils
 from nova.compute import power_state
-from raksha.virt import driver
-from raksha.image import glance
-from raksha.volume import cinder
-from raksha.compute import nova
+from workloadmanager.virt import driver
+from workloadmanager.image import glance
+from workloadmanager.volume import cinder
+from workloadmanager.compute import nova
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -363,7 +363,7 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.warning(
                 _("Can not handle authentication request for %d credentials")
                 % len(creds))
-            raise exception.RakshaException(
+            raise exception.WorkloadManagerException(
                 _("Can not handle authentication request for %d credentials")
                 % len(creds))
 
@@ -402,7 +402,7 @@ class LibvirtDriver(driver.ComputeDriver):
         try:
             self._lookup_by_name(instance_name)
             return True
-        except exception.RakshaException:
+        except exception.WorkloadManagerException:
             return False
 
     def list_instance_ids(self):
@@ -474,7 +474,7 @@ class LibvirtDriver(driver.ComputeDriver):
         """Retrieve libvirt domain object given an instance name.
 
         All libvirt error handling should be handled in this method and
-        relevant raksha exceptions should be raised in response.
+        relevant workloadmanager exceptions should be raised in response.
 
         """
         try:
@@ -486,7 +486,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
             msg = _("Error from libvirt while looking up %(instance_name)s: "
                     "[Error Code %(error_code)s] %(ex)s") % locals()
-            raise exception.RakshaException(msg)
+            raise exception.WorkloadManagerException(msg)
         
     def get_info(self, instance_name):
         """Retrieve information from libvirt for a specific instance name.
@@ -910,7 +910,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     restored_volume_name = uuid.uuid4().hex
                     volume_service = cinder.API()
                     restored_volume = volume_service.create(context, max(restored_volume_image['size']/(1024*1024*1024), 1), restored_volume_name, 
-                                                        'from raksha', None, restored_volume_image['id'], None, None, None)
+                                                        'from workloadmanager', None, restored_volume_image['id'], None, None, None)
                     device_restored_volumes.setdefault(backupjobrun_vm_resource.resource_name, restored_volume)
                    
                     #delete the image...it is not needed anymore

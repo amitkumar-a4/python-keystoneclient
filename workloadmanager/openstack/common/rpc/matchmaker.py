@@ -25,8 +25,8 @@ import json
 import eventlet
 from oslo.config import cfg
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import log as logging
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import log as logging
 
 
 matchmaker_opts = [

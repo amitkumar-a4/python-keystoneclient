@@ -30,14 +30,14 @@ import eventlet
 import logging as std_logging
 from oslo.config import cfg
 
-from raksha.openstack.common import eventlet_backdoor
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import importutils
-from raksha.openstack.common import log as logging
-from raksha.openstack.common import threadgroup
+from workloadmanager.openstack.common import eventlet_backdoor
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import importutils
+from workloadmanager.openstack.common import log as logging
+from workloadmanager.openstack.common import threadgroup
 
 
-rpc = importutils.try_import('raksha.openstack.common.rpc')
+rpc = importutils.try_import('workloadmanager.openstack.common.rpc')
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 

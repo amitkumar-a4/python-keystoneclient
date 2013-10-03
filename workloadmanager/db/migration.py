@@ -6,7 +6,7 @@
 
 """Database setup and migration commands."""
 
-from raksha import utils
+from workloadmanager import utils
 
 
 IMPL = utils.LazyPluggable('db_backend',

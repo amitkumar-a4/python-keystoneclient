@@ -21,8 +21,8 @@ import logging
 import urllib
 import urllib2
 
-from raksha.openstack.common.gettextutils import _
-from raksha.openstack.common import jsonutils
+from workloadmanager.openstack.common.gettextutils import _
+from workloadmanager.openstack.common import jsonutils
 
 
 LOG = logging.getLogger(__name__)
