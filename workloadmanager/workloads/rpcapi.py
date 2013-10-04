@@ -29,7 +29,7 @@ class WorkloadAPI(workloadmanager.openstack.common.rpc.proxy.RpcProxy):
     BASE_RPC_API_VERSION = '1.0'
 
     def __init__(self):
-        super(BackupJobAPI, self).__init__(
+        super(WorkloadAPI, self).__init__(
             topic=FLAGS.workloads_topic,
             default_version=self.BASE_RPC_API_VERSION)
 

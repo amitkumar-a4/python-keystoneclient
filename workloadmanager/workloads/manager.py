@@ -21,7 +21,6 @@ import time
 import uuid
 
 from oslo.config import cfg
-
 from workloadmanager import context
 from workloadmanager import exception
 from workloadmanager import flags
@@ -31,8 +30,8 @@ from workloadmanager.openstack.common import excutils
 from workloadmanager.openstack.common import importutils
 from workloadmanager.openstack.common import log as logging
 from workloadmanager.apscheduler.scheduler import Scheduler
-
 from workloadmanager.vault import swift
+
 
 LOG = logging.getLogger(__name__)
 

@@ -4,8 +4,3 @@
 # Copyright (c) 2013 TrilioData
 # All Rights Reserved.
 
-import pbr.version
-
-
-__version__ = pbr.version.VersionInfo(
-    'workloadmanager').version_string()

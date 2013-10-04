@@ -23,7 +23,7 @@ class API(base.Base):
     """API for interacting with the workloadmanager."""
 
     def __init__(self, db_driver=None):
-        self.workloads_rpcapi = workloads_rpcapi.BackupJobAPI()
+        self.workloads_rpcapi = workloads_rpcapi.WorkloadAPI()
         super(API, self).__init__(db_driver)
 
     def workload_get(self, context, workload_id):

@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+
 """Implementation of a backup service that uses Swift as the backend
 
 **Related Flags**
@@ -28,6 +29,7 @@
 :backup_compression_algorithm: Compression algorithm to use for volume
                                backups. Supported options are:
                                None (to disable), zlib and bz2 (default: zlib)
+
 """
 
 import hashlib

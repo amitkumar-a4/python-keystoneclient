@@ -9,7 +9,9 @@ from lxml import etree
 
 from workloadmanager import utils
 
-
+XMLNS_V10 = 'http://docs.triliodata.com/servers/api/v1.0'
+XMLNS_V11 = 'http://docs.triliodata.org/compute/api/v1.1'
+XMLNS_COMMON_V10 = 'http://docs.triliodata.org/common/api/v1.0'
 XMLNS_ATOM = 'http://www.w3.org/2005/Atom'
 
 
