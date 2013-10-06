@@ -11,6 +11,7 @@ from oslo.config import cfg
 from workloadmanager import flags
 from workloadmanager.openstack.common import importutils
 
+
 db_driver_opt = cfg.StrOpt('db_driver',
                            default='workloadmanager.db',
                            help='driver to use for database access')

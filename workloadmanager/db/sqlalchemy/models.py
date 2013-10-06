@@ -34,10 +34,10 @@ class WorkloadManagerBase(object):
     deleted = Column(Boolean, default=False)
     metadata = None
 
-    def save(self, session=None):
+    def save(self, raksha = True, session=None):
         """Save this object."""
         if not session:
-            session = get_session()
+            session = get_session(raksha)
         session.add(self)
         try:
             session.flush()
@@ -47,11 +47,11 @@ class WorkloadManagerBase(object):
             else:
                 raise
 
-    def delete(self, session=None):
+    def delete(self, raksha = True, session=None):
         """Delete this object."""
         self.deleted = True
         self.deleted_at = timeutils.utcnow()
-        self.save(session=session)
+        self.save(raksha=raksha, session=session)
 
     def __setitem__(self, key, value):
         setattr(self, key, value)

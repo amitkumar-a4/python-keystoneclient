@@ -73,6 +73,11 @@ core_opts = [
                default=0,
                help='Verbosity of SQL debugging information. 0=None, '
                     '100=Everything'),
+    cfg.StrOpt('sql_connection_raksha',
+               default='mysql://root:password@192.168.0.200/raksha?charset=utf8',
+               help='The SQLAlchemy connection string used to connect to the '
+                    'database',
+               secret=True),             
     cfg.StrOpt('api_paste_config',
                default="api-paste.ini",
                help='File name for the paste.deploy config for workloadmanager-api'),

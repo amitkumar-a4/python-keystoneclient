@@ -46,7 +46,7 @@ service_opts = [
                default="0.0.0.0",
                help='IP address for Oworkloadmanager API to listen'),
     cfg.IntOpt('workloadmanager_listen_port',
-               default=8780,
+               default=48742,
                help='port for workloadmanager api to listen'), ]
 
 FLAGS = flags.FLAGS

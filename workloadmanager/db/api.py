@@ -136,9 +136,10 @@ def backupjob_create(context, values):
     return IMPL.backupjob_create(context, values)
 
 
-def backupjob_get_all_by_project(context, project_id):
+def workload_get_all_by_project(context, project_id):
     """Get all backups belonging to a project."""
-    return IMPL.backupjob_get_all_by_project(context, project_id)
+    import pdb; pdb.set_trace()
+    return IMPL.workload_get_all_by_project(context, project_id)
 
 
 def backupjob_update(context, backupjob_id, values):
