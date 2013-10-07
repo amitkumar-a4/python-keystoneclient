@@ -118,16 +118,18 @@ class API(base.Base):
         self.db.snapshot_update(context, snapshot_id, {'status': 'deleting'})
         self.workloads_rpcapi.snapshot_delete(context,
                                                    snapshot['id'])
-    def snapshot_restore(self, context, snapshot_id):
+    def snapshot_hydrate(self, context, snapshot_id):
         """
         Make the RPC call to restore a snapshot.
         """
         snapshot = self.snapshot_get(context, snapshot_id)
-        workload = self.workload_get(context, snapshot['workload_id'])
+        workload = self.workload_get(context, snapshot['backupjob_id'])
         if snapshot['status'] != 'available':
             msg = _('snapshot status must be available')
             raise exception.InvalidBackupJob(reason=msg)
-
-        self.workloads_rpcapi.snapshot_restore(context, workload['host'], snapshot['id'])
+        
+        #GIRI 'host' is temporarily hardcoded 
+        workload['host'] = 'td-sea-srv02'
+        self.workloads_rpcapi.snapshot_hydrate(context, workload['host'], snapshot['id'])
         #TODO(gbasava): Return the restored instances
 

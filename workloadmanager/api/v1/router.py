@@ -45,7 +45,7 @@ class APIRouter(workloadmanager.api.APIRouter):
                         member={'action': 'POST'})  
         
         mapper.connect("hydrate",
-               "/{project_id}/workloads/{workload_id}/snapshots/{id}",
+               "/{project_id}/snapshots/{id}",
                controller=self.resources['snapshots'],
                action='hydrate',
                conditions={"method": ['POST']})      

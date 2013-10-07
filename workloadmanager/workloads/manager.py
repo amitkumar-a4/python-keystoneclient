@@ -114,20 +114,20 @@ class WorkloadManager(manager.SchedulerDependentManager):
         LOG.info(_('delete_workload started, workload: %s'), workload_id)
         #TODO(gbasava): Implement
 
-    def snapshot_restore(self, context, snapshot_id):
+    def snapshot_hydrate(self, context, snapshot_id):
         """
         Restore VMs and all its LUNs from a workload
         """
         LOG.info(_('restore_snapshot started, restoring snapshot id: %(snapshot_id)s') % locals())
         snapshot = self.db.snapshot_get(context, snapshot_id)
-        workload = self.db.workload_get(context, snapshot.workload_id)
+        workload = self.db.workload_get(context, snapshot.backupjob_id)
         #self.db.snapshot_update(context, snapshot.id, {'status': 'restoring'})
         #TODO(gbasava): Pick the specified vault service from the snapshot
         vault_service = swift.SwiftBackupService(context)
         
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 
-            self.driver.restore_instance(workload, snapshot, vm, vault_service, self.db, context)
+            self.driver.hydrate_instance(workload, snapshot, vm, vault_service, self.db, context)
 
 
     def snapshot_delete(self, context, snapshot_id):

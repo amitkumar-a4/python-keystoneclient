@@ -113,56 +113,55 @@ def service_update(context, service_id, values):
 ###################
 
 
-def backupjob_get(context, backupjob_id):
+def workload_get(context, backupjob_id):
     """Get a backupjob or raise if it does not exist."""
-    return IMPL.backupjob_get(context, backupjob_id)
+    return IMPL.workload_get(context, backupjob_id)
 
-def backupjob_show(context, backupjob_id):
+def workload_show(context, backupjob_id):
     """Get more details of the  backupjob or raise if it does not exist."""
-    return IMPL.backupjob_show(context, backupjob_id)
+    return IMPL.workload_show(context, backupjob_id)
 
-def backupjob_get_all(context):
+def workload_get_all(context):
     """Get all backup jobs."""
-    return IMPL.backupjob_get_all(context)
+    return IMPL.workload_get_all(context)
 
 
-def backupjob_get_all_by_host(context, host):
+def workload_get_all_by_host(context, host):
     """Get all backupjobs belonging to a host."""
-    return IMPL.backupjob_get_all_by_host(context, host)
+    return IMPL.workload_get_all_by_host(context, host)
 
 
-def backupjob_create(context, values):
+def workload_create(context, values):
     """Create a backup job from the values dictionary."""
-    return IMPL.backupjob_create(context, values)
+    return IMPL.workload_create(context, values)
 
 
 def workload_get_all_by_project(context, project_id):
     """Get all backups belonging to a project."""
-    import pdb; pdb.set_trace()
     return IMPL.workload_get_all_by_project(context, project_id)
 
 
-def backupjob_update(context, backupjob_id, values):
+def workload_update(context, backupjob_id, values):
     """
     Set the given properties on a backupjob  and update it.
 
     Raises NotFound if backupjob  does not exist.
     """
-    return IMPL.backupjob_update(context, backupjob_id, values)
+    return IMPL.workload_update(context, backupjob_id, values)
 
 
-def backupjob_destroy(context, backupjob_id):
+def workload_destroy(context, backupjob_id):
     """Destroy the backup job or raise if it does not exist."""
-    return IMPL.backupjob_destroy(context, backupjob_id)
+    return IMPL.workload_destroy(context, backupjob_id)
 
-def backupjob_vms_create(context, values):
-    return IMPL.backupjob_vms_create(context, values)
+def workload_vms_create(context, values):
+    return IMPL.workload_vms_create(context, values)
 
-def backupjob_vms_get(context, backupjob_id, session=None):
-    return IMPL.backupjob_vms_get(context, backupjob_id, session)
+def workload_vms_get(context, backupjob_id, session=None):
+    return IMPL.workload_vms_get(context, backupjob_id, session)
 
-def backupjob_vms_destroy(context, vm_id, backupjob_id):
-    return IMPL.backupjob_vms_destroy(context, vm_id, backupjob_id)
+def workload_vms_destroy(context, vm_id, backupjob_id):
+    return IMPL.workload_vms_destroy(context, vm_id, backupjob_id)
     
 def scheduledjob_create(context, scheduledjob):
     return IMPL.scheduledjob_create(context, scheduledjob)
@@ -176,65 +175,65 @@ def scheduledjob_get(context):
 def scheduledjob_update(context, scheduledjob):
     return IMPL.scheduledjob_update(context, scheduledjob)
 
-def backupjobrun_create(context, values):
-    return IMPL.backupjobrun_create(context, values)
+def snapshot_create(context, values):
+    return IMPL.snapshot_create(context, values)
 
-def backupjobrun_get(context, backupjobrun_id, session=None):
-    return IMPL.backupjobrun_get(context, backupjobrun_id, session)
+def snapshot_get(context, backupjobrun_id, session=None):
+    return IMPL.snapshot_get(context, backupjobrun_id, session)
     
-def backupjobrun_get_all(context, backupjob_id=None):
-    return IMPL.backupjobrun_get_all(context, backupjob_id)    
+def snapshot_get_all(context, backupjob_id=None):
+    return IMPL.snapshot_get_all(context, backupjob_id)    
 
-def backupjobrun_get_all_by_project(context, project_id):
+def snapshot_get_all_by_project(context, project_id):
     """Get all backups belonging to a project."""
-    return IMPL.backupjobrun_get_all_by_project(context, project_id)
+    return IMPL.snapshot_get_all_by_project(context, project_id)
     
-def backupjobrun_get_all_by_project_backupjob(context, project_id, backupjob_id):
+def snapshot_get_all_by_project_backupjob(context, project_id, backupjob_id):
     """Get all backups belonging to a project and backupjob"""
-    return IMPL.backupjobrun_get_all_by_project_backupjob(context, project_id, backupjob_id)
+    return IMPL.snapshot_get_all_by_project_backupjob(context, project_id, backupjob_id)
     
-def backupjobrun_show(context, backupjobrun_id):
+def snapshot_show(context, backupjobrun_id):
     """Get more details of the  backupjobrun or raise if it does not exist."""
-    return IMPL.backupjobrun_show(context, backupjobrun_id)
+    return IMPL.snapshot_show(context, backupjobrun_id)
 
-def backupjobrun_update(context, backupjobrun_id, values):
-    return IMPL.backupjobrun_update(context, backupjobrun_id, values)
+def snapshot_update(context, backupjobrun_id, values):
+    return IMPL.snapshot_update(context, backupjobrun_id, values)
 
-def backupjobrun_vm_create(context, values):
-    return IMPL.backupjobrun_vm_create(context, values)
+def snapshot_vm_create(context, values):
+    return IMPL.snapshot_vm_create(context, values)
 
-def backupjobrun_vm_get(context, backupjobrun_id, session=None):
-    return IMPL.backupjobrun_vm_get(context, backupjobrun_id, session)
+def snapshot_vm_get(context, backupjobrun_id, session=None):
+    return IMPL.snapshot_vm_get(context, backupjobrun_id, session)
 
-def backupjobrun_vm_destroy(context, vm_id, backupjobrun_id):
-    return IMPL.backupjobrun_vm_destroy(context, vm_id, backupjobrun_id)
+def snapshot_vm_destroy(context, vm_id, backupjobrun_id):
+    return IMPL.snapshot_vm_destroy(context, vm_id, backupjobrun_id)
 
-def vm_recent_backupjobrun_create(context, values):
+def snapshot_backupjobrun_create(context, values):
     return IMPL.vm_recent_backupjobrun_create(context, values)
 
-def vm_recent_backupjobrun_get(context, vm_id, session=None):
+def snapshot_backupjobrun_get(context, vm_id, session=None):
     return IMPL.vm_recent_backupjobrun_get(context, vm_id, session)
 
-def vm_recent_backupjobrun_update(context, vm_id, values):
+def snapshot_backupjobrun_update(context, vm_id, values):
     return IMPL.vm_recent_backupjobrun_update(context, vm_id, values)
 
-def vm_recent_backupjobrun_destroy(context, vm_id):
+def snapshot_backupjobrun_destroy(context, vm_id):
     return IMPL.vm_recent_backupjobrun_destroy(context, vm_id)
 
-def backupjobrun_vm_resource_create(context, values):
-    return IMPL.backupjobrun_vm_resource_create(context, values)
+def snapshot_vm_resource_create(context, values):
+    return IMPL.snapshot_vm_resource_create(context, values)
 
-def backupjobrun_vm_resources_get(context, vm_id, backupjobrun_id, session=None):
-    return IMPL.backupjobrun_vm_resources_get(context, vm_id, backupjobrun_id, session)
+def snapshot_vm_resources_get(context, vm_id, backupjobrun_id, session=None):
+    return IMPL.snapshot_vm_resources_get(context, vm_id, backupjobrun_id, session)
 
-def backupjobrun_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session=None):
-    return IMPL.backupjobrun_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session)
+def snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session=None):
+    return IMPL.snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session)
 
-def backupjobrun_vm_resource_get2(context, id, session=None):
-    return IMPL.backupjobrun_vm_resource_get2(context, id, session)
+def snapshot_vm_resource_get2(context, id, session=None):
+    return IMPL.snapshot_vm_resource_get2(context, id, session)
 
-def backupjobrun_vm_resource_destroy(context, id, vm_id, backupjobrun_id):
-    return IMPL.backupjobrun_vm_resource_destroy(context, id, vm_id, backupjobrun_id)
+def snapshot_vm_resource_destroy(context, id, vm_id, backupjobrun_id):
+    return IMPL.snapshot_vm_resource_destroy(context, id, vm_id, backupjobrun_id)
     
 def vm_resource_backup_create(context, values):
     return IMPL.vm_resource_backup_create(context, values)

@@ -841,7 +841,7 @@ class LibvirtDriver(driver.ComputeDriver):
             update_task_state(task_state=task_states.BACKUP_BLOCKCOMMIT_FINISH)
             update_task_state(task_state=task_states.BACKUP_COMPLETE)
     
-    def restore_instance(self, backupjob, backupjobrun, backupjobrun_vm, vault_service, db, context, update_task_state = None):
+    def hydrate_instance(self, backupjob, backupjobrun, backupjobrun_vm, vault_service, db, context, update_task_state = None):
         """
         Restores the specified instance from a backupjobrun
         """  
@@ -849,7 +849,7 @@ class LibvirtDriver(driver.ComputeDriver):
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
         temp_directory = "/tmp"
         fileutils.ensure_tree(temp_directory)
-        backupjobrun_vm_resources = db.backupjobrun_vm_resources_get(context, backupjobrun_vm.vm_id, backupjobrun.id)
+        backupjobrun_vm_resources = db.snapshot_vm_resources_get(context, backupjobrun_vm.vm_id, backupjobrun.id)
          
         #restore, rebase, commit & upload
         for backupjobrun_vm_resource in backupjobrun_vm_resources:
@@ -865,7 +865,7 @@ class LibvirtDriver(driver.ComputeDriver):
             vault_service.restore(vault_metadata, restored_file_path)                            
             while vm_resource_backup.vm_resource_backup_backing_id is not None:
                 vm_resource_backup_backing = db.vm_resource_backup_get(context, vm_resource_backup.vm_resource_backup_backing_id)
-                backupjobrun_vm_resource_backing = db.backupjobrun_vm_resource_get2(context, vm_resource_backup_backing.backupjobrun_vm_resource_id)
+                backupjobrun_vm_resource_backing = db.snapshot_vm_resource_get2(context, vm_resource_backup_backing.backupjobrun_vm_resource_id)
                 restored_file_path_backing = temp_directory + '/' + vm_resource_backup_backing.id + '_' + backupjobrun_vm_resource_backing.resource_name + '.qcow2'
                 vault_metadata = {'vault_service_url' : vm_resource_backup_backing.vault_service_url,
                                   'vault_service_metadata' : vm_resource_backup_backing.vault_service_metadata,
@@ -884,6 +884,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 restored_file_path = restored_file_path_backing
 
             #upload to glance
+
             with file(restored_file_path) as image_file:
                 image_metadata = {'is_public': False,
                                   'status': 'active',
@@ -928,4 +929,5 @@ class LibvirtDriver(driver.ComputeDriver):
         #attach volumes 
         for device, restored_volume in device_restored_volumes.iteritems():
             compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + device))
+        
               

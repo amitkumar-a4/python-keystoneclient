@@ -42,11 +42,11 @@ service_opts = [
                help='range of seconds to randomly delay when starting the'
                     ' periodic task scheduler to reduce stampeding.'
                     ' (Disable by setting to 0)'),
-    cfg.StrOpt('workloadmanager_listen',
+    cfg.StrOpt('workloadmanager_service_listen',
                default="0.0.0.0",
                help='IP address for Oworkloadmanager API to listen'),
-    cfg.IntOpt('workloadmanager_listen_port',
-               default=48742,
+    cfg.IntOpt('workloadmanager_service_listen_port',
+               default=8780,
                help='port for workloadmanager api to listen'), ]
 
 FLAGS = flags.FLAGS

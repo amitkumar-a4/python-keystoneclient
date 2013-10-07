@@ -38,7 +38,8 @@ from workloadmanager.openstack.common import timeutils
 
 glance_opts = [
     cfg.StrOpt('glance_host',
-               default='$my_ip',
+               #GIRI default='$my_ip',
+               default='192.168.0.200',
                help='default glance hostname or ip'),
     cfg.IntOpt('glance_port',
                default=9292,
@@ -63,29 +64,7 @@ glance_opts = [
                 help='A list of url scheme that can be downloaded directly '
                      'via the direct_url.  Currently supported schemes: '
                      '[file].'),
-               
-               
-    cfg.StrOpt('glance_host',
-               default='$my_ip',
-               help='default glance hostname or ip'),
-    cfg.IntOpt('glance_port',
-               default=9292,
-               help='default glance port'),
-    cfg.ListOpt('glance_api_servers',
-                default=['$glance_host:$glance_port'],
-                help='A list of the glance api servers available to workloadmanager '
-                     '([hostname|ip]:port)'),
-    cfg.IntOpt('glance_api_version',
-               default=1,
-               help='Version of the glance api to use'),
-    cfg.IntOpt('glance_num_retries',
-               default=0,
-               help='Number retries when downloading an image from glance'),
-    cfg.BoolOpt('glance_api_insecure',
-                default=False,
-                help='Allow to perform insecure SSL (https) requests to '
-                'glance'),
-               
+                
     ]
 
 LOG = logging.getLogger(__name__)

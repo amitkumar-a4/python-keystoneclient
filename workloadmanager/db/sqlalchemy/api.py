@@ -324,7 +324,7 @@ def _dict_with_extra_specs(inst_type_query):
 ###################
 
 @require_context
-def backupjob_get(context, backupjob_id, session=None):
+def workload_get(context, backupjob_id, session=None):
     result = model_query(context, models.BackupJob,
                              session=session, project_only=True).\
         filter_by(id=backupjob_id).\
@@ -336,7 +336,7 @@ def backupjob_get(context, backupjob_id, session=None):
     return result
 
 @require_context
-def backupjob_show(context, backupjob_id, session=None):
+def workload_show(context, backupjob_id, session=None):
     result = model_query(context, models.BackupJob,
                              session=session, project_only=True).\
         filter_by(id=backupjob_id).\
@@ -347,12 +347,12 @@ def backupjob_show(context, backupjob_id, session=None):
     return result
 
 @require_admin_context
-def backupjob_get_all(context):
+def workload_get_all(context):
     return model_query(context, models.BackupJob).all()
 
 
 @require_admin_context
-def backupjob_get_all_by_host(context, host):
+def workload_get_all_by_host(context, host):
     return model_query(context, models.BackupJob).filter_by(host=host).all()
 
 
@@ -366,7 +366,7 @@ def workload_get_all_by_project(context, project_id):
 
 
 @require_context
-def backupjob_create(context, values):
+def workload_create(context, values):
     backupjob = models.BackupJob()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
@@ -376,7 +376,7 @@ def backupjob_create(context, values):
 
 
 @require_context
-def backupjob_update(context, backupjob_id, values):
+def workload_update(context, backupjob_id, values):
     session = get_session()
     with session.begin():
         backupjob = model_query(context, models.BackupJob,
@@ -393,7 +393,7 @@ def backupjob_update(context, backupjob_id, values):
 
 
 @require_context
-def backupjob_destroy(context, backupjob_id):
+def workload_destroy(context, backupjob_id):
     session = get_session()
     with session.begin():
         session.query(models.BackupJob).\
@@ -404,7 +404,7 @@ def backupjob_destroy(context, backupjob_id):
                     'updated_at': literal_column('updated_at')})
 
 @require_context
-def backupjob_vms_create(context, values):
+def workload_vms_create(context, values):
     backupjob_vm = models.BackupJobVMs()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
@@ -413,7 +413,7 @@ def backupjob_vms_create(context, values):
     return backupjob_vm
 
 @require_context
-def backupjob_vms_get(context, backupjob_id, session=None):
+def workload_vms_get(context, backupjob_id, session=None):
     result = model_query(context, models.BackupJobVMs,
                              session=session).\
         filter_by(backupjob_id=backupjob_id).\
@@ -425,7 +425,7 @@ def backupjob_vms_get(context, backupjob_id, session=None):
     return result
 
 @require_context
-def backupjob_vms_destroy(context, vm_id, backupjob_id):
+def workload_vms_destroy(context, vm_id, backupjob_id):
     session = get_session()
     with session.begin():
         session.query(models.BackupJobVMs).\
@@ -490,7 +490,7 @@ def scheduledjob_update(context, scheduledjob):
         return dbjob
 
 @require_context
-def backupjobrun_get(context, backupjobrun_id, session=None):
+def snapshot_get(context, backupjobrun_id, session=None):
     result = model_query(context, models.BackupJobRuns,
                              session=session).\
         filter_by(id=backupjobrun_id).\
@@ -502,25 +502,25 @@ def backupjobrun_get(context, backupjobrun_id, session=None):
     return result
 
 @require_admin_context
-def backupjobrun_get_all(context):
+def snapshot_get_all(context):
     return model_query(context, models.BackupJobRuns).all()
 
 @require_context
-def backupjobrun_get_all_by_project(context, project_id):
+def snapshot_get_all_by_project(context, project_id):
     authorize_project_context(context, project_id)
 
     return model_query(context, models.BackupJobRuns).\
         filter_by(project_id=project_id).all()
         
 @require_context
-def backupjobrun_get_all_by_project_backupjob(context, project_id, backupjob_id):
+def snapshot_get_all_by_project_backupjob(context, project_id, backupjob_id):
     authorize_project_context(context, project_id)
     return model_query(context, models.BackupJobRuns).\
         filter_by(project_id=project_id).\
         filter_by(backupjob_id=backupjob_id).all()
 
 @require_context
-def backupjobrun_show(context, backupjobrun_id, session=None):
+def snapshot_show(context, backupjobrun_id, session=None):
     result = model_query(context, models.BackupJobRuns,
                              session=session).\
         filter_by(id=backupjobrun_id).\
@@ -532,7 +532,7 @@ def backupjobrun_show(context, backupjobrun_id, session=None):
     return result
 
 @require_context
-def backupjobrun_create(context, values):
+def snapshot_create(context, values):
     backupjobrun = models.BackupJobRuns()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
@@ -541,7 +541,7 @@ def backupjobrun_create(context, values):
     return backupjobrun
 
 @require_context
-def backupjobrun_update(context, backupjobrun_id, values):
+def snapshot_update(context, backupjobrun_id, values):
     session = get_session()
     with session.begin():
         backupjobrun = model_query(context, models.BackupJobRuns,
@@ -557,7 +557,7 @@ def backupjobrun_update(context, backupjobrun_id, values):
     return backupjobrun
 
 @require_context
-def backupjobrun_destroy(context, backupjobrun_id):
+def snapshot_destroy(context, backupjobrun_id):
     session = get_session()
     with session.begin():
         session.query(models.BackupJobRuns).\
@@ -568,7 +568,7 @@ def backupjobrun_destroy(context, backupjobrun_id):
                     'updated_at': literal_column('updated_at')})
 
 @require_context
-def backupjobrun_vm_create(context, values):
+def snapshot_vm_create(context, values):
     backupjobrun_vm = models.BackupJobRunVMs()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
@@ -577,7 +577,7 @@ def backupjobrun_vm_create(context, values):
     return backupjobrun_vm
 
 @require_context
-def backupjobrun_vm_get(context, backupjobrun_id, session=None):
+def snapshot_vm_get(context, backupjobrun_id, session=None):
     result = model_query(context, models.BackupJobRunVMs,
                              session=session).\
         filter_by(backupjobrun_id=backupjobrun_id).\
@@ -589,7 +589,7 @@ def backupjobrun_vm_get(context, backupjobrun_id, session=None):
     return result
 
 @require_context
-def backupjobrun_vm_destroy(context, vm_id, backupjobrun_id):
+def snapshot_vm_destroy(context, vm_id, backupjobrun_id):
     session = get_session()
     with session.begin():
         session.query(models.BackupJobRunVMs).\
@@ -650,7 +650,7 @@ def vm_recent_backupjobrun_destroy(context, vm_id):
                     'updated_at': literal_column('updated_at')})
 
 require_context
-def backupjobrun_vm_resource_create(context, values):
+def snapshot_vm_resource_create(context, values):
     backupjobrun_vm_resource = models.BackupJobRunVMResources()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
@@ -659,7 +659,7 @@ def backupjobrun_vm_resource_create(context, values):
     return backupjobrun_vm_resource
 
 @require_context
-def backupjobrun_vm_resources_get(context, vm_id, backupjobrun_id, session=None):
+def snapshot_vm_resources_get(context, vm_id, backupjobrun_id, session=None):
     result = model_query(context, models.BackupJobRunVMResources,
                              session=session).\
         filter_by(vm_id=vm_id).\
@@ -672,7 +672,7 @@ def backupjobrun_vm_resources_get(context, vm_id, backupjobrun_id, session=None)
     return result
 
 @require_context
-def backupjobrun_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session=None):
+def snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session=None):
     result = model_query(context, models.BackupJobRunVMResources,
                              session=session).\
         filter_by(vm_id=vm_id).\
@@ -687,7 +687,7 @@ def backupjobrun_vm_resource_get(context, vm_id, backupjobrun_id, resource_name,
 
     return result
 
-def backupjobrun_vm_resource_get2(context, id, session=None):
+def snapshot_vm_resource_get2(context, id, session=None):
     result = model_query(context, models.BackupJobRunVMResources,
                              session=session).\
         filter_by(id=id).\
@@ -699,7 +699,7 @@ def backupjobrun_vm_resource_get2(context, id, session=None):
     return result
 
 @require_context
-def backupjobrun_vm_resource_destroy(context, id, vm_id, backupjobrun_id):
+def snapshot_vm_resource_destroy(context, id, vm_id, backupjobrun_id):
     session = get_session()
     with session.begin():
         session.query(models.BackupJobRunVMResources).\
