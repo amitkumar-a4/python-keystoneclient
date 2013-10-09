@@ -1,0 +1,10 @@
+[workloadmanager.scheduler.weights]
+CapacityWeigher = workloadmanager.scheduler.weights.capacity:CapacityWeigher
+
+[workloadmanager.scheduler.filters]
+CapabilitiesFilter = workloadmanager.openstack.common.scheduler.filters.capabilities_filter:CapabilitiesFilter
+RetryFilter = workloadmanager.scheduler.filters.retry_filter:RetryFilter
+CapacityFilter = workloadmanager.scheduler.filters.capacity_filter:CapacityFilter
+JsonFilter = workloadmanager.openstack.common.scheduler.filters.json_filter:JsonFilter
+AvailabilityZoneFilter = workloadmanager.openstack.common.scheduler.filters.availability_zone_filter:AvailabilityZoneFilter
+

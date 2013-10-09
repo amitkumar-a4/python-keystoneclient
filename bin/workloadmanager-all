@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright (c) 2013 TrilioData, Inc.
+# All Rights Reserved.
+
+
+"""Starter script for All workloadmanager services.
+
+This script attempts to start all the workloadmanager services in one process.  Each
+service is started in its own greenthread.  Please note that exceptions and
+sys.exit() on the starting of a service are logged and the script will
+continue attempting to launch the rest of the services.
+
+"""
+
+import eventlet
+eventlet.monkey_patch()
+
+import os
+import sys
+
+
+possible_topdir = os.path.normpath(os.path.join(os.path.abspath(
+        sys.argv[0]), os.pardir, os.pardir))
+if os.path.exists(os.path.join(possible_topdir, "workloadmanager", "__init__.py")):
+    sys.path.insert(0, possible_topdir)
+
+from workloadmanager.openstack.common import gettextutils
+gettextutils.install('workloadmanager')
+
+from workloadmanager import flags
+from workloadmanager.openstack.common import log as logging
+from workloadmanager import service
+from workloadmanager import utils
+
+
+if __name__ == '__main__':
+    flags.parse_args(sys.argv)
+    logging.setup("workloadmanager")
+    LOG = logging.getLogger('workloadmanager.all')
+
+    utils.monkey_patch()
+    servers = []
+    # workloadmanager-api
+    try:
+        servers.append(service.WSGIService('workloadmanager-service'))
+    except (Exception, SystemExit):
+        LOG.exception(_('Failed to load workloadmanager-service'))
+
+    for binary in ['workloadmanager-scheduler']:
+        try:
+            servers.append(service.Service.create(binary=binary))
+        except (Exception, SystemExit):
+            LOG.exception(_('Failed to load %s'), binary)
+    service.serve(*servers)
+    service.wait()
