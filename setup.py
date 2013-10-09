@@ -62,7 +62,9 @@ setuptools.setup(
     scripts=['bin/workloadmanager-all',
              'bin/workloadmanager-api',
              'bin/workloadmanager-clear-rabbit-queues',
+             'bin/workloadmanager-manage',
              'bin/workloadmanager-rootwrap',
+             'bin/workloadmanager-rpc-zmq-receiver',
              'bin/workloadmanager-scheduler',
-             'bin/workloadmanager-rpc-zmq-receiver'],
+             'bin/workloadmanager-workloads'],
     py_modules=[])

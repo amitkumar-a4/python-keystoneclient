@@ -1,5 +1,7 @@
 .coveragerc
 .mailmap
+.project
+.pydevproject
 .testr.conf
 LICENSE
 MANIFEST.in
@@ -16,9 +18,11 @@ tox.ini
 bin/workloadmanager-all
 bin/workloadmanager-api
 bin/workloadmanager-clear-rabbit-queues
+bin/workloadmanager-manage
 bin/workloadmanager-rootwrap
 bin/workloadmanager-rpc-zmq-receiver
 bin/workloadmanager-scheduler
+bin/workloadmanager-workloads
 doc/source/conf.py
 doc/source/contributing.rst
 doc/source/index.rst
