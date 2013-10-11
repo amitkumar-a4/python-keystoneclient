@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2013 TrilioData, Inc.
+# All Rights Reserved.
+
+
+"""Starter script for workloadmgr service."""
+
+import os
+import sys
+
+import eventlet
+
+eventlet.monkey_patch()
+
+# If ../workloadmgr/__init__.py exists, add ../ to Python search path, so that
+# it will override what happens to be installed in /usr/(local/)lib/python...
+possible_topdir = os.path.normpath(os.path.join(os.path.abspath(sys.argv[0]),
+                                   os.pardir,
+                                   os.pardir))
+if os.path.exists(os.path.join(possible_topdir, 'workloadmgr', '__init__.py')):
+    sys.path.insert(0, possible_topdir)
+
+from workloadmgr.openstack.common import gettextutils
+gettextutils.install('workloadmgr')
+
+from workloadmgr import flags
+from workloadmgr.openstack.common import log as logging
+from workloadmgr import service
+from workloadmgr import utils
+
+if __name__ == '__main__':
+    flags.parse_args(sys.argv)
+    logging.setup("workloadmgr")
+    utils.monkey_patch()
+    launcher = service.ProcessLauncher()
+    server = service.Service.create(binary='workloadmgr-workloads')
+    launcher.launch_server(server)
+    launcher.wait()
