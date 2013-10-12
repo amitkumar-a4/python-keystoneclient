@@ -38,8 +38,7 @@ from workloadmgr.openstack.common import timeutils
 
 glance_opts = [
     cfg.StrOpt('glance_host',
-               #GIRI default='$my_ip',
-               default='192.168.0.200',
+               default='$my_ip',
                help='default glance hostname or ip'),
     cfg.IntOpt('glance_port',
                default=9292,

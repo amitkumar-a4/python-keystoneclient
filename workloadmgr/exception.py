@@ -606,7 +606,12 @@ class GlanceMetadataExists(Invalid):
 class ImageCopyFailure(Invalid):
     message = _("Failed to copy image to volume")
 
-
+class WorkloadNotFound(NotFound):
+    message = _("Workload %(workload_id)s could not be found.")
+    
+class InvalidWorkload(Invalid):
+    message = _("Invalid workload: %(reason)s")  
+    
 class BackupJobNotFound(NotFound):
     message = _("BackupJob %(backupjob_id)s could not be found.")
 

@@ -143,9 +143,9 @@ class SnapshotsController(wsgi.Controller):
     def _get_snapshots(self, req, is_detail):
         """Returns a list of snapshots, transformed through view builder."""
         context = req.environ['workloadmgr.context']
-        snapshot_id = req.GET.get('snapshot_id', None)
+        workload_id = req.GET.get('workload_id', None)
         if snapshot_id:
-            snapshots = self.workloads_api.snapshot_get_all(context, snapshot_id)
+            snapshots = self.workloads_api.snapshot_get_all(context, workload_id)
         else:
             snapshots = self.workloads_api.snapshot_get_all(context)
    
@@ -161,9 +161,9 @@ class SnapshotsController(wsgi.Controller):
     @wsgi.serializers(xml=SnapshotHydrateTemplate)
     @wsgi.deserializers(xml=HydrateDeserializer)
     def hydrate(self, req, id):
-        """Restore an existing snapshot"""
+        """Hydrate an existing snapshot"""
         snapshot_id = id
-        LOG.debug(_('Restoring snapshot %(snapshot_id)s') % locals())
+        LOG.debug(_('Hydrating snapshot %(snapshot_id)s') % locals())
         context = req.environ['workloadmgr.context']
         LOG.audit(_("Hydrating snapshot %(snapshot_id)s"),
                   locals(), context=context)

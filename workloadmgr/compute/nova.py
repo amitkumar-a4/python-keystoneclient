@@ -40,8 +40,7 @@ nova_opts = [
                  'catalog. Format is : separated values of the form: '
                  '<service_type>:<service_name>:<endpoint_type>'),
     cfg.StrOpt('nova_endpoint_template',
-               #GIRI default= 'http://localhost:8774/v2/%(project_id)s',
-               default= 'http://192.168.0.200:8774/v2/%(project_id)s',
+               default= 'http://localhost:8774/v2/%(project_id)s',
                help='Override service catalog lookup with template for nova '
                     'endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('os_region_name',
