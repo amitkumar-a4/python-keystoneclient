@@ -845,7 +845,6 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         Restores the specified instance from a backupjobrun
         """  
-        import pdb; pdb.set_trace()
         restored_image = None
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
         temp_directory = "/tmp"

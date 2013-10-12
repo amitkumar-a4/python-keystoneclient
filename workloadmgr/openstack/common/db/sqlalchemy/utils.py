@@ -22,8 +22,8 @@
 
 import sqlalchemy
 
-from cinder.openstack.common.gettextutils import _
-from cinder.openstack.common import log as logging
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import log as logging
 
 
 LOG = logging.getLogger(__name__)

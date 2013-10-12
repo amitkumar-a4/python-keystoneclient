@@ -40,8 +40,8 @@ import functools
 
 from oslo.config import cfg
 
-from cinder.openstack.common import importutils
-from cinder.openstack.common import lockutils
+from workloadmgr.openstack.common import importutils
+from workloadmgr.openstack.common import lockutils
 
 
 db_opts = [
@@ -69,7 +69,7 @@ class DBAPI(object):
         self.__backend = None
         self.__backend_mapping = backend_mapping
 
-    @lockutils.synchronized('dbapi_backend', 'cinder-')
+    @lockutils.synchronized('dbapi_backend', 'workloadmgr-')
     def __get_backend(self):
         """Get the actual backend.  May be a module or an instance of
         a class.  Doesn't matter to us.  We do this synchronized as it's

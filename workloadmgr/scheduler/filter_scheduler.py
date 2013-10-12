@@ -168,7 +168,7 @@ class FilterScheduler(driver.Scheduler):
         elevated = context.elevated()
 
         volume_properties = request_spec['volume_properties']
-        # Since Cinder is using mixed filters from Oslo and it's own, which
+        # Since workloadmgr is using mixed filters from Oslo and it's own, which
         # takes 'resource_XX' and 'volume_XX' as input respectively, copying
         # 'volume_XX' to 'resource_XX' will make both filters happy.
         resource_properties = volume_properties.copy()

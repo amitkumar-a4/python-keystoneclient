@@ -358,7 +358,6 @@ def workload_get_all_by_host(context, host):
 
 @require_context
 def workload_get_all_by_project(context, project_id):
-    import pdb; pdb.set_trace()
     authorize_project_context(context, project_id)
     
     return model_query(context, models.BackupJob).\

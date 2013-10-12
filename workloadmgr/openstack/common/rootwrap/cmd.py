@@ -20,14 +20,14 @@
 
    Filters which commands a service is allowed to run as another user.
 
-   To use this with cinder, you should set the following in
-   cinder.conf:
-   rootwrap_config=/etc/cinder/rootwrap.conf
+   To use this with workloadmgr, you should set the following in
+   workloadmgr.conf:
+   rootwrap_config=/etc/workloadmgr/rootwrap.conf
 
-   You also need to let the cinder user run cinder-rootwrap
+   You also need to let the workloadmgr user run workloadmgr-rootwrap
    as root in sudoers:
-   cinder ALL = (root) NOPASSWD: /usr/bin/cinder-rootwrap
-                                   /etc/cinder/rootwrap.conf *
+   workloadmgr ALL = (root) NOPASSWD: /usr/bin/workloadmgr-rootwrap
+                                   /etc/workloadmgr/rootwrap.conf *
 
    Service packaging should deploy .filters files only on nodes where
    they are needed, to avoid allowing more than is necessary.
@@ -73,10 +73,10 @@ def main():
     # Add ../ to sys.path to allow running from branch
     possible_topdir = os.path.normpath(os.path.join(os.path.abspath(execname),
                                                     os.pardir, os.pardir))
-    if os.path.exists(os.path.join(possible_topdir, "cinder", "__init__.py")):
+    if os.path.exists(os.path.join(possible_topdir, "workloadmgr", "__init__.py")):
         sys.path.insert(0, possible_topdir)
 
-    from cinder.openstack.common.rootwrap import wrapper
+    from workloadmgr.openstack.common.rootwrap import wrapper
 
     # Load configuration
     try:

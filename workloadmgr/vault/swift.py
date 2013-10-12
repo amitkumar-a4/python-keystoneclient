@@ -54,7 +54,7 @@ LOG = logging.getLogger(__name__)
 
 swiftbackup_service_opts = [
     cfg.StrOpt('backup_swift_url',
-               default='http://192.168.0.202:8080/v1/AUTH_',
+               default='http://localhost:8080/v1/AUTH_',
                help='The URL of the Swift endpoint'),
     cfg.StrOpt('backupjob_swift_container',
                default='backupjobs',

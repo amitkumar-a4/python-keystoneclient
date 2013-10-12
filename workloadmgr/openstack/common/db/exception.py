@@ -18,7 +18,7 @@
 
 """DB related custom exceptions."""
 
-from cinder.openstack.common.gettextutils import _
+from workloadmgr.openstack.common.gettextutils import _
 
 
 class DBError(Exception):

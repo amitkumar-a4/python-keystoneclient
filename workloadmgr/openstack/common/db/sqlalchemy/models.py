@@ -26,8 +26,8 @@ from sqlalchemy import Column, Integer
 from sqlalchemy import DateTime
 from sqlalchemy.orm import object_mapper
 
-from cinder.openstack.common.db.sqlalchemy.session import get_session
-from cinder.openstack.common import timeutils
+from workloadmgr.openstack.common.db.sqlalchemy.session import get_session
+from workloadmgr.openstack.common import timeutils
 
 
 class ModelBase(object):
