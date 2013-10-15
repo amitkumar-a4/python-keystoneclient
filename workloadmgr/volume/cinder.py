@@ -40,7 +40,7 @@ cinder_opts = [
                  '<service_type>:<service_name>:<endpoint_type>'),
     cfg.StrOpt('cinder_endpoint_template',
                #GIRI default= 'http://localhost:8776/v1/%(project_id)s', #None,
-               default= 'http://192.168.0.200:8776/v1/%(project_id)s', #None,
+               default= 'http://192.168.2.200:8776/v1/%(project_id)s', #None,
                help='Override service catalog lookup with template for cinder '
                     'endpoint e.g. http://localhost:8776/v1/%(project_id)s'),
     cfg.StrOpt('os_region_name',

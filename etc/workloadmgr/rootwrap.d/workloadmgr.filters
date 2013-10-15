@@ -5,4 +5,5 @@
 virsh: CommandFilter, /usr/bin/virsh, root
 tee: CommandFilter, /usr/bin/tee, root
 chown: CommandFilter, /bin/chown, root
-qemu-img: CommandFilter, /usr//bin/qemu-img, root
+qemu-img: CommandFilter, /usr/bin/qemu-img, root
+

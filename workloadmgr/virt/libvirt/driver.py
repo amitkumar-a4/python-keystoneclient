@@ -39,6 +39,7 @@ import os
 import socket
 import uuid
 import time
+from Queue import Queue
 
 from stat import *
 from eventlet import greenio
@@ -853,6 +854,7 @@ class LibvirtDriver(driver.ComputeDriver):
          
         #restore, rebase, commit & upload
         for backupjobrun_vm_resource in backupjobrun_vm_resources:
+            commit_queue = Queue() # queue to hold the files to be committed     
             vm_resource_backup = db.vm_resource_backup_get_top(context, backupjobrun_vm_resource.id)
             restored_file_path = restored_file_path = temp_directory + '/' + vm_resource_backup.id + '_' + backupjobrun_vm_resource.resource_name + '.qcow2'
             vault_metadata = {'vault_service_url' : vm_resource_backup.vault_service_url,
@@ -874,17 +876,26 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'resource_name':  backupjobrun_vm_resource_backing.resource_name,
                                   'backupjobrun_vm_id': backupjobrun_vm_resource_backing.vm_id,
                                   'backupjobrun_id': backupjobrun_vm_resource_backing.backupjobrun_id}
-                vault_service.restore(vault_metadata, restored_file_path_backing)                                 
+                vault_service.restore(vault_metadata, restored_file_path_backing)
                 #rebase
                 self.rebase(restored_file_path_backing, restored_file_path)
-                #commit
-                self.commit(restored_file_path)
-                utils.delete_if_exists(restored_file_path)
+                commit_queue.put(restored_file_path, restored_file_path)                                 
                 vm_resource_backup = vm_resource_backup_backing
                 restored_file_path = restored_file_path_backing
-
+             
+            import pdb; pdb.set_trace()
+            file_to_commit = commit_queue.get()    
+            while file_to_commit is not None:
+                #commit
+                self.commit(file_to_commit)
+                if restored_file_path != file_to_commit:
+                    utils.delete_if_exists(file_to_commit)
+                if commit_queue.empty():
+                    file_to_commit =  None
+                else:
+                    file_to_commit = commit_queue.get_nowait()   
+                                
             #upload to glance
-
             with file(restored_file_path) as image_file:
                 image_metadata = {'is_public': False,
                                   'status': 'active',
@@ -921,6 +932,8 @@ class LibvirtDriver(driver.ComputeDriver):
             utils.delete_if_exists(restored_file_path)
                     
         #create nova instance
+        import pdb; pdb.set_trace()
+        
         restored_instance_name = uuid.uuid4().hex
         compute_service = nova.API()
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
