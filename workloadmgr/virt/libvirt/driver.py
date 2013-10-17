@@ -55,6 +55,7 @@ from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr.virt import event as virtevent
 from workloadmgr.virt.libvirt import utils as libvirt_utils
+from workloadmgr.virt.libvirt import config as vconfig
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import fileutils
 from nova.compute import power_state
@@ -588,6 +589,34 @@ class LibvirtDriver(driver.ComputeDriver):
 
         utils.execute(*virsh_cmd, run_as_root=True)
 
+    def attach_volume(self, instance, diskpath, mountpoint):
+        instance_name = self.get_instance_name_by_uuid(instance.id)
+        virt_dom = self._lookup_by_name(instance_name)
+        disk_dev = mountpoint.rpartition("/")[2]
+        conf = vconfig.LibvirtConfigGuestDisk()
+        conf.driver_cache = 'writethrough'
+        conf.driver_name = 'qemu'
+        conf.device_type = 'disk'
+        conf.driver_format = "raw"
+        conf.driver_cache = "none"
+        conf.target_dev = disk_dev
+        conf.target_bus = 'virtio'
+        #conf.serial = 'serial'
+        conf.source_type = 'file'
+        conf.source_path = diskpath         
+
+        try:
+            # NOTE(vish): We can always affect config because our
+            #             domains are persistent, but we should only
+            #             affect live if the domain is running.
+            flags = libvirt.VIR_DOMAIN_AFFECT_CONFIG
+            state = LIBVIRT_POWER_STATE[virt_dom.info()[0]]
+            if state == power_state.RUNNING:
+                flags |= libvirt.VIR_DOMAIN_AFFECT_LIVE
+            virt_dom.attachDeviceFlags(conf.to_xml(), flags)
+        except Exception, ex:
+            return
+
     def backup_prepare(self, backupjob, backupjobrun, backupjobrun_vm, vault_service, db, context, update_task_state = None):
         """
         Prepares the backsup for the instance specified in backupjobrun_vm
@@ -883,57 +912,33 @@ class LibvirtDriver(driver.ComputeDriver):
                 vm_resource_backup = vm_resource_backup_backing
                 restored_file_path = restored_file_path_backing
              
-            import pdb; pdb.set_trace()
-            file_to_commit = commit_queue.get()    
-            while file_to_commit is not None:
-                #commit
+            while commit_queue.empty() is not True:
+                file_to_commit = commit_queue.get_nowait()  
                 self.commit(file_to_commit)
                 if restored_file_path != file_to_commit:
                     utils.delete_if_exists(file_to_commit)
-                if commit_queue.empty():
-                    file_to_commit =  None
-                else:
-                    file_to_commit = commit_queue.get_nowait()   
+                     
                                 
             #upload to glance
-            with file(restored_file_path) as image_file:
-                image_metadata = {'is_public': False,
-                                  'status': 'active',
-                                  'name': backupjobrun_vm_resource.id,
-                                  'disk_format' : 'ami',
-                                  'properties': {
-                                               'image_location': 'TODO',
-                                               'image_state': 'available',
-                                               'owner_id': context.project_id
-                                               }
-                                  }
-                #if 'architecture' in base.get('properties', {}):
-                #    arch = base['properties']['architecture']
-                #    image_metadata['properties']['architecture'] = arch
-                
-                image_service = glance.get_default_image_service()
-                if backupjobrun_vm_resource.resource_name == 'vda':
+            if backupjobrun_vm_resource.resource_name == 'vda':
+                with file(restored_file_path) as image_file:
+                    image_metadata = {'is_public': False,
+                                      'status': 'active',
+                                      'name': backupjobrun_vm_resource.id,
+                                      'disk_format' : 'ami',
+                                      'properties': {
+                                                       'image_location': 'TODO',
+                                                       'image_state': 'available',
+                                                       'owner_id': context.project_id
+                                                    }
+                                      }
+                    image_service = glance.get_default_image_service()
                     restored_image = image_service.create(context, image_metadata, image_file)
-                else:
-                    #TODO(gbasava): Request a feature in cinder to create volume from a file.
-                    #As a workaround we will create the image and covert that to cinder volume
-
-                    restored_volume_image = image_service.create(context, image_metadata, image_file)
-                    restored_volume_name = uuid.uuid4().hex
-                    volume_service = cinder.API()
-                    restored_volume = volume_service.create(context, max(restored_volume_image['size']/(1024*1024*1024), 1), restored_volume_name, 
-                                                        'from workloadmgr', None, restored_volume_image['id'], None, None, None)
-                    device_restored_volumes.setdefault(backupjobrun_vm_resource.resource_name, restored_volume)
-                   
-                    #delete the image...it is not needed anymore
-                    #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
-                    time.sleep(30)
-                    image_service.delete(context, restored_volume_image['id'])
-            utils.delete_if_exists(restored_file_path)
+                utils.delete_if_exists(restored_file_path)
+            else:
+                device_restored_volumes.setdefault(backupjobrun_vm_resource.resource_name, restored_file_path)            
                     
         #create nova instance
-        import pdb; pdb.set_trace()
-        
         restored_instance_name = uuid.uuid4().hex
         compute_service = nova.API()
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
@@ -941,6 +946,9 @@ class LibvirtDriver(driver.ComputeDriver):
         restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor)
         #attach volumes 
         for device, restored_volume in device_restored_volumes.iteritems():
-            compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + device))
+            instance_dir = libvirt_utils.get_instance_path(restored_instance.id)
+            libvirt_utils.move_file(restored_volume, instance_dir)
+            restored_volume = os.path.join(instance_dir, os.path.basename(restored_volume))
+            self.attach_volume(restored_instance, restored_volume, ('/dev/' + device))
         
               

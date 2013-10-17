@@ -270,6 +270,7 @@ workloadmgr/virt/event.py
 workloadmgr/virt/images.py
 workloadmgr/virt/virtapi.py
 workloadmgr/virt/libvirt/__init__.py
+workloadmgr/virt/libvirt/config.py
 workloadmgr/virt/libvirt/driver.py
 workloadmgr/virt/libvirt/utils.py
 workloadmgr/volume/__init__.py
