@@ -74,7 +74,7 @@ core_opts = [
                help='Verbosity of SQL debugging information. 0=None, '
                     '100=Everything'),
     cfg.StrOpt('sql_connection_raksha',
-               default='mysql://root:password@192.168.2.200/raksha?charset=utf8',
+               default='mysql://root:password@localhost/raksha?charset=utf8',
                help='The SQLAlchemy connection string used to connect to the '
                     'database',
                secret=True),             
