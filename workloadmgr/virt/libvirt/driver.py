@@ -883,6 +883,8 @@ class LibvirtDriver(driver.ComputeDriver):
          
         #restore, rebase, commit & upload
         for backupjobrun_vm_resource in backupjobrun_vm_resources:
+            if backupjobrun_vm_resource.resource_type != 'disk':
+                continue
             commit_queue = Queue() # queue to hold the files to be committed     
             vm_resource_backup = db.vm_resource_backup_get_top(context, backupjobrun_vm_resource.id)
             restored_file_path = restored_file_path = temp_directory + '/' + vm_resource_backup.id + '_' + backupjobrun_vm_resource.resource_name + '.qcow2'
