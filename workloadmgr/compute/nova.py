@@ -147,8 +147,8 @@ class API(base.Base):
                                                       reservation_id, min_count,
                                                       max_count, security_groups, userdata,
                                                       key_name, availability_zone,
-                                                      block_device_mapping, nics, scheduler_hints,
-                                                      config_drive, **kwargs)
+                                                      block_device_mapping, nics=nics, scheduler_hints=scheduler_hints,
+                                                      config_drive=config_drive, **kwargs)
             time.sleep(15)#TODO(gbasava): Creation is asynchronous. Wait and check for the status
             #Perform translation required if any
             return item 

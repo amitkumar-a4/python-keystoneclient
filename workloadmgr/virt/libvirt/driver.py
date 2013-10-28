@@ -40,6 +40,7 @@ import socket
 import uuid
 import time
 from Queue import Queue
+import cPickle as pickle
 
 from stat import *
 from eventlet import greenio
@@ -63,6 +64,7 @@ from workloadmgr.virt import driver
 from workloadmgr.image import glance
 from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
+from workloadmgr.network import neutron
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -871,6 +873,21 @@ class LibvirtDriver(driver.ComputeDriver):
             update_task_state(task_state=task_states.BACKUP_BLOCKCOMMIT_FINISH)
             update_task_state(task_state=task_states.BACKUP_COMPLETE)
     
+    def _get_metadata_value(self, vm_network_resource_backup, key):
+        for metadata in vm_network_resource_backup.metadata:
+            if metadata['key'] == key:
+                return metadata['value']
+                
+    def _get_pit_resource(self, backupjobrun_vm_resources, vm_network_resource_backup, key):
+        pit_id = ''
+        for metadata in vm_network_resource_backup.metadata:
+            if metadata['key'] == key:
+                pit_id = metadata['value']
+                break
+        for backupjobrun_vm_resource in backupjobrun_vm_resources:
+            if backupjobrun_vm_resource.resource_pit_id == pit_id:
+                return backupjobrun_vm_resource
+                
     def hydrate_instance(self, backupjob, backupjobrun, backupjobrun_vm, vault_service, db, context, update_task_state = None):
         """
         Restores the specified instance from a backupjobrun
@@ -881,6 +898,67 @@ class LibvirtDriver(driver.ComputeDriver):
         fileutils.ensure_tree(temp_directory)
         backupjobrun_vm_resources = db.snapshot_vm_resources_get(context, backupjobrun_vm.vm_id, backupjobrun.id)
          
+        #network resources
+        nics = []
+        network_service =  neutron.API()
+        for backupjobrun_vm_resource in backupjobrun_vm_resources:
+            if backupjobrun_vm_resource.resource_type == 'nic':
+                vm_nic_backup = db.vm_network_resource_backup_get(context, backupjobrun_vm_resource.id)
+                #private network
+                vm_nic_network = self._get_pit_resource(backupjobrun_vm_resources, vm_nic_backup, 'network_id')
+                vm_nic_network_backup = db.vm_network_resource_backup_get(context, vm_nic_network.id)
+                network = pickle.loads(str(vm_nic_network_backup.pickle))
+                params = {'name': network['name'],
+                          'tenant_id': context.tenant,
+                          'admin_state_up': network['admin_state_up'],
+                          'shared': network['shared'],
+                          'router:external': network['router:external']} 
+                network_new = network_service.create_network(context,**params)
+                #private subnet
+                vm_nic_subnet = self._get_pit_resource(backupjobrun_vm_resources, vm_nic_backup, 'subnet_id')
+                vm_nic_subnet_backup = db.vm_network_resource_backup_get(context, vm_nic_subnet.id)
+                subnet = pickle.loads(str(vm_nic_subnet_backup.pickle))
+                params = {'name': subnet['name'],
+                          'network_id': network_new['id'],
+                          'tenant_id': context.tenant,
+                          'cidr': subnet['cidr'],
+                          'ip_version': subnet['ip_version']} 
+                subnet_new = network_service.create_subnet(context,**params)
+
+                #external network
+                vm_nic_ext_network = self._get_pit_resource(backupjobrun_vm_resources, vm_nic_backup, 'ext_network_id')
+                vm_nic_ext_network_backup = db.vm_network_resource_backup_get(context, vm_nic_ext_network.id)
+                ext_network = pickle.loads(str(vm_nic_ext_network_backup.pickle))
+                params = {'name': ext_network['name'],
+                          'admin_state_up': ext_network['admin_state_up'],
+                          'shared': ext_network['shared'],
+                          'router:external': ext_network['router:external']} 
+                ext_network_new = network_service.create_network(context,**params)
+                #external subnet
+                vm_nic_ext_subnet = self._get_pit_resource(backupjobrun_vm_resources, vm_nic_backup, 'ext_subnet_id')
+                vm_nic_ext_subnet_backup = db.vm_network_resource_backup_get(context, vm_nic_ext_subnet.id)
+                ext_subnet = pickle.loads(str(vm_nic_ext_subnet_backup.pickle))
+                params = {'name': ext_subnet['name'],
+                          'network_id': ext_network_new['id'],
+                          'cidr': ext_subnet['cidr'],
+                          'ip_version': ext_subnet['ip_version']} 
+                subnet_ext_new = network_service.create_subnet(context,**params)
+                #router
+                vm_nic_router = self._get_pit_resource(backupjobrun_vm_resources, vm_nic_backup, 'router_id')
+                vm_nic_router_backup = db.vm_network_resource_backup_get(context, vm_nic_router.id)
+                router = pickle.loads(str(vm_nic_router_backup.pickle))
+                params = {'name': router['name'],
+                          'tenant_id': context.tenant} 
+                router_new = network_service.create_router(context,**params)
+                
+                network_service.router_add_interface(context,router_new['id'], subnet_id=subnet_new['id'])
+                network_service.router_add_gateway(context,router_new['id'], ext_network_new['id'])
+                
+                nic_info = {}
+                nic_info.setdefault('net-id', network_new['id']) 
+                nic_info.setdefault('v4-fixed-ip', self._get_metadata_value(vm_nic_backup, 'ip_address'))
+                nics.append(nic_info)                        
+                         
         #restore, rebase, commit & upload
         for backupjobrun_vm_resource in backupjobrun_vm_resources:
             if backupjobrun_vm_resource.resource_type != 'disk':
@@ -945,7 +1023,7 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API()
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
         restored_compute_flavor = compute_service.get_flavor(context, 'm1.small') 
-        restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor)
+        restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=nics)
         #attach volumes 
         for device, restored_volume in device_restored_volumes.iteritems():
             instance_dir = libvirt_utils.get_instance_path(restored_instance.id)

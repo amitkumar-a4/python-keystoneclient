@@ -221,6 +221,7 @@ class BackupJobRunVMResources(BASE, WorkloadMgrBase):
     backupjobrun_id = Column(String(255), ForeignKey('backupjobruns.id'))
     resource_type = Column(String(255)) #disk, network, definition
     resource_name = Column(String(4096)) #vda etc.
+    resource_pit_id = Column(String(255)) #resource point in time id (id at the time of backup)    
     status =  Column(String(32), nullable=False)
 
 class VMResourceBackups(BASE, WorkloadMgrBase):
@@ -251,6 +252,29 @@ class VMResourceBackupMetadata(BASE, WorkloadMgrBase):
     vm_resource_backup = relationship(VMResourceBackups, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
+    
+class VMNetworkResourceBackups(BASE, WorkloadMgrBase):
+    """Represents the  backups of a VM Network Resource"""
+    __tablename__ = str('vm_network_resource_backups')
+    vm_network_resource_backup_id = Column(String(255), ForeignKey('backupjobrun_vm_resources.id'), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.backup_name_template % self.id
+
+    pickle = Column(String(4096))
+    status = Column(String(32), nullable=False)    
+    
+class VMNetworkResourceBackupMetadata(BASE, WorkloadMgrBase):
+    """Represents  metadata for the backup of a VM Network Resource"""
+    __tablename__ = 'vm_network_resource_backup_metadata'
+    __table_args__ = (UniqueConstraint('vm_network_resource_backup_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    vm_network_resource_backup_id = Column(String(36), ForeignKey('vm_network_resource_backups.vm_network_resource_backup_id'), nullable=False)
+    vm_network_resource_backup = relationship(VMNetworkResourceBackups, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)        
         
 def register_models():
     """Register Models and create metadata.
@@ -268,7 +292,9 @@ def register_models():
               BackupJobRuns,
               BackupJobRunVMs,
               VMResourceBackups,
-              VMResourceBackupMetadata
+              VMResourceBackupMetadata,
+              VMNetworkResourceBackups,
+              VMNetworkResourceBackupMetadata
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

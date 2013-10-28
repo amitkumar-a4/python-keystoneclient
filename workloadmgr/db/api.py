@@ -249,6 +249,19 @@ def vm_resource_backup_get(context, vm_resource_backup_id, session=None):
 
 def vm_resource_backups_destroy(context, backupjobrun_vm_resource_id):
     return IMPL.vm_resource_backups_destroy(context, backupjobrun_vm_resource_id)
+
+def vm_network_resource_backup_create(context, values):
+    return IMPL.vm_network_resource_backup_create(context, values)
+
+def vm_network_resource_backups_get(context, backupjobrun_vm_resource_id, session=None):
+    import pdb; pdb.set_trace()
+    return IMPL.vm_network_resource_backups_get(context, backupjobrun_vm_resource_id, session)
+
+def vm_network_resource_backup_get(context, backupjobrun_vm_resource_id, session=None):
+    return IMPL.vm_network_resource_backup_get(context, backupjobrun_vm_resource_id, session)
+
+def vm_network_resource_backups_destroy(context, backupjobrun_vm_resource_id):
+    return IMPL.vm_network_resource_backups_destroy(context, backupjobrun_vm_resource_id)
     
 def vault_service_create(context, values):
     return IMPL.vault_service_create(context, values)

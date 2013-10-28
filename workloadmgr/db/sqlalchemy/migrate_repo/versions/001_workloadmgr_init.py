@@ -148,8 +148,9 @@ def upgrade(migrate_engine):
         Column('id', String(length=255), primary_key=True, nullable= False),
         Column('vm_id', String(length=255), nullable= False),
         Column('backupjobrun_id', String(length=255), ForeignKey('backupjobruns.id')),
-        Column('resource_name', String(length=255)),
         Column('resource_type', String(length=255)),
+        Column('resource_name', String(length=255)),
+        Column('resource_pit_id', String(length=255)),                
         Column('status', String(length=32), nullable=False),
         UniqueConstraint('vm_id', 'backupjobrun_id', 'resource_name'),
         mysql_engine='InnoDB'
@@ -185,7 +186,32 @@ def upgrade(migrate_engine):
         UniqueConstraint('vm_resource_backup_id', 'key'),
         mysql_engine='InnoDB'
     )        
-        
+
+    vm_network_resource_backups = Table(
+        'vm_network_resource_backups', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('vm_network_resource_backup_id', String(length=255), ForeignKey('backupjobrun_vm_resources.id'), primary_key=True),
+        Column('pickle',String(length=4096)),
+        Column('status', String(length=32), nullable=False),
+        mysql_engine='InnoDB'
+    )        
+    
+    vm_network_resource_backup_metadata = Table(
+        'vm_network_resource_backup_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('vm_network_resource_backup_id', String(length=255), ForeignKey('vm_network_resource_backups.vm_network_resource_backup_id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('vm_network_resource_backup_id', 'key'),
+        mysql_engine='InnoDB'
+    )        
    
     # create all tables
     # Take care on create order for those with FK dependencies
@@ -199,7 +225,9 @@ def upgrade(migrate_engine):
               vm_recent_backupjobrun,
               backupjobrun_vm_resources,
               vm_resource_backups,
-              vm_resource_backup_metadata]
+              vm_resource_backup_metadata,
+              vm_network_resource_backups,
+              vm_network_resource_backup_metadata]
 
     for table in tables:
         try:
@@ -220,7 +248,9 @@ def upgrade(migrate_engine):
                   "vm_recent_backupjobrun",
                   "backupjobrun_vm_resources",
                   "vm_resource_backups",
-                  "vm_resource_backup_metadata"]
+                  "vm_resource_backup_metadata",
+                  "vm_network_resource_backups",
+                  "vm_network_resource_backup_metadata"]
 
         sql = "SET foreign_key_checks = 0;"
         for table in tables:

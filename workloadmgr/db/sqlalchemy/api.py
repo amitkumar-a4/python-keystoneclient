@@ -857,7 +857,136 @@ def vm_resource_backups_destroy(context, backupjobrun_vm_resource_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
     
+""" network resource backup functions """
+def _set_metadata_for_vm_network_resource_backup(context, vm_network_resource_backup_ref, metadata,
+                              purge_metadata=False, session=None):
+    """
+    Create or update a set of vm_network_resource_backup_metadata for a given backup
 
+    :param context: Request context
+    :param vm_network_resource_backup_ref: An vm_network_resource_backup object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in vm_network_resource_backup_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'vm_network_resource_backup_id': vm_network_resource_backup_ref.vm_network_resource_backup_id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _vm_network_resource_backup_metadata_update(context, metadata_ref, metadata_values,
+                                   session=session)
+        else:
+            vm_network_resource_backup_metadata_create(context, metadata_values, session=session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                vm_network_resource_backup_metadata_delete(context, metadata_ref, session=session)
+
+
+def vm_network_resource_backup_metadata_create(context, values, session=None):
+    """Create an VMNetworkResourceBackupMetadata object"""
+    metadata_ref = models.VMNetworkResourceBackupMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _vm_network_resource_backup_metadata_update(context, metadata_ref, values, session=session)
+
+
+def _vm_network_resource_backup_metadata_update(context, metadata_ref, values, session=None):
+    """
+    Used internally by vm_network_resource_backup_metadata_create and vm_network_resource_backup_metadata_update
+    """
+    session = get_session()
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+
+def vm_network_resource_backup_metadata_delete(context, metadata_ref, session=None):
+    """
+    Used internally by vm_network_resource_backup_metadata_create and vm_network_resource_backup_metadata_update
+    """
+    session = get_session()
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+def _vm_network_resource_backup_update(context, values, backupjobrun_vm_resource_id, purge_metadata=False):
+    
+    metadata = values.pop('metadata', {})
+    
+    if backupjobrun_vm_resource_id:
+        vm_network_resource_backup_ref = vm_network_resource_backups_get(context, backupjobrun_vm_resource_id, None)
+    else:
+        vm_network_resource_backup_ref = models.VMNetworkResourceBackups()
+    
+    vm_network_resource_backup_ref.update(values)
+    vm_network_resource_backup_ref.save()
+    
+    _set_metadata_for_vm_network_resource_backup(context, vm_network_resource_backup_ref, metadata, purge_metadata)  
+      
+    return vm_network_resource_backup_ref
+
+
+@require_context
+def vm_network_resource_backup_create(context, values):
+    
+    return _vm_network_resource_backup_update(context, values, None, False)
+
+def vm_network_resource_backup_update(context, backupjobrun_vm_resource_id, values, purge_metadata=False):
+   
+    return _vm_network_resource_backup_update(context, values, backupjobrun_vm_resource_id, purge_metadata)
+
+@require_context
+def vm_network_resource_backups_get(context, backupjobrun_vm_resource_id, session=None):
+    session = get_session()
+    try:
+        query = session.query(models.VMNetworkResourceBackups)\
+                       .options(sa_orm.joinedload(models.VMNetworkResourceBackups.metadata))\
+                       .filter_by(vm_network_resource_backup_id==backupjobrun_vm_resource_id)
+
+        #TODO(gbasava): filter out deleted backups if context disallows it
+        vm_network_resource_backups = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.VMResourceBackupsNotFound(backupjobrun_vm_resource_id = backupjobrun_vm_resource_id)
+    
+    return vm_network_resource_backups
+
+@require_context
+def vm_network_resource_backup_get(context, backupjobrun_vm_resource_id, session=None):
+    session = get_session()
+    try:
+        query = session.query(models.VMNetworkResourceBackups)\
+                       .options(sa_orm.joinedload(models.VMNetworkResourceBackups.metadata))\
+                       .filter_by(vm_network_resource_backup_id=backupjobrun_vm_resource_id)
+
+        #TODO(gbasava): filter out deleted resource backups if context disallows it
+        vm_network_resource_backup = query.one()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.VMResourceBackupsNotFound(backupjobrun_vm_resource_id = backupjobrun_vm_resource_id)
+    
+    return vm_network_resource_backup
+
+
+@require_context
+def vm_network_resource_backups_destroy(context, backupjobrun_vm_network_resource_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.VMNetworkResourceBackups).\
+            filter_by(backupjobrun_vm_network_resource_id=backupjobrun_vm_network_resource_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+            
 @require_context
 def vault_service_create(context, values):
     vault_service = models.VaultServices()
