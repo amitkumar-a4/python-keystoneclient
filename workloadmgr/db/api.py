@@ -226,11 +226,11 @@ def snapshot_vm_resource_create(context, values):
 def snapshot_vm_resources_get(context, vm_id, backupjobrun_id, session=None):
     return IMPL.snapshot_vm_resources_get(context, vm_id, backupjobrun_id, session)
 
-def snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session=None):
-    return IMPL.snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session)
+def snapshot_vm_resource_get_by_resource_name(context, vm_id, backupjobrun_id, resource_name, session=None):
+    return IMPL.snapshot_vm_resource_get_by_resource_name(context, vm_id, backupjobrun_id, resource_name, session)
 
-def snapshot_vm_resource_get2(context, id, session=None):
-    return IMPL.snapshot_vm_resource_get2(context, id, session)
+def snapshot_vm_resource_get(context, id, session=None):
+    return IMPL.snapshot_vm_resource_get(context, id, session)
 
 def snapshot_vm_resource_destroy(context, id, vm_id, backupjobrun_id):
     return IMPL.snapshot_vm_resource_destroy(context, id, vm_id, backupjobrun_id)

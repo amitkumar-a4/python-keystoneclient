@@ -19,6 +19,7 @@ from sqlalchemy import *
 from datetime import datetime, timedelta
 import time
 import uuid
+import cPickle as pickle
 
 from oslo.config import cfg
 from workloadmgr import context
@@ -31,6 +32,7 @@ from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.vault import swift
+from workloadmgr.network import neutron
 
 
 LOG = logging.getLogger(__name__)
@@ -114,6 +116,117 @@ class WorkloadMgr(manager.SchedulerDependentManager):
         LOG.info(_('delete_workload started, workload: %s'), workload_id)
         #TODO(gbasava): Implement
 
+    def _get_metadata_value(self, vm_network_resource_backup, key):
+        for metadata in vm_network_resource_backup.metadata:
+            if metadata['key'] == key:
+                return metadata['value']
+                
+    def _get_pit_resource_id(self, vm_network_resource_backup, key):
+        for metadata in vm_network_resource_backup.metadata:
+            if metadata['key'] == key:
+                pit_id = metadata['value']
+                return pit_id
+            
+    def _get_pit_resource(self, backupjobrun_vm_common_resources, pit_id):
+        for backupjobrun_vm_resource in backupjobrun_vm_common_resources:
+            if backupjobrun_vm_resource.resource_pit_id == pit_id:
+                return backupjobrun_vm_resource   
+            
+    def _restore_networks(self, context, backupjobrun, new_net_resources):
+        """
+        Restore the networking configuration of VMs of the snapshot
+        nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
+        """
+        try:
+            network_service =  neutron.API()  
+
+            backupjobrun_vm_common_resources = self.db.snapshot_vm_resources_get(context, backupjobrun.id, backupjobrun.id)           
+            for backupjobrun_vm in self.db.snapshot_vm_get(context, backupjobrun.id):
+                backupjobrun_vm_resources = self.db.snapshot_vm_resources_get(context, backupjobrun_vm.vm_id, backupjobrun.id)        
+                for backupjobrun_vm_resource in backupjobrun_vm_resources:
+                    if backupjobrun_vm_resource.resource_type == 'nic':                
+                        vm_nic_backup = self.db.vm_network_resource_backup_get(context, backupjobrun_vm_resource.id)
+                        #private network
+                        pit_id = self._get_pit_resource_id(vm_nic_backup, 'network_id')
+                        if pit_id in new_net_resources:
+                            new_network = new_net_resources[pit_id]
+                        else:
+                            vm_nic_network = self._get_pit_resource(backupjobrun_vm_common_resources, pit_id)
+                            vm_nic_network_backup = self.db.vm_network_resource_backup_get(context, vm_nic_network.id)
+                            network = pickle.loads(str(vm_nic_network_backup.pickle))
+                            params = {'name': network['name'],
+                                      'tenant_id': context.tenant,
+                                      'admin_state_up': network['admin_state_up'],
+                                      'shared': network['shared'],
+                                      'router:external': network['router:external']} 
+                            new_network = network_service.create_network(context,**params)
+                            new_net_resources.setdefault(pit_id,new_network)
+                            
+                        #private subnet
+                        pit_id = self._get_pit_resource_id(vm_nic_backup, 'subnet_id')
+                        if pit_id in new_net_resources:                        
+                            new_subnet = new_net_resources[pit_id]
+                        else:
+                            vm_nic_subnet = self._get_pit_resource(backupjobrun_vm_common_resources, pit_id)
+                            vm_nic_subnet_backup = self.db.vm_network_resource_backup_get(context, vm_nic_subnet.id)
+                            subnet = pickle.loads(str(vm_nic_subnet_backup.pickle))
+                            params = {'name': subnet['name'],
+                                      'network_id': new_network['id'],
+                                      'tenant_id': context.tenant,
+                                      'cidr': subnet['cidr'],
+                                      'ip_version': subnet['ip_version']} 
+                            new_subnet = network_service.create_subnet(context,**params)
+                            new_net_resources.setdefault(pit_id,new_subnet)
+        
+                        #external network
+                        pit_id = self._get_pit_resource_id(vm_nic_backup, 'ext_network_id')
+                        if pit_id in new_net_resources:
+                            new_ext_network = new_net_resources[pit_id]
+                        else:
+                            vm_nic_ext_network = self._get_pit_resource(backupjobrun_vm_common_resources, pit_id)
+                            vm_nic_ext_network_backup = self.db.vm_network_resource_backup_get(context, vm_nic_ext_network.id)
+                            ext_network = pickle.loads(str(vm_nic_ext_network_backup.pickle))
+                            params = {'name': ext_network['name'],
+                                      'admin_state_up': ext_network['admin_state_up'],
+                                      'shared': ext_network['shared'],
+                                      'router:external': ext_network['router:external']} 
+                            new_ext_network = network_service.create_network(context,**params)
+                            new_net_resources.setdefault(pit_id,new_ext_network)
+                            
+                        #external subnet
+                        pit_id = self._get_pit_resource_id(vm_nic_backup, 'ext_subnet_id')
+                        if pit_id in new_net_resources:
+                            new_ext_subnet = new_net_resources[pit_id]
+                        else:
+                            vm_nic_ext_subnet = self._get_pit_resource(backupjobrun_vm_common_resources, pit_id)
+                            vm_nic_ext_subnet_backup = self.db.vm_network_resource_backup_get(context, vm_nic_ext_subnet.id)
+                            ext_subnet = pickle.loads(str(vm_nic_ext_subnet_backup.pickle))
+                            params = {'name': ext_subnet['name'],
+                                      'network_id': new_ext_network['id'],
+                                      'cidr': ext_subnet['cidr'],
+                                      'ip_version': ext_subnet['ip_version']} 
+                            new_ext_subnet = network_service.create_subnet(context,**params)
+                            new_net_resources.setdefault(pit_id,new_ext_subnet)
+                            
+                        #router
+                        pit_id = self._get_pit_resource_id(vm_nic_backup, 'router_id')
+                        if pit_id in new_net_resources:
+                            new_router = new_net_resources[pit_id]
+                        else:
+                            vm_nic_router = self._get_pit_resource(backupjobrun_vm_common_resources, pit_id)
+                            vm_nic_router_backup = self.db.vm_network_resource_backup_get(context, vm_nic_router.id)
+                            router = pickle.loads(str(vm_nic_router_backup.pickle))
+                            params = {'name': router['name'],
+                                      'tenant_id': context.tenant} 
+                            new_router = network_service.create_router(context,**params)
+                            new_net_resources.setdefault(pit_id,new_router)
+                        
+                        network_service.router_add_interface(context,new_router['id'], subnet_id=new_subnet['id'])
+                        network_service.router_add_gateway(context,new_router['id'], new_ext_network['id'])
+                        
+            return
+        except Exception as err:
+            return;       
     def snapshot_hydrate(self, context, snapshot_id):
         """
         Restore VMs and all its LUNs from a workload
@@ -122,12 +235,14 @@ class WorkloadMgr(manager.SchedulerDependentManager):
         snapshot = self.db.snapshot_get(context, snapshot_id)
         workload = self.db.workload_get(context, snapshot.backupjob_id)
         #self.db.snapshot_update(context, snapshot.id, {'status': 'restoring'})
+        new_net_resources = {}
+        self._restore_networks(context, snapshot, new_net_resources)           
         #TODO(gbasava): Pick the specified vault service from the snapshot
         vault_service = swift.SwiftBackupService(context)
         
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 
-            self.driver.hydrate_instance(workload, snapshot, vm, vault_service, self.db, context)
+            self.driver.hydrate_instance(workload, snapshot, vm, vault_service, new_net_resources, self.db, context)
 
 
     def snapshot_delete(self, context, snapshot_id):

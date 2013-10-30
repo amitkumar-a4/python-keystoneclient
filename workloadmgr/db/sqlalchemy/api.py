@@ -671,7 +671,7 @@ def snapshot_vm_resources_get(context, vm_id, backupjobrun_id, session=None):
     return result
 
 @require_context
-def snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, session=None):
+def snapshot_vm_resource_get_by_resource_name(context, vm_id, backupjobrun_id, resource_name, session=None):
     result = model_query(context, models.BackupJobRunVMResources,
                              session=session).\
         filter_by(vm_id=vm_id).\
@@ -686,7 +686,7 @@ def snapshot_vm_resource_get(context, vm_id, backupjobrun_id, resource_name, ses
 
     return result
 
-def snapshot_vm_resource_get2(context, id, session=None):
+def snapshot_vm_resource_get(context, id, session=None):
     result = model_query(context, models.BackupJobRunVMResources,
                              session=session).\
         filter_by(id=id).\

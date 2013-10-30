@@ -182,6 +182,6 @@ def backup_execute(self, backupjob, backupjobrun, backupjobrun_vm, vault_service
     """
     raise NotImplementedError()        
 
-def hydrate_instance(self, backupjob, backupjobrun, backupjobrun_vm, vault_service, db, context, update_task_state = None):
+def hydrate_instance(self, backupjob, backupjobrun, backupjobrun_vm, vault_service, new_net_resources, db, context, update_task_state = None):
     #Todo
     raise NotImplementedError()
