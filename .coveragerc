@@ -1,7 +1,0 @@
-[run]
-branch = True
-source = workloadmanager
-omit = workloadmanager/tests/*,workloadmanager/openstack/*
-
-[report]
-ignore-errors = True
