@@ -205,7 +205,6 @@ def upgrade(migrate_engine):
     # create all tables
     # Take care on create order for those with FK dependencies
     tables = [services,
-              vault_services,
               workloads,
               workload_vms,
               scheduled_jobs,
@@ -228,7 +227,6 @@ def upgrade(migrate_engine):
 
     if migrate_engine.name == "mysql":
         tables = ["services",
-                  "vault_services",
                   "workloads",
                   "workload_vms",
                   "scheduled_jobs",

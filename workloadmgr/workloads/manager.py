@@ -34,7 +34,6 @@ from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.apscheduler.scheduler import Scheduler
-from workloadmgr.workloadmgr import workloadmgr
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 

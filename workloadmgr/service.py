@@ -46,7 +46,7 @@ service_opts = [
                default="0.0.0.0",
                help='IP address for OpenStack WorkloadMgrs API to listen'),
     cfg.IntOpt('osapi_workloads_listen_port',
-               default=8779,
+               default=8780,
                help='port for WorkloadMgrs api to listen'), ]
 
 FLAGS = flags.FLAGS
