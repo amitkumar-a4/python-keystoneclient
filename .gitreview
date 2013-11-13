@@ -1,0 +1,4 @@
+[gerrit]
+host=review.triliodata.org
+port=29418
+project=triliodata/workloadmanager.git
