@@ -3,11 +3,11 @@
     "admin_or_owner":  [["is_admin:True"], ["project_id:%(project_id)s"]],
     "default": [["rule:admin_or_owner"]],
     "admin_api": [["is_admin:True"]],
-    "workloadmgr:create": [],
-    "workloadmgr:list": [],
-    "workloadmgr:prepare": [],
-    "workloadmgr:execute": [],
-    "workloadmgr:create": [],
-    "workloadmgr:list": [],
-    "workloadmgr:restore": []
+    "workload:create": [],
+    "workload:list": [],
+    "workload:prepare": [],
+    "workload:execute": [],
+    "snapshot:create": [],
+    "snapshot:list": [],
+    "snapshot:restore": []
 }

@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright (c) 2013 TrilioData
+# Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
-# THIS FILE IS MANAGED BY THE GLOBAL REQUIREMENTS REPO - DO NOT EDIT
+
 import setuptools
 
 from workloadmgr.openstack.common import setup as common_setup
@@ -34,15 +34,15 @@ weights = [
 setuptools.setup(
     name=project,
     version= common_setup.get_version(project, '2013.1.3'),
-    description='WorkloadMgr',
-    author='TrilioData',
-    author_email='info@triliodata.com',
-    url='http://www.triliodata.com/',
+    description='Data Protection As a Service',
+    author='OpenStack',
+    author_email='workloadmgr@lists.launchpad.net',
+    url='http://www.openstack.org/',
     classifiers=[
-        'Environment :: TrilioData',
+        'Environment :: OpenStack',
         'Intended Audience :: Information Technology',
         'Intended Audience :: System Administrators',
-        'License :: TrilioData',
+        'License :: OSI Approved :: Apache Software License',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
@@ -61,10 +61,10 @@ setuptools.setup(
     setup_requires=['setuptools_git>=0.4'],
     scripts=['bin/workloadmgr-all',
              'bin/workloadmgr-api',
+             'bin/workloadmgr-workloads',
              'bin/workloadmgr-clear-rabbit-queues',
              'bin/workloadmgr-manage',
              'bin/workloadmgr-rootwrap',
-             'bin/workloadmgr-rpc-zmq-receiver',
              'bin/workloadmgr-scheduler',
-             'bin/workloadmgr-workloads'],
+             'bin/workloadmgr-rpc-zmq-receiver'],
     py_modules=[])

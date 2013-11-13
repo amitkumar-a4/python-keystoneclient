@@ -4,8 +4,8 @@ The :program:`workloadmgr` shell utility
 .. program:: workloadmgr
 .. highlight:: bash
 
-The :program:`workloadmgr` shell utility interacts with the workloadmgr API
-from the command line. It supports the entirety of the workloadmgr API.
+The :program:`workloadmgr` shell utility interacts with the OpenStack WorkloadMgr API
+from the command line. It supports the entirety of the OpenStack WorkloadMgr API.
 
 You'll need to provide :program:`workloadmgr` with your OpenStack username and
 API key. You can do this with the :option:`--os-username`, :option:`--os-password`
@@ -14,7 +14,7 @@ environment variables by setting two environment variables:
 
 .. envvar:: OS_USERNAME or WORKLOADMGR_USERNAME
 
-    Your OpenStack workloadmgr username.
+    Your OpenStack WorkloadMgr username.
 
 .. envvar:: OS_PASSWORD or WORKLOADMGR_PASSWORD
 
@@ -26,11 +26,11 @@ environment variables by setting two environment variables:
 
 .. envvar:: OS_AUTH_URL or WORKLOADMGR_URL
 
-    The API server URL.
+    The OpenStack API server URL.
 
-.. envvar:: OS_WORKLOADMGR_API_VERSION
+.. envvar:: OS_DPAAS_API_VERSION
 
-    The WORKLOADMGR API version.
+    The OpenStack DPAAS API version.
 
 For example, in Bash you'd use::
 
