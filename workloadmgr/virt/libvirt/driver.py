@@ -571,8 +571,15 @@ class LibvirtDriver(driver.ComputeDriver):
                      '--top', backing_file_top]
 
         utils.execute(*virsh_cmd, run_as_root=True)
+        
+    def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None): 
+        if snapshot['snapshot_type'] == 'full' :
+            return self._snapshot_full(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+        else:
+            return self._snapshot_incremental(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+                  
 
-    def snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+    def _snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
         """
         Prepares the backsup for the instance specified in snapshot_vm
 
@@ -701,7 +708,7 @@ class LibvirtDriver(driver.ComputeDriver):
             update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
             update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
             
-    def snapshot_incremental(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+    def _snapshot_incremental(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
         """
         Incremental snapshot of the instance specified in snapshot_vm
 
@@ -832,8 +839,8 @@ class LibvirtDriver(driver.ComputeDriver):
     def _get_pit_resource_id(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
-               pit_id = metadata['value']
-               return pit_id
+                pit_id = metadata['value']
+                return pit_id
     
     def snapshot_restore(self, workload, snapshot, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
         """

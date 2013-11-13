@@ -396,48 +396,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         
         LOG.info(_('create_workload finished. workload: %s'), workload_id)
 
-    def workload_snapshot_incremental(self, context, snapshot_id):
+    def workload_snapshot(self, context, snapshot_id, full):
         """
-        Execute the workload. Invoked by the scheduler
+        Take a snapshot of the workload
         """
-        LOG.info(_('snapshot(incremental) workload started, snapshot_id %s:' %snapshot_id))
+        LOG.info(_('snapshot workload started, snapshot_id %s' %snapshot_id))
         snapshot = self.db.snapshot_get(context, snapshot_id)
-
-        """
-        Make sure the workload has a full snapshot before scheduling an incremental snapshot
-        """
-        workload = self.db.workload_get(context, snapshot.workload_id)
-        self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
-        vault_service = swift.get_vault_service(context)
-        #take a snapshot of each VM
-        for vm in self.db.workload_vms_get(context, snapshot.workload_id): 
-            #create an entry for the VM
-            options = {'vm_id': vm.vm_id,
-                       'snapshot_id': snapshot_id,
-                       'snapshot_type':'incremental',
-                       'status': 'creating'}
-            snapshot_vm = self.db.snapshot_vm_create(context, options) 
-            self.driver.snapshot_incremental(workload, snapshot, snapshot_vm, vault_service, self.db, context)
-            #TODO(gbasava): Check for the success (and update)
-            snapshot_vm.update({'status': 'available',})
-            #TODO(gbasava): handle the case where this can be updated by multiple snapshots coming from 
-            #different workloadmgr.
-            self.db.vm_recent_snapshot_update(context, vm.vm_id, {'snapshot_id': snapshot.id})
         
-        self._snapshot_networks(context, snapshot)    
-        #TODO(gbasava): Check for the success (and update)                
-        self.db.snapshot_update(context, snapshot.id, {'status': 'available'})   
-
-        #workloadmgr_service = workloadmgr.API()
-        #workloadmgr_service.hydrate(context, snapshot['id'])                          
+        #TODO(giri): Make sure the workload has a full snapshot before scheduling an incremental snapshot
+        if full == True:
+            snapshot_type = 'full'
+        else:
+            snapshot_type = 'incremental'
             
-    def workload_snapshot_full(self, context, snapshot_id):
-        """
-        Prepare the workload by doing taking full snapshot 
-        """
-        LOG.info(_('snapshot(full) workload started, snapshot_id %s:' %snapshot_id))
-        snapshot = self.db.snapshot_get(context, snapshot_id)
-
         workload = self.db.workload_get(context, snapshot.workload_id)
         self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
         vault_service = swift.get_vault_service(context)
@@ -445,11 +416,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #create an entry for the VM
             options = {'vm_id': vm.vm_id,
                        'snapshot_id': snapshot_id,
-                       'snapshot_type':'full',
+                       'snapshot_type': snapshot_type,
                        'status': 'creating',}
             snapshot_vm = self.db.snapshot_vm_create(context, options)
             #disks snapshot
-            self.driver.snapshot_full(workload, snapshot, snapshot_vm, vault_service, self.db, context)
+            self.driver.snapshot(workload, snapshot, snapshot_vm, vault_service, self.db, context)
             #TODO(giri): Check for the success (and update)
             snapshot_vm.update({'status': 'available',})
             #TODO(giri): handle the case where this can be updated by multiple workload snapshot requests coming from 

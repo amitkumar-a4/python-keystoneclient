@@ -96,24 +96,7 @@ class API(base.Base):
                                          workload['host'],
                                          workload['id'])
 
-    def workload_snapshot_full(self, context, workload_id):
-        """
-        Make the RPC call to snapshot(full) a workload.
-        """
-        workload = self.workload_get(context, workload_id)
-        if workload['status'] in ['running']:
-            msg = _('Workload snapshot job is already executing, ignoring this execution')
-            raise exception.InvalidWorkloadMgr(reason=msg)
-
-        options = {'user_id': context.user_id,
-                   'project_id': context.project_id,
-                   'workload_id': workload_id,
-                   'snapshot_type': 'full',
-                   'status': 'creating',}
-        snapshot = self.db.snapshot_create(context, options)
-        self.workloads_rpcapi.workload_snapshot_full(context, workload['host'], snapshot['id'])
-
-    def workload_snapshot_incremental(self, context, workload_id):
+    def workload_snapshot(self, context, workload_id, full):
         """
         Make the RPC call to snapshot a workload.
         """
@@ -121,14 +104,17 @@ class API(base.Base):
         if workload['status'] in ['running']:
             msg = _('Workload snapshot job is already executing, ignoring this execution')
             raise exception.InvalidWorkloadMgr(reason=msg)
-
+        if full == True:
+            snapshot_type = 'full'
+        else:
+            snapshot_type = 'incremental'
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'workload_id': workload_id,
-                   'snapshot_type': 'incremental',
+                   'snapshot_type': snapshot_type,
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
-        self.workloads_rpcapi.workload_snapshot_incremental(context, workload['host'], snapshot['id'])
+        self.workloads_rpcapi.workload_snapshot(context, workload['host'], snapshot['id'], full)
 
     def snapshot_get(self, context, snapshot_id):
         rv = self.db.snapshot_get(context, snapshot_id)
@@ -140,7 +126,7 @@ class API(base.Base):
     
     def snapshot_get_all(self, context, workload_id=None):
         if workload_id:
-             snapshots = self.db.snapshot_get_all_by_project_workload(
+            snapshots = self.db.snapshot_get_all_by_project_workload(
                                                     context,
                                                     context.project_id,
                                                     workload_id)

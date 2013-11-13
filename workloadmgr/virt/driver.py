@@ -159,7 +159,7 @@ def load_compute_driver(virtapi, compute_driver=None):
 def compute_driver_matches(match):
     return CONF.compute_driver.endswith(match)
 
-def snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
     """
     Full snapshot of the instance specified in snapshot_vm
 
@@ -170,17 +170,6 @@ def snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, cont
     """
     raise NotImplementedError()    
     
-def snapshot_incremental(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
-    """
-    Incremental snapshot of the instance specified in snapshot_vm
-
-    :param workload: 
-    :param snapshot: 
-    :param snapshot_vm: 
-
-    """
-    raise NotImplementedError()        
-
 def snapshot_restore(self, workload, snapshot, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
     
     raise NotImplementedError()        

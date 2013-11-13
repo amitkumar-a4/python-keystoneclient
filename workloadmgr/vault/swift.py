@@ -189,7 +189,7 @@ class SwiftBackupService(base.Base):
         LOG.debug(_('_read_metadata finished (%s)') % metadata)
         return metadata
 
-    def backup(self, snapshot_metadata, file_to_snapshot_path):
+    def store(self, snapshot_metadata, file_to_snapshot_path):
         """Backup the given file to swift using the given snapshot metadata."""
 
         try:
@@ -326,7 +326,7 @@ class SwiftBackupService(base.Base):
        
         self._restore_v1(snapshot_metadata, restore_to_file_path)
         
-        LOG.debug(_('restore of snapshot %s finished.') % metadata['snapshot_id'])
+        LOG.debug(_('restore of snapshot %s finished.') % snapshot_metadata['snapshot_id'])
 
     def delete(self, snapshot):
         """Delete the given snapshot from swift."""

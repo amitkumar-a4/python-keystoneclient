@@ -42,22 +42,14 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                                 workload_id=workload_id),
                   topic=topic)
 
-    def workload_snapshot_incremental(self, ctxt, host, snapshot_id):
-        LOG.debug("snapshot(incremental) workload in rpcapi snapshot_id %s", snapshot_id)
+    def workload_snapshot(self, ctxt, host, snapshot_id, full):
+        LOG.debug("snapshot workload in rpcapi snapshot_id:%s full:%s", snapshot_id, full)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
         self.cast(ctxt,
-                  self.make_msg('workload_snapshot_incremental',
-                                snapshot_id=snapshot_id),
-                  topic=topic)
-
-    def workload_snapshot_full(self, ctxt, host, snapshot_id):
-        LOG.debug("snapshot(full) workload in rpcapi snapshot_id %s", snapshot_id)
-        topic = rpc.queue_get_for(ctxt, self.topic, host)
-        LOG.debug("create queue topic=%s", topic)
-        self.cast(ctxt,
-                  self.make_msg('workload_snapshot_full',
-                                snapshot_id=snapshot_id),
+                  self.make_msg('workload_snapshot',
+                                snapshot_id=snapshot_id,
+                                full=full),
                   topic=topic)
 
     def workload_delete(self, ctxt, host, workload_id):
