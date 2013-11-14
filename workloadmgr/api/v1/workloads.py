@@ -138,7 +138,7 @@ class WorkloadMgrsController(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=unicode(error))
 
         return webob.Response(status_int=202)
-
+    
     @wsgi.serializers(xml=WorkloadMgrsTemplate)
     def index(self, req):
         """Returns a summary list of workloads."""

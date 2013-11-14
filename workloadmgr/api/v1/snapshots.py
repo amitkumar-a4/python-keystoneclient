@@ -131,19 +131,20 @@ class SnapshotsController(wsgi.Controller):
         return webob.Response(status_int=202)
 
     @wsgi.serializers(xml=SnapshotsTemplate)
-    def index(self, req):
+    def index(self, req, workload_id=None):
         """Returns a summary list of snapshots."""
-        return self._get_snapshots(req, is_detail=False)
+        return self._get_snapshots(req, workload_id, is_detail=False)
 
     @wsgi.serializers(xml=SnapshotsTemplate)
-    def detail(self, req):
+    def detail(self, req, workload_id=None):
         """Returns a detailed list of snapshots."""
-        return self._get_snapshots(req, is_detail=True)
+        return self._get_snapshots(req, workload_id, is_detail=True)
 
-    def _get_snapshots(self, req, is_detail):
+    def _get_snapshots(self, req, workload_id, is_detail):
         """Returns a list of snapshots, transformed through view builder."""
         context = req.environ['workloadmgr.context']
-        workload_id = req.GET.get('workload_id', None)
+        if workload_id and (not workload_id):
+            workload_id = req.GET.get('workload_id', None)
         if workload_id:
             snapshots = self.workload_api.snapshot_get_all(context, workload_id)
         else:
@@ -160,7 +161,7 @@ class SnapshotsController(wsgi.Controller):
     @wsgi.response(202)
     @wsgi.serializers(xml=SnapshotRestoreTemplate)
     @wsgi.deserializers(xml=RestoreDeserializer)
-    def restore(self, req, id):
+    def restore(self, req, id, workload_id=None):
         """Restore an existing snapshot"""
         snapshot_id = id
         LOG.debug(_('Restoring snapshot %(snapshot_id)s') % locals())

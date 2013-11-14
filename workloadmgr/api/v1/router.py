@@ -32,26 +32,53 @@ class APIRouter(workloadmgr.api.APIRouter):
 
         mapper.redirect("", "/")
 
+        
         self.resources['workloads'] = workloads.create_resource()
+        #detail list of workloads
         mapper.resource("workload", "workloads",
                         controller=self.resources['workloads'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
         
+        #take a snapshot of the workload
         mapper.connect("snapshot",
                        "/{project_id}/workloads/{id}",
                        controller=self.resources['workloads'],
                        action='snapshot',
                        conditions={"method": ['POST']})
-
+        
+        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)
+        #detail list of snapshots
         mapper.resource("snapshot", "snapshots",
                         controller=self.resources['snapshots'],
                         collection={'detail': 'GET'},
-                        member={'action': 'POST'})  
+                        member={'action': 'POST'})
         
+        #get the list of workload snapshots
+        mapper.connect("snapshots",
+                       "/{project_id}/workloads/{workload_id}/snapshots",
+                       controller=self.resources['snapshots'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the detail list of workload snapshots
+        mapper.connect("snapshots",
+                       "/{project_id}/workloads/{workload_id}/snapshots/detail",
+                       controller=self.resources['snapshots'],
+                       action='detail',
+                       conditions={"method": ['GET']})         
+        
+        #restore a snapshot
         mapper.connect("restore",
                "/{project_id}/snapshots/{id}",
                controller=self.resources['snapshots'],
                action='restore',
-               conditions={"method": ['POST']})      
+               conditions={"method": ['POST']}) 
+        
+        #restore a snapshot
+        mapper.connect("restore2",
+               "/{project_id}/workloads/{workload_id}/snapshots/{id}",
+               controller=self.resources['snapshots'],
+               action='restore',
+               conditions={"method": ['POST']})     
