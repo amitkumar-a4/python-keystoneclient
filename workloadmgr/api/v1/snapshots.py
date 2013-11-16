@@ -143,7 +143,7 @@ class SnapshotsController(wsgi.Controller):
     def _get_snapshots(self, req, workload_id, is_detail):
         """Returns a list of snapshots, transformed through view builder."""
         context = req.environ['workloadmgr.context']
-        if workload_id and (not workload_id):
+        if not workload_id:
             workload_id = req.GET.get('workload_id', None)
         if workload_id:
             snapshots = self.workload_api.snapshot_get_all(context, workload_id)
