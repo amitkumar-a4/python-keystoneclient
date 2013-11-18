@@ -161,7 +161,7 @@ class SnapshotsController(wsgi.Controller):
     @wsgi.response(202)
     @wsgi.serializers(xml=SnapshotRestoreTemplate)
     @wsgi.deserializers(xml=RestoreDeserializer)
-    def restore(self, req, id, workload_id=None):
+    def restore(self, req, id, workload_id=None, body=None):
         """Restore an existing snapshot"""
         snapshot_id = id
         LOG.debug(_('Restoring snapshot %(snapshot_id)s') % locals())

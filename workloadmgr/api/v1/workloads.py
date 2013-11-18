@@ -113,7 +113,7 @@ class WorkloadMgrsController(wsgi.Controller):
 
         return webob.Response(status_int=202)
 
-    def snapshot(self, req, id):
+    def snapshot(self, req, id, body=None):
         """snapshot a workload."""
         LOG.debug(_('snapshot called for workload %s'), id)
         context = req.environ['workloadmgr.context']
