@@ -40,7 +40,7 @@ from workloadmgr.virt import event as virtevent
 from workloadmgr.virt.libvirt import utils as libvirt_utils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import fileutils
-from nova.compute import power_state
+from workloadmgr.virt import power_state
 from workloadmgr.virt import driver
 from workloadmgr.image import glance
 from workloadmgr.volume import cinder
