@@ -25,11 +25,11 @@ import collections
 import pprint
 import uuid
 
-from nova import exception
-from nova.openstack.common.gettextutils import _
-from nova.openstack.common import jsonutils
-from nova.openstack.common import log as logging
-from nova.virt.vmwareapi import error_util
+from workloadmgr import exception
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import jsonutils
+from workloadmgr.openstack.common import log as logging
+from workloadmgr.virt.vmwareapi import error_util
 
 _CLASSES = ['Datacenter', 'Datastore', 'ResourcePool', 'VirtualMachine',
             'Network', 'HostSystem', 'HostNetworkSystem', 'Task', 'session',
@@ -219,7 +219,7 @@ class ManagedObject(object):
             if elem.name == attr:
                 return elem.val
         msg = _("Property %(attr)s not set for the managed object %(name)s")
-        raise exception.NovaException(msg % {'attr': attr,
+        raise exception.WorkloadMgrException(msg % {'attr': attr,
                                              'name': self.__class__.__name__})
 
     def _generate_moid(self, prefix):
@@ -874,7 +874,7 @@ class FakeVim(object):
         s = self._session
         self._session = None
         if s not in _db_content['session']:
-            raise exception.NovaException(
+            raise exception.WorkloadMgrException(
                 _("Logging out a session that is invalid or already logged "
                 "out: %s") % s)
         del _db_content['session'][s]

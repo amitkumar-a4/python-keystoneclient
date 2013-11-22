@@ -1,21 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright (c) 2013 Hewlett-Packard Development Company, L.P.
-# Copyright (c) 2012 VMware, Inc.
-# Copyright (c) 2011 Citrix Systems, Inc.
-# Copyright 2011 OpenStack Foundation
-#
-#    Licensed under the Apache License, Version 2.0 (the "License"); you may
-#    not use this file except in compliance with the License. You may obtain
-#    a copy of the License at
-#
-#         http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-#    License for the specific language governing permissions and limitations
-#    under the License.
+# Copyright (c) 2013 TrilioData, Inc.
+# All Rights Reserved.
 
 """
 A connection to the VMware ESX/vCenter platform.
@@ -27,20 +13,20 @@ import time
 from eventlet import event
 from oslo.config import cfg
 
-from nova import exception
-from nova.openstack.common.gettextutils import _
-from nova.openstack.common import jsonutils
-from nova.openstack.common import log as logging
-from nova.openstack.common import loopingcall
-from nova.openstack.common import uuidutils
-from nova.virt import driver
-from nova.virt.vmwareapi import error_util
-from nova.virt.vmwareapi import host
-from nova.virt.vmwareapi import vim
-from nova.virt.vmwareapi import vim_util
-from nova.virt.vmwareapi import vm_util
-from nova.virt.vmwareapi import vmops
-from nova.virt.vmwareapi import volumeops
+from workloadmgr import exception
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import jsonutils
+from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import loopingcall
+from workloadmgr.openstack.common import uuidutils
+from workloadmgr.virt import driver
+from workloadmgr.virt.vmwareapi import error_util
+from workloadmgr.virt.vmwareapi import host
+from workloadmgr.virt.vmwareapi import vim
+from workloadmgr.virt.vmwareapi import vim_util
+from workloadmgr.virt.vmwareapi import vm_util
+from workloadmgr.virt.vmwareapi import vmops
+from workloadmgr.virt.vmwareapi import volumeops
 
 
 LOG = logging.getLogger(__name__)
@@ -116,6 +102,7 @@ vmwareapi_opts = [
                 help='Whether to use linked clone'),
     ]
 
+
 CONF = cfg.CONF
 CONF.register_opts(vmwareapi_opts, 'vmware')
 
@@ -186,10 +173,11 @@ class VMwareESXDriver(driver.ComputeDriver):
         self._vmops.spawn(context, instance, image_meta, injected_files,
               admin_password, network_info, block_device_info)
 
-    def snapshot(self, context, instance, name, update_task_state):
+    
+    def native_snapshot(self, context, instance, name, update_task_state):
         """Create snapshot from a running VM instance."""
         self._vmops.snapshot(context, instance, name, update_task_state)
-
+    
     def reboot(self, context, instance, network_info, reboot_type,
                block_device_info=None, bad_volumes_callback=None):
         """Reboot VM instance."""
@@ -384,6 +372,9 @@ class VMwareESXDriver(driver.ComputeDriver):
         """List VM instance UUIDs."""
         uuids = self._vmops.list_instances()
         return [uuid for uuid in uuids if uuidutils.is_uuid_like(uuid)]
+    
+            
+
 
 
 class VMwareVCDriver(VMwareESXDriver):
@@ -649,7 +640,7 @@ class VMwareVCDriver(VMwareESXDriver):
         _volumeops = self._get_volumeops_for_compute_node(instance['node'])
         return _volumeops.get_volume_connector(instance)
 
-    def snapshot(self, context, instance, name, update_task_state):
+    def native_snapshot(self, context, instance, name, update_task_state):
         """Create snapshot from a running VM instance."""
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.snapshot(context, instance, name, update_task_state)
@@ -738,6 +729,265 @@ class VMwareVCDriver(VMwareESXDriver):
         """Unplug VIFs from networks."""
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.unplug_vifs(instance, network_info)
+
+    def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None): 
+        if snapshot['snapshot_type'] == 'full' :
+            return self._snapshot_full(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+        else:
+            return self._snapshot_incremental(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+                  
+
+    def _snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+        """
+        Prepares the backsup for the instance specified in snapshot_vm
+
+        :param workload: 
+        :param snapshot: 
+        :param snapshot_vm: 
+        """
+        # Todo - Check the min supported version of the QEMU and Libvirt 
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_PREPARE)    
+            
+        instance_name = self.get_instance_name_by_uuid(snapshot_vm.vm_id)
+        snapshot_directory = os.path.join(CONF.instances_path, snapshot_vm.vm_id)
+        fileutils.ensure_tree(snapshot_directory)
+        snapshot_name = uuid.uuid4().hex
+        snapshot_description = "Snapshot " + snapshot.id + "of WorkloadMgr " + workload.id
+        dev_snapshot_disk_paths = {} # Dictionary that holds dev and snapshot_disk_path
+        devices = self.get_disks(instance_name)
+        for device in devices:
+            dev_snapshot_disk_paths.setdefault(device, 
+                        snapshot_directory + '/' + snapshot_name + '_' + device + '.qcow2' )
+
+        # we may have to powerdown/suspend until the permissions issue is resolved
+        #self.suspend(instance_name)
+        self.snapshot_create_as(instance_name, snapshot_name, 
+                                snapshot_description, dev_snapshot_disk_paths)
+        # Todo - handle the failure of snapshot_create_as
+        self.snapshot_delete(instance_name, snapshot_name, True)
+        
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_SNAPSHOT_CREATED)
+
+        # stream the backing files of the new snapshots
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_UPLOAD_INPROGESS)
+        
+        
+        for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
+            src_backing_path = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)        
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                               'vm_id': snapshot_vm.vm_id,
+                                               'snapshot_id': snapshot.id,       
+                                               'resource_type': 'disk',
+                                               'resource_name':  dev,
+                                               'status': 'creating'}
+
+            snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
+                                                snapshot_vm_resource_values)                                                
+            
+            src_backings = [] # using list as a stack for the disk backings
+            while (src_backing_path != None):
+                src_backings.append(src_backing_path)
+                mode = os.stat(src_backing_path).st_mode
+                if S_ISREG(mode) :
+                    src_backing_path = libvirt_utils.get_disk_backing_file(src_backing_path, basename=False)      
+                else:
+                    src_backing_path = None
+            
+            base_backing_path = None
+            vm_disk_resource_snap_id = None
+            if(len(src_backings) > 0):
+                base_backing_path = src_backings.pop() 
+            while (base_backing_path != None):
+                top_backing_path = None
+                if(len(src_backings) > 0):
+                    top_backing_path = src_backings.pop()
+                    
+                # create an entry in the vm_disk_resource_snaps table
+                vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
+                vm_disk_resource_snap_id = str(uuid.uuid4())
+                vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
+                if(dev == 'vda' and top_backing_path == None):
+                    vm_disk_resource_snap_metadata.setdefault('base_image_ref','TODO')                    
+                vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
+                vm_disk_resource_snap_values = {'id': vm_disk_resource_snap_id,
+                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                             'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                             'metadata': vm_disk_resource_snap_metadata,       
+                                             'top':  (top_backing_path == None),
+                                             'vault_service_id' : '1',
+                                             'status': 'creating'}     
+                                                             
+                vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
+                #upload to vault service
+                vault_service_url = None
+                with utils.temporary_chown(base_backing_path):
+                    vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                      'resource_name':  dev,
+                                      'snapshot_vm_id': snapshot_vm.vm_id,
+                                      'snapshot_id': snapshot.id}
+                    vault_service_url = vault_service.store(vault_metadata, base_backing_path); 
+                # update the entry in the vm_disk_resource_snap table
+                vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
+                                             'vault_service_metadata' : 'None',
+                                             'status': 'completed'} 
+                vm_disk_resource_snap.update(vm_disk_resource_snap_values)
+                base_backing_path = top_backing_path
+
+            if dev == 'vda': 
+                #TODO(gbasava): Base image can be shared by multiple instances...should leave a minimum of 
+                # two qcow2 files in front of the base image
+                continue
+            
+            state = self.get_info(instance_name)['state']    
+            #TODO(gbasava): Walk the qcow2 for each disk device and commit and intermediate qcow2 files into base
+            with utils.temporary_chown(snapshot_disk_path):
+                backing_file = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)
+            with utils.temporary_chown(backing_file):
+                backing_file_backing = libvirt_utils.get_disk_backing_file(backing_file, basename=False)
+            #with utils.temporary_chown(backing_file_backing):
+            
+            if (backing_file_backing != None and backing_file_backing != backing_file):
+                if state == power_state.RUNNING: 
+                    # if the instance is running we will do a blockcommit
+                    self.blockcommit(instance_name, dev, backing_file_backing, backing_file)
+                    utils.delete_if_exists(backing_file)
+                elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
+                    self.commit(backing_file)
+                    utils.delete_if_exists(backing_file)                     
+                    self.rebase(backing_file_backing, snapshot_disk_path)
+                #else: TODO(gbasava): investigate and handle other powerstates     
+
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
+            update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
+            
+    def _snapshot_incremental(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+        """
+        Incremental snapshot of the instance specified in snapshot_vm
+
+        :param workload: 
+        :param snapshot: 
+        :param snapshot_vm: 
+        """
+        
+        #TODO(gbasava): Check if the previous full snapshot exists by calling vm_recent_snapshot_get
+        
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_START)    
+            
+        instance_name = self.get_instance_name_by_uuid(snapshot_vm.vm_id)
+        snapshot_directory = os.path.join(CONF.instances_path, snapshot_vm.vm_id)
+        fileutils.ensure_tree(snapshot_directory)
+ 
+        snapshot_name = uuid.uuid4().hex
+        snapshot_description = "Snapshot " + snapshot.id + "of WorkloadMgr " + workload.id
+        dev_snapshot_disk_paths = {} # Dictionary that holds dev and snapshot_disk_path
+        devices = self.get_disks(instance_name)
+        for device in devices:
+            dev_snapshot_disk_paths.setdefault(device, 
+                        snapshot_directory + '/' + snapshot_name + '_' + device + '.qcow2' )
+
+        #TODo(gbasava): snapshot_create_as is failing with permissions issue while the VM is running
+        #Need
+        self.snapshot_create_as(instance_name, snapshot_name, 
+                                snapshot_description, dev_snapshot_disk_paths)
+        #TODo(gbasava): Handle the failure of snapshot_create_as
+        self.snapshot_delete(instance_name, snapshot_name, True)
+        
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_SNAPSHOT_CREATED)
+        
+        
+        vm_recent_snapshot = db.vm_recent_snapshot_get(context, snapshot_vm.vm_id)  
+         
+                    
+        for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():
+            previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                            context, 
+                                                            snapshot_vm.vm_id, 
+                                                            vm_recent_snapshot.snapshot_id, 
+                                                            dev)
+            previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, 
+                                                                        previous_snapshot_vm_resource.id)
+                 
+            
+            src_backing_path = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)        
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                               'vm_id': snapshot_vm.vm_id,
+                                               'snapshot_id': snapshot.id,       
+                                               'resource_type': 'disk',
+                                               'resource_name':  dev,
+                                               'status': 'creating'}
+
+            snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
+                                                snapshot_vm_resource_values)                                                
+            # create an entry in the vm_disk_resource_snaps table
+            vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
+            vm_disk_resource_snap_id = str(uuid.uuid4())
+            vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
+            vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
+            vm_disk_resource_snap_values = {'id': vm_disk_resource_snap_id,
+                                         'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                         'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                         'metadata': vm_disk_resource_snap_metadata,       
+                                         'top':  True,
+                                         'vault_service_id' : '1',
+                                         'status': 'creating'}     
+                                                         
+            vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
+            #upload to vault service
+            vault_service_url = None
+            with utils.temporary_chown(src_backing_path):
+                vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                  'resource_name':  dev,
+                                  'snapshot_vm_id': snapshot_vm.vm_id,
+                                  'snapshot_id': snapshot.id}
+                vault_service_url = vault_service.store(vault_metadata, src_backing_path); 
+                
+            # update the entry in the vm_disk_resource_snap table
+            vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
+                                         'vault_service_metadata' : 'None',
+                                         'status': 'completed'} 
+            vm_disk_resource_snap.update(vm_disk_resource_snap_values)
+
+                
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
+
+        # do a block commit. 
+        # TODO(gbasava): Consider the case of a base image shared by multiple instances
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_BLOCKCOMMIT_INPROGRESS)
+
+        state = self.get_info(instance_name)['state']
+        
+        for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
+            with utils.temporary_chown(snapshot_disk_path):
+                backing_file = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)
+            with utils.temporary_chown(backing_file):
+                backing_file_backing = libvirt_utils.get_disk_backing_file(backing_file, basename=False)
+            #with utils.temporary_chown(backing_file_backing):
+            # if the instance is running we will do a blockcommit
+            if (backing_file_backing != None and backing_file_backing != backing_file):
+                if state == power_state.RUNNING:
+                    self.blockcommit(instance_name, dev, backing_file_backing, backing_file)
+                    utils.delete_if_exists(backing_file)
+                elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
+                    self.commit(backing_file)
+                    utils.delete_if_exists(backing_file)                     
+                    self.rebase(backing_file_backing, snapshot_disk_path)
+                #else: TODO(gbasava): investigate and handle other powerstates     
+
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_BLOCKCOMMIT_FINISH)
+            update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
 
 
 class VMwareAPISession(object):
@@ -929,7 +1179,8 @@ class VMwareAPISession(object):
                           "status: error %(error_info)s"),
                          {'task_name': task_name, 'task_ref': task_ref,
                           'error_info': error_info})
-                done.send_exception(exception.NovaException(error_info))
+                done.send_exception(exception.WorkloadMgrException(error_info))
         except Exception as excep:
             LOG.warn(_("In vmwareapi:_poll_task, Got this error %s") % excep)
             done.send_exception(excep)
+            

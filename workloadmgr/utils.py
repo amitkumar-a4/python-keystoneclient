@@ -45,6 +45,8 @@ LOG = logging.getLogger(__name__)
 ISO_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 PERFECT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 FLAGS = flags.FLAGS
+_IS_NEUTRON_ATTEMPTED = False
+_IS_NEUTRON = False
 
 synchronized = lockutils.synchronized_with_prefix('workloadmgr-')
 
@@ -1251,4 +1253,104 @@ class FixedIntervalLoopingCall(LoopingCallBase):
 
         greenthread.spawn(_inner)
         return self.done
+
+def is_valid_ipv4(address):
+    """Verify that address represents a valid IPv4 address."""
+    try:
+        return netaddr.valid_ipv4(address)
+    except Exception:
+        return False
+
+
+def is_valid_ipv6(address):
+    try:
+        return netaddr.valid_ipv6(address)
+    except Exception:
+        return False
+
+
+def is_valid_ipv6_cidr(address):
+    try:
+        str(netaddr.IPNetwork(address, version=6).cidr)
+        return True
+    except Exception:
+        return False
+
+
+def get_shortened_ipv6(address):
+    addr = netaddr.IPAddress(address, version=6)
+    return str(addr.ipv6())
+
+
+def get_shortened_ipv6_cidr(address):
+    net = netaddr.IPNetwork(address, version=6)
+    return str(net.cidr)
+
+
+def is_valid_cidr(address):
+    """Check if address is valid
+
+    The provided address can be a IPv6 or a IPv4
+    CIDR address.
+    """
+    try:
+        # Validate the correct CIDR Address
+        netaddr.IPNetwork(address)
+    except netaddr.core.AddrFormatError:
+        return False
+    except UnboundLocalError:
+        # NOTE(MotoKen): work around bug in netaddr 0.7.5 (see detail in
+        # https://github.com/drkjam/netaddr/issues/2)
+        return False
+
+    # Prior validation partially verify /xx part
+    # Verify it here
+    ip_segment = address.split('/')
+
+    if (len(ip_segment) <= 1 or
+            ip_segment[1] == ''):
+        return False
+
+    return True
+
+
+def get_ip_version(network):
+    """Returns the IP version of a network (IPv4 or IPv6).
+
+    Raises AddrFormatError if invalid network.
+    """
+    if netaddr.IPNetwork(network).version == 6:
+        return "IPv6"
+    elif netaddr.IPNetwork(network).version == 4:
+        return "IPv4"
+
+def is_neutron():
+    global _IS_NEUTRON_ATTEMPTED
+    global _IS_NEUTRON
+
+    if _IS_NEUTRON_ATTEMPTED:
+        return _IS_NEUTRON
+
+    try:
+        # compatibility with Folsom/Grizzly configs
+        cls_name = 'workloadmgr.network.neutronv2.api.API' #CONF.network_api_class
+        if cls_name == 'workloadmgr.network.quantumv2.api.API':
+            cls_name = 'workloadmgr.network.neutronv2.api.API'
+        _IS_NEUTRON_ATTEMPTED = True
+
+        from workloadmgr.network.neutronv2 import api as neutron_api
+        _IS_NEUTRON = issubclass(importutils.import_class(cls_name),
+                                 neutron_api.API)
+    except ImportError:
+        _IS_NEUTRON = False
+
+    return _IS_NEUTRON
+
+
+def reset_is_neutron():
+    global _IS_NEUTRON_ATTEMPTED
+    global _IS_NEUTRON
+
+    _IS_NEUTRON_ATTEMPTED = False
+    _IS_NEUTRON = False
 

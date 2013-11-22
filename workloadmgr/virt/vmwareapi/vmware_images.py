@@ -21,12 +21,12 @@ Utility functions for Image transfer.
 
 import os
 
-from nova import exception
-from nova.image import glance
-from nova.openstack.common.gettextutils import _
-from nova.openstack.common import log as logging
-from nova.virt.vmwareapi import io_util
-from nova.virt.vmwareapi import read_write_util
+from workloadmgr import exception
+from workloadmgr.image import glance
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import log as logging
+from workloadmgr.virt.vmwareapi import io_util
+from workloadmgr.virt.vmwareapi import read_write_util
 
 LOG = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ def start_transfer(context, read_file_handle, data_size,
 
         # Log and raise the exception.
         LOG.exception(exc)
-        raise exception.NovaException(exc)
+        raise exception.WorkloadMgrException(exc)
     finally:
         # No matter what, try closing the read and write handles, if it so
         # applies.

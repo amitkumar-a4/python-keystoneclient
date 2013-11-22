@@ -18,9 +18,9 @@
 """
 Exception classes and SOAP response error checking module.
 """
-from nova import exception
+from workloadmgr import exception
 
-from nova.openstack.common.gettextutils import _
+from workloadmgr.openstack.common.gettextutils import _
 
 
 FAULT_NOT_AUTHENTICATED = "NotAuthenticated"
@@ -99,7 +99,7 @@ class FaultCheckers(object):
                     exc_msg_list))
 
 
-class VMwareDriverException(exception.NovaException):
+class VMwareDriverException(exception.WorkloadMgrException):
     """Base class for all exceptions raised by the VMware Driver.
 
     All exceptions raised by the VMwareAPI drivers should raise

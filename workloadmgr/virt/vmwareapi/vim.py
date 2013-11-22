@@ -25,9 +25,9 @@ import httplib
 from oslo.config import cfg
 import suds
 
-from nova.openstack.common.gettextutils import _
-from nova import utils
-from nova.virt.vmwareapi import error_util
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr import utils
+from workloadmgr.virt.vmwareapi import error_util
 
 RESP_NOT_XML_ERROR = 'Response is "text/html", not "text/xml"'
 CONN_ABORT_ERROR = 'Software caused connection abort'

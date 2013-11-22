@@ -25,9 +25,9 @@ from eventlet import event
 from eventlet import greenthread
 from eventlet import queue
 
-from nova import exception
-from nova.openstack.common.gettextutils import _
-from nova.openstack.common import log as logging
+from workloadmgr import exception
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import log as logging
 
 LOG = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class GlanceWriteThread(object):
                         msg = (_("Glance image %s is in killed state") %
                                  self.image_id)
                         LOG.error(msg)
-                        self.done.send_exception(exception.NovaException(msg))
+                        self.done.send_exception(exception.WorkloadMgrException(msg))
                     elif image_status in ["saving", "queued"]:
                         greenthread.sleep(GLANCE_POLL_INTERVAL)
                     else:
@@ -130,7 +130,7 @@ class GlanceWriteThread(object):
                                             "image_id": self.image_id,
                                             "state": image_status}
                         LOG.error(msg)
-                        self.done.send_exception(exception.NovaException(msg))
+                        self.done.send_exception(exception.WorkloadMgrException(msg))
                 except Exception as exc:
                     self.stop()
                     self.done.send_exception(exc)

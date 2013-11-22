@@ -20,12 +20,12 @@
 Utility functions for ESX Networking.
 """
 
-from nova import exception
-from nova.openstack.common.gettextutils import _
-from nova.openstack.common import log as logging
-from nova.virt.vmwareapi import error_util
-from nova.virt.vmwareapi import vim_util
-from nova.virt.vmwareapi import vm_util
+from workloadmgr import exception
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import log as logging
+from workloadmgr.virt.vmwareapi import error_util
+from workloadmgr.virt.vmwareapi import vim_util
+from workloadmgr.virt.vmwareapi import vm_util
 
 LOG = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ def get_vlanid_and_vswitch_for_portgroup(session, pg_name, cluster=None):
         msg = _("ESX SOAP server returned an empty port group "
                 "for the host system in its response")
         LOG.error(msg)
-        raise exception.NovaException(msg)
+        raise exception.WorkloadMgrException(msg)
     port_grps_on_host = port_grps_on_host_ret.HostPortGroup
     for p_gp in port_grps_on_host:
         if p_gp.spec.name == pg_name:
@@ -170,6 +170,6 @@ def create_port_group(session, pg_name, vswitch_name, vlan_id=0, cluster=None):
         # concerned with the port group being created, which is done
         # by the other call, we can ignore the exception.
         if error_util.FAULT_ALREADY_EXISTS not in exc.fault_list:
-            raise exception.NovaException(exc)
+            raise exception.WorkloadMgrException(exc)
     LOG.debug(_("Created Port Group with name %s on "
                 "the ESX host") % pg_name)

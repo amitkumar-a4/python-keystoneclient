@@ -31,22 +31,32 @@ import uuid
 
 from oslo.config import cfg
 
-from nova.api.metadata import base as instance_metadata
-from nova import compute
-from nova.compute import power_state
-from nova.compute import task_states
-from nova import context as nova_context
-from nova import exception
-from nova.openstack.common import excutils
-from nova.openstack.common.gettextutils import _
-from nova.openstack.common import log as logging
-from nova import utils
-from nova.virt import configdrive
-from nova.virt import driver
-from nova.virt.vmwareapi import vif as vmwarevif
-from nova.virt.vmwareapi import vim_util
-from nova.virt.vmwareapi import vm_util
-from nova.virt.vmwareapi import vmware_images
+#Note(Giri): importing instance_metadata from nova will cause import issues
+#from nova.api.metadata import base as instance_metadata
+
+#Note(Giri): importing compute from nova will cause import issues
+#from nova import compute
+
+#Note(Giri): importing task_states from nova will cause import issues
+#from nova.compute import task_states
+
+#Note(Giri): importing context from nova will cause import issues
+#from nova import context as nova_context
+
+#Note(Giri): importing configdrive from nova will cause import issues
+#from workloadmgr.virt import configdrive
+
+from workloadmgr.virt import power_state
+from workloadmgr import exception
+from workloadmgr.openstack.common import excutils
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import log as logging
+from workloadmgr import utils
+from workloadmgr.virt import driver
+from workloadmgr.virt.vmwareapi import vif as vmwarevif
+from workloadmgr.virt.vmwareapi import vim_util
+from workloadmgr.virt.vmwareapi import vm_util
+from workloadmgr.virt.vmwareapi import vmware_images
 
 
 vmware_vif_opts = [
@@ -61,7 +71,8 @@ vmware_group = cfg.OptGroup(name='vmware',
 CONF = cfg.CONF
 CONF.register_group(vmware_group)
 CONF.register_opts(vmware_vif_opts, vmware_group)
-CONF.import_opt('base_dir_name', 'nova.virt.libvirt.imagecache')
+#Note(Giri): workloadmgr.virt.libvirt.imagecache is not available in workloadmgr
+#CONF.import_opt('base_dir_name', 'workloadmgr.virt.libvirt.imagecache')
 CONF.import_opt('vnc_enabled', 'nova.vnc')
 
 LOG = logging.getLogger(__name__)
@@ -83,13 +94,15 @@ class VMwareVMOps(object):
     def __init__(self, session, virtapi, volumeops, cluster=None,
                  datastore_regex=None):
         """Initializer."""
-        self.compute_api = compute.API()
+        
+        #self.compute_api = compute.API()
         self._session = session
         self._virtapi = virtapi
         self._volumeops = volumeops
         self._cluster = cluster
         self._datastore_regex = datastore_regex
-        self._instance_path_base = VMWARE_PREFIX + CONF.base_dir_name
+        #self._instance_path_base = VMWARE_PREFIX + CONF.base_dir_name
+        self._instance_path_base = VMWARE_PREFIX + '_base'
         self._default_root_device = 'vda'
         self._rescue_suffix = '-rescue'
         self._poll_rescue_last_ran = None
@@ -372,6 +385,8 @@ class VMwareVMOps(object):
                       instance=instance)
 
         def _copy_virtual_disk(source, dest):
+            #Note(Giri): configdrive is not available. return 
+            return
             """Copy a sparse virtual disk to a thin virtual disk."""
             # Copy a sparse virtual disk to a thin virtual disk. This is also
             # done to generate the meta-data file whose specifics
@@ -550,6 +565,8 @@ class VMwareVMOps(object):
 
     def _create_config_drive(self, instance, injected_files, admin_password,
                              data_store_name, upload_folder, cookies):
+        #Note(Giri): instance_metadata and configdrive are not available. return 
+        return
         if CONF.config_drive_format != 'iso9660':
             reason = (_('Invalid config_drive_format "%s"') %
                       CONF.config_drive_format)
@@ -714,7 +731,8 @@ class VMwareVMOps(object):
                       instance=instance)
 
         _create_vm_snapshot()
-        update_task_state(task_state=task_states.IMAGE_PENDING_UPLOAD)
+        if update_task_state:
+            update_task_state(task_state=task_states.IMAGE_PENDING_UPLOAD)
 
         def _check_if_tmp_folder_exists():
             # Copy the contents of the VM that were there just before the
@@ -793,8 +811,8 @@ class VMwareVMOps(object):
                 file_path="vmware-tmp/%s-flat.vmdk" % random_name)
             LOG.debug(_("Uploaded image %s") % image_id,
                       instance=instance)
-
-        update_task_state(task_state=task_states.IMAGE_UPLOADING,
+        if update_task_state:
+            update_task_state(task_state=task_states.IMAGE_UPLOADING,
                           expected_state=task_states.IMAGE_PENDING_UPLOAD)
         _upload_vmdk_to_image_repository()
 
@@ -1267,6 +1285,8 @@ class VMwareVMOps(object):
 
     def poll_rebooting_instances(self, timeout, instances):
         """Poll for rebooting instances."""
+        #Note(Giri): nova_context and compute_api are not available. return 
+        return
         ctxt = nova_context.get_admin_context()
 
         instances_info = dict(instance_count=len(instances),
