@@ -418,15 +418,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                        'status': 'creating',}
             snapshot_vm = self.db.snapshot_vm_create(context, options)
             
-            import pdb;pdb.set_trace()
             #TODO(giri) load the driver based on hypervisor of VM
             """
             if 'vmwareapi.VMwareVCDriver' == 'vmwareapi.VMwareVCDriver':
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             elif 'libvirt.LibvirtDriver' == 'libvirt.LibvirtDriver':
-                virtdriver = self.driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             """
-            virtdriver = self.driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             #disks snapshot    
             virtdriver.snapshot(workload, snapshot, snapshot_vm, vault_service, self.db, context)
             #TODO(giri): Check for the success (and update)
@@ -471,9 +470,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if 'vmwareapi.VMwareVCDriver' == 'vmwareapi.VMwareVCDriver':
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             elif 'libvirt.LibvirtDriver' == 'libvirt.LibvirtDriver':
-                virtdriver = self.driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             """
-            virtdriver = self.driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             virtdriver.snapshot_restore(workload, snapshot, vm, vault_service, new_net_resources, self.db, context)
 
 
