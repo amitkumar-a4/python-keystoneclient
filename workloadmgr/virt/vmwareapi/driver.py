@@ -176,7 +176,7 @@ class VMwareESXDriver(driver.ComputeDriver):
     
     def native_snapshot(self, context, instance, name, update_task_state):
         """Create snapshot from a running VM instance."""
-        self._vmops.snapshot(context, instance, name, update_task_state)
+        self._vmops.native_snapshot(context, instance, name, update_task_state)
     
     def reboot(self, context, instance, network_info, reboot_type,
                block_device_info=None, bad_volumes_callback=None):
@@ -730,13 +730,11 @@ class VMwareVCDriver(VMwareESXDriver):
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.unplug_vifs(instance, network_info)
 
-    def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None): 
-        if snapshot['snapshot_type'] == 'full' :
-            return self._snapshot_full(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
-        else:
-            return self._snapshot_incremental(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
-                  
-
+    def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+        #_vmops = self._get_vmops_for_compute_node(instance['node'])
+        _vmops = self._get_vmops_for_compute_node('domain-c26(td-sea-clu01)'    )
+        _vmops.snapshot(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+ 
     def _snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
         """
         Prepares the backsup for the instance specified in snapshot_vm

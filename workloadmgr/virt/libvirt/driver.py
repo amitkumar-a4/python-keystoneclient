@@ -620,11 +620,11 @@ class LibvirtDriver(driver.ComputeDriver):
         for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
             src_backing_path = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                               'vm_id': snapshot_vm.vm_id,
-                                               'snapshot_id': snapshot.id,       
-                                               'resource_type': 'disk',
-                                               'resource_name':  dev,
-                                               'status': 'creating'}
+                                           'vm_id': snapshot_vm.vm_id,
+                                           'snapshot_id': snapshot.id,       
+                                           'resource_type': 'disk',
+                                           'resource_name':  dev,
+                                           'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
                                                 snapshot_vm_resource_values)                                                
