@@ -1681,6 +1681,9 @@ class VMwareVMOps(object):
             LOG.debug(_("Deleted temporary vmdk file %s")
                         % dest_vmdk_file_location, instance=instance)            
         
+        def _replace_last(source_string, replace_what, replace_with):
+            head, sep, tail = source_string.rpartition(replace_what)
+            return head + replace_with + tail        
         
         """
         Steps followed are:
@@ -1733,6 +1736,47 @@ class VMwareVMOps(object):
                    "vmware-tmp/%s.vmdk" % random_name)
         dc_ref = self._get_datacenter_ref_and_name()[0]
 
+        if update_task_state:
+            update_task_state(task_state=task_states.SNAPSHOT_UPLOADING,
+                          expected_state=task_states.SNAPSHOT_PENDING_UPLOAD)                       
+    
+        cookies = self._session._get_vim().client.options.transport.cookiejar
+        vmdk_descriptor = None
+        if full == True:
+            _copy_vmdk_content()
+            vmdk_data_file = "vmware-tmp/%s-flat.vmdk" % random_name
+        else:
+            tmp, vmdk_descriptor_file = vm_util.split_datastore_path(vmdk_file_path_before_snapshot)
+            vmdk_data_file = _replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
+            #get descriptor file contents
+            vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                    self._session._host_ip,
+                                                    self._get_datacenter_ref_and_name()[1],
+                                                    datastore_name,
+                                                    cookies,
+                                                    vmdk_descriptor_file)
+            vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
+            #TODO(giri): throw exception if the size is more than 65536    
+            vmdk_descriptor = vmdk_descriptor_file_handle.read(vmdk_descriptor_file_size)
+            vmdk_descriptor_file_handle.close()
+        
+        tmp_file_on_controller = '/tmp' + '/' + uuid.uuid4().hex + '_' + 'vda' + '.vmdk'
+        vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                self._session._host_ip,
+                                                self._get_datacenter_ref_and_name()[1],
+                                                datastore_name,
+                                                cookies,
+                                                vmdk_data_file)
+                 
+        vmdk_data_file_size = int(vmdk_data_file_handle.get_size())
+        tmp_file_on_controller_handle = open(tmp_file_on_controller,'wb')
+        while vmdk_data_file_size > 0:
+            chunk =  vmdk_data_file_handle.read(65536)
+            tmp_file_on_controller_handle.write(chunk)
+            vmdk_data_file_size -= 65536
+        vmdk_data_file_handle.close()
+        tmp_file_on_controller_handle.close()
+
         # create an entry in the vm_disk_resource_snaps table
         vm_disk_resource_snap_backing_id = None
         vm_disk_resource_snap_id = str(uuid.uuid4())
@@ -1740,6 +1784,7 @@ class VMwareVMOps(object):
         vm_disk_resource_snap_metadata.setdefault('disk_format','vmdk')
         vm_disk_resource_snap_metadata.setdefault('vmware_disktype','thin')
         vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','ide')
+        vm_disk_resource_snap_metadata.setdefault('vmdk_descriptor',vmdk_descriptor)
         vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
                                          'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                          'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
@@ -1749,39 +1794,7 @@ class VMwareVMOps(object):
                                          'status': 'creating'}     
                                              
         vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values) 
-        
-            
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_UPLOADING,
-                          expected_state=task_states.SNAPSHOT_PENDING_UPLOAD)                       
-    
-        cookies = self._session._get_vim().client.options.transport.cookiejar
-        if full == True:
-            _copy_vmdk_content()
-            vmdk_file_path_to_upload = "vmware-tmp/%s-flat.vmdk" % random_name
-        else:
-            vmdk_file_path_to_upload = vmdk_file_path_before_snapshot
-        
-        tmp_file_on_controller = '/tmp' + '/' + uuid.uuid4().hex + '_' + 'vda' + '.vmdk'
-        
-        vmware_http_read_file = read_write_util.VMwareHTTPReadFile(
-                                                self._session._host_ip,
-                                                self._get_datacenter_ref_and_name()[1],
-                                                datastore_name,
-                                                cookies,
-                                                vmdk_file_path_to_upload)
-        
-        import pdb; pdb.set_trace()         
-        vmware_http_read_file_size = int(vmware_http_read_file.get_size())
-        tmp_file_on_controller_handle = open(tmp_file_on_controller,'wb')
-        while vmware_http_read_file_size > 0:
-            chunk =  vmware_http_read_file.read(65536)
-            tmp_file_on_controller_handle.write(chunk)
-            vmware_http_read_file_size -= 65536
-        vmware_http_read_file.close()
-        tmp_file_on_controller_handle.close()
-        import pdb; pdb.set_trace()
- 
+
         vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
                           'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
                           'snapshot_vm_resource_id': snapshot_vm_resource.id,
@@ -1791,14 +1804,17 @@ class VMwareVMOps(object):
 
         vault_service_url = vault_service.store(vault_metadata, tmp_file_on_controller)
         utils.delete_if_exists(tmp_file_on_controller)
-        
+     
+        if full == True:
+            _clean_temp_data()
+                    
         # update the entry in the vm_disk_resource_snap table
         vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                         'vault_service_metadata' : 'None',
                                         'status': 'completed'} 
         vm_disk_resource_snap.update(vm_disk_resource_snap_values)
             
-        _clean_temp_data()    
+            
 
 
 class VMwareVCVMOps(VMwareVMOps):

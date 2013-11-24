@@ -904,17 +904,21 @@ class LibvirtDriver(driver.ComputeDriver):
                 if restored_file_path != file_to_commit:
                     utils.delete_if_exists(file_to_commit)              
 
+            #import pdb; pdb.set_trace()
             #upload to glance
             with file(restored_file_path) as image_file:
                 image_metadata = {'is_public': False,
                                   'status': 'active',
                                   'name': snapshot_vm_resource.id,
                                   'disk_format' : 'ami',
+                                  #'disk_format' : 'vmdk', 
+                                  'container_format' : 'bare',
                                   'properties': {
-                                               'image_location': 'TODO',
-                                               'image_state': 'available',
-                                               'owner_id': context.project_id
-                                               }
+                                                 #'vmware_adaptertype' : 'ide',
+                                                 #'vmware_disktype': 'thin',
+                                                 'image_location': 'TODO',
+                                                 'image_state': 'available',
+                                                 'owner_id': context.project_id}
                                   }
                 #if 'architecture' in base.get('properties', {}):
                 #    arch = base['properties']['architecture']
