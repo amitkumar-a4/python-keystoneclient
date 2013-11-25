@@ -1548,6 +1548,9 @@ class VMwareVMOps(object):
         service_content = self._session._get_vim().get_service_content()
         
         (disks, os_type) = _get_vm_and_vmdk_attribs()
+        
+        _create_vm_snapshot()
+        
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_UPLOADING,
                           expected_state=task_states.SNAPSHOT_PENDING_UPLOAD)          
@@ -1562,7 +1565,7 @@ class VMwareVMOps(object):
             snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
                                                 snapshot_vm_resource_values)                                                
              
-            _create_vm_snapshot()
+            
             if update_task_state:
                 update_task_state(task_state=task_states.SNAPSHOT_PENDING_UPLOAD)
     
