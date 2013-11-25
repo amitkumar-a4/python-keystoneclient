@@ -322,6 +322,46 @@ def get_vmdk_path_and_adapter_type(hardware_devices):
     return (vmdk_file_path, vmdk_controler_key, adapter_type,
             disk_type, unit_number)
 
+def get_disks(hardware_devices):
+    """Gets ALL the vmdk file paths and the storage adapter types."""
+    if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
+        hardware_devices = hardware_devices.VirtualDevice
+
+    adapter_type_dict = {}
+    for device in hardware_devices:
+        if device.__class__.__name__ == "VirtualLsiLogicController":
+            adapter_type_dict[device.key] = "lsiLogic"
+        elif device.__class__.__name__ == "VirtualBusLogicController":
+            adapter_type_dict[device.key] = "busLogic"
+        elif device.__class__.__name__ == "VirtualIDEController":
+            adapter_type_dict[device.key] = "ide"
+        elif device.__class__.__name__ == "VirtualLsiLogicSASController":
+            adapter_type_dict[device.key] = "lsiLogicsas"
+    
+    disks = []
+    for device in hardware_devices:
+        if device.__class__.__name__ == "VirtualDisk":
+            disk = {}
+            disk['label'] = device.deviceInfo.label
+            disk['capacityInKB'] = device.capacityInKB
+            if device.backing.__class__.__name__ == \
+                    "VirtualDiskFlatVer2BackingInfo":
+                disk['vmdk_file_path'] = device.backing.fileName
+                disk['datastore_name'] = split_datastore_path(device.backing.fileName)[0]
+                disk['vmdk_controler_key'] = device.controllerKey
+                if getattr(device.backing, 'thinProvisioned', False):
+                    disk['disk_type'] = "thin"
+                else:
+                    if getattr(device.backing, 'eagerlyScrub', False):
+                        disk['disk_type'] = "eagerZeroedThick"
+                    else:
+                        disk['disk_type'] = "preallocated"
+            disk['unit_number'] = device.unitNumber
+            disk['adapter_type'] = adapter_type_dict.get(disk['vmdk_controler_key'], "")
+            disks.append(disk)
+
+    return disks
+
 
 def get_rdm_disk(hardware_devices, uuid):
     """Gets the RDM disk key."""

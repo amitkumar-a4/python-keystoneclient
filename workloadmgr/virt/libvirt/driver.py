@@ -925,7 +925,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 #    image_metadata['properties']['architecture'] = arch
                 
                 image_service = glance.get_default_image_service()
-                if snapshot_vm_resource.resource_name == 'vda':
+                if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
                     restored_image = image_service.create(context, image_metadata, image_file)
                 else:
                     #TODO(gbasava): Request a feature in cinder to create volume from a file.
