@@ -24,6 +24,8 @@ import uuid
 import time
 from Queue import Queue
 import cPickle as pickle
+import re
+import shutil
 
 from stat import *
 from eventlet import greenio
@@ -543,18 +545,51 @@ class LibvirtDriver(driver.ComputeDriver):
             virsh_cmd = virsh_cmd + ['--metadata']
         utils.execute(*virsh_cmd, run_as_root=True)
   
-    def rebase(self, backing_file_base, backing_file_top):
+    def rebase_qcow2(self, backing_file_base, backing_file_top):
         """rebase the backing_file_top to backing_file_base using unsafe mode
         :param backing_file_base: backing file to rebase to
         :param backing_file_top: top file to rebase
         """
         utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=True)   
 
-    def commit(self, backing_file_top):
+    def commit_qcow2(self, backing_file_top):
         """rebase the backing_file_top to backing_file_base
          :param backing_file_top: top file to commit from to its base
         """
         utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=True)        
+
+    def rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
+        """
+        rebase the top to base
+        """
+        base_path, base_filename = os.path.split(base)
+        orig_base_path, orig_base_filename = os.path.split(orig_base)
+        os.rename(base, os.path.join(base_path,orig_base_filename))
+        top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
+        base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
+        with open(base, "w") as base_descriptor_file:
+            base_descriptor_file.write("%s"%base_descriptor)
+        
+        top_path, top_filename = os.path.split(top)
+        orig_top_path, orig_top_filename = os.path.split(orig_top)
+        if(os.path.isfile(os.path.join(top_path,orig_top_filename))):
+            with open(top, "r") as top_descriptor_file:
+                top_descriptor =  top_descriptor_file.read() 
+        else:
+            os.rename(top, os.path.join(top_path,orig_top_filename))
+        top_descriptor = re.sub(r'parentFileNameHint="([^"]*)"', "parentFileNameHint=\"%s\""%base, top_descriptor)
+        with open(top, "w") as top_descriptor_file:
+            top_descriptor_file.write("%s"%top_descriptor)            
+ 
+    def commit_vmdk(self, file_to_commit, commit_to):
+        """rebase the backing_file_top to backing_file_base
+         :param backing_file_top: top file to commit from to its base
+        """
+        #due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
+        #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
+        utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
+        return commit_to.replace(".vmdk", "-flat.vmdk")      
+
                      
     def blockcommit(self, instance, dev, backing_file_base, backing_file_top):
         """block commit the changes from top to base
@@ -699,9 +734,9 @@ class LibvirtDriver(driver.ComputeDriver):
                     self.blockcommit(instance_name, dev, backing_file_backing, backing_file)
                     utils.delete_if_exists(backing_file)
                 elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
-                    self.commit(backing_file)
+                    self.commit_qcow2(backing_file)
                     utils.delete_if_exists(backing_file)                     
-                    self.rebase(backing_file_backing, snapshot_disk_path)
+                    self.rebase_qcow2(backing_file_backing, snapshot_disk_path)
                 #else: TODO(gbasava): investigate and handle other powerstates     
 
         if update_task_state:
@@ -822,20 +857,15 @@ class LibvirtDriver(driver.ComputeDriver):
                     self.blockcommit(instance_name, dev, backing_file_backing, backing_file)
                     utils.delete_if_exists(backing_file)
                 elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
-                    self.commit(backing_file)
+                    self.commit_qcow2(backing_file)
                     utils.delete_if_exists(backing_file)                     
-                    self.rebase(backing_file_backing, snapshot_disk_path)
+                    self.rebase_qcow2(backing_file_backing, snapshot_disk_path)
                 #else: TODO(gbasava): investigate and handle other powerstates     
 
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_BLOCKCOMMIT_FINISH)
             update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
             
-    def _get_metadata_value(self, vm_network_resource_snap, key):
-        for metadata in vm_network_resource_snap.metadata:
-            if metadata['key'] == key:
-                return metadata['value']            
-          
     def _get_pit_resource_id(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
@@ -848,8 +878,6 @@ class LibvirtDriver(driver.ComputeDriver):
         """  
         restored_image = None
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
-        temp_directory = "/tmp"
-        fileutils.ensure_tree(temp_directory)
         snapshot_vm_resources = db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)        
 
         #network resources
@@ -862,16 +890,27 @@ class LibvirtDriver(driver.ComputeDriver):
                 new_network = new_net_resources[pit_id]
                 nic_info = {}
                 nic_info.setdefault('net-id', new_network['id']) 
-                nic_info.setdefault('v4-fixed-ip', self._get_metadata_value(vm_nic_snapshot, 'ip_address'))
+                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
                 nics.append(nic_info)                        
                                
         #restore, rebase, commit & upload
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
+            temp_directory = os.path.join("/tmp", snapshot_vm_resource.id)
+            try:
+                shutil.rmtree( temp_directory )
+            except OSError as exc:
+                pass
+            fileutils.ensure_tree(temp_directory)
+            
             commit_queue = Queue() # queue to hold the files to be committed                 
             vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
-            restored_file_path = restored_file_path = temp_directory + '/' + vm_disk_resource_snap.id + '_' + snapshot_vm_resource.resource_name + '.qcow2'
+            disk_filename_extention = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
+            restored_file_path =temp_directory + '/' + vm_disk_resource_snap.id + \
+                                '_' + snapshot_vm_resource.resource_name + '.' \
+                                + disk_filename_extention
+            restored_file_path = restored_file_path.replace(" ", "")
             vault_metadata = {'vault_service_url' : vm_disk_resource_snap.vault_service_url,
                               'vault_service_metadata' : vm_disk_resource_snap.vault_service_metadata,
                               'vm_disk_resource_snap_id' : vm_disk_resource_snap.id,
@@ -883,7 +922,10 @@ class LibvirtDriver(driver.ComputeDriver):
             while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get(context, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                restored_file_path_backing = temp_directory + '/' + vm_disk_resource_snap_backing.id + '_' + snapshot_vm_resource_backing.resource_name + '.qcow2'
+                restored_file_path_backing =temp_directory + '/' + vm_disk_resource_snap_backing.id + \
+                                            '_' + snapshot_vm_resource_backing.resource_name + '.' \
+                                            + disk_filename_extention
+                restored_file_path_backing = restored_file_path_backing.replace(" ", "")
                 vault_metadata = {'vault_service_url' : vm_disk_resource_snap_backing.vault_service_url,
                                   'vault_service_metadata' : vm_disk_resource_snap_backing.vault_service_metadata,
                                   'vm_disk_resource_snap_id' : vm_disk_resource_snap_backing.id,
@@ -893,29 +935,44 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'snapshot_id': snapshot_vm_resource_backing.snapshot_id}
                 vault_service.restore(vault_metadata, restored_file_path_backing)     
                 #rebase
-                self.rebase(restored_file_path_backing, restored_file_path)
-                commit_queue.put(restored_file_path, restored_file_path)                                 
+                if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
+                    self.rebase_qcow2(restored_file_path_backing, restored_file_path)
+                elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
+                    self.rebase_vmdk(restored_file_path_backing,
+                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_data_file_name'),
+                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_descriptor'),
+                                     restored_file_path,
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'))               
+                commit_queue.put(restored_file_path)                                 
                 vm_disk_resource_snap = vm_disk_resource_snap_backing
                 restored_file_path = restored_file_path_backing
-             
-            while commit_queue.empty() is not True:
-                file_to_commit = commit_queue.get_nowait()
-                self.commit(file_to_commit)
-                if restored_file_path != file_to_commit:
-                    utils.delete_if_exists(file_to_commit)              
+            
+            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
+                while commit_queue.empty() is not True:
+                    file_to_commit = commit_queue.get_nowait()
+                    self.commit_qcow2(file_to_commit)
+                    if restored_file_path != file_to_commit:
+                        utils.delete_if_exists(file_to_commit)
+            elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
+                if commit_queue.empty() is not True:
+                    commit_queue.put(restored_file_path)
+                    file_to_commit = commit_queue.get_nowait()
+                    commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
+                    commit_to = commit_to.replace(" ", "")
+                    restored_file_path = self.commit_vmdk(file_to_commit, commit_to)
 
-            #import pdb; pdb.set_trace()
             #upload to glance
             with file(restored_file_path) as image_file:
                 image_metadata = {'is_public': False,
                                   'status': 'active',
                                   'name': snapshot_vm_resource.id,
-                                  'disk_format' : 'ami',
-                                  #'disk_format' : 'vmdk', 
+                                  #'disk_format' : 'ami',
+                                  'disk_format' : 'vmdk', 
                                   'container_format' : 'bare',
                                   'properties': {
-                                                 #'vmware_adaptertype' : 'ide',
-                                                 #'vmware_disktype': 'thin',
+                                                 'vmware_adaptertype' : 'ide',
+                                                 'vmware_disktype': 'preallocated',
                                                  'image_location': 'TODO',
                                                  'image_state': 'available',
                                                  'owner_id': context.project_id}
@@ -943,6 +1000,10 @@ class LibvirtDriver(driver.ComputeDriver):
                     time.sleep(30)
                     image_service.delete(context, restored_volume_image['id'])
             utils.delete_if_exists(restored_file_path)
+            try:
+                shutil.rmtree( temp_directory )
+            except OSError as exc:
+                pass
                     
         #create nova instance
         restored_instance_name = uuid.uuid4().hex

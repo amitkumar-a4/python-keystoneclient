@@ -1579,25 +1579,39 @@ class VMwareVMOps(object):
             dc_ref = self._get_datacenter_ref_and_name()[0]
         
             cookies = self._session._get_vim().client.options.transport.cookiejar
-            vmdk_descriptor = None
+
             if full == True:
                 _copy_vmdk_content(disk)
+                vmdk_descriptor_file = "vmware-tmp/%s.vmdk" % random_name
                 vmdk_data_file = "vmware-tmp/%s-flat.vmdk" % random_name
+                vm_disk_resource_snap_backing_id = None
             else:
                 tmp, vmdk_descriptor_file = vm_util.split_datastore_path(disk['vmdk_file_path'])
                 vmdk_data_file = _replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
-                #get descriptor file contents
-                vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
-                                                        self._session._host_ip,
-                                                        self._get_datacenter_ref_and_name()[1],
-                                                        disk['datastore_name'],
-                                                        cookies,
-                                                        vmdk_descriptor_file)
-                vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
-                #TODO(giri): throw exception if the size is more than 65536    
-                vmdk_descriptor = vmdk_descriptor_file_handle.read(vmdk_descriptor_file_size)
-                vmdk_descriptor_file_handle.close()
+                vm_recent_snapshot = db.vm_recent_snapshot_get(context, snapshot_vm.vm_id)
+                previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                context, 
+                                                                snapshot_vm.vm_id, 
+                                                                vm_recent_snapshot.snapshot_id, 
+                                                                disk['label'])
+                previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
+                                                                context, 
+                                                                previous_snapshot_vm_resource.id)
+                vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
+                
             
+
+            vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                    self._session._host_ip,
+                                                    self._get_datacenter_ref_and_name()[1],
+                                                    disk['datastore_name'],
+                                                    cookies,
+                                                    vmdk_descriptor_file)
+            vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
+            #TODO(giri): throw exception if the size is more than 65536    
+            vmdk_descriptor = vmdk_descriptor_file_handle.read(vmdk_descriptor_file_size)
+            vmdk_descriptor_file_handle.close()
+                
             tmp_file_on_controller = '/tmp' + '/' + uuid.uuid4().hex + '_' + disk['label'].replace(' ','') + '.vmdk'
             vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
                                                     self._session._host_ip,
@@ -1616,13 +1630,13 @@ class VMwareVMOps(object):
             tmp_file_on_controller_handle.close()
     
             # create an entry in the vm_disk_resource_snaps table
-            vm_disk_resource_snap_backing_id = None
             vm_disk_resource_snap_id = str(uuid.uuid4())
             vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
             vm_disk_resource_snap_metadata.setdefault('disk_format','vmdk')
             vm_disk_resource_snap_metadata.setdefault('vmware_disktype','thin')
             vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','ide')
             vm_disk_resource_snap_metadata.setdefault('vmdk_descriptor',vmdk_descriptor)
+            vm_disk_resource_snap_metadata.setdefault('vmdk_data_file_name',vmdk_data_file)
             vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
                                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                              'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,

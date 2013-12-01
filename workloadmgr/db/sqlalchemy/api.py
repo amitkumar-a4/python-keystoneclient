@@ -964,3 +964,8 @@ def vm_network_resource_snaps_destroy(context, snapshot_vm_network_resource_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
             
+def get_metadata_value(metadata, key):
+    for metadata in metadata:
+        if metadata['key'] == key:
+            return metadata['value']
+    return None

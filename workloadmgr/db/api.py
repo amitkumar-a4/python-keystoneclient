@@ -246,3 +246,5 @@ def vm_network_resource_snap_get(context, snapshot_vm_resource_id, session=None)
 def vm_network_resource_snaps_destroy(context, snapshot_vm_resource_id):
     return IMPL.vm_network_resource_snaps_destroy(context, snapshot_vm_resource_id)
     
+def get_metadata_value(metadata, key):
+    return IMPL.get_metadata_value(metadata, key)
