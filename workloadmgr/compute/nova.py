@@ -144,8 +144,6 @@ class API(base.Base):
     def get_server(self, context, name):
         """
         Get the server given the name
-
-        :param name: name of the image
         :rtype: :class:`Server`
         """   
     
@@ -154,6 +152,66 @@ class API(base.Base):
         except Exception:
             #TODO(gbasava): Handle the exception 
             return 
+        
+    def get_server_by_id(self, context, id):
+        """
+        :param id to query.
+        :rtype: :class:`Server`
+        """   
+    
+        try:
+            return novaclient(context).servers.find(id=id) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return         
+
+    def stop(self, context, server):
+        """
+        Stop the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context).servers.stop(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return         
+        
+    def start(self, context, server):
+        """
+        Start the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context).servers.start(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return                 
+        
+    def suspend(self, context, server):
+        """
+        Suspend the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context).servers.suspend(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return         
+
+    def resume(self, context, server):
+        """
+        Resume the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context).servers.resume(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return         
                     
     def attach_volume(self, context, server_id, volume_id, device):
         """

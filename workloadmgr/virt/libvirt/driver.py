@@ -1012,7 +1012,22 @@ class LibvirtDriver(driver.ComputeDriver):
         restored_compute_flavor = compute_service.get_flavor(context, 'm1.tiny')
 
         restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=nics)
+        while restored_instance.status != 'ACTIVE':
+            time.sleep(30)
+            restored_instance =  compute_service.get_server_by_id(context, restored_instance.id)
+        compute_service.stop(context, restored_instance.id)
+        time.sleep(10)
         #attach volumes 
         for device, restored_volume in device_restored_volumes.iteritems():
-            compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + device))
-              
+            if device == 'Hard disk 2':
+                devname = 'sdb'
+            elif device == 'Hard disk 3':
+                devname = 'sdc'
+            elif device == 'Hard disk 4':
+                devname = 'sdd'
+            elif device == 'Hard disk 5':
+                devname = 'sde' 
+            else:
+                devname =  device                   
+            compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + devname))
+        compute_service.start(context, restored_instance.id)      
