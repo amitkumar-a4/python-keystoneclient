@@ -40,29 +40,29 @@ from swiftclient import client as swift
 
 LOG = logging.getLogger(__name__)
 
-swiftsnapshot_service_opts = [
-    cfg.StrOpt('snapshot_swift_url',
+wlm_swift_opts = [
+    cfg.StrOpt('wlm_swift_url',
                default='http://localhost:8080/v1/AUTH_',
                help='The URL of the Swift endpoint'),
-    cfg.StrOpt('workload_swift_container',
-               default='workloads',
-               help='The default Swift container to use for workload instances'),
-    cfg.IntOpt('snapshot_swift_object_size',
+    cfg.StrOpt('wlm_swift_container',
+               default='wlm_snapshots',
+               help='The default Swift container to use for workload snapshots'),
+    cfg.IntOpt('wlm_swift_object_size',
                default=524288000,
                help='The size in bytes of Swift snapshot objects'),
-    cfg.IntOpt('workload_swift_retry_attempts',
+    cfg.IntOpt('wlm_swift_retry_attempts',
                default=3,
                help='The number of retries to make for Swift operations'),
-    cfg.IntOpt('workload_swift_retry_backoff',
+    cfg.IntOpt('wlm_swift_retry_backoff',
                default=2,
                help='The backoff time in seconds between Swift retries'),
-    cfg.StrOpt('workload_compression_algorithm',
+    cfg.StrOpt('wlm_compression_algorithm',
                default= 'none', #'zlib',
                help='Compression algorithm (None to disable)'),
 ]
 
 FLAGS = flags.FLAGS
-FLAGS.register_opts(swiftsnapshot_service_opts)
+FLAGS.register_opts(wlm_swift_opts)
 
 
 class SwiftBackupService(base.Base):
@@ -89,14 +89,14 @@ class SwiftBackupService(base.Base):
 
     def __init__(self, context, db_driver=None):
         self.context = context
-        self.swift_url = '%s%s' % (FLAGS.snapshot_swift_url,
+        self.swift_url = '%s%s' % (FLAGS.wlm_swift_url,
                                    self.context.project_id)
         self.az = FLAGS.storage_availability_zone
-        self.data_block_size_bytes = FLAGS.snapshot_swift_object_size
-        self.swift_attempts = FLAGS.workload_swift_retry_attempts
-        self.swift_backoff = FLAGS.workload_swift_retry_backoff
+        self.data_block_size_bytes = FLAGS.wlm_swift_object_size
+        self.swift_attempts = FLAGS.wlm_swift_retry_attempts
+        self.swift_backoff = FLAGS.wlm_swift_retry_backoff
         self.compressor = \
-            self._get_compressor(FLAGS.workload_compression_algorithm)
+            self._get_compressor(FLAGS.wlm_compression_algorithm)
         self.conn = swift.Connection(None, None, None,
                                      retries=self.swift_attempts,
                                      preauthurl=self.swift_url,
@@ -124,7 +124,7 @@ class SwiftBackupService(base.Base):
         LOG.debug(_('_create_container started, container: %(container)s,'
                     'snapshot: %(snapshot_id)s') % locals())
         if container is None:
-            container = FLAGS.snapshot_swift_container
+            container = FLAGS.wlm_swift_container
         if not self._check_container_exists(container):
             self.conn.put_container(container)
         return container
@@ -220,7 +220,7 @@ class SwiftBackupService(base.Base):
                 break
             LOG.debug(_('reading chunk of data from volume'))
             if self.compressor is not None:
-                algorithm = FLAGS.workload_compression_algorithm.lower()
+                algorithm = FLAGS.wlm_compression_algorithm.lower()
                 obj[object_name]['compression'] = algorithm
                 data_size_bytes = len(data)
                 data = self.compressor.compress(data)
