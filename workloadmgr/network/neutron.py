@@ -19,9 +19,15 @@ from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
 
 neutron_opts = [
-    cfg.StrOpt('neutron_url',
+    cfg.StrOpt('neutron_production_url',
                default='http://localhost:9696',
-               help='URL for connecting to neutron'),
+               help='URL for connecting to production neutron'),
+    cfg.StrOpt('neutron_tvault_url',
+               default='http://localhost:9696',
+               help='URL for connecting to tvault neutron'), 
+    cfg.StrOpt('neutron_admin_auth_url',
+               default='http://localhost:5000/v2.0',
+               help='auth url for connecting to quantum in admin context'),                
     cfg.IntOpt('neutron_url_timeout',
                default=30,
                help='timeout value for connecting to neutron in seconds'),
@@ -38,9 +44,6 @@ neutron_opts = [
     cfg.StrOpt('neutron_region_name',
                default=None,
                help='region name for connecting to neutron in admin context'),
-    cfg.StrOpt('neutron_admin_auth_url',
-               default='http://localhost:5000/v2.0',
-               help='auth url for connecting to quantum in admin context'),
     cfg.BoolOpt('neutron_api_insecure',
                 default=False,
                 help='if set, ignore any SSL validation issues'),
@@ -73,11 +76,15 @@ def _get_auth_token():
             LOG.exception(_("_get_auth_token() failed"))
     return httpclient.auth_token
 
-def _get_client(token=None):
+def _get_client(token=None, production= True):
     if not token and CONF.neutron_auth_strategy:
         token = _get_auth_token()
+    if production == True:
+        neutron_url = CONF.neutron_production_url
+    else:
+        neutron_url = CONF.neutron_tvault_url
     params = {
-        'endpoint_url': CONF.neutron_url,
+        'endpoint_url': neutron_url,
         'timeout': CONF.neutron_url_timeout,
         'insecure': CONF.neutron_api_insecure,
     }
@@ -87,7 +94,7 @@ def _get_client(token=None):
         params['auth_strategy'] = None
     return clientv20.Client(**params)
 
-def get_client(context, admin=False):
+def get_client(context, admin=False, production = True):
     if admin:
         token = None
     else:
@@ -96,15 +103,18 @@ def get_client(context, admin=False):
     
 class API(base.Base):
     """API for interacting with the network manager."""
+    
+    def __init__(self, production = True):
+        self._production = production        
 
     def get_ports(self, context, **search_opts):
-        return get_client(context, admin=True).list_ports(**search_opts)
+        return get_client(context, admin=True, production=self._production).list_ports(**search_opts)
 
     def get_port(self, context, port_id):
-        return get_client(context, admin=True).show_port(port_id)
+        return get_client(context, admin=True, production=self._production).show_port(port_id)
     
     def create_subnet(self, context, **kwargs):
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
         body = {'subnet': kwargs}
         subnet = client.create_subnet(body=body).get('subnet')        
         subnet['label'] = subnet['name']
@@ -122,7 +132,7 @@ class API(base.Base):
         if not fixed_ips:
             return []
         search_opts = {'id': [ip['subnet_id'] for ip in fixed_ips]}
-        data = get_client(context, admin=True).list_subnets(**search_opts)
+        data = get_client(context, admin=True, production=self._production).list_subnets(**search_opts)
         return data
         """
         ipam_subnets = data.get('subnets', [])
@@ -157,20 +167,20 @@ class API(base.Base):
         """   
 
     def create_network(self, context, **kwargs):
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
         body = {'network': kwargs}
         network = client.create_network(body=body).get('network')        
         network['label'] = network['name']
         return network
 
     def get_network(self, context, network_uuid):
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
         network = client.show_network(network_uuid).get('network') or {}
         network['label'] = network['name']
         return network
 
     def get_networks(self, context):
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
         networks = client.list_networks().get('networks')
         for network in networks:
             network['label'] = network['name']
@@ -182,7 +192,7 @@ class API(base.Base):
         The list contains networks owned by the tenant and public networks.
         If net_ids specified, it searches networks with requested IDs only.
         """
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
 
         # If user has specified networks,
         # add them to **search_opts
@@ -205,7 +215,7 @@ class API(base.Base):
         return nets
     
     def create_router(self, context, **kwargs):
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
         body = {'router': kwargs}
         router = client.create_router(body=body).get('router')        
         router['label'] = router['name']
@@ -213,7 +223,7 @@ class API(base.Base):
         
     def get_routers(self, context):
         """Fetches a list of all routers for a tenant."""
-        client = get_client(context, admin=True)
+        client = get_client(context, admin=True, production=self._production)
         search_opts = {}
         routers = client.list_routers(**search_opts).get('routers', [])
         return routers
@@ -224,7 +234,7 @@ class API(base.Base):
             body['subnet_id'] = subnet_id
         if port_id:
             body['port_id'] = port_id
-        get_client(context, admin=True).add_interface_router(router_id, body)
+        get_client(context, admin=True, production=self._production).add_interface_router(router_id, body)
     
     
     def router_remove_interface(request, router_id, subnet_id=None, port_id=None):
@@ -233,12 +243,12 @@ class API(base.Base):
             body['subnet_id'] = subnet_id
         if port_id:
             body['port_id'] = port_id
-        get_client(context, admin=True).remove_interface_router(router_id, body)
+        get_client(context, admin=True, production=self._production).remove_interface_router(router_id, body)
     
     
     def router_add_gateway(self, context, router_id, network_id):
         body = {'network_id': network_id}
-        get_client(context, admin=True).add_gateway_router(router_id, body)
+        get_client(context, admin=True, production=self._production).add_gateway_router(router_id, body)
     
         
 

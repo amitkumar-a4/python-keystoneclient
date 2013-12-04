@@ -27,6 +27,7 @@ import os
 import socket
 import StringIO
 import time
+import types
 
 import eventlet
 from oslo.config import cfg
@@ -191,7 +192,7 @@ class SwiftBackupService(base.Base):
 
     def store(self, snapshot_metadata, file_to_snapshot_path):
         """Backup the given file to swift using the given snapshot metadata."""
-
+           
         try:
             container = self._create_container(self.context, snapshot_metadata)
         except socket.error as err:
@@ -262,6 +263,7 @@ class SwiftBackupService(base.Base):
 
     def _restore_v1(self, snapshot_metadata, restore_to_file_path):
         """Restore a v1 swift volume snapshot from swift."""
+
         try:
             container = self._create_container(self.context, snapshot_metadata)
         except socket.error as err:
@@ -316,13 +318,15 @@ class SwiftBackupService(base.Base):
         
     def restore(self, snapshot_metadata, restore_to_file_path):
         """Restore to the given file from swift."""
+     
+        """
         try:
             container = self._create_container(self.context, snapshot_metadata)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
         object_prefix = self._generate_swift_object_name_prefix(snapshot_metadata)
- 
+         """
        
         self._restore_v1(snapshot_metadata, restore_to_file_path)
         
@@ -360,5 +364,3 @@ class SwiftBackupService(base.Base):
         LOG.debug(_('delete %s finished') % snapshot_metadata['snapshot_id'])
 
 
-def get_vault_service(context):
-    return SwiftBackupService(context)

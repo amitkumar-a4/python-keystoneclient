@@ -25,16 +25,23 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 
 glance_opts = [
-    cfg.StrOpt('glance_host',
+    cfg.StrOpt('glance_production_host',
                default='$my_ip',
-               help='default glance hostname or ip'),
+               help='default glance hostname or ip of production'),
+    cfg.StrOpt('glance_tvault_host',
+               default='$my_ip',
+               help='default glance hostname or ip of tvault'),               
     cfg.IntOpt('glance_port',
                default=9292,
                help='default glance port'),
-    cfg.ListOpt('glance_api_servers',
-                default=['$glance_host:$glance_port'],
+    cfg.ListOpt('glance_production_api_servers',
+                default=['$glance_production_host:$glance_port'],
                 help='A list of the glance api servers available to workloadmgr '
                      '([hostname|ip]:port)'),
+    cfg.ListOpt('glance_tvault_api_servers',
+                default=['$glance_tvault_host:$glance_port'],
+                help='A list of the glance api servers available to workloadmgr '
+                     '([hostname|ip]:port)'),               
     cfg.StrOpt('glance_protocol',
                 default='http',
                 help='Default protocol to use when connecting to glance. '
@@ -51,29 +58,6 @@ glance_opts = [
                 help='A list of url scheme that can be downloaded directly '
                      'via the direct_url.  Currently supported schemes: '
                      '[file].'),
-               
-               
-    cfg.StrOpt('glance_host',
-               default='$my_ip',
-               help='default glance hostname or ip'),
-    cfg.IntOpt('glance_port',
-               default=9292,
-               help='default glance port'),
-    cfg.ListOpt('glance_api_servers',
-                default=['$glance_host:$glance_port'],
-                help='A list of the glance api servers available to workloadmgr '
-                     '([hostname|ip]:port)'),
-    cfg.IntOpt('glance_api_version',
-               default=1,
-               help='Version of the glance api to use'),
-    cfg.IntOpt('glance_num_retries',
-               default=0,
-               help='Number retries when downloading an image from glance'),
-    cfg.BoolOpt('glance_api_insecure',
-                default=False,
-                help='Allow to perform insecure SSL (https) requests to '
-                'glance'),
-               
     ]
 
 LOG = logging.getLogger(__name__)
@@ -81,15 +65,20 @@ CONF = cfg.CONF
 CONF.register_opts(glance_opts)
 
 
-def generate_glance_url():
+def generate_glance_url(production):
     """Generate the URL to glance."""
-    return "%s://%s:%d" % (CONF.glance_protocol, CONF.glance_host,
+    if production == True:
+        glance_host = CONF.glance_production_host
+    else:
+        glance_host = CONF.glance_tvault_host
+            
+    return "%s://%s:%d" % (CONF.glance_protocol, glance_host,
                            CONF.glance_port)
 
 
-def generate_image_url(image_ref):
+def generate_image_url(image_ref, production):
     """Generate an image URL from an image_ref."""
-    return "%s/images/%s" % (generate_glance_url(), image_ref)
+    return "%s/images/%s" % (generate_glance_url(production), image_ref)
 
 
 def _parse_image_ref(image_href):
@@ -122,14 +111,20 @@ def _create_glance_client(context, host, port, use_ssl, version=1):
     return glanceclient.Client(str(version), endpoint, **params)
 
 
-def get_api_servers():
+def get_api_servers(production):
     """
     Shuffle a list of CONF.glance_api_servers and return an iterator
     that will cycle through the list, looping around to the beginning
     if necessary.
     """
     api_servers = []
-    for api_server in CONF.glance_api_servers:
+    
+    if production == True:
+        glance_api_servers = CONF.glance_production_api_servers
+    else:
+        glance_api_servers = CONF.glance_tvault_api_servers
+            
+    for api_server in glance_api_servers:
         if '//' not in api_server:
             api_server = 'http://' + api_server
         o = urlparse.urlparse(api_server)
@@ -144,7 +139,7 @@ def get_api_servers():
 class GlanceClientWrapper(object):
     """Glance client wrapper class that implements retries."""
 
-    def __init__(self, context=None, host=None, port=None, use_ssl=False,
+    def __init__(self, production, context=None, host=None, port=None, use_ssl=False,
                  version=1):
         if host is not None:
             self.client = self._create_static_client(context,
@@ -153,6 +148,7 @@ class GlanceClientWrapper(object):
         else:
             self.client = None
         self.api_servers = None
+        self._production = production
 
     def _create_static_client(self, context, host, port, use_ssl, version):
         """Create a client that we'll use for every call."""
@@ -167,7 +163,7 @@ class GlanceClientWrapper(object):
     def _create_onetime_client(self, context, version):
         """Create a client that will be used for one call."""
         if self.api_servers is None:
-            self.api_servers = get_api_servers()
+            self.api_servers = get_api_servers(self._production)
         self.host, self.port, self.use_ssl = self.api_servers.next()
         return _create_glance_client(context,
                                      self.host, self.port,
@@ -206,8 +202,8 @@ class GlanceClientWrapper(object):
 class GlanceImageService(object):
     """Provides storage and retrieval of disk image objects within Glance."""
 
-    def __init__(self, client=None):
-        self._client = client or GlanceClientWrapper()
+    def __init__(self, client=None, production=True):
+        self._client = client or GlanceClientWrapper(production)
 
     def detail(self, context, **kwargs):
         """Calls out to Glance for a list of detailed image information."""
@@ -487,7 +483,7 @@ def _translate_plain_exception(exc_value):
     return exc_value
 
 
-def get_remote_image_service(context, image_href):
+def get_remote_image_service(context, image_href, production=True):
     """Create an image_service and parse the id from the given image_href.
 
     The image_href param can be an href of the form
@@ -504,7 +500,7 @@ def get_remote_image_service(context, image_href):
     #NOTE(bcwaldon): If image_href doesn't look like a URI, assume its a
     # standalone image ID
     if '/' not in str(image_href):
-        image_service = get_default_image_service()
+        image_service = get_default_image_service(production)
         return image_service, image_href
 
     try:
@@ -515,9 +511,9 @@ def get_remote_image_service(context, image_href):
     except ValueError:
         raise exception.InvalidImageRef(image_href=image_href)
 
-    image_service = GlanceImageService(client=glance_client)
+    image_service = GlanceImageService(client=glance_client, production = production)
     return image_service, image_id
 
 
-def get_default_image_service():
-    return GlanceImageService()
+def get_default_image_service(production=True):
+    return GlanceImageService(production=production)

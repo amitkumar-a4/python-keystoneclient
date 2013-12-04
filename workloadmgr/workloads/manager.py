@@ -37,8 +37,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 
-
-from workloadmgr.vault import swift
+from workloadmgr.vault import vault
 
 LOG = logging.getLogger(__name__)
 
@@ -89,13 +88,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         list.append(new_item)
         
        
-    def _snapshot_networks(self, context, snapshot):
+    def _snapshot_networks(self, context, production, snapshot):
         """
         Snapshot the networking configuration of VMs
         """
         try:
-            compute_service = nova.API()
-            network_service =  neutron.API()  
+            compute_service = nova.API(production=production)
+            network_service =  neutron.API(production=production)  
             subnets = []
             networks = []
             routers = []
@@ -266,13 +265,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if snapshot_vm_resource.resource_pit_id == pit_id:
                 return snapshot_vm_resource            
                     
-    def _restore_networks(self, context, snapshot, new_net_resources):
+    def _restore_networks(self, context, production, snapshot, new_net_resources):
         """
         Restore the networking configuration of VMs of the snapshot
         nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
         """
         try:
-            network_service =  neutron.API()  
+            network_service =  neutron.API(production=production)  
 
             snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot.id, snapshot.id)           
             for snapshot_vm in self.db.snapshot_vm_get(context, snapshot.id):
@@ -409,7 +408,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
         workload = self.db.workload_get(context, snapshot.workload_id)
         self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
-        vault_service = swift.get_vault_service(context)
+        vault_service = vault.get_vault_service(context)
         for vm in self.db.workload_vms_get(context, snapshot.workload_id):
             #create an entry for the VM
             options = {'vm_id': vm.vm_id,
@@ -435,7 +434,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #different workloadmgr.
             self.db.vm_recent_snapshot_update(context, vm.vm_id, {'snapshot_id': snapshot.id})
         
-        self._snapshot_networks(context, snapshot)
+        self._snapshot_networks(context, True, snapshot)
         
         #TODO(gbasava): Check for the success (and update)                
         self.db.snapshot_update(context, snapshot.id, {'status': 'available'})   
@@ -461,8 +460,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         #self.db.snapshot_update(context, snapshot.id, {'status': 'restoring'})
         
         new_net_resources = {}
-        self._restore_networks(context, snapshot, new_net_resources)        
-        vault_service = swift.get_vault_service(context)
+        self._restore_networks(context, True, snapshot, new_net_resources)        
+        vault_service = vault.get_vault_service(context)
         
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 

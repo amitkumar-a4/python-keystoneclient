@@ -48,6 +48,7 @@ from workloadmgr.image import glance
 from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
+from workloadmgr.vault import vault
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -75,6 +76,9 @@ libvirt_opts = [
                default='$instances_path/snapshots',
                help='Location where libvirt driver will store snapshots '
                     'before uploading them to image service'),
+    cfg.StrOpt('libvirt_type',
+               default='kvm',
+               help='Libvirt domain type (valid options are: kvm)'),                
     ]
 
 CONF = cfg.CONF
@@ -587,7 +591,7 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         #due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
         #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
-        utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
+        utils.execute( '/usr/vddk/bin/vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
         return commit_to.replace(".vmdk", "-flat.vmdk")      
 
                      
@@ -710,8 +714,8 @@ class LibvirtDriver(driver.ComputeDriver):
                     vault_service_url = vault_service.store(vault_metadata, base_backing_path); 
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
-                                             'vault_service_metadata' : 'None',
-                                             'status': 'completed'} 
+                                                'vault_service_metadata' : 'None',
+                                                'status': 'completed'} 
                 vm_disk_resource_snap.update(vm_disk_resource_snap_values)
                 base_backing_path = top_backing_path
 
@@ -981,7 +985,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 #    arch = base['properties']['architecture']
                 #    image_metadata['properties']['architecture'] = arch
                 
-                image_service = glance.get_default_image_service()
+                image_service = glance.get_default_image_service(production=True)
                 if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
                     restored_image = image_service.create(context, image_metadata, image_file)
                 else:
@@ -1007,7 +1011,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     
         #create nova instance
         restored_instance_name = uuid.uuid4().hex
-        compute_service = nova.API()
+        compute_service = nova.API(production=True)
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
         restored_compute_flavor = compute_service.get_flavor(context, 'm1.tiny')
 

@@ -19,15 +19,12 @@ from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
 
 nova_opts = [
-    cfg.StrOpt('nova_catalog_info',
-               default='compute:nova:publicURL',
-               help='Info to match when looking for nova in the service '
-                    'catalog. Format is : separated values of the form: '
-                    '<service_type>:<service_name>:<endpoint_type>'),
-    cfg.StrOpt('nova_endpoint_template',
+    cfg.StrOpt('nova_production_endpoint_template',
                default= 'http://localhost:8774/v2/%(project_id)s',
-               help='Override service catalog lookup with template for nova '
-                    'endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
+               help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
+    cfg.StrOpt('nova_tvault_endpoint_template',
+               default= 'http://localhost:8774/v2/%(project_id)s',
+               help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),             
     cfg.StrOpt('os_region_name',
                default=None,
                help='region name of this node'),
@@ -43,30 +40,11 @@ CONF.register_opts(nova_opts)
 LOG = logging.getLogger(__name__)
 
     
-def novaclient(context):
-
-    compat_catalog = {
-        # TODO(giri): Check this...   'access': {'serviceCatalog': context.service_catalog or []}
-        'access': []
-    }
-    sc = service_catalog.ServiceCatalog(compat_catalog)
-    if CONF.nova_endpoint_template:
-        url = CONF.nova_endpoint_template % context.to_dict()
+def novaclient(context, production):
+    if production == True:
+        url = CONF.nova_production_endpoint_template % context.to_dict()
     else:
-        info = CONF.nova_catalog_info
-        service_type, service_name, endpoint_type = info.split(':')
-        # extract the region if set in configuration
-        if CONF.os_region_name:
-            attr = 'region'
-            filter_value = CONF.os_region_name
-        else:
-            attr = None
-            filter_value = None
-        url = sc.url_for(attr=attr,
-                         filter_value=filter_value,
-                         service_type=service_type,
-                         service_name=service_name,
-                         endpoint_type=endpoint_type)
+        url = CONF.nova_tvault_endpoint_template % context.to_dict() 
 
     LOG.debug(_('Novaclient connection created using URL: %s') % url)
 
@@ -84,8 +62,11 @@ def novaclient(context):
 
 class API(base.Base):
     """API for interacting with the volume manager."""
+    
+    def __init__(self, production = True):
+        self._production = production    
 
-    def create_server(self, context, name, image, flavor, 
+    def create_server(self, context, name, image, flavor,
                meta=None, files=None,
                reservation_id=None, min_count=None,
                max_count=None, security_groups=None, userdata=None,
@@ -99,6 +80,7 @@ class API(base.Base):
         :param name: Something to name the server.
         :param image: The :class:`Image` to boot with.
         :param flavor: The :class:`Flavor` to boot onto.
+        :param production: If True, production Nova will be used.
         :param meta: A dict of arbitrary key/value metadata to store for this
                      server. A maximum of five entries is allowed, and both
                      keys and values must be 255 characters or less.
@@ -127,7 +109,7 @@ class API(base.Base):
         """
         
         try:
-            item = novaclient(context).servers.create(name, image, flavor, 
+            item = novaclient(context, self._production).servers.create(name, image, flavor, 
                                                       meta, files,
                                                       reservation_id, min_count,
                                                       max_count, security_groups, userdata,
@@ -148,7 +130,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).servers.find(name=name) 
+            return novaclient(context, self._production).servers.find(name=name) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return 
@@ -160,7 +142,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).servers.find(id=id) 
+            return novaclient(context, self._production).servers.find(id=id) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return         
@@ -172,7 +154,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).servers.stop(server=server) 
+            return novaclient(context, self._production).servers.stop(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return         
@@ -184,7 +166,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).servers.start(server=server) 
+            return novaclient(context, self._production).servers.start(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return                 
@@ -196,7 +178,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).servers.suspend(server=server) 
+            return novaclient(context, self._production).servers.suspend(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return         
@@ -208,7 +190,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).servers.resume(server=server) 
+            return novaclient(context, self._production).servers.resume(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return         
@@ -224,7 +206,7 @@ class API(base.Base):
         """   
   
         try:
-            return novaclient(context).volumes.create_server_volume(server_id, volume_id, device) 
+            return novaclient(context, self._production).volumes.create_server_volume(server_id, volume_id, device) 
         except Exception:
             #TODO(gbasava): Handle the exception   
             return 
@@ -238,7 +220,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).images.find(id=id) 
+            return novaclient(context, self._production).images.find(id=id) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return 
@@ -252,7 +234,7 @@ class API(base.Base):
         """   
     
         try:
-            return novaclient(context).flavors.find(name=name) 
+            return novaclient(context, self._production).flavors.find(name=name) 
         except Exception:
             #TODO(gbasava): Handle the exception   
             return  
@@ -264,7 +246,7 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """        
         try:
-            return novaclient(context).servers.interface_list(server=server) 
+            return novaclient(context, self._production).servers.interface_list(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception   
             return              
