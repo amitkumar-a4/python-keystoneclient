@@ -135,12 +135,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             if router_found : break
                             router_port_fixed_ips = router_port['fixed_ips']
                             if router_port_fixed_ips:
-                               for router_port_ip in router_port_fixed_ips:
-                                   if router_found : break
-                                   for subnet in subnets_data['subnets']:
-                                       if router_port_ip['subnet_id'] == subnet['id']:
-                                           router_found = router
-                                           break;
+                                for router_port_ip in router_port_fixed_ips:
+                                    if router_found : break
+                                    for subnet in subnets_data['subnets']:
+                                        if router_port_ip['subnet_id'] == subnet['id']:
+                                            router_found = router
+                                            break;
                                     
                     if router_found:
                         self._append_unique(routers, router_found)

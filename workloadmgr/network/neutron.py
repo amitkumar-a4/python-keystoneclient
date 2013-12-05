@@ -237,7 +237,7 @@ class API(base.Base):
         get_client(context, admin=True, production=self._production).add_interface_router(router_id, body)
     
     
-    def router_remove_interface(request, router_id, subnet_id=None, port_id=None):
+    def router_remove_interface(self, request, router_id, subnet_id=None, port_id=None):
         body = {}
         if subnet_id:
             body['subnet_id'] = subnet_id
