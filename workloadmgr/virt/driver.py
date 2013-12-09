@@ -170,7 +170,7 @@ def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, 
     """
     raise NotImplementedError()    
     
-def snapshot_restore(self, workload, snapshot, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
+def snapshot_restore(self, workload, snapshot, test, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
     
     raise NotImplementedError()        
     

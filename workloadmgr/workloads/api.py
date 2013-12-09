@@ -149,7 +149,7 @@ class API(base.Base):
         self.db.snapshot_update(context, snapshot_id, {'status': 'deleting'})
         self.workloads_rpcapi.snapshot_delete(context,
                                                    snapshot['id'])
-    def snapshot_restore(self, context, snapshot_id):
+    def snapshot_restore(self, context, snapshot_id, test):
         """
         Make the RPC call to restore a snapshot.
         """
@@ -158,7 +158,6 @@ class API(base.Base):
         if snapshot['status'] != 'available':
             msg = _('Snapshot status must be available')
             raise exception.InvalidWorkloadMgr(reason=msg)
-
-        self.workloads_rpcapi.snapshot_restore(context, workload['host'], snapshot['id'])
+        self.workloads_rpcapi.snapshot_restore(context, workload['host'], snapshot['id'], test)
         #TODO(gbasava): Return the restored instances
 

@@ -7,3 +7,4 @@ tee: CommandFilter, /usr/bin/tee, root
 chown: CommandFilter, /bin/chown, root
 qemu-img: CommandFilter, /usr/bin/qemu-img, root
 vmware-vdiskmanager: CommandFilter, /usr/vddk/bin/vmware-vdiskmanager, root
+chmod: CommandFilter, /bin/chmod, root

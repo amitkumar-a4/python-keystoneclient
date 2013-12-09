@@ -99,7 +99,7 @@ def get_client(context, admin=False, production = True):
         token = None
     else:
         token = context.auth_token
-    return _get_client(token=token)
+    return _get_client(token=token, production=production)
     
 class API(base.Base):
     """API for interacting with the network manager."""

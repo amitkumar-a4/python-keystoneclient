@@ -33,3 +33,20 @@ def get_disk_backing_file(path, basename=True):
     return backing_file
 
 
+def execute(*args, **kwargs):
+    return utils.execute(*args, **kwargs)
+ 
+def move_file(src, dest):
+    execute('mv', src, dest)
+    
+def get_instance_path(instance_id, relative=False):
+    """Determine the correct path for instance storage.
+    This method determines the directory name for instance storage
+    :param instance: the instance we want a path for
+    :param relative: if True, just the relative path is returned
+    :returns: a path to store information about that instance
+    """
+    if relative:
+        return instance_id
+    return os.path.join(CONF.instances_path, instance_id)    
+

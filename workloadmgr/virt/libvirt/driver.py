@@ -26,6 +26,7 @@ from Queue import Queue
 import cPickle as pickle
 import re
 import shutil
+import math
 
 from stat import *
 from eventlet import greenio
@@ -40,6 +41,7 @@ from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr.virt import event as virtevent
 from workloadmgr.virt.libvirt import utils as libvirt_utils
+from workloadmgr.virt.libvirt import config as vconfig
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import fileutils
 from workloadmgr.virt import power_state
@@ -566,33 +568,45 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         rebase the top to base
         """
+        
         base_path, base_filename = os.path.split(base)
         orig_base_path, orig_base_filename = os.path.split(orig_base)
         os.rename(base, os.path.join(base_path,orig_base_filename))
-        top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
-        base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
+        if top_descriptor is not None:
+            top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
+            base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
         with open(base, "w") as base_descriptor_file:
             base_descriptor_file.write("%s"%base_descriptor)
         
-        top_path, top_filename = os.path.split(top)
-        orig_top_path, orig_top_filename = os.path.split(orig_top)
-        if(os.path.isfile(os.path.join(top_path,orig_top_filename))):
-            with open(top, "r") as top_descriptor_file:
-                top_descriptor =  top_descriptor_file.read() 
-        else:
-            os.rename(top, os.path.join(top_path,orig_top_filename))
-        top_descriptor = re.sub(r'parentFileNameHint="([^"]*)"', "parentFileNameHint=\"%s\""%base, top_descriptor)
-        with open(top, "w") as top_descriptor_file:
-            top_descriptor_file.write("%s"%top_descriptor)            
+        if top_descriptor is not None:
+            top_path, top_filename = os.path.split(top)
+            orig_top_path, orig_top_filename = os.path.split(orig_top)
+            if(os.path.isfile(os.path.join(top_path,orig_top_filename))):
+                with open(top, "r") as top_descriptor_file:
+                    top_descriptor =  top_descriptor_file.read() 
+            else:
+                os.rename(top, os.path.join(top_path,orig_top_filename))
+            top_descriptor = re.sub(r'parentFileNameHint="([^"]*)"', "parentFileNameHint=\"%s\""%base, top_descriptor)
+            with open(top, "w") as top_descriptor_file:
+                top_descriptor_file.write("%s"%top_descriptor)            
  
-    def commit_vmdk(self, file_to_commit, commit_to):
+    def commit_vmdk(self, file_to_commit, commit_to, test):
         """rebase the backing_file_top to backing_file_base
          :param backing_file_top: top file to commit from to its base
         """
         #due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
         #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
-        utils.execute( '/usr/vddk/bin/vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
-        return commit_to.replace(".vmdk", "-flat.vmdk")      
+        if test:
+            utils.execute( '/usr/vddk/bin/vmware-vdiskmanager', '-r', file_to_commit, '-t 2',  commit_to, run_as_root=False)
+        else:
+            utils.execute( '/usr/vddk/bin/vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
+        utils.chmod(commit_to, '0664')
+        utils.chmod(commit_to.replace(".vmdk", "-flat.vmdk"), '0664')
+        if test:
+            utils.execute('qemu-img', 'convert', '-f', 'vmdk', '-O', 'raw', commit_to, commit_to.replace(".vmdk", ".img"), run_as_root=False)
+            return commit_to.replace(".vmdk", ".img")
+        else:
+            return commit_to.replace(".vmdk", "-flat.vmdk")      
 
                      
     def blockcommit(self, instance, dev, backing_file_base, backing_file_top):
@@ -610,6 +624,44 @@ class LibvirtDriver(driver.ComputeDriver):
                      '--top', backing_file_top]
 
         utils.execute(*virsh_cmd, run_as_root=True)
+        
+    def shutdown_instance(self, instance):
+        instance_name = self.get_instance_name_by_uuid(instance.id)
+        virt_dom = self._lookup_by_name(instance_name)
+        virt_dom.shutdown()
+
+    def reboot_instance(self, instance):
+        instance_name = self.get_instance_name_by_uuid(instance.id)
+        virt_dom = self._lookup_by_name(instance_name)
+        virt_dom.reboot(0)
+        
+    def attach_volume(self, instance, diskpath, mountpoint):
+            instance_name = self.get_instance_name_by_uuid(instance.id)
+            virt_dom = self._lookup_by_name(instance_name)
+            disk_dev = mountpoint.rpartition("/")[2]
+            conf = vconfig.LibvirtConfigGuestDisk()
+            conf.driver_cache = 'writethrough'
+            conf.driver_name = 'qemu'
+            conf.device_type = 'disk'
+            conf.driver_format = "raw"
+            conf.driver_cache = "none"
+            conf.target_dev = disk_dev
+            conf.target_bus = 'virtio'
+            #conf.serial = 'serial'
+            conf.source_type = 'file'
+            conf.source_path = diskpath         
+    
+            try:
+                # NOTE(vish): We can always affect config because our
+                #             domains are persistent, but we should only
+                #             affect live if the domain is running.
+                flags = libvirt.VIR_DOMAIN_AFFECT_CONFIG
+                state = LIBVIRT_POWER_STATE[virt_dom.info()[0]]
+                if state == power_state.RUNNING:
+                    flags |= libvirt.VIR_DOMAIN_AFFECT_LIVE
+                virt_dom.attachDeviceFlags(conf.to_xml(), flags)
+            except Exception, ex:
+                return        
         
     def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None): 
         if snapshot['snapshot_type'] == 'full' :
@@ -876,7 +928,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 pit_id = metadata['value']
                 return pit_id
     
-    def snapshot_restore(self, workload, snapshot, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
+    def snapshot_restore(self, workload, snapshot, test, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
         """
         Restores the specified instance from a snapshot
         """  
@@ -896,7 +948,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 nic_info.setdefault('net-id', new_network['id']) 
                 nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
                 nics.append(nic_info)                        
-                               
+        
+        volume_service = cinder.API()                       
         #restore, rebase, commit & upload
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
@@ -922,7 +975,15 @@ class LibvirtDriver(driver.ComputeDriver):
                               'resource_name':  snapshot_vm_resource.resource_name,
                               'snapshot_vm_id': snapshot_vm_resource.vm_id,
                               'snapshot_id': snapshot_vm_resource.snapshot_id}
-            vault_service.restore(vault_metadata, restored_file_path)                            
+            vault_service.restore(vault_metadata, restored_file_path)
+            if vm_disk_resource_snap.vm_disk_resource_snap_backing_id is None:
+                self.rebase_vmdk(restored_file_path,
+                                 db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
+                                 db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'),
+                                 None,
+                                 None,
+                                 None)               
+                                           
             while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get(context, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
@@ -959,12 +1020,12 @@ class LibvirtDriver(driver.ComputeDriver):
                     if restored_file_path != file_to_commit:
                         utils.delete_if_exists(file_to_commit)
             elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
-                if commit_queue.empty() is not True:
-                    commit_queue.put(restored_file_path)
-                    file_to_commit = commit_queue.get_nowait()
+                    file_to_commit = restored_file_path
                     commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
                     commit_to = commit_to.replace(" ", "")
-                    restored_file_path = self.commit_vmdk(file_to_commit, commit_to)
+                    restored_file_path = self.commit_vmdk(file_to_commit, commit_to, test)
+                    
+                
 
             #upload to glance
             with file(restored_file_path) as image_file:
@@ -985,42 +1046,50 @@ class LibvirtDriver(driver.ComputeDriver):
                 #    arch = base['properties']['architecture']
                 #    image_metadata['properties']['architecture'] = arch
                 
-                image_service = glance.get_default_image_service(production=True)
+                if test:
+                    image_service = glance.get_default_image_service(production=False)
+                else:
+                    image_service = glance.get_default_image_service(production=True)
                 if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
                     restored_image = image_service.create(context, image_metadata, image_file)
                 else:
-                    #TODO(gbasava): Request a feature in cinder to create volume from a file.
-                    #As a workaround we will create the image and covert that to cinder volume
+                    if test == False:
+                        #TODO(gbasava): Request a feature in cinder to create volume from a file.
+                        #As a workaround we will create the image and covert that to cinder volume
+    
+                        restored_volume_image = image_service.create(context, image_metadata, image_file)
+                        restored_volume_name = uuid.uuid4().hex
+                        restored_volume = volume_service.create(context, math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)), restored_volume_name, 'from workloadmgr', None, restored_volume_image['id'], None, None, None)
+                        device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
+                       
+                        #delete the image...it is not needed anymore
+                        #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
+                        time.sleep(30)
+                        image_service.delete(context, restored_volume_image['id'])
+                    else:
+                        device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_file_path)                        
 
-                    restored_volume_image = image_service.create(context, image_metadata, image_file)
-                    restored_volume_name = uuid.uuid4().hex
-                    volume_service = cinder.API()
-                    restored_volume = volume_service.create(context, max(restored_volume_image['size']/(1024*1024*1024), 1), restored_volume_name, 
-                                                        'from workloadmgr', None, restored_volume_image['id'], None, None, None)
-                    device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
-                   
-                    #delete the image...it is not needed anymore
-                    #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
-                    time.sleep(30)
-                    image_service.delete(context, restored_volume_image['id'])
-            utils.delete_if_exists(restored_file_path)
-            try:
-                shutil.rmtree( temp_directory )
-            except OSError as exc:
-                pass
                     
         #create nova instance
         restored_instance_name = uuid.uuid4().hex
-        compute_service = nova.API(production=True)
+        if test:
+            compute_service = nova.API(production=False)
+        else:
+            compute_service = nova.API(production=True)
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
-        restored_compute_flavor = compute_service.get_flavor(context, 'm1.tiny')
-
+        restored_compute_flavor = compute_service.get_flavor(context, 'm1.small')
         restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=nics)
         while restored_instance.status != 'ACTIVE':
             time.sleep(30)
             restored_instance =  compute_service.get_server_by_id(context, restored_instance.id)
-        compute_service.stop(context, restored_instance.id)
-        time.sleep(10)
+        
+        if test == True:
+            #self.shutdown_instance(restored_instance) 
+            #time.sleep(10)
+            pass
+        else:
+            compute_service.stop(context, restored_instance.id)
+            time.sleep(10)
         #attach volumes 
         for device, restored_volume in device_restored_volumes.iteritems():
             if device == 'Hard disk 2':
@@ -1032,6 +1101,31 @@ class LibvirtDriver(driver.ComputeDriver):
             elif device == 'Hard disk 5':
                 devname = 'sde' 
             else:
-                devname =  device                   
-            compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + devname))
-        compute_service.start(context, restored_instance.id)      
+                devname =  device
+            if test == False:
+                while restored_volume['status'] != 'available':
+                    #TODO:(giri) need a timeout to exit
+                    time.sleep(30)
+                    restored_volume = volume_service.get(context, restored_volume['id'])
+                compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + devname))
+                time.sleep(15)
+            else:
+                instance_dir = libvirt_utils.get_instance_path(restored_instance.id)
+                libvirt_utils.move_file(restored_volume, instance_dir)
+                restored_volume = os.path.join(instance_dir, os.path.basename(restored_volume))
+                
+                self.attach_volume(restored_instance, restored_volume, ('/dev/' + devname))
+        if test == True:
+            self.reboot_instance(restored_instance) 
+            time.sleep(10)
+        else:            
+            compute_service.start(context, restored_instance.id)  
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type != 'disk':
+                continue
+            temp_directory = os.path.join("/tmp", snapshot_vm_resource.id)
+            try:
+                shutil.rmtree(temp_directory)
+            except OSError as exc:
+                pass            
+

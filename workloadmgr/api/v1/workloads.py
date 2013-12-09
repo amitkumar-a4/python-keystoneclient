@@ -117,7 +117,7 @@ class WorkloadMgrsController(wsgi.Controller):
         """snapshot a workload."""
         LOG.debug(_('snapshot called for workload %s'), id)
         context = req.environ['workloadmgr.context']
-        full = None;
+        full = None
         if ('QUERY_STRING' in req.environ) :
             qs=parse_qs(req.environ['QUERY_STRING'])
             var = parse_qs(req.environ['QUERY_STRING'])

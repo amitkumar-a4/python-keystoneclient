@@ -59,13 +59,15 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   self.make_msg('workload_delete', workload_id=workload_id),
                   topic=topic)
 
-    def snapshot_restore(self, ctxt, host, snapshot_id):
+    def snapshot_restore(self, ctxt, host, snapshot_id, test):
         LOG.debug("restore_snapshot in rpcapi snapshot_id %s", 
                               snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("restore queue topic=%s", topic)
         self.cast(ctxt,
-                  self.make_msg('snapshot_restore',snapshot_id=snapshot_id),
+                  self.make_msg('snapshot_restore',
+                                snapshot_id=snapshot_id,
+                                test=test),
                   topic=topic)
         
     def snapshot_delete(self, ctxt, host, snapshot_id):

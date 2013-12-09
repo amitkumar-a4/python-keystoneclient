@@ -8,6 +8,7 @@
 import webob
 from webob import exc
 from xml.dom import minidom
+from cgi import parse_qs, escape
 
 from workloadmgr.api import common
 from workloadmgr.api import wsgi
@@ -19,6 +20,7 @@ from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import snapshots as snapshot_views
+
 
 
 LOG = logging.getLogger(__name__)
@@ -168,9 +170,18 @@ class SnapshotsController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
         LOG.audit(_("Restoring snapshot %(snapshot_id)s"),
                   locals(), context=context)
-
+        test = None
+        if ('QUERY_STRING' in req.environ) :
+            qs=parse_qs(req.environ['QUERY_STRING'])
+            var = parse_qs(req.environ['QUERY_STRING'])
+            test = var.get('test',[''])[0]
+            test = escape(test)
         try:
-            self.workload_api.snapshot_restore(context, snapshot_id = snapshot_id )
+            if(test and test == '1'):
+                test = True
+            else:
+                test = False    
+            self.workload_api.snapshot_restore(context, snapshot_id = snapshot_id, test=test )
         except exception.InvalidInput as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.InvalidVolume as error:

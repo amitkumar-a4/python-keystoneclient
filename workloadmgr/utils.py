@@ -1066,6 +1066,14 @@ def temporary_chown(path, owner_uid=None):
     finally:
         if orig_uid != owner_uid:
             execute('chown', orig_uid, path, run_as_root=True)
+            
+def chmod(path, mode):
+    """change the mode of the file.
+
+    :params mode
+    """
+    execute('chmod', mode, path, run_as_root=True)
+       
 
 
 @contextlib.contextmanager

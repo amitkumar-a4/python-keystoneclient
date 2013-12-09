@@ -354,12 +354,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             new_router = network_service.create_router(context,**params)
                             new_net_resources.setdefault(pit_id,new_router)
                         
-                        network_service.router_add_interface(context,new_router['id'], subnet_id=new_subnet['id'])
-                        network_service.router_add_gateway(context,new_router['id'], new_ext_network['id'])
-                        
+                        try:
+                            network_service.router_add_interface(context,new_router['id'], subnet_id=new_subnet['id'])
+                            network_service.router_add_gateway(context,new_router['id'], new_ext_network['id'])
+                        except Exception as err:
+                            pass
             return
         except Exception as err:
-            return;               
+            return             
         
     def workload_create(self, context, workload_id):
         """
@@ -435,7 +437,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.vm_recent_snapshot_update(context, vm.vm_id, {'snapshot_id': snapshot.id})
         
         self._snapshot_networks(context, True, snapshot)
-        
         #TODO(gbasava): Check for the success (and update)                
         self.db.snapshot_update(context, snapshot.id, {'status': 'available'})   
 
@@ -450,7 +451,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('delete_workload started, workload: %s'), workload_id)
         #TODO(gbasava): Implement
 
-    def snapshot_restore(self, context, snapshot_id):
+    def snapshot_restore(self, context, snapshot_id, test):
         """
         Restore VMs and all its LUNs from a snapshot
         """
@@ -460,7 +461,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         #self.db.snapshot_update(context, snapshot.id, {'status': 'restoring'})
         
         new_net_resources = {}
-        self._restore_networks(context, True, snapshot, new_net_resources)        
+        if test:
+            self._restore_networks(context, False, snapshot, new_net_resources)
+        else:
+            self._restore_networks(context, True, snapshot, new_net_resources)    
         vault_service = vault.get_vault_service(context)
         
         #restore each VM
@@ -473,8 +477,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             """
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            virtdriver.snapshot_restore(workload, snapshot, vm, vault_service, new_net_resources, self.db, context)
-
+            virtdriver.snapshot_restore(workload, snapshot, test, vm, vault_service, new_net_resources, self.db, context)
 
     def snapshot_delete(self, context, workload_id, snapshot_id):
         """

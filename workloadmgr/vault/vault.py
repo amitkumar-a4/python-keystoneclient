@@ -67,7 +67,7 @@ class VaultBackupService(base.Base):
             copy_to_file_path_handle.write(chunk)
             file_to_snapshot_size -= FLAGS.wlm_vault_write_chunk_size_kb*1024
         file_to_snapshot_handle.close()
-        copy_to_file_path_handle.__del__()
+        #copy_to_file_path_handle.__del__()
            
         return copy_to_file_path
         
@@ -90,7 +90,7 @@ class VaultBackupService(base.Base):
             restore_to_file_path_handle.write(rbuf[:rc])
             rc = copy_from_file_path_handle.read_buffer(rbuf, FLAGS.wlm_vault_read_chunk_size_kb*1024)
         restore_to_file_path_handle.close()
-        copy_from_file_path_handle.__del__()
+        #copy_from_file_path_handle.__del__()
         return    
 
 

@@ -1629,6 +1629,7 @@ class VMwareVMOps(object):
             vmdk_data_file_handle.close()
             tmp_file_on_controller_handle.close()
     
+            
             # create an entry in the vm_disk_resource_snaps table
             vm_disk_resource_snap_id = str(uuid.uuid4())
             vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
