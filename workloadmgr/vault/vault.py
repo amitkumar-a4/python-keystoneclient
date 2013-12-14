@@ -18,6 +18,8 @@ from oslo.config import cfg
 from workloadmgr.db import base
 from workloadmgr import exception
 from workloadmgr import flags
+from workloadmgr import utils
+from workloadmgr.openstack.common import fileutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.vault.glusterapi import gfapi
@@ -35,6 +37,12 @@ wlm_vault_opts = [
     cfg.StrOpt('wlm_vault_service',
                default='vault',
                help='Write size in KB'),
+    cfg.StrOpt('wlm_vault_local',
+               default=True,
+               help='Store in local file system'),
+    cfg.StrOpt('wlm_vault_local_directory',
+               default='/tmp/snapshots',
+               help='Location where snapshots will be stored'),        
 ]
 
 FLAGS = flags.FLAGS
@@ -44,8 +52,39 @@ class VaultBackupService(base.Base):
     def __init__(self, context):
         self.context = context
 
+    def store_local(self, snapshot_metadata, file_to_snapshot_path):
+        """Backup the given file to local filesystem using the given snapshot metadata."""
+                 
+        copy_to_file_path = FLAGS.wlm_vault_local_directory
+        fileutils.ensure_tree(copy_to_file_path)
+        copy_to_file_path = copy_to_file_path + '/snapshot_%s' % (snapshot_metadata['snapshot_id'])
+        fileutils.ensure_tree(copy_to_file_path)
+        copy_to_file_path = copy_to_file_path + '/vm_id_%s' % (snapshot_metadata['snapshot_vm_id'])
+        fileutils.ensure_tree(copy_to_file_path)
+        copy_to_file_path = copy_to_file_path + '/vm_res_id_%s_%s' % (snapshot_metadata['snapshot_vm_resource_id'], 
+                                                                      snapshot_metadata['resource_name'].replace(' ',''))
+        fileutils.ensure_tree(copy_to_file_path)
+        copy_to_file_path = copy_to_file_path + '/' + snapshot_metadata['vm_disk_resource_snap_id']
+        utils.move_file(file_to_snapshot_path, copy_to_file_path)   
+        return copy_to_file_path
+    
+    def restore_local(self, snapshot_metadata, restore_to_file_path):
+        """Restore a snapshot from stored on local filesystem."""
+                 
+        copy_from_file_path = FLAGS.wlm_vault_local_directory
+        copy_from_file_path = copy_from_file_path + '/snapshot_%s' % (snapshot_metadata['snapshot_id'])
+        copy_from_file_path = copy_from_file_path + '/vm_id_%s' % (snapshot_metadata['snapshot_vm_id'])
+        copy_from_file_path = copy_from_file_path + '/vm_res_id_%s_%s' % (snapshot_metadata['snapshot_vm_resource_id'], 
+                                                                      snapshot_metadata['resource_name'].replace(' ',''))
+        copy_from_file_path = copy_from_file_path + '/' + snapshot_metadata['vm_disk_resource_snap_id']
+        utils.copy_file(copy_from_file_path, restore_to_file_path)
+        return    
+    
+    
     def store(self, snapshot_metadata, file_to_snapshot_path):
-        """Backup the given file to swift using the given snapshot metadata."""
+        """Backup the given file to trilioFS using the given snapshot metadata."""
+        if FLAGS.wlm_vault_local:
+            return self.store_local(snapshot_metadata, file_to_snapshot_path)
         volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
@@ -67,12 +106,13 @@ class VaultBackupService(base.Base):
             copy_to_file_path_handle.write(chunk)
             file_to_snapshot_size -= FLAGS.wlm_vault_write_chunk_size_kb*1024
         file_to_snapshot_handle.close()
-        #copy_to_file_path_handle.__del__()
            
         return copy_to_file_path
         
     def restore(self, snapshot_metadata, restore_to_file_path):
-        """Restore a v1 swift volume snapshot from swift."""
+        """Restore a snapshot from trilioFS."""
+        if FLAGS.wlm_vault_local:
+            return self.restore_local(snapshot_metadata, restore_to_file_path)
         volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
@@ -90,7 +130,6 @@ class VaultBackupService(base.Base):
             restore_to_file_path_handle.write(rbuf[:rc])
             rc = copy_from_file_path_handle.read_buffer(rbuf, FLAGS.wlm_vault_read_chunk_size_kb*1024)
         restore_to_file_path_handle.close()
-        #copy_from_file_path_handle.__del__()
         return    
 
 

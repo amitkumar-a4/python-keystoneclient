@@ -1073,7 +1073,7 @@ def chmod(path, mode):
     :params mode
     """
     execute('chmod', mode, path, run_as_root=True)
-       
+      
 
 
 @contextlib.contextmanager
@@ -1362,3 +1362,10 @@ def reset_is_neutron():
     _IS_NEUTRON_ATTEMPTED = False
     _IS_NEUTRON = False
 
+ 
+def move_file(src, dest):
+    execute('mv', src, dest)
+    
+def copy_file(src, dest):
+    execute('cp', src, dest)    
+  

@@ -1483,8 +1483,8 @@ class VMwareVMOps(object):
             # Copy the contents of the disk (or disks, if there were snapshots
             # done earlier) to a temporary vmdk file.
             copy_spec = self.get_copy_virtual_disk_spec(client_factory,
-                                                        disk['adapter_type'],
-                                                        disk['disk_type'])
+                                                        'lsiLogic', #disk['adapter_type'],
+                                                        'thin') #disk['disk_type'])
             LOG.debug(_('Copying disk data before snapshot of the VM'),
                       instance=instance)
             copy_disk_task = self._session._call_method(
@@ -1635,7 +1635,7 @@ class VMwareVMOps(object):
             vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
             vm_disk_resource_snap_metadata.setdefault('disk_format','vmdk')
             vm_disk_resource_snap_metadata.setdefault('vmware_disktype','thin')
-            vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','ide')
+            vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','lsiLogic')
             vm_disk_resource_snap_metadata.setdefault('vmdk_descriptor',vmdk_descriptor)
             vm_disk_resource_snap_metadata.setdefault('vmdk_data_file_name',vmdk_data_file)
             vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,

@@ -597,9 +597,9 @@ class LibvirtDriver(driver.ComputeDriver):
         #due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
         #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
         if test:
-            utils.execute( '/usr/vddk/bin/vmware-vdiskmanager', '-r', file_to_commit, '-t 2',  commit_to, run_as_root=False)
+            utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 2',  commit_to, run_as_root=False)
         else:
-            utils.execute( '/usr/vddk/bin/vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
+            utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
         utils.chmod(commit_to, '0664')
         utils.chmod(commit_to.replace(".vmdk", "-flat.vmdk"), '0664')
         if test:
@@ -646,7 +646,7 @@ class LibvirtDriver(driver.ComputeDriver):
             conf.driver_format = "raw"
             conf.driver_cache = "none"
             conf.target_dev = disk_dev
-            conf.target_bus = 'virtio'
+            conf.target_bus = 'scsi'
             #conf.serial = 'serial'
             conf.source_type = 'file'
             conf.source_path = diskpath         
@@ -1029,23 +1029,34 @@ class LibvirtDriver(driver.ComputeDriver):
 
             #upload to glance
             with file(restored_file_path) as image_file:
-                image_metadata = {'is_public': False,
-                                  'status': 'active',
-                                  'name': snapshot_vm_resource.id,
-                                  #'disk_format' : 'ami',
-                                  'disk_format' : 'vmdk', 
-                                  'container_format' : 'bare',
-                                  'properties': {
-                                                 'vmware_adaptertype' : 'ide',
-                                                 'vmware_disktype': 'preallocated',
-                                                 'image_location': 'TODO',
-                                                 'image_state': 'available',
-                                                 'owner_id': context.project_id}
-                                  }
-                #if 'architecture' in base.get('properties', {}):
-                #    arch = base['properties']['architecture']
-                #    image_metadata['properties']['architecture'] = arch
-                
+                if db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk':
+                    image_metadata = {'is_public': False,
+                                      'status': 'active',
+                                      'name': snapshot_vm_resource.id,
+                                      #'disk_format' : 'ami',
+                                      'disk_format' : 'vmdk', 
+                                      'container_format' : 'bare',
+                                      'properties': {
+                                                     'hw_disk_bus' : 'scsi',
+                                                     'vmware_adaptertype' : 'lsiLogic',
+                                                     'vmware_disktype': 'preallocated',
+                                                     'image_location': 'TODO',
+                                                     'image_state': 'available',
+                                                     'owner_id': context.project_id}
+                                      }
+                else:
+                    image_metadata = {'is_public': False,
+                                      'status': 'active',
+                                      'name': snapshot_vm_resource.id,
+                                      'disk_format' : 'qcow2',
+                                      'container_format' : 'bare',
+                                      'properties': {
+                                                     'hw_disk_bus' : 'virtio',
+                                                     'image_location': 'TODO',
+                                                     'image_state': 'available',
+                                                     'owner_id': context.project_id}
+                                      }
+                    
                 if test:
                     image_service = glance.get_default_image_service(production=False)
                 else:
@@ -1084,6 +1095,7 @@ class LibvirtDriver(driver.ComputeDriver):
             restored_instance =  compute_service.get_server_by_id(context, restored_instance.id)
         
         if test == True:
+            # We will not powerdown the VM if we are doing a test restore.
             #self.shutdown_instance(restored_instance) 
             #time.sleep(10)
             pass
@@ -1111,9 +1123,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 time.sleep(15)
             else:
                 instance_dir = libvirt_utils.get_instance_path(restored_instance.id)
-                libvirt_utils.move_file(restored_volume, instance_dir)
+                utils.move_file(restored_volume, instance_dir)
                 restored_volume = os.path.join(instance_dir, os.path.basename(restored_volume))
-                
                 self.attach_volume(restored_instance, restored_volume, ('/dev/' + devname))
         if test == True:
             self.reboot_instance(restored_instance) 

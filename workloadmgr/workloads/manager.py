@@ -420,13 +420,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot_vm = self.db.snapshot_vm_create(context, options)
             
             #TODO(giri) load the driver based on hypervisor of VM
-            #"""
-            if 'vmwareapi.VMwareVCDriver' == 'vmwareapi.VMwareVCDriver':
-                virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            elif 'libvirt.LibvirtDriver' == 'libvirt.LibvirtDriver':
-                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            #"""
             #virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             
             #disks snapshot    
             virtdriver.snapshot(workload, snapshot, snapshot_vm, vault_service, self.db, context)
@@ -470,13 +465,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 
             #TODO(giri) load the driver based on hypervisor of VM
-            """
-            if 'vmwareapi.VMwareVCDriver' == 'vmwareapi.VMwareVCDriver':
-                virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            elif 'libvirt.LibvirtDriver' == 'libvirt.LibvirtDriver':
-                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            """
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+            
             virtdriver.snapshot_restore(workload, snapshot, test, vm, vault_service, new_net_resources, self.db, context)
 
     def snapshot_delete(self, context, workload_id, snapshot_id):

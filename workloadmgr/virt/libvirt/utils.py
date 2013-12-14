@@ -8,7 +8,6 @@ import os
 from oslo.config import cfg
 from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
-from workloadmgr import utils
 from workloadmgr.virt.libvirt import images
 
 libvirt_opts = [
@@ -33,12 +32,7 @@ def get_disk_backing_file(path, basename=True):
     return backing_file
 
 
-def execute(*args, **kwargs):
-    return utils.execute(*args, **kwargs)
- 
-def move_file(src, dest):
-    execute('mv', src, dest)
-    
+   
 def get_instance_path(instance_id, relative=False):
     """Determine the correct path for instance storage.
     This method determines the directory name for instance storage
