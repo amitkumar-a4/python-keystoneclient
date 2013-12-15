@@ -22,7 +22,6 @@ from workloadmgr import utils
 from workloadmgr.openstack.common import fileutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
-from workloadmgr.vault.glusterapi import gfapi
 from workloadmgr.vault import swift
 
 LOG = logging.getLogger(__name__)
@@ -85,7 +84,8 @@ class VaultBackupService(base.Base):
         """Backup the given file to trilioFS using the given snapshot metadata."""
         if FLAGS.wlm_vault_local:
             return self.store_local(snapshot_metadata, file_to_snapshot_path)
-        volume = gfapi.Volume("localhost", "vault")
+        from workloadmgr.vault.glusterapi import gfapi
+	volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
         copy_to_file_path = 'snapshots'
@@ -113,7 +113,8 @@ class VaultBackupService(base.Base):
         """Restore a snapshot from trilioFS."""
         if FLAGS.wlm_vault_local:
             return self.restore_local(snapshot_metadata, restore_to_file_path)
-        volume = gfapi.Volume("localhost", "vault")
+        from workloadmgr.vault.glusterapi import gfapi
+	volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
         copy_from_file_path = 'snapshots'
