@@ -22,7 +22,7 @@ import logging.handlers
 import os
 import string
 
-from cinder.openstack.common.rootwrap import filters
+from workloadmgr.openstack.common.rootwrap import filters
 
 
 class NoFilterMatched(Exception):
