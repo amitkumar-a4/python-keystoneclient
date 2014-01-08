@@ -400,8 +400,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Take a snapshot of the workload
         """
         LOG.info(_('snapshot workload started, snapshot_id %s' %snapshot_id))
-        snapshot = self.db.snapshot_get(context, snapshot_id)
+        import pdb; pdb.set_trace()
+        compute_service = nova.API(production=True)
+        instances = compute_service.get_servers(context,all_tenants=True)  
+        #instances[0].__dict__['OS-EXT-SRV-ATTR:host']      
         
+        snapshot = self.db.snapshot_get(context, snapshot_id)
         #TODO(giri): Make sure the workload has a full snapshot before scheduling an incremental snapshot
         if full == True:
             snapshot_type = 'full'
@@ -412,6 +416,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
         vault_service = vault.get_vault_service(context)
         for vm in self.db.workload_vms_get(context, snapshot.workload_id):
+            vm_instance = None
+            for instance in instances:
+                if vm.vm_id == instance.id:
+                    vm_instance = instance
+                    break;
+            if vm_instance == None:
+                pass #TODO(giri): Throw exception
+
             #create an entry for the VM
             options = {'vm_id': vm.vm_id,
                        'snapshot_id': snapshot_id,
