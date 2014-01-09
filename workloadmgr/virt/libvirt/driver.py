@@ -550,6 +550,10 @@ class LibvirtDriver(driver.ComputeDriver):
         if metadata :
             virsh_cmd = virsh_cmd + ['--metadata']
         utils.execute(*virsh_cmd, run_as_root=True)
+        
+    def ssh(self, host, cmd):
+        user_host = 'root@' + host
+        utils.execute('ssh', user_host, cmd, run_as_root=True)
   
     def rebase_qcow2(self, backing_file_base, backing_file_top):
         """rebase the backing_file_top to backing_file_base using unsafe mode
@@ -663,14 +667,18 @@ class LibvirtDriver(driver.ComputeDriver):
             except Exception, ex:
                 return        
         
-    def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None): 
+    def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+        import pdb; pdb.set_trace()
+        CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
+        self._get_connection()
+         
         if snapshot['snapshot_type'] == 'full' :
-            return self._snapshot_full(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+            return self._snapshot_full(workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state)
         else:
-            return self._snapshot_incremental(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
+            return self._snapshot_incremental(workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state)
                   
 
-    def _snapshot_full(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+    def _snapshot_full(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         """
         Prepares the backsup for the instance specified in snapshot_vm
 
@@ -799,7 +807,7 @@ class LibvirtDriver(driver.ComputeDriver):
             update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
             update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
             
-    def _snapshot_incremental(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+    def _snapshot_incremental(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         """
         Incremental snapshot of the instance specified in snapshot_vm
 

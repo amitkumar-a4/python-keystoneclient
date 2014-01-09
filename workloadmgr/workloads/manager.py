@@ -400,10 +400,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Take a snapshot of the workload
         """
         LOG.info(_('snapshot workload started, snapshot_id %s' %snapshot_id))
-        import pdb; pdb.set_trace()
+        
         compute_service = nova.API(production=True)
         instances = compute_service.get_servers(context,all_tenants=True)  
-        #instances[0].__dict__['OS-EXT-SRV-ATTR:host']      
+        hypervisors = compute_service.get_hypervisors(context)     
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
         #TODO(giri): Make sure the workload has a full snapshot before scheduling an incremental snapshot
@@ -423,6 +423,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     break;
             if vm_instance == None:
                 pass #TODO(giri): Throw exception
+            
+            vm_hypervisor = None
+            for hypervisor in hypervisors:
+                if hypervisor.hypervisor_hostname == vm_instance.__dict__['OS-EXT-SRV-ATTR:host']:
+                    vm_hypervisor = hypervisor
+            if vm_hypervisor == None:
+                pass #TODO(giri): Throw exception
+
+            import pdb; pdb.set_trace()
+            if vm_hypervisor.hypervisor_type == 'QEMU': 
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            else: #TODO(giri) Check for all other hypervisor types
+                virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+            
 
             #create an entry for the VM
             options = {'vm_id': vm.vm_id,
@@ -431,12 +445,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                        'status': 'creating',}
             snapshot_vm = self.db.snapshot_vm_create(context, options)
             
-            #TODO(giri) load the driver based on hypervisor of VM
-            #virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             
             #disks snapshot    
-            virtdriver.snapshot(workload, snapshot, snapshot_vm, vault_service, self.db, context)
+            virtdriver.snapshot(workload, snapshot, snapshot_vm, vm_hypervisor.hypervisor_hostname, vault_service, self.db, context)
             #TODO(giri): Check for the success (and update)
             snapshot_vm.update({'status': 'available',})
             #TODO(giri): handle the case where this can be updated by multiple workload snapshot requests coming from 
@@ -476,10 +487,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 
-            #TODO(giri) load the driver based on hypervisor of VM
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            
             virtdriver.snapshot_restore(workload, snapshot, test, vm, vault_service, new_net_resources, self.db, context)
 
     def snapshot_delete(self, context, workload_id, snapshot_id):

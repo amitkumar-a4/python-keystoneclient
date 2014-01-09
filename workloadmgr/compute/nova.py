@@ -28,7 +28,7 @@ nova_opts = [
                default= 'http://localhost:8774/v2/%(project_id)s',
                help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_production_admin_auth_url',
-               default='http://localhost:5000/v2.0',
+               default='http://192.168.2.202:5000/v2.0',
                help='auth url for connecting to nova in admin context'),                
     cfg.StrOpt('nova_production_admin_username',
                default='admin',
@@ -118,7 +118,11 @@ class API(base.Base):
     """API for interacting with the volume manager."""
     
     def __init__(self, production = True):
-        self._production = production    
+        self._production = production   
+        
+    def get_hypervisors(self,context):
+        hypervisors = novaclient(context, self._production, True).hypervisors.list()
+        return hypervisors         
 
     def create_server(self, context, name, image, flavor,
                meta=None, files=None,

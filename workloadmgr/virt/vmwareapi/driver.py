@@ -730,9 +730,9 @@ class VMwareVCDriver(VMwareESXDriver):
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.unplug_vifs(instance, network_info)
 
-    def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+    def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         #_vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops = self._get_vmops_for_compute_node('domain-c26(td-sea-clu01)'    )
+        _vmops = self._get_vmops_for_compute_node(hypervisor_hostname) #('domain-c26(td-sea-clu01)'    )
         _vmops.snapshot(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
  
 

@@ -159,7 +159,7 @@ def load_compute_driver(virtapi, compute_driver=None):
 def compute_driver_matches(match):
     return CONF.compute_driver.endswith(match)
 
-def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
+def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
     """
     Full snapshot of the instance specified in snapshot_vm
 
