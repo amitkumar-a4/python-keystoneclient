@@ -50,8 +50,16 @@ FLAGS.register_opts(wlm_vault_opts)
 class VaultBackupService(base.Base):
     def __init__(self, context):
         self.context = context
+        
+    def move_file(self, src_host, src, dest):
+        try:
+            utils.execute('scp', 'root@' + src_host + ':' + src, dest, run_as_root=False)
+        except:
+            #TODO(giri): handle exception
+            pass
+      
 
-    def store_local(self, snapshot_metadata, file_to_snapshot_path):
+    def store_local(self, snapshot_metadata, src_host, file_to_snapshot_path):
         """Backup the given file to local filesystem using the given snapshot metadata."""
                  
         copy_to_file_path = FLAGS.wlm_vault_local_directory
@@ -64,7 +72,7 @@ class VaultBackupService(base.Base):
                                                                       snapshot_metadata['resource_name'].replace(' ',''))
         fileutils.ensure_tree(copy_to_file_path)
         copy_to_file_path = copy_to_file_path + '/' + snapshot_metadata['vm_disk_resource_snap_id']
-        utils.move_file(file_to_snapshot_path, copy_to_file_path)   
+        self.move_file(src_host, file_to_snapshot_path, copy_to_file_path)   
         return copy_to_file_path
     
     def restore_local(self, snapshot_metadata, restore_to_file_path):
@@ -80,12 +88,12 @@ class VaultBackupService(base.Base):
         return    
     
     
-    def store(self, snapshot_metadata, file_to_snapshot_path):
+    def store(self, snapshot_metadata, src_host, file_to_snapshot_path):
         """Backup the given file to trilioFS using the given snapshot metadata."""
         if FLAGS.wlm_vault_local:
-            return self.store_local(snapshot_metadata, file_to_snapshot_path)
+            return self.store_local(snapshot_metadata, src_host, file_to_snapshot_path)
         from workloadmgr.vault.glusterapi import gfapi
-	volume = gfapi.Volume("localhost", "vault")
+        volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
         copy_to_file_path = 'snapshots'
@@ -106,7 +114,6 @@ class VaultBackupService(base.Base):
             copy_to_file_path_handle.write(chunk)
             file_to_snapshot_size -= FLAGS.wlm_vault_write_chunk_size_kb*1024
         file_to_snapshot_handle.close()
-           
         return copy_to_file_path
         
     def restore(self, snapshot_metadata, restore_to_file_path):
@@ -114,7 +121,7 @@ class VaultBackupService(base.Base):
         if FLAGS.wlm_vault_local:
             return self.restore_local(snapshot_metadata, restore_to_file_path)
         from workloadmgr.vault.glusterapi import gfapi
-	volume = gfapi.Volume("localhost", "vault")
+        volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
         copy_from_file_path = 'snapshots'

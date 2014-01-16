@@ -19,13 +19,13 @@ CONF.register_opts(libvirt_opts)
 LOG = logging.getLogger(__name__)
 
 
-def get_disk_backing_file(path, basename=True):
+def get_disk_backing_file(host, path, basename=True):
     """Get the backing file of a disk image
 
     :param path: Path to the disk image
     :returns: a path to the image's backing store
     """
-    backing_file = images.qemu_img_info(path).backing_file
+    backing_file = images.qemu_img_info(host, path).backing_file
     if backing_file and basename:
         backing_file = os.path.basename(backing_file)
 

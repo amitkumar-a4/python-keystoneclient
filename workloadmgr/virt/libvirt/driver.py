@@ -517,7 +517,24 @@ class LibvirtDriver(driver.ComputeDriver):
                       [target.get("dev")
                        for target in doc.findall('devices/disk/target')])        
 
-    def snapshot_create_as(self, instance_name, snapshot_name, snapshot_description, dev_snapshot_disk_paths):
+    def ensure_tree(self, host, path):
+        """Create a directory (and any ancestor directories required)
+        :param path: Directory to create
+        """
+        try:
+            utils.execute('ssh', 'root@' + host, 'mkdir', '-p', path, run_as_root=False)
+        except:
+            #TODO(giri): handle exception
+            pass 
+    def delete_if_exists(self, host, pathname):
+        """delete a file, but ignore file not found error"""
+        try:
+            utils.execute('ssh', 'root@' + host, 'rm', pathname, run_as_root=False)
+        except:
+            #TODO(giri): handle exception
+            pass       
+        
+    def snapshot_create_as(self, host, instance_name, snapshot_name, snapshot_description, dev_snapshot_disk_paths):
         """Atomic disk only external snapshots of an instance
         Todo: use virDomainSnapshotCreateXML instead of virsh
 
@@ -530,15 +547,15 @@ class LibvirtDriver(driver.ComputeDriver):
         for dev, snapshot in dev_snapshot_disk_paths.iteritems():
             diskspecs = diskspecs + ['--diskspec', dev + ',snapshot=external,file=' + snapshot]
 
-        virsh_cmd = ['virsh', 'snapshot-create-as', 
+        virsh_cmd = ['ssh', 'root@' + host,
+                     'virsh', 'snapshot-create-as', 
                      instance_name, snapshot_name, 
                      snapshot_description, 
                      '--disk-only', '--atomic'] + diskspecs
+        utils.execute(*virsh_cmd, run_as_root=False)
 
-        utils.execute(*virsh_cmd, run_as_root=True)
 
-
-    def snapshot_delete(self, instance_name, snapshot_name, metadata = False):
+    def snapshot_delete(self, host, instance_name, snapshot_name, metadata = False):
         """delete the snapshot
         Todo: use virDomainXXX instead of virsh
 
@@ -546,27 +563,29 @@ class LibvirtDriver(driver.ComputeDriver):
         :param snapshot_name: Name of snapshot
         :param metadata: If True, delete the metadata only
         """
-        virsh_cmd = ['virsh', 'snapshot-delete', instance_name, snapshot_name] 
+        virsh_cmd = ['ssh', 'root@' + host, 'virsh', 'snapshot-delete', instance_name, snapshot_name] 
         if metadata :
             virsh_cmd = virsh_cmd + ['--metadata']
-        utils.execute(*virsh_cmd, run_as_root=True)
+        utils.execute(*virsh_cmd, run_as_root=False)
         
-    def ssh(self, host, cmd):
-        user_host = 'root@' + host
-        utils.execute('ssh', user_host, cmd, run_as_root=True)
-  
-    def rebase_qcow2(self, backing_file_base, backing_file_top):
+    def rebase_qcow2(self, host, backing_file_base, backing_file_top):
         """rebase the backing_file_top to backing_file_base using unsafe mode
         :param backing_file_base: backing file to rebase to
         :param backing_file_top: top file to rebase
         """
-        utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=True)   
+        if host == 'localhost':
+            utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=False)
+        else:
+            utils.execute('ssh', 'root@' + host, 'qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=False)   
 
-    def commit_qcow2(self, backing_file_top):
+    def commit_qcow2(self, host, backing_file_top):
         """rebase the backing_file_top to backing_file_base
          :param backing_file_top: top file to commit from to its base
         """
-        utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=True)        
+        if host == 'localhost':
+            utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=False)
+        else:
+            utils.execute('ssh', 'root@' + host, 'qemu-img', 'commit', backing_file_top, run_as_root=False)        
 
     def rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
         """
@@ -613,7 +632,7 @@ class LibvirtDriver(driver.ComputeDriver):
             return commit_to.replace(".vmdk", "-flat.vmdk")      
 
                      
-    def blockcommit(self, instance, dev, backing_file_base, backing_file_top):
+    def blockcommit(self, host, instance, dev, backing_file_base, backing_file_top):
         """block commit the changes from top to base
         Todo: use virDomainXXX instead of virsh
 
@@ -623,11 +642,11 @@ class LibvirtDriver(driver.ComputeDriver):
         :param backing_file_top: top file to commit from
         """
 
-        virsh_cmd = ['virsh', 'blockcommit', '--domain', 
+        virsh_cmd = ['ssh', 'root@' + host, 'virsh', 'blockcommit', '--domain', 
                      instance, dev, '--wait', '--base', backing_file_base, 
                      '--top', backing_file_top]
 
-        utils.execute(*virsh_cmd, run_as_root=True)
+        utils.execute(*virsh_cmd, run_as_root=False)
         
     def shutdown_instance(self, instance):
         instance_name = self.get_instance_name_by_uuid(instance.id)
@@ -668,7 +687,6 @@ class LibvirtDriver(driver.ComputeDriver):
                 return        
         
     def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        import pdb; pdb.set_trace()
         CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
         self._get_connection()
          
@@ -692,9 +710,9 @@ class LibvirtDriver(driver.ComputeDriver):
             
         instance_name = self.get_instance_name_by_uuid(snapshot_vm.vm_id)
         snapshot_directory = os.path.join(CONF.instances_path, snapshot_vm.vm_id)
-        fileutils.ensure_tree(snapshot_directory)
+        self.ensure_tree(hypervisor_hostname, snapshot_directory)
         snapshot_name = uuid.uuid4().hex
-        snapshot_description = "Snapshot " + snapshot.id + "of WorkloadMgr " + workload.id
+        snapshot_description = "snapshot_" + snapshot.id + "of_workload_" + workload.id
         dev_snapshot_disk_paths = {} # Dictionary that holds dev and snapshot_disk_path
         devices = self.get_disks(instance_name)
         for device in devices:
@@ -703,10 +721,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # we may have to powerdown/suspend until the permissions issue is resolved
         #self.suspend(instance_name)
-        self.snapshot_create_as(instance_name, snapshot_name, 
+        self.snapshot_create_as(hypervisor_hostname, instance_name, snapshot_name, 
                                 snapshot_description, dev_snapshot_disk_paths)
         # Todo - handle the failure of snapshot_create_as
-        self.snapshot_delete(instance_name, snapshot_name, True)
+        self.snapshot_delete(hypervisor_hostname, instance_name, snapshot_name, True)
         
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_SNAPSHOT_CREATED)
@@ -717,7 +735,7 @@ class LibvirtDriver(driver.ComputeDriver):
         
         
         for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
-            src_backing_path = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)        
+            src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': snapshot_vm.vm_id,
                                            'snapshot_id': snapshot.id,       
@@ -731,11 +749,12 @@ class LibvirtDriver(driver.ComputeDriver):
             src_backings = [] # using list as a stack for the disk backings
             while (src_backing_path != None):
                 src_backings.append(src_backing_path)
-                mode = os.stat(src_backing_path).st_mode
-                if S_ISREG(mode) :
-                    src_backing_path = libvirt_utils.get_disk_backing_file(src_backing_path, basename=False)      
-                else:
-                    src_backing_path = None
+                src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, src_backing_path, basename=False)
+                #mode = os.stat(src_backing_path).st_mode
+                #if S_ISREG(mode) :
+                #    src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, src_backing_path, basename=False)      
+                #else:
+                #    src_backing_path = None
             
             base_backing_path = None
             vm_disk_resource_snap_id = None
@@ -764,14 +783,17 @@ class LibvirtDriver(driver.ComputeDriver):
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
                 #upload to vault service
                 vault_service_url = None
-                with utils.temporary_chown(base_backing_path):
-                    vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
-                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
-                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                      'resource_name':  dev,
-                                      'snapshot_vm_id': snapshot_vm.vm_id,
-                                      'snapshot_id': snapshot.id}
-                    vault_service_url = vault_service.store(vault_metadata, base_backing_path); 
+                
+                #with utils.temporary_chown(base_backing_path):
+                vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                  'resource_name':  dev,
+                                  'snapshot_vm_id': snapshot_vm.vm_id,
+                                  'snapshot_id': snapshot.id}
+                vault_service_url = vault_service.store(vault_metadata, hypervisor_hostname, base_backing_path); 
+                    
+                    
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                                 'vault_service_metadata' : 'None',
@@ -786,21 +808,21 @@ class LibvirtDriver(driver.ComputeDriver):
             
             state = self.get_info(instance_name)['state']    
             #TODO(gbasava): Walk the qcow2 for each disk device and commit and intermediate qcow2 files into base
-            with utils.temporary_chown(snapshot_disk_path):
-                backing_file = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)
-            with utils.temporary_chown(backing_file):
-                backing_file_backing = libvirt_utils.get_disk_backing_file(backing_file, basename=False)
+            #with utils.temporary_chown(snapshot_disk_path):
+            backing_file = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)
+            #with utils.temporary_chown(backing_file):
+            backing_file_backing = libvirt_utils.get_disk_backing_file(hypervisor_hostname, backing_file, basename=False)
             #with utils.temporary_chown(backing_file_backing):
             
             if (backing_file_backing != None and backing_file_backing != backing_file):
                 if state == power_state.RUNNING: 
                     # if the instance is running we will do a blockcommit
-                    self.blockcommit(instance_name, dev, backing_file_backing, backing_file)
-                    utils.delete_if_exists(backing_file)
+                    self.blockcommit(hypervisor_hostname, instance_name, dev, backing_file_backing, backing_file)
+                    self.delete_if_exists(hypervisor_hostname, backing_file)
                 elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
-                    self.commit_qcow2(backing_file)
-                    utils.delete_if_exists(backing_file)                     
-                    self.rebase_qcow2(backing_file_backing, snapshot_disk_path)
+                    self.commit_qcow2(hypervisor_hostname, backing_file)
+                    self.delete_if_exists(hypervisor_hostname, backing_file)                     
+                    self.rebase_qcow2(hypervisor_hostname, backing_file_backing, snapshot_disk_path)
                 #else: TODO(gbasava): investigate and handle other powerstates     
 
         if update_task_state:
@@ -823,10 +845,10 @@ class LibvirtDriver(driver.ComputeDriver):
             
         instance_name = self.get_instance_name_by_uuid(snapshot_vm.vm_id)
         snapshot_directory = os.path.join(CONF.instances_path, snapshot_vm.vm_id)
-        fileutils.ensure_tree(snapshot_directory)
+        self.ensure_tree(hypervisor_hostname, snapshot_directory)
  
         snapshot_name = uuid.uuid4().hex
-        snapshot_description = "Snapshot " + snapshot.id + "of WorkloadMgr " + workload.id
+        snapshot_description = "snapshot_" + snapshot.id + "of_workload_" + workload.id
         dev_snapshot_disk_paths = {} # Dictionary that holds dev and snapshot_disk_path
         devices = self.get_disks(instance_name)
         for device in devices:
@@ -835,10 +857,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
         #TODo(gbasava): snapshot_create_as is failing with permissions issue while the VM is running
         #Need
-        self.snapshot_create_as(instance_name, snapshot_name, 
+        self.snapshot_create_as(hypervisor_hostname, instance_name, snapshot_name, 
                                 snapshot_description, dev_snapshot_disk_paths)
         #TODo(gbasava): Handle the failure of snapshot_create_as
-        self.snapshot_delete(instance_name, snapshot_name, True)
+        self.snapshot_delete(hypervisor_hostname, instance_name, snapshot_name, True)
         
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_SNAPSHOT_CREATED)
@@ -857,7 +879,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                         previous_snapshot_vm_resource.id)
                  
             
-            src_backing_path = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)        
+            src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                                'vm_id': snapshot_vm.vm_id,
                                                'snapshot_id': snapshot.id,       
@@ -883,14 +905,14 @@ class LibvirtDriver(driver.ComputeDriver):
             vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
             #upload to vault service
             vault_service_url = None
-            with utils.temporary_chown(src_backing_path):
-                vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
-                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
-                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                  'resource_name':  dev,
-                                  'snapshot_vm_id': snapshot_vm.vm_id,
-                                  'snapshot_id': snapshot.id}
-                vault_service_url = vault_service.store(vault_metadata, src_backing_path); 
+            #with utils.temporary_chown(src_backing_path):
+            vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                              'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                              'resource_name':  dev,
+                              'snapshot_vm_id': snapshot_vm.vm_id,
+                              'snapshot_id': snapshot.id}
+            vault_service_url = vault_service.store(vault_metadata, hypervisor_hostname, src_backing_path); 
                 
             # update the entry in the vm_disk_resource_snap table
             vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
@@ -910,20 +932,20 @@ class LibvirtDriver(driver.ComputeDriver):
         state = self.get_info(instance_name)['state']
         
         for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
-            with utils.temporary_chown(snapshot_disk_path):
-                backing_file = libvirt_utils.get_disk_backing_file(snapshot_disk_path, basename=False)
-            with utils.temporary_chown(backing_file):
-                backing_file_backing = libvirt_utils.get_disk_backing_file(backing_file, basename=False)
-            #with utils.temporary_chown(backing_file_backing):
+            #with utils.temporary_chown(snapshot_disk_path):
+            backing_file = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)
+            #with utils.temporary_chown(backing_file):
+            backing_file_backing = libvirt_utils.get_disk_backing_file(hypervisor_hostname, backing_file, basename=False)
+            
             # if the instance is running we will do a blockcommit
             if (backing_file_backing != None and backing_file_backing != backing_file):
                 if state == power_state.RUNNING:
-                    self.blockcommit(instance_name, dev, backing_file_backing, backing_file)
-                    utils.delete_if_exists(backing_file)
+                    self.blockcommit(hypervisor_hostname, instance_name, dev, backing_file_backing, backing_file)
+                    self.delete_if_exists(hypervisor_hostname, backing_file)
                 elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
-                    self.commit_qcow2(backing_file)
-                    utils.delete_if_exists(backing_file)                     
-                    self.rebase_qcow2(backing_file_backing, snapshot_disk_path)
+                    self.commit_qcow2(hypervisor_hostname,backing_file)
+                    self.delete_if_exists(hypervisor_hostname, backing_file)                     
+                    self.rebase_qcow2(hypervisor_hostname, backing_file_backing, snapshot_disk_path)
                 #else: TODO(gbasava): investigate and handle other powerstates     
 
         if update_task_state:
@@ -1009,7 +1031,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 vault_service.restore(vault_metadata, restored_file_path_backing)     
                 #rebase
                 if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
-                    self.rebase_qcow2(restored_file_path_backing, restored_file_path)
+                    self.rebase_qcow2('localhost', restored_file_path_backing, restored_file_path)
                 elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
                     self.rebase_vmdk(restored_file_path_backing,
                                      db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_data_file_name'),
@@ -1024,7 +1046,7 @@ class LibvirtDriver(driver.ComputeDriver):
             if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
                 while commit_queue.empty() is not True:
                     file_to_commit = commit_queue.get_nowait()
-                    self.commit_qcow2(file_to_commit)
+                    self.commit_qcow2('localhost', file_to_commit)
                     if restored_file_path != file_to_commit:
                         utils.delete_if_exists(file_to_commit)
             elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):

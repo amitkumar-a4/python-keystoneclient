@@ -160,12 +160,14 @@ class QemuImgInfo(object):
         return contents
 
 
-def qemu_img_info(path):
+def qemu_img_info(host, path):
     """Return an object containing the parsed output from qemu-img info."""
-    if not os.path.exists(path):
-        return QemuImgInfo()
+    #TODO(giri): check if the remote file exists
+    #if not os.path.exists(path):
+    #    return QemuImgInfo()
 
-    out, err = utils.execute('env', 'LC_ALL=C', 'LANG=C',
+    out, err = utils.execute('env', 'LC_ALL=C', 'LANG=C', 
+                             'ssh', 'root@' + host, 
                              'qemu-img', 'info', path)
     return QemuImgInfo(out)
 

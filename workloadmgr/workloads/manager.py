@@ -431,7 +431,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if vm_hypervisor == None:
                 pass #TODO(giri): Throw exception
 
-            import pdb; pdb.set_trace()
             if vm_hypervisor.hypervisor_type == 'QEMU': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             else: #TODO(giri) Check for all other hypervisor types
