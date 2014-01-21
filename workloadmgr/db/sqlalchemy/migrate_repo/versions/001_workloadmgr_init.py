@@ -65,6 +65,7 @@ def upgrade(migrate_engine):
         Column('deleted', Boolean),
         Column('id', String(length=255), primary_key=True, nullable= False),
         Column('vm_id', String(length=255), nullable= False),
+        Column('vm_name', String(length=255), nullable= False),
         Column('workload_id', String(length=255), ForeignKey('workloads.id')),
         mysql_engine='InnoDB'
     )
@@ -112,6 +113,7 @@ def upgrade(migrate_engine):
         Column('deleted', Boolean),
         Column('id', String(length=255), primary_key=True, nullable= False),
         Column('vm_id', String(length=255), nullable= False),
+        Column('vm_name', String(length=255), nullable= False),
         Column('snapshot_id', String(length=255), ForeignKey('snapshots.id')),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'

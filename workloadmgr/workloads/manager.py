@@ -436,9 +436,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else: #TODO(giri) Check for all other hypervisor types
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             
-
             #create an entry for the VM
             options = {'vm_id': vm.vm_id,
+                       'vm_name': vm.vm_name,
                        'snapshot_id': snapshot_id,
                        'snapshot_type': snapshot_type,
                        'status': 'creating',}

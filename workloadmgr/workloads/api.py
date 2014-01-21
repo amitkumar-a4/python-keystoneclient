@@ -15,6 +15,7 @@ from workloadmgr.db import base
 from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.compute import nova
 
 
 FLAGS = flags.FLAGS
@@ -61,6 +62,14 @@ class API(base.Base):
         """
         Make the RPC call to create a workload.
         """
+        compute_service = nova.API(production=True)
+        instances_with_name = compute_service.get_servers(context,all_tenants=True)
+        #TODO(giri): optimize this lookup
+        for instance in instances:
+            for instance_with_name in instances_with_name:
+                if instance['instance-id'] == instance_with_name.id:
+                   instance['instance-name'] = instance_with_name.name 
+                   
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'display_name': name,
@@ -73,12 +82,13 @@ class API(base.Base):
         workload = self.db.workload_create(context, options)
         for instance in instances:
             values = {'workload_id': workload.id,
-                      'vm_id': instance['instance-id']}
+                      'vm_id': instance['instance-id'],
+                      'vm_name': instance['instance-name']}
             vm = self.db.workload_vms_create(context, values)
         
         self.workloads_rpcapi.workload_create(context,
-                                         workload['host'],
-                                         workload['id'])
+                                              workload['host'],
+                                              workload['id'])
         
         return workload
     
@@ -122,7 +132,9 @@ class API(base.Base):
 
     def snapshot_show(self, context, snapshot_id):
         rv = self.db.snapshot_show(context, snapshot_id)
-        return dict(rv.iteritems())
+        snapshot_details  = dict(rv.iteritems())
+        instances = self.db.snapshot_vm_get(context, snapshot_id)
+        return snapshot_details
     
     def snapshot_get_all(self, context, workload_id=None):
         if workload_id:

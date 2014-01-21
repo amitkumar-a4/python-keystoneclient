@@ -135,6 +135,7 @@ class WorkloadMgrVMs(BASE, WorkloadMgrBase):
         return FLAGS.workload_name_template % self.id
 
     vm_id = Column(String(255))
+    vm_name = Column(String(255))
     workload_id = Column(String(255), ForeignKey('workloads.id'))
 
 class ScheduledJobs(BASE, WorkloadMgrBase):
@@ -181,6 +182,7 @@ class SnapshotVMs(BASE, WorkloadMgrBase):
         return FLAGS.workload_name_template % self.id
 
     vm_id = Column(String(255))
+    vm_name = Column(String(255))
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     status =  Column(String(32), nullable=False)
     
