@@ -57,6 +57,8 @@ class ViewBuilder(common.ViewBuilder):
                 'status': snapshot.get('status'),
                 #'links': self._get_links(request, snapshot['id'],
                 'name':  snapshot['id'],
+                'snapshot_type': snapshot.get('snapshot_type'),
+                'workload_id': snapshot.get('workload_id'),
             }
         }
 

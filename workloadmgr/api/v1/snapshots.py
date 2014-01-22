@@ -44,7 +44,14 @@ def _translate_snapshot_summary_view(context, snapshot):
     d['id'] = snapshot['id']
     d['created_at'] = snapshot['created_at']
     d['status'] = snapshot['status']
- 
+    d['workload_id'] = snapshot['workload_id']
+    instances = []
+    for vm in snapshot['instances']:
+        instances.append({'id':vm['vm_id'],
+                          'name':vm['vm_name'],
+                          'status':vm['status']
+                          }) 
+    d['instances'] = instances
     return d
 
 

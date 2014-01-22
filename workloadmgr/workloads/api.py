@@ -44,7 +44,7 @@ class API(base.Base):
         workload_dict = dict(workload.iteritems())
         workload_vm_ids = []
         for workload_vm in self.db.workload_vms_get(context, workload.id):
-           workload_vm_ids.append(workload_vm.vm_id)  
+            workload_vm_ids.append(workload_vm.vm_id)  
         workload_dict['vm_ids'] = workload_vm_ids
         return workload_dict
     
@@ -68,7 +68,7 @@ class API(base.Base):
         for instance in instances:
             for instance_with_name in instances_with_name:
                 if instance['instance-id'] == instance_with_name.id:
-                   instance['instance-name'] = instance_with_name.name 
+                    instance['instance-name'] = instance_with_name.name 
                    
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
@@ -128,12 +128,22 @@ class API(base.Base):
 
     def snapshot_get(self, context, snapshot_id):
         rv = self.db.snapshot_get(context, snapshot_id)
-        return dict(rv.iteritems())
+        snapshot_details  = dict(rv.iteritems())
+        vms = self.db.snapshot_vm_get(context, snapshot_id)
+        instances = []
+        for vm in vms:
+            instances.append(dict(vm.iteritems()))
+        snapshot_details.setdefault('instances', instances)    
+        return snapshot_details
 
     def snapshot_show(self, context, snapshot_id):
         rv = self.db.snapshot_show(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
-        instances = self.db.snapshot_vm_get(context, snapshot_id)
+        vms = self.db.snapshot_vm_get(context, snapshot_id)
+        instances = []
+        for vm in vms:
+            instances.append(dict(vm.iteritems()))
+        snapshot_details.setdefault('instances', instances)    
         return snapshot_details
     
     def snapshot_get_all(self, context, workload_id=None):

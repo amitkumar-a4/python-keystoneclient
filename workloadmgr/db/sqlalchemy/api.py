@@ -484,7 +484,6 @@ def snapshot_get_all(context):
 @require_context
 def snapshot_get_all_by_project(context, project_id):
     authorize_project_context(context, project_id)
-
     return model_query(context, models.Snapshots).\
         filter_by(project_id=project_id).all()
         

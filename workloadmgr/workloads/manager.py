@@ -257,8 +257,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def _get_pit_resource_id(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
-               pit_id = metadata['value']
-               return pit_id
+                pit_id = metadata['value']
+                return pit_id
             
     def _get_pit_resource(self, snapshot_vm_common_resources, pit_id):
         for snapshot_vm_resource in snapshot_vm_common_resources:
