@@ -212,6 +212,17 @@ class SnapshotVMResources(BASE, WorkloadMgrBase):
     resource_name = Column(String(255)) #vda etc.
     resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot)    
     status =  Column(String(32), nullable=False)
+    
+class SnapshotVMResourceMetadata(BASE, WorkloadMgrBase):
+    """Represents  metadata for the snapshot of a VM Resource"""
+    __tablename__ = 'snapshot_vm_resource_metadata'
+    __table_args__ = (UniqueConstraint('snapshot_vm_resource_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    snapshot_vm_resource_id = Column(String(36), ForeignKey('snapshot_vm_resources.id'), nullable=False)
+    snapshot_vm_resource = relationship(SnapshotVMResources, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)    
 
 class VMDiskResourceSnaps(BASE, WorkloadMgrBase):
     """Represents the snapshot of a VM Resource"""

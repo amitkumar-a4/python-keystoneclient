@@ -147,6 +147,20 @@ def upgrade(migrate_engine):
         mysql_engine='InnoDB'
     )
     
+    snapshot_vm_resource_metadata = Table(
+        'snapshot_vm_resource_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('snapshot_vm_resource_id', String(length=255), ForeignKey('snapshot_vm_resources.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('snapshot_vm_resource_id', 'key'),
+        mysql_engine='InnoDB'
+    )            
+    
     vm_disk_resource_snaps = Table(
         'vm_disk_resource_snaps', meta,
         Column('created_at', DateTime),
@@ -214,6 +228,7 @@ def upgrade(migrate_engine):
               snapshot_vms,
               vm_recent_snapshot,
               snapshot_vm_resources,
+              snapshot_vm_resource_metadata,
               vm_disk_resource_snaps,
               vm_disk_resource_snap_metadata,
               vm_network_resource_snaps,
@@ -236,6 +251,7 @@ def upgrade(migrate_engine):
                   "snapshot_vms",
                   "vm_recent_snapshot",
                   "snapshot_vm_resources",
+                  "snapshot_vm_resource_metadata",
                   "vm_disk_resource_snaps",
                   "vm_disk_resource_snap_metadata",
                   "vm_network_resource_snaps",

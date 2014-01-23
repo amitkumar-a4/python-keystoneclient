@@ -741,6 +741,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                            'snapshot_id': snapshot.id,       
                                            'resource_type': 'disk',
                                            'resource_name':  dev,
+                                           'metadata': {},
                                            'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
@@ -885,6 +886,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                'snapshot_id': snapshot.id,       
                                                'resource_type': 'disk',
                                                'resource_name':  dev,
+                                               'metadata': {},
                                                'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(context, 

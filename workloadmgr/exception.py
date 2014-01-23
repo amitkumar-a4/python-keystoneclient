@@ -627,5 +627,8 @@ class SnapshotVMResourcesWithIdNotFound:
     message = _("SnapshotVMResource with Id  %(id)s could not be found.")
 
 class VMDiskResourceSnapsNotFound:
+    message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")
+    
+class VMNetworkResourceSnapsNotFound:
     message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")  
     

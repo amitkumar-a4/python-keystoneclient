@@ -169,6 +169,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                        'resource_type': 'nic',
                                                        'resource_name':  '',
                                                        'resource_pit_id': '',
+                                                       'metadata': {},
                                                        'status': 'available'}
                     snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                         snapshot_vm_resource_values)                                                
@@ -192,6 +193,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                    'resource_type': 'subnet',
                                                    'resource_name':  subnet['name'],
                                                    'resource_pit_id': subnet['id'],
+                                                   'metadata': {},
                                                    'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                     snapshot_vm_resource_values)                                                
@@ -212,6 +214,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                    'resource_type': 'network',
                                                    'resource_name':  network['name'],
                                                    'resource_pit_id': network['id'],
+                                                   'metadata': {},
                                                    'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                     snapshot_vm_resource_values)                                                
@@ -232,6 +235,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                    'resource_type': 'router',
                                                    'resource_name':  router['name'],
                                                    'resource_pit_id': router['id'],
+                                                   'metadata': {},
                                                    'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                     snapshot_vm_resource_values)                                                

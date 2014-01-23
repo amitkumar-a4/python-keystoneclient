@@ -1560,6 +1560,7 @@ class VMwareVMOps(object):
                                            'snapshot_id': snapshot.id,       
                                            'resource_type': 'disk',
                                            'resource_name':  disk['label'],
+                                           'metadata': {},
                                            'status': 'creating'}
     
             snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
