@@ -733,7 +733,6 @@ class LibvirtDriver(driver.ComputeDriver):
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_UPLOAD_INPROGESS)
         
-        
         for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
             src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
@@ -964,9 +963,28 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         Restores the specified instance from a snapshot
         """  
+        if test:
+            compute_service = nova.API(production=False)
+        else:
+            compute_service = nova.API(production=True)
+                    
         restored_image = None
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
-        snapshot_vm_resources = db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)        
+        snapshot_vm_resources = db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)
+
+        #vm flavor
+        restored_compute_flavor = compute_service.get_flavor_by_name(context, 'm1.small')
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type == 'flavor':
+                snapshot_vm_flavor = db.snapshot_vm_resource_get(context, snapshot_vm_resource.id)
+                for flavor in compute_service.get_flavors(context):
+                    if ((str(flavor.vcpus) ==  db.get_metadata_value(snapshot_vm_flavor.metadata, 'vcpus')) and
+                        (str(flavor.ram) ==  db.get_metadata_value(snapshot_vm_flavor.metadata, 'ram')) and
+                        (str(flavor.disk) ==  db.get_metadata_value(snapshot_vm_flavor.metadata, 'disk')) and
+                        (str(flavor.ephemeral) == db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral'))):
+                        restored_compute_flavor = flavor
+                        break
+                break                                       
 
         #network resources
         nics = []
@@ -1115,12 +1133,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     
         #create nova instance
         restored_instance_name = uuid.uuid4().hex
-        if test:
-            compute_service = nova.API(production=False)
-        else:
-            compute_service = nova.API(production=True)
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
-        restored_compute_flavor = compute_service.get_flavor(context, 'm1.small')
         restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=nics)
         while restored_instance.status != 'ACTIVE':
             time.sleep(30)

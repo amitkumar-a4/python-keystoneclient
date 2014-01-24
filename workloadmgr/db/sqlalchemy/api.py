@@ -640,7 +640,7 @@ def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, me
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'snapshot_vm_resource_id': snapshot_vm_resource_ref.snapshot_vm_resource_id,
+        metadata_values = {'snapshot_vm_resource_id': snapshot_vm_resource_ref.id,
                            'key': key,
                            'value': value}
         if key in orig_metadata:
@@ -705,7 +705,6 @@ def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge
 
 @require_context
 def snapshot_vm_resource_create(context, values):
-    
     return _snapshot_vm_resource_update(context, values, None, False)
 
 def snapshot_vm_resource_update(context, snapshot_vm_resource_id, values, purge_metadata=False):

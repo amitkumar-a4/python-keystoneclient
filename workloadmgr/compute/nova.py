@@ -296,8 +296,21 @@ class API(base.Base):
         except Exception:
             #TODO(gbasava): Handle the exception 
             return 
+        
+    def get_flavors(self, context, is_public=True):
+        """
+        Get the list of flavors 
+
+        :param is_public: public flavors
+        :rtype: :class:`Flavor`
+        """   
+        try:
+            return novaclient(context, self._production).flavors.list(is_public=is_public) 
+        except Exception:
+            #TODO(gbasava): Handle the exception   
+            return         
                       
-    def get_flavor(self, context, name):
+    def get_flavor_by_name(self, context, name):
         """
         Get the flavors given the name
 
@@ -309,8 +322,22 @@ class API(base.Base):
             return novaclient(context, self._production).flavors.find(name=name) 
         except Exception:
             #TODO(gbasava): Handle the exception   
+            return 
+         
+    def get_flavor_by_id(self, context, id):
+        """
+        Get the flavor given the id
+
+        :param name: id of the flavors
+        :rtype: :class:`Flavor`
+        """   
+    
+        try:
+            return novaclient(context, self._production).flavors.get(id) 
+        except Exception:
+            #TODO(gbasava): Handle the exception   
             return  
-       
+               
     def get_interfaces(self, context, server):   
         """
         List attached network interfaces

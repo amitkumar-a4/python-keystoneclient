@@ -403,7 +403,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Take a snapshot of the workload
         """
-        LOG.info(_('snapshot workload started, snapshot_id %s' %snapshot_id))
+        LOG.info(_('snapshot of workload started, snapshot_id %s' %snapshot_id))
         
         compute_service = nova.API(production=True)
         instances = compute_service.get_servers(context,all_tenants=True)  
@@ -448,6 +448,17 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                        'status': 'creating',}
             snapshot_vm = self.db.snapshot_vm_create(context, options)
             
+            # Create  a flavor resource
+            flavor = compute_service.get_flavor_by_id(context, vm_instance.flavor['id'])
+            metadata = {'name':flavor.name, 'vcpus':flavor.vcpus, 'ram':flavor.ram, 'disk':flavor.disk, 'ephemeral':flavor.ephemeral}
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': snapshot_vm.vm_id,
+                                           'snapshot_id': snapshot.id,       
+                                           'resource_type': 'flavor',
+                                           'resource_name':  flavor.name,
+                                           'metadata': metadata,
+                                           'status': 'available'}
+            snapshot_vm_resource = self.db.snapshot_vm_resource_create(context,  snapshot_vm_resource_values)                         
             
             #disks snapshot    
             virtdriver.snapshot(workload, snapshot, snapshot_vm, vm_hypervisor.hypervisor_hostname, vault_service, self.db, context)
