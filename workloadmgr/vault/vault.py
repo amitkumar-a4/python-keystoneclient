@@ -37,7 +37,7 @@ wlm_vault_opts = [
                default='vault',
                help='Write size in KB'),
     cfg.StrOpt('wlm_vault_local',
-               default=True,
+               default=False,
                help='Store in local file system'),
     cfg.StrOpt('wlm_vault_local_directory',
                default='/tmp/snapshots',
@@ -51,9 +51,12 @@ class VaultBackupService(base.Base):
     def __init__(self, context):
         self.context = context
         
-    def move_file(self, src_host, src, dest):
+    def copy_remote_file(self, src_host, src, dest, tvault_fs=False):
         try:
-            utils.execute('scp', 'root@' + src_host + ':' + src, dest, run_as_root=False)
+            if tvault_fs:
+                utils.execute('gcp', 'root@' + src_host + ':' + src, dest, run_as_root=False)
+            else:
+                utils.execute('scp', 'root@' + src_host + ':' + src, dest, run_as_root=False)
         except:
             #TODO(giri): handle exception
             pass
@@ -72,11 +75,11 @@ class VaultBackupService(base.Base):
                                                                       snapshot_metadata['resource_name'].replace(' ',''))
         fileutils.ensure_tree(copy_to_file_path)
         copy_to_file_path = copy_to_file_path + '/' + snapshot_metadata['vm_disk_resource_snap_id']
-        self.move_file(src_host, file_to_snapshot_path, copy_to_file_path)   
+        self.copy_remote_file(src_host, file_to_snapshot_path, copy_to_file_path)   
         return copy_to_file_path
     
     def restore_local(self, snapshot_metadata, restore_to_file_path):
-        """Restore a snapshot from stored on local filesystem."""
+        """Restore a snapshot from the local filesystem."""
                  
         copy_from_file_path = FLAGS.wlm_vault_local_directory
         copy_from_file_path = copy_from_file_path + '/snapshot_%s' % (snapshot_metadata['snapshot_id'])
@@ -96,7 +99,7 @@ class VaultBackupService(base.Base):
         volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
-        copy_to_file_path = 'snapshots'
+        copy_to_file_path = '/snapshots'
         volume.mkdir(copy_to_file_path.encode('ascii','ignore'))
         copy_to_file_path = copy_to_file_path + '/snapshot_%s' % (snapshot_metadata['snapshot_id'])
         volume.mkdir(copy_to_file_path.encode('ascii','ignore'))
@@ -106,6 +109,8 @@ class VaultBackupService(base.Base):
                                                                       snapshot_metadata['resource_name'].replace(' ',''))
         volume.mkdir(copy_to_file_path.encode('ascii','ignore'))
         copy_to_file_path = copy_to_file_path + '/' + snapshot_metadata['vm_disk_resource_snap_id']
+        self.copy_remote_file(src_host, file_to_snapshot_path, copy_to_file_path, tvault_fs = True)  
+        """
         copy_to_file_path_handle = volume.creat(copy_to_file_path.encode('ascii','ignore'), os.O_RDWR, 0644)
         file_to_snapshot_handle = file(file_to_snapshot_path, 'rb')
         file_to_snapshot_size = int(os.stat(file_to_snapshot_path).st_size)
@@ -114,6 +119,7 @@ class VaultBackupService(base.Base):
             copy_to_file_path_handle.write(chunk)
             file_to_snapshot_size -= FLAGS.wlm_vault_write_chunk_size_kb*1024
         file_to_snapshot_handle.close()
+        """
         return copy_to_file_path
         
     def restore(self, snapshot_metadata, restore_to_file_path):

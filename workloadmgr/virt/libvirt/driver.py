@@ -750,11 +750,6 @@ class LibvirtDriver(driver.ComputeDriver):
             while (src_backing_path != None):
                 src_backings.append(src_backing_path)
                 src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, src_backing_path, basename=False)
-                #mode = os.stat(src_backing_path).st_mode
-                #if S_ISREG(mode) :
-                #    src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, src_backing_path, basename=False)      
-                #else:
-                #    src_backing_path = None
             
             base_backing_path = None
             vm_disk_resource_snap_id = None
@@ -797,22 +792,20 @@ class LibvirtDriver(driver.ComputeDriver):
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                                 'vault_service_metadata' : 'None',
-                                                'status': 'completed'} 
+                                                'status': 'available'} 
                 vm_disk_resource_snap.update(vm_disk_resource_snap_values)
                 base_backing_path = top_backing_path
 
             if dev == 'vda': 
-                #TODO(gbasava): Base image can be shared by multiple instances...should leave a minimum of 
+                #TODO(giri): Base image can be shared by multiple instances...should leave a minimum of 
                 # two qcow2 files in front of the base image
+                snapshot_vm_resource.update({'status': 'available',})
                 continue
             
             state = self.get_info(instance_name)['state']    
             #TODO(gbasava): Walk the qcow2 for each disk device and commit and intermediate qcow2 files into base
-            #with utils.temporary_chown(snapshot_disk_path):
             backing_file = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)
-            #with utils.temporary_chown(backing_file):
             backing_file_backing = libvirt_utils.get_disk_backing_file(hypervisor_hostname, backing_file, basename=False)
-            #with utils.temporary_chown(backing_file_backing):
             
             if (backing_file_backing != None and backing_file_backing != backing_file):
                 if state == power_state.RUNNING: 
@@ -824,7 +817,8 @@ class LibvirtDriver(driver.ComputeDriver):
                     self.delete_if_exists(hypervisor_hostname, backing_file)                     
                     self.rebase_qcow2(hypervisor_hostname, backing_file_backing, snapshot_disk_path)
                 #else: TODO(gbasava): investigate and handle other powerstates     
-
+            snapshot_vm_resource.update({'status': 'available',})
+                    
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
             update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
@@ -837,7 +831,6 @@ class LibvirtDriver(driver.ComputeDriver):
         :param snapshot: 
         :param snapshot_vm: 
         """
-        
         #TODO(gbasava): Check if the previous full snapshot exists by calling vm_recent_snapshot_get
         
         if update_task_state:
@@ -855,11 +848,9 @@ class LibvirtDriver(driver.ComputeDriver):
             dev_snapshot_disk_paths.setdefault(device, 
                         snapshot_directory + '/' + snapshot_name + '_' + device + '.qcow2' )
 
-        #TODo(gbasava): snapshot_create_as is failing with permissions issue while the VM is running
-        #Need
-        self.snapshot_create_as(hypervisor_hostname, instance_name, snapshot_name, 
-                                snapshot_description, dev_snapshot_disk_paths)
-        #TODo(gbasava): Handle the failure of snapshot_create_as
+
+        self.snapshot_create_as(hypervisor_hostname, instance_name, snapshot_name, snapshot_description, dev_snapshot_disk_paths)
+        #TODo(giri): Handle the failure of snapshot_create_as
         self.snapshot_delete(hypervisor_hostname, instance_name, snapshot_name, True)
         
         if update_task_state:
@@ -881,12 +872,12 @@ class LibvirtDriver(driver.ComputeDriver):
             
             src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                               'vm_id': snapshot_vm.vm_id,
-                                               'snapshot_id': snapshot.id,       
-                                               'resource_type': 'disk',
-                                               'resource_name':  dev,
-                                               'metadata': {},
-                                               'status': 'creating'}
+                                           'vm_id': snapshot_vm.vm_id,
+                                           'snapshot_id': snapshot.id,       
+                                           'resource_type': 'disk',
+                                           'resource_name':  dev,
+                                           'metadata': {},
+                                           'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
                                                 snapshot_vm_resource_values)                                                
@@ -906,7 +897,6 @@ class LibvirtDriver(driver.ComputeDriver):
             vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
             #upload to vault service
             vault_service_url = None
-            #with utils.temporary_chown(src_backing_path):
             vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
                               'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
                               'snapshot_vm_resource_id': snapshot_vm_resource.id,
@@ -917,9 +907,11 @@ class LibvirtDriver(driver.ComputeDriver):
                 
             # update the entry in the vm_disk_resource_snap table
             vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
-                                         'vault_service_metadata' : 'None',
-                                         'status': 'completed'} 
+                                            'vault_service_metadata' : 'None',
+                                            'status': 'available'} 
             vm_disk_resource_snap.update(vm_disk_resource_snap_values)
+            
+            snapshot_vm_resource.update({'status': 'available',})
 
                 
         if update_task_state:

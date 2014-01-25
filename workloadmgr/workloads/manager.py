@@ -269,7 +269,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if snapshot_vm_resource.resource_pit_id == pit_id:
                 return snapshot_vm_resource            
                     
-    def _restore_networks(self, context, production, snapshot, new_net_resources):
+    def _restore_networks(self, context, production, snapshot, restore_id, new_net_resources):
         """
         Restore the networking configuration of VMs of the snapshot
         nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
@@ -291,7 +291,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_network.id)
                             network = pickle.loads(str(vm_nic_network_snapshot.pickle))
-                            params = {'name': network['name'],
+                            params = {'name': network['name'] + restore_id,
                                       'tenant_id': context.tenant,
                                       'admin_state_up': network['admin_state_up'],
                                       'shared': network['shared'],
@@ -307,7 +307,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
                             subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                            params = {'name': subnet['name'],
+                            params = {'name': subnet['name'] + restore_id,
                                       'network_id': new_network['id'],
                                       'tenant_id': context.tenant,
                                       'cidr': subnet['cidr'],
@@ -323,7 +323,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_ext_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_ext_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_network.id)
                             ext_network = pickle.loads(str(vm_nic_ext_network_snapshot.pickle))
-                            params = {'name': ext_network['name'],
+                            params = {'name': ext_network['name'] + restore_id,
                                       'admin_state_up': ext_network['admin_state_up'],
                                       'shared': ext_network['shared'],
                                       'router:external': ext_network['router:external']} 
@@ -338,7 +338,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_ext_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_ext_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_subnet.id)
                             ext_subnet = pickle.loads(str(vm_nic_ext_subnet_snapshot.pickle))
-                            params = {'name': ext_subnet['name'],
+                            params = {'name': ext_subnet['name'] + + restore_id,
                                       'network_id': new_ext_network['id'],
                                       'cidr': ext_subnet['cidr'],
                                       'ip_version': ext_subnet['ip_version']} 
@@ -353,7 +353,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_router = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_router_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_router.id)
                             router = pickle.loads(str(vm_nic_router_snapshot.pickle))
-                            params = {'name': router['name'],
+                            params = {'name': router['name'] + restore_id,
                                       'tenant_id': context.tenant} 
                             new_router = network_service.create_router(context,**params)
                             new_net_resources.setdefault(pit_id,new_router)
@@ -464,9 +464,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             virtdriver.snapshot(workload, snapshot, snapshot_vm, vm_hypervisor.hypervisor_hostname, vault_service, self.db, context)
             #TODO(giri): Check for the success (and update)
             snapshot_vm.update({'status': 'available',})
-            #TODO(giri): handle the case where this can be updated by multiple workload snapshot requests coming from 
-            #different workloadmgr.
+            #TODO(giri): handle the case where this can be updated by multiple workload snapshot requests 
             self.db.vm_recent_snapshot_update(context, vm.vm_id, {'snapshot_id': snapshot.id})
+            
         
         self._snapshot_networks(context, True, snapshot)
         #TODO(gbasava): Check for the success (and update)                
@@ -491,12 +491,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         snapshot = self.db.snapshot_get(context, snapshot_id)
         workload = self.db.workload_get(context, snapshot.workload_id)
         #self.db.snapshot_update(context, snapshot.id, {'status': 'restoring'})
+        restore_id = str(uuid.uuid4())
+        
         
         new_net_resources = {}
         if test:
-            self._restore_networks(context, False, snapshot, new_net_resources)
+            self._restore_networks(context, False, snapshot, restore_id, new_net_resources)
         else:
-            self._restore_networks(context, True, snapshot, new_net_resources)    
+            self._restore_networks(context, True, snapshot, restore_id, new_net_resources)    
         vault_service = vault.get_vault_service(context)
         
         #restore each VM
