@@ -767,13 +767,13 @@ class LibvirtDriver(driver.ComputeDriver):
                 if(dev == 'vda' and top_backing_path == None):
                     vm_disk_resource_snap_metadata.setdefault('base_image_ref','TODO')                    
                 vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
-                vm_disk_resource_snap_values = {'id': vm_disk_resource_snap_id,
-                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                             'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
-                                             'metadata': vm_disk_resource_snap_metadata,       
-                                             'top':  (top_backing_path == None),
-                                             'vault_service_id' : '1',
-                                             'status': 'creating'}     
+                vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
+                                                 'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                 'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                                 'metadata': vm_disk_resource_snap_metadata,       
+                                                 'top':  (top_backing_path == None),
+                                                 'vault_service_id' : '1',
+                                                 'status': 'creating'}     
                                                              
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
                 #upload to vault service
@@ -793,13 +793,13 @@ class LibvirtDriver(driver.ComputeDriver):
                 vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                                 'vault_service_metadata' : 'None',
                                                 'status': 'available'} 
-                vm_disk_resource_snap.update(vm_disk_resource_snap_values)
+                db.vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 base_backing_path = top_backing_path
 
             if dev == 'vda': 
                 #TODO(giri): Base image can be shared by multiple instances...should leave a minimum of 
                 # two qcow2 files in front of the base image
-                snapshot_vm_resource.update({'status': 'available',})
+                db.snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'status': 'available',})
                 continue
             
             state = self.get_info(instance_name)['state']    
@@ -817,7 +817,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     self.delete_if_exists(hypervisor_hostname, backing_file)                     
                     self.rebase_qcow2(hypervisor_hostname, backing_file_backing, snapshot_disk_path)
                 #else: TODO(gbasava): investigate and handle other powerstates     
-            snapshot_vm_resource.update({'status': 'available',})
+            db.snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'status': 'available',})
                     
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
@@ -908,10 +908,10 @@ class LibvirtDriver(driver.ComputeDriver):
             # update the entry in the vm_disk_resource_snap table
             vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                             'vault_service_metadata' : 'None',
-                                            'status': 'available'} 
-            vm_disk_resource_snap.update(vm_disk_resource_snap_values)
+                                            'status': 'available'}
+            db.vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'status': 'available',}) 
             
-            snapshot_vm_resource.update({'status': 'available',})
+            db.snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'status': 'available',})
 
                 
         if update_task_state:

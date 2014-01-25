@@ -207,6 +207,9 @@ def vm_recent_snapshot_destroy(context, vm_id):
 def snapshot_vm_resource_create(context, values):
     return IMPL.snapshot_vm_resource_create(context, values)
 
+def snapshot_vm_resource_update(context, id, vaules, purge_metadata=False):
+    return IMPL.snapshot_vm_resource_update(context, id, vaules, purge_metadata)
+
 def snapshot_vm_resources_get(context, vm_id, snapshot_id, session=None):
     return IMPL.snapshot_vm_resources_get(context, vm_id, snapshot_id, session)
 
@@ -222,6 +225,9 @@ def snapshot_vm_resource_destroy(context, id, vm_id, snapshot_id):
 def vm_disk_resource_snap_create(context, values):
     return IMPL.vm_disk_resource_snap_create(context, values)
 
+def vm_disk_resource_snap_update(context, id, vaules, purge_metadata=False):
+    return IMPL.vm_disk_resource_snap_update(context, id, vaules, purge_metadata)
+
 def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, session=None):
     return IMPL.vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, session)
 
@@ -236,6 +242,9 @@ def vm_disk_resource_snaps_destroy(context, snapshot_vm_resource_id):
 
 def vm_network_resource_snap_create(context, values):
     return IMPL.vm_network_resource_snap_create(context, values)
+
+def vm_network_resource_snap_update(context, id, vaules, purge_metadata=False):
+    return IMPL.vm_network_resource_snap_update(context, id, vaules, purge_metadata)
 
 def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session=None):
     return IMPL.vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session)

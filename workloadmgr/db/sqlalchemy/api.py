@@ -656,7 +656,7 @@ def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, me
                 metadata_ref = orig_metadata[key]
                 snapshot_vm_resource_metadata_delete(context, metadata_ref, session=session)
 
-
+@require_context
 def snapshot_vm_resource_metadata_create(context, values, session=None):
     """Create an SnapshotVMResourceMetadata object"""
     metadata_ref = models.SnapshotVMResourceMetadata()
@@ -676,7 +676,7 @@ def _snapshot_vm_resource_metadata_update(context, metadata_ref, values, session
     metadata_ref.save(session=session)
     return metadata_ref
 
-
+@require_context
 def snapshot_vm_resource_metadata_delete(context, metadata_ref, session=None):
     """
     Used internally by snapshot_vm_resource_metadata_create and snapshot_vm_resource_metadata_update
@@ -690,13 +690,14 @@ def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge
     
     metadata = values.pop('metadata', {})
     
+    session = get_session()
     if snapshot_vm_resource_id:
-        snapshot_vm_resource_ref = snapshot_vm_resources_get(context, snapshot_vm_resource_id, None)
+        snapshot_vm_resource_ref = snapshot_vm_resource_get(context, snapshot_vm_resource_id, session)
     else:
         snapshot_vm_resource_ref = models.SnapshotVMResources()
     
     snapshot_vm_resource_ref.update(values)
-    snapshot_vm_resource_ref.save()
+    snapshot_vm_resource_ref.save(session)
     
     _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, metadata, purge_metadata)  
       
@@ -707,6 +708,7 @@ def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge
 def snapshot_vm_resource_create(context, values):
     return _snapshot_vm_resource_update(context, values, None, False)
 
+@require_context
 def snapshot_vm_resource_update(context, snapshot_vm_resource_id, values, purge_metadata=False):
    
     return _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge_metadata)
@@ -750,6 +752,7 @@ def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resou
 
     return snapshot_vm_resources
 
+@require_context
 def snapshot_vm_resource_get(context, id, session=None):
     if session == None: 
         session = get_session()
@@ -811,7 +814,7 @@ def _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, 
                 metadata_ref = orig_metadata[key]
                 vm_disk_resource_snap_metadata_delete(context, metadata_ref, session=session)
 
-
+@require_context
 def vm_disk_resource_snap_metadata_create(context, values, session=None):
     """Create an VMDiskResourceSnapMetadata object"""
     metadata_ref = models.VMDiskResourceSnapMetadata()
@@ -845,14 +848,14 @@ def _vm_disk_resource_snap_update(context, values, snapshot_vm_resource_id, purg
     
     metadata = values.pop('metadata', {})
     
+    session = get_session()
     if snapshot_vm_resource_id:
-        vm_disk_resource_snap_ref = vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, None)
+        vm_disk_resource_snap_ref = vm_disk_resource_snap_get(context, snapshot_vm_resource_id, session)
     else:
         vm_disk_resource_snap_ref = models.VMDiskResourceSnaps()
-    if not values.get('id'):
-        values['id'] = str(uuid.uuid4())
+
     vm_disk_resource_snap_ref.update(values)
-    vm_disk_resource_snap_ref.save()
+    vm_disk_resource_snap_ref.save(session)
     
     _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, metadata, purge_metadata)  
       
@@ -864,6 +867,7 @@ def vm_disk_resource_snap_create(context, values):
     
     return _vm_disk_resource_snap_update(context, values, None, False)
 
+@require_context
 def vm_disk_resource_snap_update(context, snapshot_vm_resource_id, values, purge_metadata=False):
    
     return _vm_disk_resource_snap_update(context, values, snapshot_vm_resource_id, purge_metadata)
@@ -965,7 +969,7 @@ def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap
                 metadata_ref = orig_metadata[key]
                 vm_network_resource_snap_metadata_delete(context, metadata_ref, session=session)
 
-
+@require_context
 def vm_network_resource_snap_metadata_create(context, values, session=None):
     """Create an VMNetworkResourceSnapMetadata object"""
     metadata_ref = models.VMNetworkResourceSnapMetadata()
@@ -985,7 +989,7 @@ def _vm_network_resource_snap_metadata_update(context, metadata_ref, values, ses
     metadata_ref.save(session=session)
     return metadata_ref
 
-
+@require_context
 def vm_network_resource_snap_metadata_delete(context, metadata_ref, session=None):
     """
     Used internally by vm_network_resource_snap_metadata_create and vm_network_resource_snap_metadata_update
@@ -999,13 +1003,14 @@ def _vm_network_resource_snap_update(context, values, snapshot_vm_resource_id, p
     
     metadata = values.pop('metadata', {})
     
+    session = get_session()
     if snapshot_vm_resource_id:
-        vm_network_resource_snap_ref = vm_network_resource_snaps_get(context, snapshot_vm_resource_id, None)
+        vm_network_resource_snap_ref = vm_network_resource_snap_get(context, snapshot_vm_resource_id, session)
     else:
         vm_network_resource_snap_ref = models.VMNetworkResourceSnaps()
     
     vm_network_resource_snap_ref.update(values)
-    vm_network_resource_snap_ref.save()
+    vm_network_resource_snap_ref.save(session)
     
     _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap_ref, metadata, purge_metadata)  
       
@@ -1017,6 +1022,7 @@ def vm_network_resource_snap_create(context, values):
     
     return _vm_network_resource_snap_update(context, values, None, False)
 
+@require_context
 def vm_network_resource_snap_update(context, snapshot_vm_resource_id, values, purge_metadata=False):
    
     return _vm_network_resource_snap_update(context, values, snapshot_vm_resource_id, purge_metadata)

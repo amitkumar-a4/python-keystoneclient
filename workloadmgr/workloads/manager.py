@@ -464,6 +464,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             virtdriver.snapshot(workload, snapshot, snapshot_vm, vm_hypervisor.hypervisor_hostname, vault_service, self.db, context)
             #TODO(giri): Check for the success (and update)
             snapshot_vm.update({'status': 'available',})
+            snapshot_vm.save()
             #TODO(giri): handle the case where this can be updated by multiple workload snapshot requests 
             self.db.vm_recent_snapshot_update(context, vm.vm_id, {'snapshot_id': snapshot.id})
             

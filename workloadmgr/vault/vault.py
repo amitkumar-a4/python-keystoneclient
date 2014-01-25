@@ -130,7 +130,7 @@ class VaultBackupService(base.Base):
         volume = gfapi.Volume("localhost", "vault")
         volume.mount() 
                  
-        copy_from_file_path = 'snapshots'
+        copy_from_file_path = '/snapshots'
         copy_from_file_path = copy_from_file_path + '/snapshot_%s' % (snapshot_metadata['snapshot_id'])
         copy_from_file_path = copy_from_file_path + '/vm_id_%s' % (snapshot_metadata['snapshot_vm_id'])
         copy_from_file_path = copy_from_file_path + '/vm_res_id_%s_%s' % (snapshot_metadata['snapshot_vm_resource_id'], 
