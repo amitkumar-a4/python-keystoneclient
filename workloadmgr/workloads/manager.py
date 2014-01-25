@@ -276,7 +276,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         try:
             network_service =  neutron.API(production=production)  
-
             snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot.id, snapshot.id)           
             for snapshot_vm in self.db.snapshot_vm_get(context, snapshot.id):
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)        
@@ -291,7 +290,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_network.id)
                             network = pickle.loads(str(vm_nic_network_snapshot.pickle))
-                            params = {'name': network['name'] + restore_id,
+                            params = {'name': network['name'] + '_' + restore_id,
                                       'tenant_id': context.tenant,
                                       'admin_state_up': network['admin_state_up'],
                                       'shared': network['shared'],
@@ -307,7 +306,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
                             subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                            params = {'name': subnet['name'] + restore_id,
+                            params = {'name': subnet['name'] + '_' + restore_id,
                                       'network_id': new_network['id'],
                                       'tenant_id': context.tenant,
                                       'cidr': subnet['cidr'],
@@ -323,7 +322,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_ext_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_ext_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_network.id)
                             ext_network = pickle.loads(str(vm_nic_ext_network_snapshot.pickle))
-                            params = {'name': ext_network['name'] + restore_id,
+                            params = {'name': ext_network['name'] + '_' + restore_id,
                                       'admin_state_up': ext_network['admin_state_up'],
                                       'shared': ext_network['shared'],
                                       'router:external': ext_network['router:external']} 
@@ -338,7 +337,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_ext_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_ext_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_subnet.id)
                             ext_subnet = pickle.loads(str(vm_nic_ext_subnet_snapshot.pickle))
-                            params = {'name': ext_subnet['name'] + + restore_id,
+                            params = {'name': ext_subnet['name'] + '_' + restore_id,
                                       'network_id': new_ext_network['id'],
                                       'cidr': ext_subnet['cidr'],
                                       'ip_version': ext_subnet['ip_version']} 
@@ -353,7 +352,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_router = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_router_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_router.id)
                             router = pickle.loads(str(vm_nic_router_snapshot.pickle))
-                            params = {'name': router['name'] + restore_id,
+                            params = {'name': router['name'] + '_' + restore_id,
                                       'tenant_id': context.tenant} 
                             new_router = network_service.create_router(context,**params)
                             new_net_resources.setdefault(pit_id,new_router)
