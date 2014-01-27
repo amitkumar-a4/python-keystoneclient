@@ -23,6 +23,32 @@ from workloadmgr.openstack.common import log as logging
 FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
 
+def _translate_snapshot_detail_view(context, snapshot):
+    """Maps keys for snapshots details view."""
+
+    d = _translate_snapshot_summary_view(context, snapshot)
+
+    return d
+
+
+def _translate_snapshot_summary_view(context, snapshot):
+    """Maps keys for snapshots summary view."""
+    d = {}
+
+    d['id'] = snapshot['id']
+    d['created_at'] = snapshot['created_at']
+    d['status'] = snapshot['status']
+    d['workload_id'] = snapshot['workload_id']
+    if 'instances' in snapshot:
+        instances = []
+        for vm in snapshot['instances']:
+            instances.append({'id':vm['vm_id'],
+                              'name':vm['vm_name'],
+                              'status':vm['status']
+                              }) 
+        d['instances'] = instances
+    return d
+
 
 def make_workload(elem):
     elem.set('id')
@@ -131,13 +157,13 @@ class WorkloadMgrsController(wsgi.Controller):
                 full = True
             else:
                 full = False    
-            self.workload_api.workload_snapshot(context, id, full)
+            new_snapshot = self.workload_api.workload_snapshot(context, id, full)
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidWorkloadMgr as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
 
-        return webob.Response(status_int=202)
+        return {'snapshot': _translate_snapshot_detail_view(context, dict(new_snapshot.iteritems()))}
     
     @wsgi.serializers(xml=WorkloadMgrsTemplate)
     def index(self, req):
@@ -186,16 +212,16 @@ class WorkloadMgrsController(wsgi.Controller):
         LOG.audit(_("Creating workload"), locals(), context=context)
 
         try:
-            new_snapshot = self.workload_api.workload_create(context, name, 
+            new_workload = self.workload_api.workload_create(context, name, 
                                                              description, instances,
                                                              vault_service, hours)
-            new_snapshot_dict = self.workload_api.workload_show(context, new_snapshot.id)
+            new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
         except exception.InvalidVolume as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.VolumeNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
  
-        retval = self._view_builder.summary(req, new_snapshot_dict)
+        retval = self._view_builder.summary(req, new_workload_dict)
         return retval
 
 

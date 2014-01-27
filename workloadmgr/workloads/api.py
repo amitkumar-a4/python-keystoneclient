@@ -22,7 +22,6 @@ FLAGS = flags.FLAGS
 
 LOG = logging.getLogger(__name__)
 
-
 class API(base.Base):
     """API for interacting with the Workload Manager."""
 
@@ -125,6 +124,7 @@ class API(base.Base):
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
         self.workloads_rpcapi.workload_snapshot(context, workload['host'], snapshot['id'], full)
+        return snapshot
 
     def snapshot_get(self, context, snapshot_id):
         rv = self.db.snapshot_get(context, snapshot_id)
