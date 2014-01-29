@@ -173,7 +173,7 @@ class Snapshots(BASE, WorkloadMgrBase):
     status =  Column(String(32), nullable=False)
 
 class SnapshotVMs(BASE, WorkloadMgrBase):
-    """Represents vms of a workload"""
+    """Represents vms of a workload snapshot"""
     __tablename__ = str('snapshot_vms')
     id = Column(String(255), primary_key=True)
 
@@ -198,7 +198,7 @@ class VMRecentSnapshot(BASE, WorkloadMgrBase):
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     
 class SnapshotVMResources(BASE, WorkloadMgrBase):
-    """Represents vm resoruces of a workload"""
+    """Represents vm resources of a workload"""
     __tablename__ = str('snapshot_vm_resources')
     id = Column(String(255), primary_key=True)
 
@@ -274,6 +274,64 @@ class VMNetworkResourceSnapMetadata(BASE, WorkloadMgrBase):
     vm_network_resource_snap = relationship(VMNetworkResourceSnaps, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)    
+    
+class Restores(BASE, WorkloadMgrBase):
+    """Represents a restore of a workload snapshots."""
+
+    __tablename__ = 'restores'
+    id = Column(String(255), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    
+    snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
+    restore_type = Column(String(32), nullable=False)
+    status =  Column(String(32), nullable=False)
+
+class RestoredVMs(BASE, WorkloadMgrBase):
+    """Represents restored vms of a workload snapshot"""
+    __tablename__ = str('restored_vms')
+    id = Column(String(255), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    vm_id = Column(String(255))
+    vm_name = Column(String(255))
+    restore_id = Column(String(255), ForeignKey('restores.id'))
+    status =  Column(String(32), nullable=False)
+    
+class RestoredVMResources(BASE, WorkloadMgrBase):
+    """Represents vm resources of a restored snapshot"""
+    __tablename__ = str('restored_vm_resources')
+    id = Column(String(255), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    vm_id = Column(String(255))
+    restore_id = Column(String(255), ForeignKey('restores.id'))
+    resource_type = Column(String(255)) #disk, network, definition
+    resource_name = Column(String(255)) #vda etc.
+    status =  Column(String(32), nullable=False)
+    
+class RestoredVMResourceMetadata(BASE, WorkloadMgrBase):
+    """Represents  metadata for the restore of a VM Resource"""
+    __tablename__ = 'restored_vm_resource_metadata'
+    __table_args__ = (UniqueConstraint('restored_vm_resource_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    restored_vm_resource_id = Column(String(36), ForeignKey('restored_vm_resources.id'), nullable=False)
+    restored_vm_resource = relationship(RestoredVMResources, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)    
+
         
 def register_models():
     """Register Models and create metadata.
@@ -293,7 +351,11 @@ def register_models():
               VMDiskResourceSnaps,
               VMDiskResourceSnapMetadata,
               VMNetworkResourceSnaps,
-              VMNetworkResourceSnapMetadata
+              VMNetworkResourceSnapMetadata,
+              Restores,
+              RestoredVMs,
+              RestoredVMResources,
+              RestoredVMResourceMetadata,
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

@@ -257,3 +257,60 @@ def vm_network_resource_snaps_destroy(context, snapshot_vm_resource_id):
     
 def get_metadata_value(metadata, key):
     return IMPL.get_metadata_value(metadata, key)
+
+def restore_get(context, restore_id, session=None):
+    return IMPL.restore_get(context, restore_id, session)
+
+def restore_get_all(context):
+    return IMPL.restore_get_all(context)
+
+def restore_get_all_by_project(context, project_id):
+    return IMPL.restore_get_all_by_project(context, project_id)
+        
+def restore_get_all_by_project_snapshot(context, project_id, snapshot_id):
+    return IMPL.restore_get_all_by_project_snapshot(context, project_id, snapshot_id)
+
+def restore_show(context, restore_id, session=None):
+    return IMPL.restore_show(context, restore_id, session=None)
+
+def restore_create(context, values):
+    return IMPL.restore_create(context, values)
+
+def restore_update(context, restore_id, values):
+    return IMPL.restore_update(context, restore_id, values)
+
+def restore_destroy(context, restore_id):
+    return IMPL.restore_destroy(context, restore_id)
+
+def restored_vm_create(context, values):
+    return IMPL.restored_vm_create(context, values)
+
+def restored_vm_get(context, restore_id, session=None):
+    return IMPL.restored_vm_get(context, restore_id, session)
+
+def restored_vm_destroy(context, vm_id, restore_id):
+    return IMPL.restored_vm_destroy(context, vm_id, restore_id)
+
+def restored_vm_resource_metadata_create(context, values, session=None):
+    return IMPL.restored_vm_resource_metadata_create(context, values, session)
+
+def restored_vm_resource_metadata_delete(context, metadata_ref, session=None):
+    return IMPL.restored_vm_resource_metadata_delete(context, metadata_ref, session)
+
+def restored_vm_resource_create(context, values):
+    return IMPL.restored_vm_resource_create(context, values)
+
+def restored_vm_resource_update(context, restored_vm_resource_id, values, purge_metadata=False):
+    return IMPL.restored_vm_resource_update(context, restored_vm_resource_id, values, purge_metadata)
+
+def restored_vm_resources_get(context, vm_id, restore_id, session=None):
+    return IMPL.restored_vm_resources_get(context, vm_id, restore_id, session)
+
+def restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name, session=None):
+    return IMPL.restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name, session)
+
+def restored_vm_resource_get(context, id, session=None):
+    return IMPL.restored_vm_resource_get(context, id, session)
+
+def restored_vm_resource_destroy(context, id, vm_id, restore_id):
+    return IMPL.restored_vm_resource_destroy(context, id, vm_id, restore_id)

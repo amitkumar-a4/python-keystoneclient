@@ -60,7 +60,6 @@ def test_unlink (path, data):
     return True, "unlink worked"
 
 def test_mkdir (path, data):
-    import pdb; pdb.set_trace()
     mypath = path + ".dir"
     rc = mkdir(mypath)
     if rc < 0:
@@ -86,7 +85,6 @@ def test_dir_listing (path, data):
             break
         name = ent.d_name[:ent.d_reclen]
         files.append(name)
-        import pdb;pdb.set_trace()
         if files != [".", "..", "probe"]:
             return False, "wrong directory contents"
         return True, "directory listing worked"

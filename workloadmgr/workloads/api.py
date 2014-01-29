@@ -123,7 +123,7 @@ class API(base.Base):
                    'snapshot_type': snapshot_type,
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
-        self.workloads_rpcapi.workload_snapshot(context, workload['host'], snapshot['id'], full)
+        self.workloads_rpcapi.workload_snapshot(context, workload['host'], snapshot['id'])
         return snapshot
 
     def snapshot_get(self, context, snapshot_id):
@@ -180,6 +180,17 @@ class API(base.Base):
         if snapshot['status'] != 'available':
             msg = _('Snapshot status must be available')
             raise exception.InvalidWorkloadMgr(reason=msg)
-        self.workloads_rpcapi.snapshot_restore(context, workload['host'], snapshot['id'], test)
+        
+        restore_type = "restore"
+        if test:
+            restore_type = "test"
+        options = {'user_id': context.user_id,
+                   'project_id': context.project_id,
+                   'snapshot_id': snapshot_id,
+                   'restore_type': restore_type,
+                   'status': 'restoring',}
+        restore = self.db.restore_create(context, options)
+        self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
+        return restore
         #TODO(gbasava): Return the restored instances
 

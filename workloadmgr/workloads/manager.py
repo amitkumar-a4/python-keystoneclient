@@ -164,13 +164,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 #Store the nics in the DB
                 for nic in nics:
                     snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                                       'vm_id': snapshot_vm.vm_id,
-                                                       'snapshot_id': snapshot.id,       
-                                                       'resource_type': 'nic',
-                                                       'resource_name':  '',
-                                                       'resource_pit_id': '',
-                                                       'metadata': {},
-                                                       'status': 'available'}
+                                                   'vm_id': snapshot_vm.vm_id,
+                                                   'snapshot_id': snapshot.id,       
+                                                   'resource_type': 'nic',
+                                                   'resource_name':  '',
+                                                   'resource_pit_id': '',
+                                                   'metadata': {},
+                                                   'status': 'available'}
                     snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                         snapshot_vm_resource_values)                                                
                     # create an entry in the vm_network_resource_snaps table
@@ -188,18 +188,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #store the subnets, networks and routers in the DB
             for subnet in subnets:
                 snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                                   'vm_id': snapshot.id, 
-                                                   'snapshot_id': snapshot.id,       
-                                                   'resource_type': 'subnet',
-                                                   'resource_name':  subnet['name'],
-                                                   'resource_pit_id': subnet['id'],
-                                                   'metadata': {},
-                                                   'status': 'available'}
+                                               'vm_id': snapshot.id, 
+                                               'snapshot_id': snapshot.id,       
+                                               'resource_type': 'subnet',
+                                               'resource_name':  subnet['name'],
+                                               'resource_pit_id': subnet['id'],
+                                               'metadata': {},
+                                               'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                     snapshot_vm_resource_values)                                                
                 # create an entry in the vm_network_resource_snaps table
                 vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-                vm_network_resource_snap_values = {'vm_network_resource_snap_id': snapshot_vm_resource.id,
+                vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                      'pickle': pickle.dumps(subnet, 0),
                                                      'metadata': vm_network_resource_snap_metadata,       
@@ -209,18 +209,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
             for network in networks:
                 snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                                   'vm_id': snapshot.id,
-                                                   'snapshot_id': snapshot.id,       
-                                                   'resource_type': 'network',
-                                                   'resource_name':  network['name'],
-                                                   'resource_pit_id': network['id'],
-                                                   'metadata': {},
-                                                   'status': 'available'}
+                                               'vm_id': snapshot.id,
+                                               'snapshot_id': snapshot.id,       
+                                               'resource_type': 'network',
+                                               'resource_name':  network['name'],
+                                               'resource_pit_id': network['id'],
+                                               'metadata': {},
+                                               'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                     snapshot_vm_resource_values)                                                
                 # create an entry in the vm_network_resource_snaps table
                 vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-                vm_network_resource_snap_values = {'vm_network_resource_snap_id': snapshot_vm_resource.id,
+                vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                      'pickle': pickle.dumps(network, 0),
                                                      'metadata': vm_network_resource_snap_metadata,       
@@ -230,18 +230,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
    
             for router in routers:
                 snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                                   'vm_id': snapshot.id,
-                                                   'snapshot_id': snapshot.id,       
-                                                   'resource_type': 'router',
-                                                   'resource_name':  router['name'],
-                                                   'resource_pit_id': router['id'],
-                                                   'metadata': {},
-                                                   'status': 'available'}
+                                               'vm_id': snapshot.id,
+                                               'snapshot_id': snapshot.id,       
+                                               'resource_type': 'router',
+                                               'resource_name':  router['name'],
+                                               'resource_pit_id': router['id'],
+                                               'metadata': {},
+                                               'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context, 
                                                     snapshot_vm_resource_values)                                                
                 # create an entry in the vm_network_resource_snaps table
                 vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-                vm_network_resource_snap_values = {'vm_network_resource_snap_id': snapshot_vm_resource.id,
+                vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                      'pickle': pickle.dumps(router, 0),
                                                      'metadata': vm_network_resource_snap_metadata,       
@@ -269,7 +269,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if snapshot_vm_resource.resource_pit_id == pit_id:
                 return snapshot_vm_resource            
                     
-    def _restore_networks(self, context, production, snapshot, restore_id, new_net_resources):
+    def _restore_networks(self, context, production, snapshot, restore, new_net_resources):
         """
         Restore the networking configuration of VMs of the snapshot
         nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
@@ -290,7 +290,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_network.id)
                             network = pickle.loads(str(vm_nic_network_snapshot.pickle))
-                            params = {'name': network['name'] + '_' + restore_id,
+                            params = {'name': network['name'] + '_' + restore.id,
                                       'tenant_id': context.tenant,
                                       'admin_state_up': network['admin_state_up'],
                                       'shared': network['shared'],
@@ -306,7 +306,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
                             subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                            params = {'name': subnet['name'] + '_' + restore_id,
+                            params = {'name': subnet['name'] + '_' + restore.id,
                                       'network_id': new_network['id'],
                                       'tenant_id': context.tenant,
                                       'cidr': subnet['cidr'],
@@ -322,7 +322,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_ext_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_ext_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_network.id)
                             ext_network = pickle.loads(str(vm_nic_ext_network_snapshot.pickle))
-                            params = {'name': ext_network['name'] + '_' + restore_id,
+                            params = {'name': ext_network['name'] + '_' + restore.id,
                                       'admin_state_up': ext_network['admin_state_up'],
                                       'shared': ext_network['shared'],
                                       'router:external': ext_network['router:external']} 
@@ -337,7 +337,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_ext_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_ext_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_subnet.id)
                             ext_subnet = pickle.loads(str(vm_nic_ext_subnet_snapshot.pickle))
-                            params = {'name': ext_subnet['name'] + '_' + restore_id,
+                            params = {'name': ext_subnet['name'] + '_' + restore.id,
                                       'network_id': new_ext_network['id'],
                                       'cidr': ext_subnet['cidr'],
                                       'ip_version': ext_subnet['ip_version']} 
@@ -352,7 +352,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             vm_nic_router = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
                             vm_nic_router_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_router.id)
                             router = pickle.loads(str(vm_nic_router_snapshot.pickle))
-                            params = {'name': router['name'] + '_' + restore_id,
+                            params = {'name': router['name'] + '_' + restore.id,
                                       'tenant_id': context.tenant} 
                             new_router = network_service.create_router(context,**params)
                             new_net_resources.setdefault(pit_id,new_router)
@@ -398,7 +398,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         
         LOG.info(_('create_workload finished. workload: %s'), workload_id)
 
-    def workload_snapshot(self, context, snapshot_id, full):
+    def workload_snapshot(self, context, snapshot_id):
         """
         Take a snapshot of the workload
         """
@@ -410,11 +410,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
         #TODO(giri): Make sure the workload has a full snapshot before scheduling an incremental snapshot
-        if full == True:
-            snapshot_type = 'full'
-        else:
-            snapshot_type = 'incremental'
-            
+        
+           
         workload = self.db.workload_get(context, snapshot.workload_id)
         self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
         vault_service = vault.get_vault_service(context)
@@ -443,7 +440,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             options = {'vm_id': vm.vm_id,
                        'vm_name': vm.vm_name,
                        'snapshot_id': snapshot_id,
-                       'snapshot_type': snapshot_type,
+                       'snapshot_type': snapshot.snapshot_type,
                        'status': 'creating',}
             snapshot_vm = self.db.snapshot_vm_create(context, options)
             
@@ -483,28 +480,27 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('delete_workload started, workload: %s'), workload_id)
         #TODO(gbasava): Implement
 
-    def snapshot_restore(self, context, snapshot_id, test):
+    def snapshot_restore(self, context, restore_id):
         """
         Restore VMs and all its LUNs from a snapshot
         """
-        LOG.info(_('restore_snapshot started, restoring snapshot id: %(snapshot_id)s') % locals())
-        snapshot = self.db.snapshot_get(context, snapshot_id)
-        workload = self.db.workload_get(context, snapshot.workload_id)
-        #self.db.snapshot_update(context, snapshot.id, {'status': 'restoring'})
-        restore_id = str(uuid.uuid4())
+        LOG.info(_('restore_snapshot started, restore id: %(restore_id)s') % locals())
         
+        restore = self.db.restore_get(context, restore_id)
+        snapshot = self.db.snapshot_get(context, restore.snapshot_id)
+        workload = self.db.workload_get(context, snapshot.workload_id)
         
         new_net_resources = {}
-        if test:
-            self._restore_networks(context, False, snapshot, restore_id, new_net_resources)
+        if restore.restore_type == 'test':
+            self._restore_networks(context, False, snapshot, restore, new_net_resources)
         else:
-            self._restore_networks(context, True, snapshot, restore_id, new_net_resources)    
+            self._restore_networks(context, True, snapshot, restore, new_net_resources)    
         vault_service = vault.get_vault_service(context)
         
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            virtdriver.snapshot_restore(workload, snapshot, test, vm, vault_service, new_net_resources, self.db, context)
+            virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
 
     def snapshot_delete(self, context, workload_id, snapshot_id):
         """

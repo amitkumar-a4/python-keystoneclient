@@ -37,7 +37,7 @@ wlm_vault_opts = [
                default='vault',
                help='Write size in KB'),
     cfg.StrOpt('wlm_vault_local',
-               default=False,
+               default=True,
                help='Store in local file system'),
     cfg.StrOpt('wlm_vault_local_directory',
                default='/tmp/snapshots',

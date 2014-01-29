@@ -951,13 +951,15 @@ class LibvirtDriver(driver.ComputeDriver):
                 pit_id = metadata['value']
                 return pit_id
     
-    def snapshot_restore(self, workload, snapshot, test, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
+    def snapshot_restore(self, workload, snapshot, restore, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
         """
         Restores the specified instance from a snapshot
         """  
-        if test:
+        if restore.restore_type == 'test':
+            test = True
             compute_service = nova.API(production=False)
         else:
+            test = False
             compute_service = nova.API(production=True)
                     
         restored_image = None
@@ -1058,7 +1060,10 @@ class LibvirtDriver(driver.ComputeDriver):
             if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
                 while commit_queue.empty() is not True:
                     file_to_commit = commit_queue.get_nowait()
+                    #try:
                     self.commit_qcow2('localhost', file_to_commit)
+                    #except Exception, ex:
+                    #    pass                       
                     if restored_file_path != file_to_commit:
                         utils.delete_if_exists(file_to_commit)
             elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):

@@ -216,7 +216,68 @@ def upgrade(migrate_engine):
         Column('value', Text()),
         UniqueConstraint('vm_network_resource_snap_id', 'key'),
         mysql_engine='InnoDB'
-    )        
+    ) 
+    
+    restores = Table(
+        'restores', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('snapshot_id', String(length=255), ForeignKey('snapshots.id')),
+        Column('user_id', String(length=255)),
+        Column('project_id', String(length=255)),
+        Column('restore_type', String(length=32), primary_key=False, nullable= False),
+        Column('status', String(length=32), nullable=False),
+        mysql_engine='InnoDB'
+    )
+    
+    restored_vms = Table(
+        'restored_vms', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('vm_id', String(length=255), nullable= False),
+        Column('vm_name', String(length=255), nullable= False),
+        Column('restore_id', String(length=255), ForeignKey('restores.id')),
+        Column('status', String(length=32), nullable=False),
+        mysql_engine='InnoDB'
+    )
+    
+   
+    restored_vm_resources = Table(
+        'restored_vm_resources', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('vm_id', String(length=255), nullable= False),
+        Column('restore_id', String(length=255), ForeignKey('restores.id')),
+        Column('resource_type', String(length=255)),
+        Column('resource_name', String(length=255)),
+        Column('resource_pit_id', String(length=255)),                
+        Column('status', String(length=32), nullable=False),
+        UniqueConstraint('vm_id', 'restore_id', 'resource_name'),
+        mysql_engine='InnoDB'
+    )
+    
+    restored_vm_resource_metadata = Table(
+        'restored_vm_resource_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('restored_vm_resource_id', String(length=255), ForeignKey('restored_vm_resources.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('restored_vm_resource_id', 'key'),
+        mysql_engine='InnoDB'
+    )            
    
     # create all tables
     # Take care on create order for those with FK dependencies
@@ -232,7 +293,11 @@ def upgrade(migrate_engine):
               vm_disk_resource_snaps,
               vm_disk_resource_snap_metadata,
               vm_network_resource_snaps,
-              vm_network_resource_snap_metadata]
+              vm_network_resource_snap_metadata,
+              restores,
+              restored_vms,
+              restored_vm_resources,
+              restored_vm_resource_metadata]
 
     for table in tables:
         try:
@@ -255,7 +320,11 @@ def upgrade(migrate_engine):
                   "vm_disk_resource_snaps",
                   "vm_disk_resource_snap_metadata",
                   "vm_network_resource_snaps",
-                  "vm_network_resource_snap_metadata"]                  
+                  "vm_network_resource_snap_metadata",
+                  "restores",
+                  "restored_vms",
+                  "restored_vm_resources",
+                  "restored_vm_resource_metadata"]                  
 
         sql = "SET foreign_key_checks = 0;"
         for table in tables:

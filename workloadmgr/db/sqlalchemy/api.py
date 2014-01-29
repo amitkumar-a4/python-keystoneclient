@@ -1078,3 +1078,273 @@ def get_metadata_value(metadata, key):
         if metadata['key'] == key:
             return metadata['value']
     return None
+
+# Restore Functions
+
+@require_context
+def restore_get(context, restore_id, session=None):
+    result = model_query(context, models.Restores,
+                             session=session).\
+        filter_by(id=restore_id).\
+        first()
+
+    if not result:
+        raise exception.RestoreNotFound(restore_id=restore_id)
+
+    return result
+
+@require_admin_context
+def restore_get_all(context):
+    return model_query(context, models.Restores).all()
+
+@require_context
+def restore_get_all_by_project(context, project_id):
+    authorize_project_context(context, project_id)
+    return model_query(context, models.Restores).\
+        filter_by(project_id=project_id).all()
+        
+@require_context
+def restore_get_all_by_project_snapshot(context, project_id, snapshot_id):
+    authorize_project_context(context, project_id)
+    return model_query(context, models.Restores).\
+        filter_by(project_id=project_id).\
+        filter_by(snapshot_id=snapshot_id).all()
+
+@require_context
+def restore_show(context, restore_id, session=None):
+    result = model_query(context, models.Restores,
+                             session=session).\
+        filter_by(id=restore_id).\
+        first()
+
+    if not result:
+        raise exception.RestoreNotFound(restore_id=restore_id)
+
+    return result
+
+@require_context
+def restore_create(context, values):
+    restore = models.Restores()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    restore.update(values)
+    restore.save()
+    return restore
+
+@require_context
+def restore_update(context, restore_id, values):
+    session = get_session()
+    with session.begin():
+        restore = model_query(context, models.Restores,
+                             session=session, read_deleted="yes").\
+            filter_by(id=restore_id).first()
+
+        if not restore:
+            raise exception.RestoreNotFound(
+                _("No restore with id %(restore_id)s") % locals())
+
+        restore.update(values)
+        restore.save(session=session)
+    return restore
+
+@require_context
+def restore_destroy(context, restore_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.Restores).\
+            filter_by(id=restore_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
+@require_context
+def restored_vm_create(context, values):
+    restored_vm = models.RestoredVMs()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    restored_vm.update(values)
+    restored_vm.save()
+    return restored_vm
+
+@require_context
+def restored_vm_get(context, restore_id, session=None):
+    result = model_query(context, models.RestoredVMs,
+                             session=session).\
+        filter_by(restore_id=restore_id).\
+        all()
+
+    if not result:
+        raise exception.VMsOfRestoreNotFound(restore_id=restore_id)
+
+    return result
+
+@require_context
+def restored_vm_destroy(context, vm_id, restore_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.RestoredVMs).\
+            filter_by(vm_id=vm_id).\
+            filter_by(restore_id=restore_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
+""" restore vm resource functions """
+def _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, metadata,
+                              purge_metadata=False, session=None):
+    """
+    Create or update a set of restored_vm_resource_metadata for a given restored resource
+
+    :param context: Request context
+    :param restored_vm_resource_ref: An restored_vm_resource object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in restored_vm_resource_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'restored_vm_resource_id': restored_vm_resource_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _restored_vm_resource_metadata_update(context, metadata_ref, metadata_values,
+                                   session=session)
+        else:
+            restored_vm_resource_metadata_create(context, metadata_values, session=session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                restored_vm_resource_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def restored_vm_resource_metadata_create(context, values, session=None):
+    """Create an RestoredVMResourceMetadata object"""
+    metadata_ref = models.RestoredVMResourceMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _restored_vm_resource_metadata_update(context, metadata_ref, values, session=session)
+
+
+def _restored_vm_resource_metadata_update(context, metadata_ref, values, session=None):
+    """
+    Used internally by restored_vm_resource_metadata_create and restored_vm_resource_metadata_update
+    """
+    if session == None: 
+        session = get_session()
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def restored_vm_resource_metadata_delete(context, metadata_ref, session=None):
+    """
+    Used internally by restored_vm_resource_metadata_create and restored_vm_resource_metadata_update
+    """
+    if session == None: 
+        session = get_session()
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+def _restored_vm_resource_update(context, values, restored_vm_resource_id, purge_metadata=False):
+    
+    metadata = values.pop('metadata', {})
+    
+    session = get_session()
+    if restored_vm_resource_id:
+        restored_vm_resource_ref = restored_vm_resource_get(context, restored_vm_resource_id, session)
+    else:
+        restored_vm_resource_ref = models.RestoredVMResources()
+    
+    restored_vm_resource_ref.update(values)
+    restored_vm_resource_ref.save(session)
+    
+    _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, metadata, purge_metadata)  
+      
+    return restored_vm_resource_ref
+
+
+@require_context
+def restored_vm_resource_create(context, values):
+    return _restored_vm_resource_update(context, values, None, False)
+
+@require_context
+def restored_vm_resource_update(context, restored_vm_resource_id, values, purge_metadata=False):
+   
+    return _restored_vm_resource_update(context, values, restored_vm_resource_id, purge_metadata)
+
+@require_context
+def restored_vm_resources_get(context, vm_id, restore_id, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.RestoredVMResources)\
+                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
+                       .filter_by(vm_id=vm_id)\
+                       .filter_by(restore_id=restore_id)
+
+        #TODO(gbasava): filter out deleted restores if context disallows it
+        restored_vm_resources = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.RestoredVMResourcesNotFound(vm_id = vm_id, restore_id = restore_id)
+    
+    return restored_vm_resources
+
+@require_context
+def restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.RestoredVMResources)\
+                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
+                       .filter_by(vm_id=vm_id)\
+                       .filter_by(restore_id=restore_id)\
+                       .filter_by(resource_name=resource_name)
+
+        #TODO(gbasava): filter out deleted restores if context disallows it
+        restored_vm_resources = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.RestoredVMResourcesWithNameNotFound(vm_id = vm_id, 
+                                                        restore_id = restore_id,
+                                                        resource_name = resource_name)
+
+    return restored_vm_resources
+
+@require_context
+def restored_vm_resource_get(context, id, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.RestoredVMResources)\
+                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
+                       .filter_by(id=id)
+
+        #TODO(gbasava): filter out deleted restored if context disallows it
+        restored_vm_resources = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.RestoredVMResourcesWithIdNotFound(id = id)
+
+    return restored_vm_resources
+
+@require_context
+def restored_vm_resource_destroy(context, id, vm_id, restore_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.RestoredVMResources).\
+            filter_by(id=id).\
+            filter_by(vm_id=vm_id).\
+            filter_by(restore_id=restore_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})

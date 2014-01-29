@@ -55,6 +55,31 @@ def _translate_snapshot_summary_view(context, snapshot):
         d['instances'] = instances
     return d
 
+def _translate_restore_detail_view(context, restore):
+    """Maps keys for snapshots details view."""
+
+    d = _translate_restore_summary_view(context, restore)
+
+    return d
+
+
+def _translate_restore_summary_view(context, restore):
+    """Maps keys for snapshots summary view."""
+    d = {}
+
+    d['id'] = restore['id']
+    d['created_at'] = restore['created_at']
+    d['status'] = restore['status']
+    d['snapshot_id'] = restore['snapshot_id']
+    if 'instances' in restore:
+        instances = []
+        for vm in restore['instances']:
+            instances.append({'id':vm['vm_id'],
+                              'name':vm['vm_name'],
+                              'status':vm['status']
+                              }) 
+        d['instances'] = instances
+    return d
 
 def make_snapshot(elem):
     elem.set('id')
@@ -189,7 +214,7 @@ class SnapshotsController(wsgi.Controller):
                 test = True
             else:
                 test = False    
-            self.workload_api.snapshot_restore(context, snapshot_id = snapshot_id, test=test )
+            new_restore = self.workload_api.snapshot_restore(context, snapshot_id = snapshot_id, test=test )
         except exception.InvalidInput as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.InvalidVolume as error:
@@ -207,7 +232,7 @@ class SnapshotsController(wsgi.Controller):
             raise exc.HTTPRequestEntityTooLarge(
                 explanation=error.message, headers={'Retry-After': 0})
 
-        return webob.Response(status_int=202)
+        return {'restore': _translate_restore_detail_view(context, dict(new_restore.iteritems()))}
 
 
 def create_resource(ext_mgr):
