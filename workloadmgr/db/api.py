@@ -189,6 +189,9 @@ def snapshot_vm_create(context, values):
 def snapshot_vm_get(context, snapshot_id, session=None):
     return IMPL.snapshot_vm_get(context, snapshot_id, session)
 
+def snapshot_vm_update(context, snapshot_vm_id, values):
+    return IMPL.snapshot_vm_update(context, snapshot_vm_id, values)
+
 def snapshot_vm_destroy(context, vm_id, snapshot_id):
     return IMPL.snapshot_vm_destroy(context, vm_id, snapshot_id)
 

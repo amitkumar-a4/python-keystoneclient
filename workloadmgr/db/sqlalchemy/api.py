@@ -564,6 +564,22 @@ def snapshot_vm_get(context, snapshot_id, session=None):
     return result
 
 @require_context
+def snapshot_vm_update(context, snapshot_vm_id, values):
+    session = get_session()
+    with session.begin():
+        snapshot_vm = model_query(context, models.SnapshotVMs,
+                             session=session, read_deleted="yes").\
+            filter_by(id=snapshot_vm_id).first()
+
+        if not snapshot_vm:
+            raise exception.SnapshotNotFound(
+                _("No snapshot VM with id %(snapshot_vm_id)s") % locals())
+
+        snapshot_vm.update(values)
+        snapshot_vm.save(session=session)
+    return snapshot_vm
+
+@require_context
 def snapshot_vm_destroy(context, vm_id, snapshot_id):
     session = get_session()
     with session.begin():

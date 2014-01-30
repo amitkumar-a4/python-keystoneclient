@@ -297,6 +297,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'router:external': network['router:external']} 
                             new_network = network_service.create_network(context,**params)
                             new_net_resources.setdefault(pit_id,new_network)
+                            restored_vm_resource_values = {'id': new_network['id'],
+                                                           'vm_id': restore.id,
+                                                           'restore_id': restore.id,       
+                                                           'resource_type': 'network',
+                                                           'resource_name':  new_network['name'],
+                                                           'metadata': {},
+                                                           'status': 'available'}
+                            restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                                        
                             
                         #private subnet
                         pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'subnet_id')
@@ -313,6 +321,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'ip_version': subnet['ip_version']} 
                             new_subnet = network_service.create_subnet(context,**params)
                             new_net_resources.setdefault(pit_id,new_subnet)
+                            restored_vm_resource_values = {'id': new_subnet['id'],
+                                                           'vm_id': restore.id,
+                                                           'restore_id': restore.id,       
+                                                           'resource_type': 'subnet',
+                                                           'resource_name':  new_subnet['name'],
+                                                           'metadata': {},
+                                                           'status': 'available'}
+                            restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                              
         
                         #external network
                         pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'ext_network_id')
@@ -328,6 +344,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'router:external': ext_network['router:external']} 
                             new_ext_network = network_service.create_network(context,**params)
                             new_net_resources.setdefault(pit_id,new_ext_network)
+                            restored_vm_resource_values = {'id': new_ext_network['id'],
+                                                           'vm_id': restore.id,
+                                                           'restore_id': restore.id,       
+                                                           'resource_type': 'network',
+                                                           'resource_name':  new_ext_network['name'],
+                                                           'metadata': {},
+                                                           'status': 'available'}
+                            restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                             
                             
                         #external subnet
                         pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'ext_subnet_id')
@@ -343,6 +367,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'ip_version': ext_subnet['ip_version']} 
                             new_ext_subnet = network_service.create_subnet(context,**params)
                             new_net_resources.setdefault(pit_id,new_ext_subnet)
+                            restored_vm_resource_values = {'id': new_ext_subnet['id'],
+                                                           'vm_id': restore.id,
+                                                           'restore_id': restore.id,       
+                                                           'resource_type': 'subnet',
+                                                           'resource_name':  new_ext_subnet['name'],
+                                                           'metadata': {},
+                                                           'status': 'available'}
+                            restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                              
                             
                         #router
                         pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'router_id')
@@ -356,6 +388,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'tenant_id': context.tenant} 
                             new_router = network_service.create_router(context,**params)
                             new_net_resources.setdefault(pit_id,new_router)
+                            restored_vm_resource_values = {'id': new_router['id'],
+                                                           'vm_id': restore.id,
+                                                           'restore_id': restore.id,       
+                                                           'resource_type': 'router',
+                                                           'resource_name':  new_router['name'],
+                                                           'metadata': {},
+                                                           'status': 'available'}
+                            restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                                   
                         
                         try:
                             network_service.router_add_interface(context,new_router['id'], subnet_id=new_subnet['id'])
@@ -459,8 +499,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #disks snapshot    
             virtdriver.snapshot(workload, snapshot, snapshot_vm, vm_hypervisor.hypervisor_hostname, vault_service, self.db, context)
             #TODO(giri): Check for the success (and update)
-            snapshot_vm.update({'status': 'available',})
-            snapshot_vm.save()
+            self.db.snapshot_vm_update(context, snapshot_vm.id, {'status': 'executing'})
             #TODO(giri): handle the case where this can be updated by multiple workload snapshot requests 
             self.db.vm_recent_snapshot_update(context, vm.vm_id, {'snapshot_id': snapshot.id})
             
@@ -500,7 +539,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         #restore each VM
         for vm in self.db.snapshot_vm_get(context, snapshot.id): 
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
+            restored_instance = virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
+            restored_vm_values = {'vm_id': restored_instance.id,
+                                  'vm_name':  restored_instance.name,    
+                                  'restore_id': restore.id,
+                                  'status': 'available'}
+            restored_vm = self.db.restored_vm_create(context,restored_vm_values)    
+                                        
+        self.db.restore_update(context, restore.id, {'status': 'completed'})
 
     def snapshot_delete(self, context, workload_id, snapshot_id):
         """

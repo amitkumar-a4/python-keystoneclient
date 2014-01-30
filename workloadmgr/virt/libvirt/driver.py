@@ -1060,10 +1060,10 @@ class LibvirtDriver(driver.ComputeDriver):
             if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
                 while commit_queue.empty() is not True:
                     file_to_commit = commit_queue.get_nowait()
-                    #try:
-                    self.commit_qcow2('localhost', file_to_commit)
-                    #except Exception, ex:
-                    #    pass                       
+                    try:
+                        self.commit_qcow2('localhost', file_to_commit)
+                    except Exception, ex:
+                        pass                       
                     if restored_file_path != file_to_commit:
                         utils.delete_if_exists(file_to_commit)
             elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
@@ -1180,5 +1180,6 @@ class LibvirtDriver(driver.ComputeDriver):
             try:
                 shutil.rmtree(temp_directory)
             except OSError as exc:
-                pass            
+                pass  
+        return restored_instance          
 
