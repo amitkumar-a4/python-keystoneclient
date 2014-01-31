@@ -28,7 +28,7 @@ nova_opts = [
                default= 'http://localhost:8774/v2/%(project_id)s',
                help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_production_admin_auth_url',
-               default='http://192.168.2.202:5000/v2.0',
+               default='http://localhost:5000/v2.0',
                help='auth url for connecting to nova in admin context'),                
     cfg.StrOpt('nova_production_admin_username',
                default='admin',
