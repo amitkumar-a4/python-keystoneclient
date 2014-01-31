@@ -19,12 +19,11 @@ FLAGS = flags.FLAGS
 
 
 class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
-    '''Client side of the workloadmgr rpc API.
-
+    """
+    Client side of the workloadmgr rpc API.
     API version history:
-
-        1.0 - Initial version.
-    '''
+    1.0 - Initial version.
+    """
 
     BASE_RPC_API_VERSION = '1.0'
 
@@ -50,6 +49,7 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
 
     def workload_delete(self, ctxt, host, workload_id):
+        # this will not be called, since we delete workload in the API layer instead of making an RPC call
         LOG.debug("delete_workload  rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         self.cast(ctxt,
@@ -65,6 +65,7 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
         
     def snapshot_delete(self, ctxt, host, snapshot_id):
+        # this will not be called, since we delete snapshot in the API layer instead of making an RPC call
         LOG.debug("delete_snapshot  rpcapi snapshot_id %s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         self.cast(ctxt,

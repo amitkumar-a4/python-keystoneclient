@@ -93,17 +93,18 @@ class API(base.Base):
     
     def workload_delete(self, context, workload_id):
         """
-        Make the RPC call to delete a workload.
+        Delete a workload. No RPC call is made
         """
         workload = self.workload_get(context, workload_id)
         if workload['status'] not in ['available', 'error']:
             msg = _('Workload status must be available or error')
             raise exception.InvalidWorkloadMgr(reason=msg)
 
-        self.db.workload_update(context, workload_id, {'status': 'deleting'})
-        self.workloads_rpcapi.workload_delete(context,
-                                         workload['host'],
-                                         workload['id'])
+        snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
+        for snapshot in snapshots:
+            self.snapshot_delete(context, snapshot['id'])
+
+        self.db.workload_delete(context, workload_id)
 
     def workload_snapshot(self, context, workload_id, full):
         """
@@ -161,16 +162,15 @@ class API(base.Base):
     
     def snapshot_delete(self, context, snapshot_id):
         """
-        Make the RPC call to delete a workloadrun.
+        Delete a workload snapshot. No RPC call required
         """
         snapshot = self.snapshot_get(context, snapshot_id)
         if snapshot['status'] not in ['available', 'error']:
             msg = _('Snapshot status must be available or error')
             raise exception.InvalidWorkloadMgr(reason=msg)
 
-        self.db.snapshot_update(context, snapshot_id, {'status': 'deleting'})
-        self.workloads_rpcapi.snapshot_delete(context,
-                                                   snapshot['id'])
+        self.db.snapshot_delete(context, snapshot_id)
+        
     def snapshot_restore(self, context, snapshot_id, test):
         """
         Make the RPC call to restore a snapshot.

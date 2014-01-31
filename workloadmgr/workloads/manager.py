@@ -515,9 +515,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing workload
         """
-        workload = self.db.workload_get(context, workload_id)
-        LOG.info(_('delete_workload started, workload: %s'), workload_id)
-        #TODO(gbasava): Implement
+        LOG.info(_('deleting workload: %s'), workload_id)
+        snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
+        for snapshot in snapshots:
+            self.snapshot_delete(context, snapshot['id'])
+        self.db.workload_delete(context, workload_id)
+
 
     def snapshot_restore(self, context, restore_id):
         """
@@ -548,10 +551,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         
         self.db.restore_update(context, restore.id, {'status': 'completed'})
 
-    def snapshot_delete(self, context, workload_id, snapshot_id):
+    def snapshot_delete(self, context, snapshot_id):
         """
         Delete an existing snapshot
         """
-        snapshot = self.db.snapshot_get(context, workload_id, snapshot_id)
-        #TODO(gbasava):Implement
+        LOG.info(_('deleting snapshot %s'), snapshot_id)        
+        self.db.snapshot_delete(context, snapshot_id)
  

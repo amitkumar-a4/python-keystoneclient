@@ -159,8 +159,7 @@ class SnapshotsController(wsgi.Controller):
         LOG.audit(_("Delete snapshot with id: %s"), id, context=context)
 
         try:
-            snapshot = self.workload_api.snapshot_get(context, id)
-            self.workload_api.deletesnapshot(context, snapshot)
+            self.workload_api.snapshot_delete(context, id)
         except exception.NotFound:
             raise exc.HTTPNotFound()
         return webob.Response(status_int=202)
@@ -181,11 +180,17 @@ class SnapshotsController(wsgi.Controller):
         if not workload_id:
             workload_id = req.GET.get('workload_id', None)
         if workload_id:
-            snapshots = self.workload_api.snapshot_get_all(context, workload_id)
+            snapshots_all = self.workload_api.snapshot_get_all(context, workload_id)
         else:
-            snapshots = self.workload_api.snapshot_get_all(context)
+            snapshots_all = self.workload_api.snapshot_get_all(context)
    
-        limited_list = common.limited(snapshots, req)
+        limited_list = common.limited(snapshots_all, req)
+        
+        #TODO(giri): implement the search_opts to specify the filters
+        snapshots = []
+        for snapshot in snapshots_all:
+            if snapshot['deleted'] == False:
+                snapshots.append(snapshot)        
 
         if is_detail:
             snapshots = self._view_builder.detail_list(req, limited_list)

@@ -191,7 +191,7 @@ def exact_filter(query, model, filters, legal_keys):
 
 
 @require_admin_context
-def service_destroy(context, service_id):
+def service_delete(context, service_id):
     session = get_session()
     with session.begin():
         service_ref = service_get(context, service_id, session=session)
@@ -369,7 +369,7 @@ def workload_update(context, workload_id, values):
 
 
 @require_context
-def workload_destroy(context, workload_id):
+def workload_delete(context, workload_id):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadMgr).\
@@ -401,7 +401,7 @@ def workload_vms_get(context, workload_id, session=None):
     return result
 
 @require_context
-def workload_vms_destroy(context, vm_id, workload_id):
+def workload_vms_delete(context, vm_id, workload_id):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadMgrVMs).\
@@ -467,10 +467,9 @@ def scheduledjob_update(context, scheduledjob):
 
 @require_context
 def snapshot_get(context, snapshot_id, session=None):
-    result = model_query(context, models.Snapshots,
-                             session=session).\
-        filter_by(id=snapshot_id).\
-        first()
+    result = model_query(   context, models.Snapshots, session=session).\
+                            filter_by(id=snapshot_id).\
+                            first()
 
     if not result:
         raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
@@ -532,7 +531,7 @@ def snapshot_update(context, snapshot_id, values):
     return snapshot
 
 @require_context
-def snapshot_destroy(context, snapshot_id):
+def snapshot_delete(context, snapshot_id):
     session = get_session()
     with session.begin():
         session.query(models.Snapshots).\
@@ -580,7 +579,7 @@ def snapshot_vm_update(context, snapshot_vm_id, values):
     return snapshot_vm
 
 @require_context
-def snapshot_vm_destroy(context, vm_id, snapshot_id):
+def snapshot_vm_delete(context, vm_id, snapshot_id):
     session = get_session()
     with session.begin():
         session.query(models.SnapshotVMs).\
@@ -630,7 +629,7 @@ def vm_recent_snapshot_update(context, vm_id, values):
     return vm_recent_snapshot
 
 @require_context
-def vm_recent_snapshot_destroy(context, vm_id):
+def vm_recent_snapshot_delete(context, vm_id):
     session = get_session()
     with session.begin():
         session.query(models.VMRecentSnapshot).\
@@ -786,7 +785,7 @@ def snapshot_vm_resource_get(context, id, session=None):
     return snapshot_vm_resources
 
 @require_context
-def snapshot_vm_resource_destroy(context, id, vm_id, snapshot_id):
+def snapshot_vm_resource_delete(context, id, vm_id, snapshot_id):
     session = get_session()
     with session.begin():
         session.query(models.SnapshotVMResources).\
@@ -942,7 +941,7 @@ def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session=None):
 
 
 @require_context
-def vm_disk_resource_snaps_destroy(context, snapshot_vm_resource_id):
+def vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id):
     if session == None: 
         session = get_session()
     with session.begin():
@@ -1079,7 +1078,7 @@ def vm_network_resource_snap_get(context, snapshot_vm_resource_id, session=None)
 
 
 @require_context
-def vm_network_resource_snaps_destroy(context, snapshot_vm_network_resource_id):
+def vm_network_resource_snaps_delete(context, snapshot_vm_network_resource_id):
     session = get_session()
     with session.begin():
         session.query(models.VMNetworkResourceSnaps).\
@@ -1164,7 +1163,7 @@ def restore_update(context, restore_id, values):
     return restore
 
 @require_context
-def restore_destroy(context, restore_id):
+def restore_delete(context, restore_id):
     session = get_session()
     with session.begin():
         session.query(models.Restores).\
@@ -1196,7 +1195,7 @@ def restored_vm_get(context, restore_id, session=None):
     return result
 
 @require_context
-def restored_vm_destroy(context, vm_id, restore_id):
+def restored_vm_delete(context, vm_id, restore_id):
     session = get_session()
     with session.begin():
         session.query(models.RestoredVMs).\
@@ -1353,7 +1352,7 @@ def restored_vm_resource_get(context, id, session=None):
     return restored_vm_resources
 
 @require_context
-def restored_vm_resource_destroy(context, id, vm_id, restore_id):
+def restored_vm_resource_delete(context, id, vm_id, restore_id):
     session = get_session()
     with session.begin():
         session.query(models.RestoredVMResources).\

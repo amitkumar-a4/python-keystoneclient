@@ -129,7 +129,6 @@ class WorkloadMgrsController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         LOG.audit(_('Delete workload with id: %s'), id, context=context)
-
         try:
             self.workload_api.workload_delete(context, id)
         except exception.WorkloadMgrNotFound as error:
@@ -178,9 +177,15 @@ class WorkloadMgrsController(wsgi.Controller):
     def _get_workloads(self, req, is_detail):
         """Returns a list of workloadmgr, transformed through view builder."""
         context = req.environ['workloadmgr.context']
-        workloads = self.workload_api.workload_get_all(context)
-        limited_list = common.limited(workloads, req)
-
+        workloads_all = self.workload_api.workload_get_all(context)
+        limited_list = common.limited(workloads_all, req)
+        
+        #TODO(giri): implement the search_opts to specify the filters
+        workloads = []
+        for workload in workloads_all:
+            if workload['deleted'] == False:
+                workloads.append(workload)
+        
         if is_detail:
             workloads = self._view_builder.detail_list(req, limited_list)
         else:
