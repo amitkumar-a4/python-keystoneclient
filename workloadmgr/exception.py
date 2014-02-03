@@ -611,24 +611,24 @@ class SwiftConnectionFailed(WorkloadMgrException):
 class VMsofWorkloadMgrNotFound(NotFound):
     message = _("VMs for WorkloadMgr %(workload_id)s could not be found.")    
     
-class VMsOfSnapshotNotFound:
+class VMsOfSnapshotNotFound(NotFound):
     message = _("VMs for Snapshot %(snapshot_id)s could not be found.")  
 
-class VMRecentSnapshotNotFound:
+class VMRecentSnapshotNotFound(NotFound):
     message = _("Recent successful Snapshot for VM %(vm_id)s could not be found.") 
     
-class SnapshotVMResourcesNotFound:
+class SnapshotVMResourcesNotFound(NotFound):
     message = _("SnapshotVMResources of VM  %(vm_id)s Snapshot %(snapshot_id)s could not be found.")
 
-class SnapshotVMResourcesWithNameNotFound:
+class SnapshotVMResourcesWithNameNotFound(NotFound):
     message = _("SnapshotVMResource of VM  %(vm_id)s Snapshot %(snapshot_id)s Resource %(resource_name)s could not be found.")
 
-class SnapshotVMResourcesWithIdNotFound:
+class SnapshotVMResourcesWithIdNotFound(NotFound):
     message = _("SnapshotVMResource with Id  %(id)s could not be found.")
 
-class VMDiskResourceSnapsNotFound:
+class VMDiskResourceSnapsNotFound(NotFound):
     message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")
     
-class VMNetworkResourceSnapsNotFound:
+class VMNetworkResourceSnapsNotFound(NotFound):
     message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")  
     

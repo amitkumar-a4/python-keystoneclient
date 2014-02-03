@@ -106,7 +106,7 @@ class API(base.Base):
 
         self.db.workload_delete(context, workload_id)
 
-    def workload_snapshot(self, context, workload_id, full):
+    def workload_snapshot(self, context, workload_id, snapshot_type):
         """
         Make the RPC call to snapshot a workload.
         """
@@ -114,10 +114,7 @@ class API(base.Base):
         if workload['status'] in ['running']:
             msg = _('Workload snapshot job is already executing, ignoring this execution')
             raise exception.InvalidWorkloadMgr(reason=msg)
-        if full == True:
-            snapshot_type = 'full'
-        else:
-            snapshot_type = 'incremental'
+
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'workload_id': workload_id,
@@ -130,20 +127,26 @@ class API(base.Base):
     def snapshot_get(self, context, snapshot_id):
         rv = self.db.snapshot_get(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
-        vms = self.db.snapshot_vm_get(context, snapshot_id)
         instances = []
-        for vm in vms:
-            instances.append(dict(vm.iteritems()))
+        try:
+            vms = self.db.snapshot_vm_get(context, snapshot_id)
+            for vm in vms:
+                instances.append(dict(vm.iteritems()))
+        except Exception as ex:
+            pass
         snapshot_details.setdefault('instances', instances)    
         return snapshot_details
 
     def snapshot_show(self, context, snapshot_id):
         rv = self.db.snapshot_show(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
-        vms = self.db.snapshot_vm_get(context, snapshot_id)
         instances = []
-        for vm in vms:
-            instances.append(dict(vm.iteritems()))
+        try:
+            vms = self.db.snapshot_vm_get(context, snapshot_id)
+            for vm in vms:
+                instances.append(dict(vm.iteritems()))
+        except Exception as ex:
+            pass
         snapshot_details.setdefault('instances', instances)    
         return snapshot_details
     
