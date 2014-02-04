@@ -13,6 +13,7 @@ import workloadmgr.api
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.api.v1 import workloads
 from workloadmgr.api.v1 import snapshots
+from workloadmgr.api.v1 import restores
 
 LOG = logging.getLogger(__name__)
 
@@ -35,13 +36,13 @@ class APIRouter(workloadmgr.api.APIRouter):
         
         self.resources['workloads'] = workloads.create_resource()
         #detail list of workloads
-        mapper.resource("workload", "workloads",
+        mapper.resource("workloads", "workloads",
                         controller=self.resources['workloads'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
         
         #take a snapshot of the workload
-        mapper.connect("snapshot",
+        mapper.connect("workload_snapshot",
                        "/{project_id}/workloads/{id}",
                        controller=self.resources['workloads'],
                        action='snapshot',
@@ -50,21 +51,21 @@ class APIRouter(workloadmgr.api.APIRouter):
         
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)
         #detail list of snapshots
-        mapper.resource("snapshots1", "snapshots",
+        mapper.resource("snapshots_1", "snapshots",
                         controller=self.resources['snapshots'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
         
                
         #get the list of workload snapshots
-        mapper.connect("snapshots2",
+        mapper.connect("snapshots_2",
                        "/{project_id}/workloads/{workload_id}/snapshots",
                        controller=self.resources['snapshots'],
                        action='index',
                        conditions={"method": ['GET']}) 
         
         #get the detail list of workload snapshots
-        mapper.connect("snapshot3",
+        mapper.connect("snapshots_3",
                        "/{project_id}/workloads/{workload_id}/snapshots/detail",
                        controller=self.resources['snapshots'],
                        action='detail',
@@ -78,15 +79,45 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']}) 
         
         #restore a snapshot
-        mapper.connect("restore",
+        mapper.connect("restore_snapshot_1",
                        "/{project_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='restore',
                        conditions={"method": ['POST']}) 
         
         #restore a snapshot
-        mapper.connect("restore2",
+        mapper.connect("restore_snapshot_2",
                        "/{project_id}/workloads/{workload_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='restore',
                        conditions={"method": ['POST']})     
+        
+        self.resources['restores'] = restores.create_resource(ext_mgr)
+        #detail list of restores
+        mapper.resource("restores_1", "restores",
+                        controller=self.resources['restores'],
+                        collection={'detail': 'GET'},
+                        member={'action': 'POST'})
+        
+               
+        #get the list of workload snapshot restores
+        mapper.connect("restores_2",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores",
+                       controller=self.resources['restores'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the detail list of workload snapshot restores
+        mapper.connect("restores_3",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/detail",
+                       controller=self.resources['snapshots'],
+                       action='detail',
+                       conditions={"method": ['GET']})  
+        
+        #get the specified snapshot
+        mapper.connect("restore",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
+                       controller=self.resources['snapshots'],
+                       action='show',
+                       conditions={"method": ['GET']}) 
+        

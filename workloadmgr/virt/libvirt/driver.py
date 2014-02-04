@@ -477,8 +477,7 @@ class LibvirtDriver(driver.ComputeDriver):
             if error_code == libvirt.VIR_ERR_NO_DOMAIN:
                 raise exception.InstanceNotFound(instance_id=instance_name)
 
-            msg = _("Error from libvirt while looking up %(instance_name)s: "
-                    "[Error Code %(error_code)s] %(ex)s") % locals()
+            msg = _("Error from libvirt while looking up %(instance_name)s: ""[Error Code %(error_code)s] %(ex)s") % locals()
             raise exception.WorkloadMgrException(msg)
         
     def get_info(self, instance_name):

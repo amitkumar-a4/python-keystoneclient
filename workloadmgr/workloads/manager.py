@@ -556,9 +556,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'restore_id': restore.id,
                                       'status': 'available'}
                 restored_vm = self.db.restored_vm_create(context,restored_vm_values)    
-                                            
+           
             self.db.restore_update(context, restore.id, {'status': 'completed'})
-        except Exception as err:
+        except Exception as ex:
             msg = _("Error Restoring %(restore_id)s with failure: %(exception)s")
             LOG.debug(msg, {'restore_id': restore_id, 'exception': ex})
             LOG.exception(ex)

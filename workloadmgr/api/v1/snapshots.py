@@ -20,7 +20,7 @@ from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import snapshots as snapshot_views
-
+from workloadmgr.api.views import restores as restore_views
 
 
 LOG = logging.getLogger(__name__)
@@ -134,6 +134,7 @@ class SnapshotsController(wsgi.Controller):
     """The snapshots API controller for the OpenStack API."""
 
     _view_builder_class = snapshot_views.ViewBuilder
+    restore_view_builder = restore_views.ViewBuilder()
     
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
@@ -141,7 +142,7 @@ class SnapshotsController(wsgi.Controller):
         super(SnapshotsController, self).__init__()
 
     @wsgi.serializers(xml=SnapshotTemplate)
-    def show(self, req, id, workload_id=None):
+    def show(self, req, id):
         """Return data about the given Snapshot."""
         context = req.environ['workloadmgr.context']
 
@@ -150,9 +151,10 @@ class SnapshotsController(wsgi.Controller):
         except exception.NotFound:
             raise exc.HTTPNotFound()
 
-        return {'snapshot': _translate_snapshot_detail_view(context, snapshot)}
+        return self._view_builder.detail(req, snapshot)
+        #return {'snapshot': _translate_snapshot_detail_view(context, snapshot)}
 
-    def delete(self, req, id, workload_id=None):
+    def delete(self, req, id):
         """Delete a snapshot."""
         context = req.environ['workloadmgr.context']
 
@@ -237,7 +239,8 @@ class SnapshotsController(wsgi.Controller):
             raise exc.HTTPRequestEntityTooLarge(
                 explanation=error.message, headers={'Retry-After': 0})
 
-        return {'restore': _translate_restore_detail_view(context, dict(new_restore.iteritems()))}
+        return self.restore_view_builder.detail(req, dict(new_restore.iteritems()))
+        #return {'restore': _translate_restore_detail_view(context, dict(new_restore.iteritems()))}
 
 
 def create_resource(ext_mgr):

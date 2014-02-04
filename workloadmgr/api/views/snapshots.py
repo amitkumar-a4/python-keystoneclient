@@ -29,38 +29,44 @@ class ViewBuilder(common.ViewBuilder):
 
     def summary(self, request, snapshot):
         """Generic, non-detailed view of a snapshot."""
-        return {
-            'snapshot': {
-                'id': snapshot['id'],
-                'links': self._get_links(request,
-                                         snapshot['id']),
-            },
-        }
+        d = {}
+        d['id'] = snapshot['id']
+        d['status'] = snapshot['status']
+        d['snapshot_type'] = snapshot['snapshot_type']
+        d['workload_id'] = snapshot['workload_id']
+        if 'instances' in snapshot:
+            instances = []
+            for vm in snapshot['instances']:
+                instances.append({'id':vm['vm_id'],
+                                  'name':vm['vm_name'],
+                                  'status':vm['status']
+                                  }) 
+            d['instances'] = instances
+        d['links'] = self._get_links(request, snapshot['id'])
+        return {'snapshot': d}       
 
-    def restore_summary(self, request, restore):
-        """Generic, non-detailed view of a restore."""
-        return {
-            'restore': {
-                'snapshot_id': restore['snapshot_id'],
-            },
-        }
 
     def detail(self, request, snapshot):
         """Detailed view of a single snapshot."""
-        return {
-            'snapshot': {
-                'created_at': snapshot.get('created_at'),
-                'updated_at': snapshot.get('updated_at'),
-                'id': snapshot.get('id'),
-                'user_id': snapshot.get('user_id'),
-                'project_id': snapshot.get('project_id'),
-                'status': snapshot.get('status'),
-                #'links': self._get_links(request, snapshot['id'],
-                'name':  snapshot['id'],
-                'snapshot_type': snapshot.get('snapshot_type'),
-                'workload_id': snapshot.get('workload_id'),
-            }
-        }
+        d = {}
+        d['id'] = snapshot['id']
+        d['created_at'] = snapshot['created_at']
+        d['updated_at'] = snapshot['created_at']
+        d['user_id'] = snapshot['user_id']
+        d['project_id'] = snapshot['project_id']
+        d['status'] = snapshot['status']
+        d['snapshot_type'] = snapshot['snapshot_type']
+        d['workload_id'] = snapshot['workload_id']
+        if 'instances' in snapshot:
+            instances = []
+            for vm in snapshot['instances']:
+                instances.append({'id':vm['vm_id'],
+                                  'name':vm['vm_name'],
+                                  'status':vm['status']
+                                  }) 
+            d['instances'] = instances
+        d['links'] = self._get_links(request, snapshot['id'])
+        return {'snapshot': d}      
 
     def _list_view(self, func, request, snapshots):
         """Provide a view for a list of snapshots."""

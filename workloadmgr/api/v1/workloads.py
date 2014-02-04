@@ -14,6 +14,7 @@ from workloadmgr.api import extensions
 from workloadmgr.api import wsgi
 from workloadmgr.api import common
 from workloadmgr.api.views import workloads as workload_views
+from workloadmgr.api.views import snapshots as snapshot_views
 from workloadmgr.api import xmlutil
 from workloadmgr import workloads as workloadAPI
 from workloadmgr import exception
@@ -105,6 +106,7 @@ class WorkloadMgrsController(wsgi.Controller):
     """The API controller """
 
     _view_builder_class = workload_views.ViewBuilder
+    snapshot_view_builder = snapshot_views.ViewBuilder()
 
     def __init__(self):
         self.workload_api = workloadAPI.API()
@@ -159,8 +161,9 @@ class WorkloadMgrsController(wsgi.Controller):
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidWorkloadMgr as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
-
-        return {'snapshot': _translate_snapshot_detail_view(context, dict(new_snapshot.iteritems()))}
+        
+        return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
+        #return {'snapshot': _translate_snapshot_detail_view(context, dict(new_snapshot.iteritems()))}
     
     @wsgi.serializers(xml=WorkloadMgrsTemplate)
     def index(self, req):

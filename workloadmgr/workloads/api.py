@@ -195,5 +195,54 @@ class API(base.Base):
         restore = self.db.restore_create(context, options)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
         return restore
-        #TODO(gbasava): Return the restored instances
 
+    def restore_get(self, context, restore_id):
+        rv = self.db.restore_get(context, restore_id)
+        restore_details  = dict(rv.iteritems())
+        instances = []
+        try:
+            vms = self.db.restore_vm_get(context, restore_id)
+            for vm in vms:
+                instances.append(dict(vm.iteritems()))
+        except Exception as ex:
+            pass
+        restore_details.setdefault('instances', instances)    
+        return restore_details
+
+    def restore_show(self, context, restore_id):
+        rv = self.db.restore_show(context, restore_id)
+        restore_details  = dict(rv.iteritems())
+        instances = []
+        try:
+            vms = self.db.restore_vm_get(context, restore_id)
+            for vm in vms:
+                instances.append(dict(vm.iteritems()))
+        except Exception as ex:
+            pass
+        restore_details.setdefault('instances', instances)    
+        return restore_details
+    
+    def restore_get_all(self, context, snapshot_id=None):
+        if snapshot_id:
+            restores = self.db.restore_get_all_by_project_snapshot(
+                                                    context,
+                                                    context.project_id,
+                                                    snapshot_id)
+        elif context.is_admin:
+            restores = self.db.restore_get_all(context)
+        else:
+            restores = self.db.restore_get_all_by_project(
+                                        context,context.project_id)
+        return restores
+    
+    def restore_delete(self, context, restore_id):
+        """
+        Delete a workload restore. No RPC call required
+        """
+        restore = self.restore_get(context, restore_id)
+        if restore['status'] not in ['available', 'error']:
+            msg = _('Snapshot status must be available or error')
+            raise exception.InvalidWorkloadMgr(reason=msg)
+
+        self.db.restore_delete(context, restore_id)
+        
