@@ -34,13 +34,13 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = testbubble['status']
         d['snapshot_id'] = testbubble['snapshot_id']
         if 'instances' in testbubble:
-            instances = []
-            for vm in testbubble['instances']:
-                instances.append({'id':vm['vm_id'],
-                                  'name':vm['vm_name'],
-                                  'status':vm['status']
-                                  }) 
-            d['instances'] = instances
+            d['instances'] = testbubble['instances']
+        if 'networks' in testbubble:
+            d['networks'] = testbubble['networks']
+        if 'subnets' in testbubble:
+            d['subnets'] = testbubble['subnets']
+        if 'routers' in testbubble:
+            d['routers'] = testbubble['routers']  
         d['links'] = self._get_links(request, testbubble['id'])
         return {'testbubble': d}        
 
@@ -56,13 +56,13 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = testbubble['status']
         d['snapshot_id'] = testbubble['snapshot_id']
         if 'instances' in testbubble:
-            instances = []
-            for vm in testbubble['instances']:
-                instances.append({'id':vm['vm_id'],
-                                  'name':vm['vm_name'],
-                                  'status':vm['status']
-                                  }) 
-            d['instances'] = instances
+            d['instances'] = testbubble['instances']
+        if 'networks' in testbubble:
+            d['networks'] = testbubble['networks']
+        if 'subnets' in testbubble:
+            d['subnets'] = testbubble['subnets']
+        if 'routers' in testbubble:
+            d['routers'] = testbubble['routers']                                
         d['links'] = self._get_links(request, testbubble['id'])
         return {'testbubble': d}        
 

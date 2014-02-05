@@ -122,7 +122,7 @@ class RestoresController(wsgi.Controller):
         
         #TODO(giri): implement the search_opts to specify the filters
         restores = []
-        for restore in restores_all:
+        for restore in limited_list:
             if (restore['deleted'] == False) and (restore['restore_type'] != 'test'):
                 restores.append(restore)        
 

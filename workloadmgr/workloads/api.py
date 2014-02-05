@@ -212,14 +212,34 @@ class API(base.Base):
     def restore_show(self, context, restore_id):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())
+        
         instances = []
         try:
-            vms = self.db.restore_vm_get(context, restore_id)
+            vms = self.db.restored_vm_get(context, restore_id)
             for vm in vms:
-                instances.append(dict(vm.iteritems()))
+                instances.append({'id':vm.vm_id, 'name':vm.vm_name})
         except Exception as ex:
             pass
-        restore_details.setdefault('instances', instances)    
+        restore_details.setdefault('instances', instances) 
+        
+        networks_list = []
+        subnets_list = []
+        routers_list = []
+        try:
+            resources = self.db.restored_vm_resources_get(context, restore_id, restore_id)
+            for resource in resources:
+                if resource.resource_type == 'network':
+                    networks_list.append({'id':resource.id, 'name':resource.resource_name})
+                elif resource.resource_type == 'subnet':
+                    subnets_list.append({'id':resource.id, 'name':resource.resource_name})
+                elif resource.resource_type == 'router':
+                    routers_list.append({'id':resource.id, 'name':resource.resource_name})                                    
+        except Exception as ex:
+            pass        
+        restore_details.setdefault('networks', networks_list) 
+        restore_details.setdefault('subnets', subnets_list)
+        restore_details.setdefault('routers', routers_list) 
+                
         return restore_details
     
     def restore_get_all(self, context, snapshot_id=None):

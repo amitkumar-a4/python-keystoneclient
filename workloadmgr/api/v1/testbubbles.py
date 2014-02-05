@@ -82,7 +82,7 @@ class TestbubblesController(wsgi.Controller):
         except exception.NotFound:
             raise exc.HTTPNotFound()
 
-        return self._view_builder.detail(req, restore)
+        return self._view_builder.detail(req, testbubble)
 
     def delete(self, req, id):
         """Delete a testbubble."""
@@ -120,7 +120,7 @@ class TestbubblesController(wsgi.Controller):
         
         #TODO(giri): implement the search_opts to specify the filters
         testbubbles = []
-        for testbubble in testbubbles_all:
+        for testbubble in limited_list:
             if (testbubble['deleted'] == False) and (testbubble['restore_type'] == 'test'):
                 testbubbles.append(testbubble)        
 

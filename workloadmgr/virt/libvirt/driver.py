@@ -1170,8 +1170,10 @@ class LibvirtDriver(driver.ComputeDriver):
         if test == True:
             self.reboot_instance(restored_instance) 
             time.sleep(10)
+            LOG.debug(_("Test Restore Completed"))
         else:            
             compute_service.start(context, restored_instance.id)  
+            LOG.debug(_("Restore Completed"))
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
@@ -1179,6 +1181,7 @@ class LibvirtDriver(driver.ComputeDriver):
             try:
                 shutil.rmtree(temp_directory)
             except OSError as exc:
-                pass  
+                pass 
+         
         return restored_instance          
 

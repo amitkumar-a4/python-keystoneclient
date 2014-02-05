@@ -34,14 +34,14 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
-        if 'instances' in restore:
-            instances = []
-            for vm in restore['instances']:
-                instances.append({'id':vm['vm_id'],
-                                  'name':vm['vm_name'],
-                                  'status':vm['status']
-                                  }) 
-            d['instances'] = instances
+        if 'instances' in testbubble:
+            d['instances'] = testbubble['instances']
+        if 'networks' in testbubble:
+            d['networks'] = testbubble['networks']
+        if 'subnets' in testbubble:
+            d['subnets'] = testbubble['subnets']
+        if 'routers' in testbubble:
+            d['routers'] = testbubble['routers']  
         d['links'] = self._get_links(request, restore['id'])
         return {'restore': d}        
 
@@ -57,14 +57,14 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
-        if 'instances' in restore:
-            instances = []
-            for vm in restore['instances']:
-                instances.append({'id':vm['vm_id'],
-                                  'name':vm['vm_name'],
-                                  'status':vm['status']
-                                  }) 
-            d['instances'] = instances
+        if 'instances' in testbubble:
+            d['instances'] = testbubble['instances']
+        if 'networks' in testbubble:
+            d['networks'] = testbubble['networks']
+        if 'subnets' in testbubble:
+            d['subnets'] = testbubble['subnets']
+        if 'routers' in testbubble:
+            d['routers'] = testbubble['routers']  
         d['links'] = self._get_links(request, restore['id'])
         return {'restore': d}        
 

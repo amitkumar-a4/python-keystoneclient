@@ -547,7 +547,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 self._restore_networks(context, True, snapshot, restore, new_net_resources)    
             vault_service = vault.get_vault_service(context)
             
-            #restore each VM
+            #restore each VM 
+            #TODO(giri): If one VM restore fails, rollback the whole transaction
             for vm in self.db.snapshot_vm_get(context, snapshot.id): 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
                 restored_instance = virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
@@ -556,7 +557,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'restore_id': restore.id,
                                       'status': 'available'}
                 restored_vm = self.db.restored_vm_create(context,restored_vm_values)    
-           
+                           
             self.db.restore_update(context, restore.id, {'status': 'completed'})
         except Exception as ex:
             msg = _("Error Restoring %(restore_id)s with failure: %(exception)s")

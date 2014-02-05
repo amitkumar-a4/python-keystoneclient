@@ -138,7 +138,7 @@ class SnapshotsController(wsgi.Controller):
         
         #TODO(giri): implement the search_opts to specify the filters
         snapshots = []
-        for snapshot in snapshots_all:
+        for snapshot in limited_list:
             if snapshot['deleted'] == False:
                 snapshots.append(snapshot)        
 

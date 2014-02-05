@@ -156,7 +156,7 @@ class WorkloadMgrsController(wsgi.Controller):
         
         #TODO(giri): implement the search_opts to specify the filters
         workloads = []
-        for workload in workloads_all:
+        for workload in limited_list:
             if workload['deleted'] == False:
                 workloads.append(workload)
         
