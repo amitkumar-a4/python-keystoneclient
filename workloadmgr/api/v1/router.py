@@ -14,6 +14,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.api.v1 import workloads
 from workloadmgr.api.v1 import snapshots
 from workloadmgr.api.v1 import restores
+from workloadmgr.api.v1 import testbubbles
 
 LOG = logging.getLogger(__name__)
 
@@ -110,14 +111,43 @@ class APIRouter(workloadmgr.api.APIRouter):
         #get the detail list of workload snapshot restores
         mapper.connect("restores_3",
                        "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/detail",
-                       controller=self.resources['snapshots'],
+                       controller=self.resources['restores'],
                        action='detail',
                        conditions={"method": ['GET']})  
         
         #get the specified snapshot
         mapper.connect("restore",
                        "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
-                       controller=self.resources['snapshots'],
+                       controller=self.resources['restores'],
                        action='show',
                        conditions={"method": ['GET']}) 
+        
+        self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
+        #detail list of testbubbles
+        mapper.resource("testbubbles_1", "testbubbles",
+                        controller=self.resources['testbubbles'],
+                        collection={'detail': 'GET'},
+                        member={'action': 'POST'})
+        
+               
+        #get the list of workload snapshot testbubbles
+        mapper.connect("testbubbles_2",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles",
+                       controller=self.resources['testbubbles'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the detail list of workload snapshot testbubbles
+        mapper.connect("testbubbles_3",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/detail",
+                       controller=self.resources['testbubbles'],
+                       action='detail',
+                       conditions={"method": ['GET']})  
+        
+        #get the specified snapshot
+        mapper.connect("testbubble",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
+                       controller=self.resources['testbubbles'],
+                       action='show',
+                       conditions={"method": ['GET']})         
         

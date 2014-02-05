@@ -24,33 +24,6 @@ from workloadmgr.openstack.common import log as logging
 FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
 
-def _translate_snapshot_detail_view(context, snapshot):
-    """Maps keys for snapshots details view."""
-
-    d = _translate_snapshot_summary_view(context, snapshot)
-
-    return d
-
-
-def _translate_snapshot_summary_view(context, snapshot):
-    """Maps keys for snapshots summary view."""
-    d = {}
-
-    d['id'] = snapshot['id']
-    d['created_at'] = snapshot['created_at']
-    d['status'] = snapshot['status']
-    d['workload_id'] = snapshot['workload_id']
-    if 'instances' in snapshot:
-        instances = []
-        for vm in snapshot['instances']:
-            instances.append({'id':vm['vm_id'],
-                              'name':vm['vm_name'],
-                              'status':vm['status']
-                              }) 
-        d['instances'] = instances
-    return d
-
-
 def make_workload(elem):
     elem.set('id')
     elem.set('status')
@@ -188,9 +161,9 @@ class WorkloadMgrsController(wsgi.Controller):
                 workloads.append(workload)
         
         if is_detail:
-            workloads = self._view_builder.detail_list(req, limited_list)
+            workloads = self._view_builder.detail_list(req, workloads)
         else:
-            workloads = self._view_builder.summary_list(req, limited_list)
+            workloads = self._view_builder.summary_list(req, workloads)
         return workloads
 
     @wsgi.response(202)
