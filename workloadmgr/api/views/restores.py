@@ -34,15 +34,17 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
-        if 'instances' in testbubble:
-            d['instances'] = testbubble['instances']
-        if 'networks' in testbubble:
-            d['networks'] = testbubble['networks']
-        if 'subnets' in testbubble:
-            d['subnets'] = testbubble['subnets']
-        if 'routers' in testbubble:
-            d['routers'] = testbubble['routers']  
+        if 'instances' in restore:
+            d['instances'] = restore['instances']
+        if 'networks' in restore:
+            d['networks'] = restore['networks']
+        if 'subnets' in restore:
+            d['subnets'] = restore['subnets']
+        if 'routers' in restore:
+            d['routers'] = restore['routers']  
         d['links'] = self._get_links(request, restore['id'])
+        d['name'] = restore['display_name']
+        d['description'] =  restore['display_description']        
         return {'restore': d}        
 
 
@@ -57,15 +59,17 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
-        if 'instances' in testbubble:
-            d['instances'] = testbubble['instances']
-        if 'networks' in testbubble:
-            d['networks'] = testbubble['networks']
-        if 'subnets' in testbubble:
-            d['subnets'] = testbubble['subnets']
-        if 'routers' in testbubble:
-            d['routers'] = testbubble['routers']  
+        if 'instances' in restore:
+            d['instances'] = restore['instances']
+        if 'networks' in restore:
+            d['networks'] = restore['networks']
+        if 'subnets' in restore:
+            d['subnets'] = restore['subnets']
+        if 'routers' in restore:
+            d['routers'] = restore['routers']  
         d['links'] = self._get_links(request, restore['id'])
+        d['name'] = restore['display_name']
+        d['description'] =  restore['display_description']          
         return {'restore': d}        
 
     def _list_view(self, func, request, restores):

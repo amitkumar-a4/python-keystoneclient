@@ -43,6 +43,8 @@ class ViewBuilder(common.ViewBuilder):
                                   }) 
             d['instances'] = instances
         d['links'] = self._get_links(request, snapshot['id'])
+        d['name'] = snapshot['display_name']
+        d['description'] =  snapshot['display_description']          
         return {'snapshot': d}       
 
 
@@ -66,6 +68,8 @@ class ViewBuilder(common.ViewBuilder):
                                   }) 
             d['instances'] = instances
         d['links'] = self._get_links(request, snapshot['id'])
+        d['name'] = snapshot['display_name']
+        d['description'] =  snapshot['display_description']          
         return {'snapshot': d}      
 
     def _list_view(self, func, request, snapshots):

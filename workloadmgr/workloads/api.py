@@ -106,7 +106,7 @@ class API(base.Base):
 
         self.db.workload_delete(context, workload_id)
 
-    def workload_snapshot(self, context, workload_id, snapshot_type):
+    def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """
         Make the RPC call to snapshot a workload.
         """
@@ -119,6 +119,8 @@ class API(base.Base):
                    'project_id': context.project_id,
                    'workload_id': workload_id,
                    'snapshot_type': snapshot_type,
+                   'display_name': name,
+                   'display_description': description,                   
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
         self.workloads_rpcapi.workload_snapshot(context, workload['host'], snapshot['id'])
@@ -174,7 +176,7 @@ class API(base.Base):
 
         self.db.snapshot_delete(context, snapshot_id)
         
-    def snapshot_restore(self, context, snapshot_id, test):
+    def snapshot_restore(self, context, snapshot_id, test, name, description):
         """
         Make the RPC call to restore a snapshot.
         """
@@ -191,6 +193,8 @@ class API(base.Base):
                    'project_id': context.project_id,
                    'snapshot_id': snapshot_id,
                    'restore_type': restore_type,
+                   'display_name': name,
+                   'display_description': description,
                    'status': 'restoring',}
         restore = self.db.restore_create(context, options)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])

@@ -21,7 +21,7 @@ from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import snapshots as snapshot_views
 from workloadmgr.api.views import restores as restore_views
-
+from workloadmgr.api.views import testbubbles as testbubble_views
 
 LOG = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ class SnapshotsController(wsgi.Controller):
 
     _view_builder_class = snapshot_views.ViewBuilder
     restore_view_builder = restore_views.ViewBuilder()
+    testbubble_view_builder = testbubble_views.ViewBuilder()
     
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
@@ -148,16 +149,13 @@ class SnapshotsController(wsgi.Controller):
             snapshots = self._view_builder.summary_list(req, snapshots)
         return snapshots
     
-    @wsgi.response(202)
-    @wsgi.serializers(xml=SnapshotRestoreTemplate)
-    @wsgi.deserializers(xml=RestoreDeserializer)
-    def restore(self, req, id, workload_id=None, body=None):
+   
+    def _restore(self, req, id, workload_id=None, body=None):
         """Restore an existing snapshot"""
         snapshot_id = id
         LOG.debug(_('Restoring snapshot %(snapshot_id)s') % locals())
         context = req.environ['workloadmgr.context']
-        LOG.audit(_("Restoring snapshot %(snapshot_id)s"),
-                  locals(), context=context)
+        LOG.audit(_("Restoring snapshot %(snapshot_id)s"), locals(), context=context)
         test = None
         if ('QUERY_STRING' in req.environ) :
             qs=parse_qs(req.environ['QUERY_STRING'])
@@ -168,28 +166,43 @@ class SnapshotsController(wsgi.Controller):
             if(test and test == '1'):
                 test = True
             else:
-                test = False    
-            new_restore = self.workload_api.snapshot_restore(context, snapshot_id = snapshot_id, test=test )
+                test = False
+            name = ''
+            description = ''
+            if (body and 'testbubble' in body):
+                name = body['testbubble'].get('name', None)
+                description = body['testbubble'].get('description', None)
+            elif (body and 'restore' in body):
+                name = body['restore'].get('name', None)
+                description = body['restore'].get('description', None)
+                                                  
+            restore = self.workload_api.snapshot_restore(context, 
+                                                         snapshot_id=snapshot_id, 
+                                                         test=test,
+                                                         name=name, 
+                                                         description=description)
         except exception.InvalidInput as error:
-            raise exc.HTTPBadRequest(explanation=unicode(error))
-        except exception.InvalidVolume as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.InvalidWorkloadMgr as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
-        except exception.VolumeNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
-        except exception.VolumeSizeExceedsAvailableQuota as error:
-            raise exc.HTTPRequestEntityTooLarge(
-                explanation=error.message, headers={'Retry-After': 0})
-        except exception.VolumeLimitExceeded as error:
-            raise exc.HTTPRequestEntityTooLarge(
-                explanation=error.message, headers={'Retry-After': 0})
 
-        return self.restore_view_builder.detail(req, dict(new_restore.iteritems()))
-        #return {'restore': _translate_restore_detail_view(context, dict(new_restore.iteritems()))}
+        return restore
 
-
+    @wsgi.response(202)
+    @wsgi.serializers(xml=SnapshotRestoreTemplate)
+    @wsgi.deserializers(xml=RestoreDeserializer)
+    def restore(self, req, id, workload_id=None, body=None):
+        restore = self._restore(req, id, workload_id, body)
+        return self.restore_view_builder.detail(req, dict(restore.iteritems()))
+    
+    @wsgi.response(202)
+    @wsgi.serializers(xml=SnapshotRestoreTemplate)
+    @wsgi.deserializers(xml=RestoreDeserializer)
+    def test_restore(self, req, id, workload_id=None, body=None):
+        test_restore = self._restore(self, req, id, workload_id, body)
+        return self.testbubble_view_builder.detail(req, dict(test_restore.iteritems()))
+    
 def create_resource(ext_mgr):
     return wsgi.Resource(SnapshotsController(ext_mgr))

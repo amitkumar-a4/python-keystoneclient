@@ -170,6 +170,8 @@ class Snapshots(BASE, WorkloadMgrBase):
     
     workload_id = Column(String(255), ForeignKey('workloads.id'))
     snapshot_type = Column(String(32), nullable=False)
+    display_name = Column(String(255))
+    display_description = Column(String(255))    
     status =  Column(String(32), nullable=False)
 
 class SnapshotVMs(BASE, WorkloadMgrBase):
@@ -290,6 +292,8 @@ class Restores(BASE, WorkloadMgrBase):
     
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     restore_type = Column(String(32), nullable=False)
+    display_name = Column(String(255))
+    display_description = Column(String(255))    
     status =  Column(String(32), nullable=False)
 
 class RestoredVMs(BASE, WorkloadMgrBase):

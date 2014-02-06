@@ -97,12 +97,12 @@ class TestbubblesController(wsgi.Controller):
         return webob.Response(status_int=202)
 
     @wsgi.serializers(xml=TestbubblesTemplate)
-    def index(self, req, snapshot_id=None):
+    def index(self, req, workload_id=None, snapshot_id=None):
         """Returns a summary list of testbubbles."""
         return self._get_testbubbles(req, snapshot_id, is_detail=False)
 
     @wsgi.serializers(xml=TestbubblesTemplate)
-    def detail(self, req, snapshot_id=None):
+    def detail(self, req, workload_id=None, snapshot_id=None):
         """Returns a detailed list of testbubbles."""
         return self._get_testbubbles(req, snapshot_id, is_detail=True)
 

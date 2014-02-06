@@ -1128,7 +1128,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
                     
         #create nova instance
-        restored_instance_name = uuid.uuid4().hex
+        restored_instance_name = snapshot_vm.vm_name + '_of_snapshot_' + snapshot.id + '_' + uuid.uuid4().hex[:6]
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
         restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=nics)
         while restored_instance.status != 'ACTIVE':

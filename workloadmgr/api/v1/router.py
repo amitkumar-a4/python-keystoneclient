@@ -49,7 +49,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='snapshot',
                        conditions={"method": ['POST']})
         
-        
+        ###################################################################################################        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)
         #detail list of snapshots
         mapper.resource("snapshots_1", "snapshots",
@@ -73,7 +73,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})  
         
         #get the specified snapshot
-        mapper.connect("snapshot",
+        mapper.connect("snapshot_4",
                        "/{project_id}/workloads/{workload_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='show',
@@ -93,6 +93,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='restore',
                        conditions={"method": ['POST']})     
         
+        ###################################################################################################
         self.resources['restores'] = restores.create_resource(ext_mgr)
         #detail list of restores
         mapper.resource("restores_1", "restores",
@@ -116,12 +117,20 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})  
         
         #get the specified snapshot
-        mapper.connect("restore",
+        mapper.connect("restore_4",
                        "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
                        controller=self.resources['restores'],
                        action='show',
-                       conditions={"method": ['GET']}) 
+                       conditions={"method": ['GET']})
         
+        #restore a snapshot
+        mapper.connect("restore_5",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/restores",
+                       controller=self.resources['snapshots'],
+                       action='restore',
+                       conditions={"method": ['POST']})  
+        
+        ###################################################################################################
         self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
         #detail list of testbubbles
         mapper.resource("testbubbles_1", "testbubbles",
@@ -145,9 +154,16 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})  
         
         #get the specified snapshot
-        mapper.connect("testbubble",
+        mapper.connect("testbubble_4",
                        "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
                        controller=self.resources['testbubbles'],
                        action='show',
-                       conditions={"method": ['GET']})         
+                       conditions={"method": ['GET']})  
+        
+        #test restore a snapshot
+        mapper.connect("testbubble_5",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/testbubbles",
+                       controller=self.resources['snapshots'],
+                       action='test_restore',
+                       conditions={"method": ['POST']}) 
         

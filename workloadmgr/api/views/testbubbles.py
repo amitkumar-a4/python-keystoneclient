@@ -42,6 +42,8 @@ class ViewBuilder(common.ViewBuilder):
         if 'routers' in testbubble:
             d['routers'] = testbubble['routers']  
         d['links'] = self._get_links(request, testbubble['id'])
+        d['name'] = testbubble['display_name']
+        d['description'] =  testbubble['display_description']         
         return {'testbubble': d}        
 
 
@@ -64,6 +66,8 @@ class ViewBuilder(common.ViewBuilder):
         if 'routers' in testbubble:
             d['routers'] = testbubble['routers']                                
         d['links'] = self._get_links(request, testbubble['id'])
+        d['name'] = testbubble['display_name']
+        d['description'] =  testbubble['display_description']         
         return {'testbubble': d}        
 
     def _list_view(self, func, request, testbubbles):

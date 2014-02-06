@@ -101,6 +101,8 @@ def upgrade(migrate_engine):
         Column('user_id', String(length=255)),
         Column('project_id', String(length=255)),
         Column('snapshot_type', String(length=32), primary_key=False, nullable= False),
+        Column('display_name', String(length=255)),
+        Column('display_description', String(length=255)),        
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -229,6 +231,8 @@ def upgrade(migrate_engine):
         Column('user_id', String(length=255)),
         Column('project_id', String(length=255)),
         Column('restore_type', String(length=32), primary_key=False, nullable= False),
+        Column('display_name', String(length=255)),
+        Column('display_description', String(length=255)),        
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
