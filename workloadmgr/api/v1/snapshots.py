@@ -91,7 +91,7 @@ class SnapshotsController(wsgi.Controller):
         super(SnapshotsController, self).__init__()
 
     @wsgi.serializers(xml=SnapshotTemplate)
-    def show(self, req, id):
+    def show(self, req, id, workload_id=None):
         """Return data about the given Snapshot."""
         context = req.environ['workloadmgr.context']
 
@@ -103,7 +103,7 @@ class SnapshotsController(wsgi.Controller):
         return self._view_builder.detail(req, snapshot)
         #return {'snapshot': _translate_snapshot_detail_view(context, snapshot)}
 
-    def delete(self, req, id):
+    def delete(self, req, id, workload_id=None):
         """Delete a snapshot."""
         context = req.environ['workloadmgr.context']
 

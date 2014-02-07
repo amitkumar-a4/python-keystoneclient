@@ -74,7 +74,7 @@ class RestoresController(wsgi.Controller):
         super(RestoresController, self).__init__()
 
     @wsgi.serializers(xml=RestoreTemplate)
-    def show(self, req, id):
+    def show(self, req, id, workload_id=None, snapshot_id=None):
         """Return data about the given Restore."""
         context = req.environ['workloadmgr.context']
 
@@ -86,7 +86,7 @@ class RestoresController(wsgi.Controller):
         return self._view_builder.detail(req, restore)
         #return {'restore': _translate_restore_detail_view(context, restore)}
 
-    def delete(self, req, id):
+    def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a restore."""
         context = req.environ['workloadmgr.context']
 

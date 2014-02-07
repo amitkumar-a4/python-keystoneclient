@@ -73,7 +73,7 @@ class TestbubblesController(wsgi.Controller):
         super(TestbubblesController, self).__init__()
 
     @wsgi.serializers(xml=TestbubbleTemplate)
-    def show(self, req, id):
+    def show(self, req, id, workload_id=None, snapshot_id=None):
         """Return data about the given Testbubble."""
         context = req.environ['workloadmgr.context']
 
@@ -84,7 +84,7 @@ class TestbubblesController(wsgi.Controller):
 
         return self._view_builder.detail(req, testbubble)
 
-    def delete(self, req, id):
+    def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a testbubble."""
         context = req.environ['workloadmgr.context']
 
