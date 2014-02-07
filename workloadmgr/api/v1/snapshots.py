@@ -201,7 +201,7 @@ class SnapshotsController(wsgi.Controller):
     @wsgi.serializers(xml=SnapshotRestoreTemplate)
     @wsgi.deserializers(xml=RestoreDeserializer)
     def test_restore(self, req, id, workload_id=None, body=None):
-        test_restore = self._restore(self, req, id, workload_id, body)
+        test_restore = self._restore(req, id, workload_id, body)
         return self.testbubble_view_builder.detail(req, dict(test_restore.iteritems()))
     
 def create_resource(ext_mgr):
