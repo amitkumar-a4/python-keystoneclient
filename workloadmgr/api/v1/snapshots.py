@@ -150,23 +150,9 @@ class SnapshotsController(wsgi.Controller):
         return snapshots
     
    
-    def _restore(self, req, id, workload_id=None, body=None):
+    def _restore(self, context, id, workload_id=None, body=None, test=False):
         """Restore an existing snapshot"""
-        snapshot_id = id
-        LOG.debug(_('Restoring snapshot %(snapshot_id)s') % locals())
-        context = req.environ['workloadmgr.context']
-        LOG.audit(_("Restoring snapshot %(snapshot_id)s"), locals(), context=context)
-        test = None
-        if ('QUERY_STRING' in req.environ) :
-            qs=parse_qs(req.environ['QUERY_STRING'])
-            var = parse_qs(req.environ['QUERY_STRING'])
-            test = var.get('test',[''])[0]
-            test = escape(test)
         try:
-            if(test and test == '1'):
-                test = True
-            else:
-                test = False
             name = ''
             description = ''
             if (body and 'testbubble' in body):
@@ -177,7 +163,7 @@ class SnapshotsController(wsgi.Controller):
                 description = body['restore'].get('description', None)
                                                   
             restore = self.workload_api.snapshot_restore(context, 
-                                                         snapshot_id=snapshot_id, 
+                                                         snapshot_id=id, 
                                                          test=test,
                                                          name=name, 
                                                          description=description)
@@ -194,14 +180,28 @@ class SnapshotsController(wsgi.Controller):
     @wsgi.serializers(xml=SnapshotRestoreTemplate)
     @wsgi.deserializers(xml=RestoreDeserializer)
     def restore(self, req, id, workload_id=None, body=None):
-        restore = self._restore(req, id, workload_id, body)
+        LOG.debug(_('Restoring snapshot %(id)s') % locals())
+        test = None
+        if ('QUERY_STRING' in req.environ) :
+            qs=parse_qs(req.environ['QUERY_STRING'])
+            var = parse_qs(req.environ['QUERY_STRING'])
+            test = var.get('test',[''])[0]
+            test = escape(test)
+        if(test and test == '1'):
+            test = True
+        else:
+            test = False 
+        context = req.environ['workloadmgr.context']                
+        restore = self._restore(context, id, workload_id, body, test)
         return self.restore_view_builder.detail(req, dict(restore.iteritems()))
     
     @wsgi.response(202)
     @wsgi.serializers(xml=SnapshotRestoreTemplate)
     @wsgi.deserializers(xml=RestoreDeserializer)
     def test_restore(self, req, id, workload_id=None, body=None):
-        test_restore = self._restore(req, id, workload_id, body)
+        LOG.debug(_('Test Restoring snapshot %(id)s') % locals()) 
+        context = req.environ['workloadmgr.context']       
+        test_restore = self._restore(context, id, workload_id, body, test=True)
         return self.testbubble_view_builder.detail(req, dict(test_restore.iteritems()))
     
 def create_resource(ext_mgr):

@@ -654,6 +654,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def reboot_instance(self, instance):
         instance_name = self.get_instance_name_by_uuid(instance.id)
+        #NOTE(giri):there is some timing issue. The return vaule is some times None
+        if instance_name is None:
+            time.sleep(5)
+            instance_name = self.get_instance_name_by_uuid(instance.id)
         virt_dom = self._lookup_by_name(instance_name)
         virt_dom.reboot(0)
         
