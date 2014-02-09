@@ -203,6 +203,10 @@ class API(base.Base):
     def restore_get(self, context, restore_id):
         rv = self.db.restore_get(context, restore_id)
         restore_details  = dict(rv.iteritems())
+        
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id)
+        restore_details.setdefault('workload_id', snapshot.workload_id)
+                
         instances = []
         try:
             vms = self.db.restore_vm_get(context, restore_id)
@@ -216,6 +220,9 @@ class API(base.Base):
     def restore_show(self, context, restore_id):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())
+        
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id)
+        restore_details.setdefault('workload_id', snapshot.workload_id)
         
         instances = []
         try:

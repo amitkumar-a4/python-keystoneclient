@@ -33,6 +33,8 @@ class ViewBuilder(common.ViewBuilder):
         d['id'] = testbubble['id']
         d['status'] = testbubble['status']
         d['snapshot_id'] = testbubble['snapshot_id']
+        if 'workload_id' in testbubble:
+            d['workload_id'] = testbubble['workload_id']
         if 'instances' in testbubble:
             d['instances'] = testbubble['instances']
         if 'networks' in testbubble:
@@ -57,6 +59,8 @@ class ViewBuilder(common.ViewBuilder):
         d['project_id'] = testbubble['project_id']
         d['status'] = testbubble['status']
         d['snapshot_id'] = testbubble['snapshot_id']
+        if 'workload_id' in testbubble:
+            d['workload_id'] = testbubble['workload_id']
         if 'instances' in testbubble:
             d['instances'] = testbubble['instances']
         if 'networks' in testbubble:

@@ -34,6 +34,8 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
+        if 'workload_id' in restore:
+            d['workload_id'] = restore['workload_id']
         if 'instances' in restore:
             d['instances'] = restore['instances']
         if 'networks' in restore:
@@ -59,6 +61,8 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
+        if 'workload_id' in restore:
+            d['workload_id'] = restore['workload_id']
         if 'instances' in restore:
             d['instances'] = restore['instances']
         if 'networks' in restore:
