@@ -1167,12 +1167,16 @@ class LibvirtDriver(driver.ComputeDriver):
                 utils.move_file(restored_volume, instance_dir)
                 restored_volume = os.path.join(instance_dir, os.path.basename(restored_volume))
                 
-                hypervisor_hostname = restored_instance.__dict__['OS-EXT-SRV-ATTR:host']
+                #Get the restored instance using admin context.
+                restored_instance_admin_context = compute_service.get_server_by_id(context, restored_instance.id , admin=True)
+                hypervisor_hostname = restored_instance_admin_context.__dict__['OS-EXT-SRV-ATTR:host']
                 CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
                 self._get_connection()                     
                 self.attach_volume(restored_instance, restored_volume, ('/dev/' + devname))
         if test == True:
-            hypervisor_hostname = restored_instance.__dict__['OS-EXT-SRV-ATTR:host']
+            #Get the restored instance using admin context.
+            restored_instance_admin_context = compute_service.get_server_by_id(context, restored_instance.id , admin=True)            
+            hypervisor_hostname = restored_instance_admin_context.__dict__['OS-EXT-SRV-ATTR:host']
             CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
             self._get_connection()            
             self.reboot_instance(restored_instance) 

@@ -435,7 +435,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('snapshot of workload started, snapshot_id %s' %snapshot_id))
         try:
             compute_service = nova.API(production=True)
-            instances = compute_service.get_servers(context,all_tenants=True)  
+            instances = compute_service.get_servers(context,admin=True)  
             hypervisors = compute_service.get_hypervisors(context)     
             
             snapshot = self.db.snapshot_get(context, snapshot_id)

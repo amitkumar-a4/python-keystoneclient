@@ -23,7 +23,23 @@ from workloadmgr.openstack.common import log as logging
 nova_opts = [
     cfg.StrOpt('nova_tvault_endpoint_template',
                default= 'http://localhost:8774/v2/%(project_id)s',
-               help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),             
+               help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
+    cfg.StrOpt('nova_tvault_admin_auth_url',
+               default='http://localhost:5000/v2.0',
+               help='auth url for connecting to tvault nova in admin context'),               
+    cfg.StrOpt('nova_tvault_admin_username',
+               default='admin',
+               help='tenant name for connecting to tvault nova in admin context'),   
+    cfg.StrOpt('nova_tvault_admin_password',
+               default='password',
+               help='password for connecting to tvault nova in admin context',
+               secret=True),
+    cfg.StrOpt('nova_tvault_admin_tenant_name',
+               default='admin',
+               help='tenant name for connecting to tvault nova in admin context'),
+    cfg.StrOpt('nova_tvault_region_name',
+               default=None,
+               help='region name for connecting to tvault nova in admin context'),
     cfg.StrOpt('nova_production_endpoint_template',
                default= 'http://localhost:8774/v2/%(project_id)s',
                help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
@@ -62,20 +78,34 @@ CONF.register_opts(nova_opts)
 
 LOG = logging.getLogger(__name__)
 
-def _get_httpclient():
+def _get_httpclient(production):
     try:
-        httpclient = client.HTTPClient(
-            user=CONF.nova_production_admin_username,
-            password=CONF.nova_production_admin_password,
-            projectid=CONF.nova_production_admin_tenant_name,
-            service_name='nova',
-            service_type='compute',
-            endpoint_type='adminURL',
-            region_name=CONF.nova_production_region_name,
-            auth_url=CONF.nova_production_admin_auth_url,
-            timeout=CONF.nova_url_timeout,
-            auth_system=CONF.nova_auth_system,
-            insecure=CONF.nova_api_insecure)
+        if production:
+            httpclient = client.HTTPClient(
+                user=CONF.nova_production_admin_username,
+                password=CONF.nova_production_admin_password,
+                projectid=CONF.nova_production_admin_tenant_name,
+                service_name='nova',
+                service_type='compute',
+                endpoint_type='adminURL',
+                region_name=CONF.nova_production_region_name,
+                auth_url=CONF.nova_production_admin_auth_url,
+                timeout=CONF.nova_url_timeout,
+                auth_system=CONF.nova_auth_system,
+                insecure=CONF.nova_api_insecure)
+        else:
+            httpclient = client.HTTPClient(
+                user=CONF.nova_tvault_admin_username,
+                password=CONF.nova_tvault_admin_password,
+                projectid=CONF.nova_tvault_admin_tenant_name,
+                service_name='nova',
+                service_type='compute',
+                endpoint_type='adminURL',
+                region_name=CONF.nova_tvault_region_name,
+                auth_url=CONF.nova_tvault_admin_auth_url,
+                timeout=CONF.nova_url_timeout,
+                auth_system=CONF.nova_auth_system,
+                insecure=CONF.nova_api_insecure)            
         httpclient.authenticate()
     except Exception:
         with excutils.save_and_reraise_exception():
@@ -84,17 +114,22 @@ def _get_httpclient():
     
 def novaclient(context, production, admin=False):
     if admin:
-        httpclient = _get_httpclient()
+        httpclient = _get_httpclient(production)
         if production == True:
             url = CONF.nova_production_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
+            c = nova_client.Client(CONF.nova_production_admin_username,
+                                   CONF.nova_production_admin_password,
+                                   project_id=httpclient.tenant_id,
+                                   auth_url=url,
+                                   insecure=CONF.nova_api_insecure)            
         else:
             url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
+            c = nova_client.Client(CONF.nova_tvault_admin_username,
+                                   CONF.nova_tvault_admin_password,
+                                   project_id=httpclient.tenant_id,
+                                   auth_url=url,
+                                   insecure=CONF.nova_api_insecure)                 
         LOG.debug(_('Novaclient connection created using URL: %s') % url)
-        c = nova_client.Client(CONF.nova_production_admin_username,
-                               CONF.nova_production_admin_password,
-                               project_id=httpclient.tenant_id,
-                               auth_url=url,
-                               insecure=CONF.nova_api_insecure)
         c.client.auth_token = httpclient.auth_token
         c.client.management_url = url
     else:
@@ -167,13 +202,13 @@ class API(base.Base):
         """
         
         try:
-            item = novaclient(context, self._production).servers.create(name, image, flavor, 
-                                                      meta, files,
-                                                      reservation_id, min_count,
-                                                      max_count, security_groups, userdata,
-                                                      key_name, availability_zone,
-                                                      block_device_mapping, nics=nics, scheduler_hints=scheduler_hints,
-                                                      config_drive=config_drive, **kwargs)
+            item = novaclient(context, self._production).servers.create(  name, image, flavor, 
+                                                                          meta, files,
+                                                                          reservation_id, min_count,
+                                                                          max_count, security_groups, userdata,
+                                                                          key_name, availability_zone,
+                                                                          block_device_mapping, nics=nics, scheduler_hints=scheduler_hints,
+                                                                          config_drive=config_drive, **kwargs)
             time.sleep(15)#TODO(gbasava): Creation is asynchronous. Wait and check for the status
             #Perform translation required if any
             return item 
@@ -181,40 +216,42 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception 
             return       
         
-    def get_servers(self, context, search_opts=None, all_tenants=False):
+    def get_servers(self, context, search_opts=None, admin=False):
         """
         Get all the servers for a particular tenant or all tenants 
         :rtype: :class:`Server`
         """        
         if search_opts is None:
             search_opts = {}
-        if all_tenants:
+        if admin:
             search_opts['all_tenants'] = True
         else:
             search_opts['project_id'] = context.project_id
-        servers = novaclient(context, self._production, all_tenants).servers.list(True, search_opts)
+        servers = novaclient(context, self._production, admin=admin).servers.list(True, search_opts)
         return servers
 
-    def get_server(self, context, name):
+    def get_server(self, context, name, admin=False):
         """
         Get the server given the name
         :rtype: :class:`Server`
         """   
     
         try:
-            return novaclient(context, self._production).servers.find(name=name) 
+            return novaclient(context, self._production, admin).servers.find(name=name) 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return 
         
-    def get_server_by_id(self, context, id):
+    def get_server_by_id(self, context, id, admin=False):
         """
         :param id to query.
         :rtype: :class:`Server`
         """   
-    
         try:
-            return novaclient(context, self._production).servers.find(id=id) 
+            servers = self.get_servers(context, search_opts=None, admin=admin)
+            for server in servers:
+                if server.id == id:
+                    return server 
         except Exception:
             #TODO(gbasava): Handle the exception 
             return       

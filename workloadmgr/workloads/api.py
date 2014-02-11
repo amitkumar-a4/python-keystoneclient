@@ -63,7 +63,7 @@ class API(base.Base):
         Make the RPC call to create a workload.
         """
         compute_service = nova.API(production=True)
-        instances_with_name = compute_service.get_servers(context,all_tenants=True)
+        instances_with_name = compute_service.get_servers(context,admin=True)
         #TODO(giri): optimize this lookup
         for instance in instances:
             for instance_with_name in instances_with_name:
