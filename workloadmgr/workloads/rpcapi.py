@@ -71,3 +71,10 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('snapshot_delete',snapshot_id=snapshot_id),
                   topic=topic)
+        
+    def restore_delete(self, ctxt, host, restore_id):
+        LOG.debug("delete_restore  rpcapi restore_id %s", restore_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        self.cast(ctxt,
+                  self.make_msg('restore_delete',restore_id=restore_id),
+                  topic=topic)        

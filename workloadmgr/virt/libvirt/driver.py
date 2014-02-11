@@ -654,40 +654,36 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def reboot_instance(self, instance):
         instance_name = self.get_instance_name_by_uuid(instance.id)
-        #NOTE(giri):there is some timing issue. The return vaule is some times None
-        if instance_name is None:
-            time.sleep(5)
-            instance_name = self.get_instance_name_by_uuid(instance.id)
         virt_dom = self._lookup_by_name(instance_name)
         virt_dom.reboot(0)
         
     def attach_volume(self, instance, diskpath, mountpoint):
-            instance_name = self.get_instance_name_by_uuid(instance.id)
-            virt_dom = self._lookup_by_name(instance_name)
-            disk_dev = mountpoint.rpartition("/")[2]
-            conf = vconfig.LibvirtConfigGuestDisk()
-            conf.driver_cache = 'writethrough'
-            conf.driver_name = 'qemu'
-            conf.device_type = 'disk'
-            conf.driver_format = "raw"
-            conf.driver_cache = "none"
-            conf.target_dev = disk_dev
-            conf.target_bus = 'scsi'
-            #conf.serial = 'serial'
-            conf.source_type = 'file'
-            conf.source_path = diskpath         
-    
-            try:
-                # NOTE(vish): We can always affect config because our
-                #             domains are persistent, but we should only
-                #             affect live if the domain is running.
-                flags = libvirt.VIR_DOMAIN_AFFECT_CONFIG
-                state = LIBVIRT_POWER_STATE[virt_dom.info()[0]]
-                if state == power_state.RUNNING:
-                    flags |= libvirt.VIR_DOMAIN_AFFECT_LIVE
-                virt_dom.attachDeviceFlags(conf.to_xml(), flags)
-            except Exception, ex:
-                return        
+        instance_name = self.get_instance_name_by_uuid(instance.id)
+        virt_dom = self._lookup_by_name(instance_name)
+        disk_dev = mountpoint.rpartition("/")[2]
+        conf = vconfig.LibvirtConfigGuestDisk()
+        conf.driver_cache = 'writethrough'
+        conf.driver_name = 'qemu'
+        conf.device_type = 'disk'
+        conf.driver_format = "raw"
+        conf.driver_cache = "none"
+        conf.target_dev = disk_dev
+        conf.target_bus = 'scsi'
+        #conf.serial = 'serial'
+        conf.source_type = 'file'
+        conf.source_path = diskpath         
+
+        try:
+            # NOTE(vish): We can always affect config because our
+            #             domains are persistent, but we should only
+            #             affect live if the domain is running.
+            flags = libvirt.VIR_DOMAIN_AFFECT_CONFIG
+            state = LIBVIRT_POWER_STATE[virt_dom.info()[0]]
+            if state == power_state.RUNNING:
+                flags |= libvirt.VIR_DOMAIN_AFFECT_LIVE
+            virt_dom.attachDeviceFlags(conf.to_xml(), flags)
+        except Exception, ex:
+            return        
         
     def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
@@ -1170,8 +1166,15 @@ class LibvirtDriver(driver.ComputeDriver):
                 instance_dir = libvirt_utils.get_instance_path(restored_instance.id)
                 utils.move_file(restored_volume, instance_dir)
                 restored_volume = os.path.join(instance_dir, os.path.basename(restored_volume))
+                
+                hypervisor_hostname = restored_instance.__dict__['OS-EXT-SRV-ATTR:host']
+                CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
+                self._get_connection()                     
                 self.attach_volume(restored_instance, restored_volume, ('/dev/' + devname))
         if test == True:
+            hypervisor_hostname = restored_instance.__dict__['OS-EXT-SRV-ATTR:host']
+            CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
+            self._get_connection()            
             self.reboot_instance(restored_instance) 
             time.sleep(10)
             LOG.debug(_("Test Restore Completed"))

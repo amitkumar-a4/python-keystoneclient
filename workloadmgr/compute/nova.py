@@ -265,7 +265,31 @@ class API(base.Base):
             return novaclient(context, self._production).servers.resume(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
-            return         
+            return    
+        
+    def delete(self, context, server):
+        """
+        Delete the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context, self._production).servers.delete(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return
+        
+    def force_delete(self, context, server):
+        """
+        Force Delete the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context, self._production).servers.force_delete(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return 
                     
     def attach_volume(self, context, server_id, volume_id, device):
         """

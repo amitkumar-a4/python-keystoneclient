@@ -572,4 +572,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         LOG.info(_('deleting snapshot %s'), snapshot_id)        
         self.db.snapshot_delete(context, snapshot_id)
+        
+    def restore_delete(self, context, restore_id):
+        """
+        Delete an existing restore 
+        """
+        LOG.info(_('deleting restore %s'), restore_id)
+        self.db.restore_delete(context, restore_id)        
  

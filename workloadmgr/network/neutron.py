@@ -113,12 +113,27 @@ class API(base.Base):
     def get_port(self, context, port_id):
         return get_client(context, admin=True, production=self._production).show_port(port_id)
     
+    def delete_port(self, context, port_id):
+        return get_client(context, admin=True, production=self._production).delete_port(port_id)    
+    
     def create_subnet(self, context, **kwargs):
         client = get_client(context, admin=True, production=self._production)
         body = {'subnet': kwargs}
         subnet = client.create_subnet(body=body).get('subnet')        
         subnet['label'] = subnet['name']
-        return subnet    
+        return subnet  
+    
+    def get_subnet(self, context, subnet_id):
+        return get_client(context, admin=True, production=self._production).show_subnet(subnet_id)
+    
+    def delete_subnet(self, context, subnet_id):
+        client = get_client(context, admin=True, production=self._production)
+        rv_subnets = self.get_subnet(context, subnet_id)
+        search_opts = {'network_id': rv_subnets['subnet']['network_id']}        
+        rv_ports = self.get_ports(context, **search_opts)
+        for port in rv_ports['ports']:
+            self.delete_port(context, port['id'])
+        client.delete_subnet(subnet_id) 
     
     def get_subnets_from_port(self, context, port):
         """Return the subnets for a given port."""
@@ -172,6 +187,10 @@ class API(base.Base):
         network = client.create_network(body=body).get('network')        
         network['label'] = network['name']
         return network
+    
+    def delete_network(self, context, network_id):
+        client = get_client(context, admin=True, production=self._production)
+        client.delete_network(network_id)          
 
     def get_network(self, context, network_uuid):
         client = get_client(context, admin=True, production=self._production)
@@ -220,6 +239,14 @@ class API(base.Base):
         router = client.create_router(body=body).get('router')        
         router['label'] = router['name']
         return router
+    
+    def delete_router(self, context, router_id):
+        client = get_client(context, admin=True, production=self._production)
+        search_opts = {'device_owner': 'network:router_interface','device_id': router_id}
+        ports = client.list_ports(**search_opts).get('ports')
+        for port in ports:
+            self.router_remove_interface(context, router_id, port_id=port['id'])        
+        client.delete_router(router_id)        
         
     def get_routers(self, context):
         """Fetches a list of all routers for a tenant."""
@@ -237,14 +264,13 @@ class API(base.Base):
         get_client(context, admin=True, production=self._production).add_interface_router(router_id, body)
     
     
-    def router_remove_interface(self, request, router_id, subnet_id=None, port_id=None):
+    def router_remove_interface(self, context, router_id, subnet_id=None, port_id=None):
         body = {}
         if subnet_id:
             body['subnet_id'] = subnet_id
         if port_id:
             body['port_id'] = port_id
         get_client(context, admin=True, production=self._production).remove_interface_router(router_id, body)
-    
     
     def router_add_gateway(self, context, router_id, network_id):
         body = {'network_id': network_id}

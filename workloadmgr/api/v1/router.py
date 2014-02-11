@@ -92,7 +92,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['snapshots'],
                        action='restore',
                        conditions={"method": ['POST']})     
-        
+
+        #delete a snapshot
+        mapper.connect("delete_snapshot",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{id}",
+                       controller=self.resources['snapshots'],
+                       action='delete',
+                       conditions={"method": ['DELETE']})     
+                
         ###################################################################################################
         self.resources['restores'] = restores.create_resource(ext_mgr)
         #detail list of restores
@@ -116,7 +123,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='detail',
                        conditions={"method": ['GET']})  
         
-        #get the specified snapshot
+        #get the specified restore
         mapper.connect("restore_4",
                        "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
                        controller=self.resources['restores'],
@@ -129,6 +136,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['snapshots'],
                        action='restore',
                        conditions={"method": ['POST']})  
+        
+        #delete a restore
+        mapper.connect("delete_restore",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
+                       controller=self.resources['restores'],
+                       action='delete',
+                       conditions={"method": ['DELETE']})         
         
         ###################################################################################################
         self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
@@ -166,4 +180,11 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['snapshots'],
                        action='test_restore',
                        conditions={"method": ['POST']}) 
+        
+        #delete a testbubble
+        mapper.connect("delete_testbubble",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
+                       controller=self.resources['testbubbles'],
+                       action='delete',
+                       conditions={"method": ['DELETE']})         
         

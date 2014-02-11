@@ -16,6 +16,7 @@ from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
+from workloadmgr.network import neutron
 
 
 FLAGS = flags.FLAGS
@@ -34,7 +35,7 @@ class API(base.Base):
         workload_dict = dict(workload.iteritems())
         workload_vm_ids = []
         for workload_vm in self.db.workload_vms_get(context, workload.id):
-           workload_vm_ids.append(workload_vm.vm_id)  
+            workload_vm_ids.append(workload_vm.vm_id)  
         workload_dict['vm_ids'] = workload_vm_ids
         return workload_dict
 
@@ -101,9 +102,10 @@ class API(base.Base):
             raise exception.InvalidWorkloadMgr(reason=msg)
 
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
-        for snapshot in snapshots:
-            self.snapshot_delete(context, snapshot['id'])
-
+        if len(snapshots) > 0:
+            msg = _('This workload contains snapshots')
+            raise exception.InvalidWorkloadMgr(reason=msg)
+                    
         self.db.workload_delete(context, workload_id)
 
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
@@ -173,6 +175,12 @@ class API(base.Base):
         if snapshot['status'] not in ['available', 'error']:
             msg = _('Snapshot status must be available or error')
             raise exception.InvalidWorkloadMgr(reason=msg)
+        
+        restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
+        for restore in restores:
+            if restore.restore_type == 'test':
+                msg = _('This workload snapshot contains testbubbles')
+                raise exception.InvalidWorkloadMgr(reason=msg)      
 
         self.db.snapshot_delete(context, snapshot_id)
         
@@ -268,12 +276,28 @@ class API(base.Base):
     
     def restore_delete(self, context, restore_id):
         """
-        Delete a workload restore. No RPC call required
+        Delete a workload restore. RPC call may be required
         """
-        restore = self.restore_get(context, restore_id)
-        if restore['status'] not in ['available', 'error']:
-            msg = _('Snapshot status must be available or error')
+        restore_details = self.restore_show(context, restore_id)
+        if restore_details['status'] not in ['completed', 'error']:
+            msg = _('Restore or Testbubble status must be completed or error')
             raise exception.InvalidWorkloadMgr(reason=msg)
+
+        if restore_details['restore_type'] == 'test':
+            network_service =  neutron.API(production=False)
+            compute_service = nova.API(production=False)
+        else:
+            network_service =  neutron.API(production=True)
+            compute_service = nova.API(production=True)        
+            
+        for instance in restore_details['instances']:
+            compute_service.delete(context, instance['id']) 
+        for router in restore_details['routers']:
+            network_service.delete_router(context,router['id'])
+        for subnet in restore_details['subnets']:
+            network_service.delete_subnet(context,subnet['id'])
+        for network in restore_details['networks']:
+            network_service.delete_network(context,network['id'])
 
         self.db.restore_delete(context, restore_id)
         
