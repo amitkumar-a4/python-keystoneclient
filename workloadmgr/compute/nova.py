@@ -8,10 +8,17 @@ Handles all requests relating to compute + nova.
 """
 
 import time
+import glob
+import itertools
+import pkgutil
+import os
+import imp
+import pkg_resources
 
 from novaclient import exceptions as nova_exception
 from novaclient import service_catalog
 from novaclient import client
+from novaclient import extension as nova_extension
 from novaclient.v1_1 import client as nova_client
 from oslo.config import cfg
 
@@ -19,6 +26,7 @@ from workloadmgr.db import base
 from workloadmgr import exception
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
+
 
 nova_opts = [
     cfg.StrOpt('nova_tvault_endpoint_template',
@@ -78,6 +86,53 @@ CONF.register_opts(nova_opts)
 
 LOG = logging.getLogger(__name__)
 
+def _discover_extensions(version):
+    extensions = []
+    for name, module in itertools.chain(
+            _discover_via_python_path(),
+            _discover_via_contrib_path(version),
+            _discover_via_entry_points()):
+
+        extension = nova_extension.Extension(name, module)
+        extensions.append(extension)
+
+    return extensions
+
+def _discover_via_python_path():
+    for (module_loader, name, _ispkg) in pkgutil.iter_modules():
+        if name.endswith('_python_novaclient_ext'):
+            if not hasattr(module_loader, 'load_module'):
+                # Python 2.6 compat: actually get an ImpImporter obj
+                module_loader = module_loader.find_module(name)
+
+            module = module_loader.load_module(name)
+            if hasattr(module, 'extension_name'):
+                name = module.extension_name
+
+            yield name, module
+
+def _discover_via_contrib_path(version):
+    module_path = os.path.dirname(os.path.abspath(__file__))
+    version_str = "v%s" % version.replace('.', '_')
+    ext_path = os.path.join(module_path, version_str, 'contrib')
+    ext_glob = os.path.join(ext_path, "*.py")
+
+    for ext_path in glob.iglob(ext_glob):
+        name = os.path.basename(ext_path)[:-3]
+
+        if name == "__init__":
+            continue
+
+        module = imp.load_source(name, ext_path)
+        yield name, module
+
+def _discover_via_entry_points():
+    for ep in pkg_resources.iter_entry_points('novaclient.extension'):
+        name = ep.name
+        module = ep.load()
+
+        yield name, module
+
 def _get_httpclient(production):
     try:
         if production:
@@ -112,7 +167,7 @@ def _get_httpclient(production):
             LOG.exception(_("_get_auth_token() failed"))
     return httpclient
     
-def novaclient(context, production, admin=False):
+def novaclient(context, production, admin=False, extensions = None):
     if admin:
         httpclient = _get_httpclient(production)
         if production == True:
@@ -121,14 +176,16 @@ def novaclient(context, production, admin=False):
                                    CONF.nova_production_admin_password,
                                    project_id=httpclient.tenant_id,
                                    auth_url=url,
-                                   insecure=CONF.nova_api_insecure)            
+                                   insecure=CONF.nova_api_insecure,
+                                   extensions = extensions)            
         else:
             url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
             c = nova_client.Client(CONF.nova_tvault_admin_username,
                                    CONF.nova_tvault_admin_password,
                                    project_id=httpclient.tenant_id,
                                    auth_url=url,
-                                   insecure=CONF.nova_api_insecure)                 
+                                   insecure=CONF.nova_api_insecure,
+                                   extensions = extensions)                 
         LOG.debug(_('Novaclient connection created using URL: %s') % url)
         c.client.auth_token = httpclient.auth_token
         c.client.management_url = url
@@ -142,7 +199,8 @@ def novaclient(context, production, admin=False):
                                context.auth_token,
                                project_id=context.project_id,
                                auth_url=url,
-                               insecure=CONF.nova_api_insecure)
+                               insecure=CONF.nova_api_insecure,
+                               extensions = extensions)
         # noauth extracts user_id:tenant_id from auth_token
         c.client.auth_token = context.auth_token or '%s:%s' % (context.user_id, context.project_id)
         c.client.management_url = url
@@ -410,4 +468,17 @@ class API(base.Base):
         except Exception:
             #TODO(gbasava): Handle the exception   
             return              
-                                              
+                          
+    def vast_instance(self, context, server):
+        """
+        VAST an interfaces
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_instance(server=server) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            return                      
+        

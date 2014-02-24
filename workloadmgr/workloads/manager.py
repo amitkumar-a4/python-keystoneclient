@@ -9,9 +9,8 @@ Job scheduler manages WorkloadMgr
 
 **Related Flags**
 
-:workloads_topic:  What :mod:`rpc` topic to listen to (default:
-                        `workloadmgr-workloads`).
-:workloads_manager:  The module name of a class derived from
+:workloads_topic:  What :mod:`rpc` topic to listen to (default:`workloadmgr-workloads`).
+:workloads_manager:  The module name of a class derived from 
                           :class:`manager.Manager` (default:
                           :class:`workloadmgr.workload.manager.Manager`).
 
@@ -498,7 +497,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                'status': 'available'}
                 snapshot_vm_resource = self.db.snapshot_vm_resource_create(context,  snapshot_vm_resource_values)                         
                 
-                #disks snapshot    
+                #disks snapshot 
+                #import pdb; pdb.set_trace()
+                #compute_service.vast_instance(context,snapshot_vm.vm_id) 
+                #import pdb; pdb.set_trace()  
                 virtdriver.snapshot(workload, snapshot, snapshot_vm, vm_hypervisor.hypervisor_hostname, vault_service, self.db, context)
                 #TODO(giri): Check for the success (and update)
                 self.db.snapshot_vm_update(context, snapshot_vm.id, {'status': 'executing'})
