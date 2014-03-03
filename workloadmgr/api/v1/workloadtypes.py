@@ -78,7 +78,7 @@ class WorkloadTypesController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         try:
-            workload_types = self.workload_api.workload_types_show(context, id)
+            workload_types = self.workload_api.workload_type_show(context, id)
         except exception.NotFound:
             raise exc.HTTPNotFound()
 
