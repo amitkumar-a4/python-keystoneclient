@@ -18,6 +18,7 @@ import sys
 
 from oslo.config import cfg
 
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import version
 
 FLAGS = cfg.CONF
