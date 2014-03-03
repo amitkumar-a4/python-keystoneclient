@@ -33,11 +33,19 @@ class API(base.Base):
     def workload_type_get(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
         workload_type_dict = dict(workload_type.iteritems())
+        metadata = {}
+        for kvpair in workload_type.metadata:
+            metadata.setdefault(kvpair['key'], kvpair['value'])
+        workload_type_dict['metadata'] = metadata        
         return workload_type_dict
 
     def workload_type_show(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
         workload_type_dict = dict(workload_type.iteritems())
+        metadata = {}
+        for kvpair in workload_type.metadata:
+            metadata.setdefault(kvpair['key'], kvpair['value'])
+        workload_type_dict['metadata'] = metadata
         return workload_type_dict
     
     def workload_type_get_all(self, context, search_opts={}):
@@ -75,19 +83,33 @@ class API(base.Base):
     def workload_get(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
+        
         workload_vm_ids = []
         for workload_vm in self.db.workload_vms_get(context, workload.id):
             workload_vm_ids.append(workload_vm.vm_id)  
         workload_dict['vm_ids'] = workload_vm_ids
+        
+        metadata = {}
+        for kvpair in workload.metadata:
+            metadata.setdefault(kvpair['key'], kvpair['value'])
+        workload_dict['metadata'] = metadata        
+                
         return workload_dict
 
     def workload_show(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
+        
         workload_vm_ids = []
         for workload_vm in self.db.workload_vms_get(context, workload.id):
             workload_vm_ids.append(workload_vm.vm_id)  
         workload_dict['vm_ids'] = workload_vm_ids
+        
+        metadata = {}
+        for kvpair in workload.metadata:
+            metadata.setdefault(kvpair['key'], kvpair['value'])
+        workload_dict['metadata'] = metadata 
+                
         return workload_dict
     
     def workload_get_all(self, context, search_opts={}):

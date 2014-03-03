@@ -65,7 +65,8 @@ class ViewBuilder(common.ViewBuilder):
                 'name': workload.get('display_name'),
                 'description': workload.get('display_description'),
                 'interval': workload.get('hours'),
-                'instances': workload.get('vm_ids'),                
+                'instances': workload.get('vm_ids'),
+                'metadata' : workload.get('metadata'),                
                 'status': workload.get('status'),
                 'links': self._get_links(request, workload['id'])
             }

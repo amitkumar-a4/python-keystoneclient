@@ -34,7 +34,7 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = workloadtype['status']
         d['links'] = self._get_links(request, workloadtype['id'])
         d['name'] = workloadtype['display_name']
-        d['description'] =  workloadtype['display_description']         
+        d['description'] =  workloadtype['display_description']
         return {'workload_type': d}        
 
 
@@ -49,7 +49,8 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = workloadtype['status']
         d['links'] = self._get_links(request, workloadtype['id'])
         d['name'] = workloadtype['display_name']
-        d['description'] =  workloadtype['display_description']         
+        d['description'] = workloadtype['display_description'] 
+        d['metadata'] = workloadtype['metadata']        
         return {'workload_type': d}        
 
     def _list_view(self, func, request, workloadtypes):
