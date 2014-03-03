@@ -558,14 +558,16 @@ class MongoDBWorkflow(workflow.Workflow):
         # Details the flow details based on the
         # current topology, number of VMs etc
         def recurseflow(item):
+            
             if isinstance(item, task.Task):
-                return [{"name":str(item)}]
+                return [{"name":str(item), "type":'Task'}]
 
             flowdetails = {}
-            flowdetails["type"] = str(item)
-            flowdetails["items"] = []
+            flowdetails["name"] = str(item)
+            flowdetails["type"] = item.__class__.__name__
+            flowdetails["children"] = []
             for it in item:
-                flowdetails["items"].append(recurseflow(it))
+                flowdetails["children"].append(recurseflow(it))
 
             return flowdetails
 
@@ -576,7 +578,7 @@ class MongoDBWorkflow(workflow.Workflow):
         return getvmids(self._context, self._host, self._port, self._username, self._password)
 
     def execute(self):
-        result = engines.run(self._flow, engine_conf='parallel', store=store)
+        result = engines.run(self._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
 
 
 #test code
@@ -586,7 +588,8 @@ context = context.RequestContext("fc5e4f521b6a464ca401c456d59a3f61",
                                  is_admin = True,
                                  auth_token=c.client.auth_token)
 mwf = MongoDBWorkflow("testflow", context)
+import pdb;pdb.set_trace()
 print mwf.details()
 print mwf.discover()
 print mwf.topology()
-print mwf.execute()
+#print mwf.execute()
