@@ -151,7 +151,17 @@ class Workloads(BASE, WorkloadsBase):
     vault_service = Column(String(255))
     workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
     status = Column(String(255)) 
-    
+  
+class WorkloadMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the workload"""
+    __tablename__ = 'workload_metadata'
+    __table_args__ = (UniqueConstraint('workload_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    workload_id = Column(String(36), ForeignKey('workloads.id'), nullable=False)
+    workload = relationship(Workloads, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)        
 
 class WorkloadVMs(BASE, WorkloadsBase):
     """Represents vms of a workload"""
@@ -378,6 +388,7 @@ def register_models():
               WorkloadTypes,
               WorkloadTypeMetadata,
               Workloads,
+              WorkloadMetadata,
               WorkloadVMs,
               ScheduledJobs,
               Snapshots,

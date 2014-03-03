@@ -85,6 +85,20 @@ def upgrade(migrate_engine):
         Column('status', String(length=255)),
         mysql_engine='InnoDB'
     )
+    
+    workload_metadata = Table(
+        'workload_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('workload_id', String(length=255), ForeignKey('workloads.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('workload_id', 'key'),
+        mysql_engine='InnoDB'
+    )     
   
     workload_vms = Table(
         'workload_vms', meta,
@@ -317,6 +331,7 @@ def upgrade(migrate_engine):
               workload_types,
               workload_type_metadata,
               workloads,
+              workload_metadata,
               workload_vms,
               scheduled_jobs,
               snapshots,
@@ -346,6 +361,7 @@ def upgrade(migrate_engine):
                   "workload_types",
                   "workload_type_metadata",
                   "workloads",
+                  "workload_metadata",
                   "workload_vms",
                   "scheduled_jobs",
                   "snapshots",

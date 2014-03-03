@@ -100,7 +100,7 @@ class API(base.Base):
         return workloads
     
     def workload_create(self, context, name, description, instances,
-                        vault_service, workload_type_id,
+                        vault_service, workload_type_id, metadata,
                         hours=int(24), availability_zone=None):
         """
         Make the RPC call to create a workload.
@@ -121,6 +121,7 @@ class API(base.Base):
                    'status': 'creating',
                    'vault_service': vault_service,
                    'workload_type_id': workload_type_id,
+                   'metadata' : metadata,
                    'host': socket.gethostname(), }
 
         workload = self.db.workload_create(context, options)

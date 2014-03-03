@@ -184,7 +184,8 @@ class WorkloadMgrsController(wsgi.Controller):
 
         try:
             workload = body['workload']
-            instances = workload.get('instances')
+            instances = workload.get('instances', None)
+            metadata = workload.get('metadata', {})
         except KeyError:
             msg = _("Incorrect request body format")
             raise exc.HTTPBadRequest(explanation=msg)
@@ -202,7 +203,8 @@ class WorkloadMgrsController(wsgi.Controller):
                                                              description, 
                                                              instances,
                                                              vault_service,
-                                                             workload_type_id, 
+                                                             workload_type_id,
+                                                             metadata, 
                                                              hours)
             new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
         except exception.InvalidVolume as error:
