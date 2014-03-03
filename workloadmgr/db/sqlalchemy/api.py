@@ -297,53 +297,187 @@ def service_update(context, service_id, values):
         service_ref.save(session=session)
 
 
-###################
+#### Work load Types #################
+""" workload_type functions """
+def _set_metadata_for_workload_type(context, workload_type_ref, metadata,
+                              purge_metadata=False, session=None):
+    """
+    Create or update a set of workload_type_metadata for a given workload_type
+
+    :param context: Request context
+    :param workload_type_ref: An workload_type object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in workload_type_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'workload_type_id': workload_type_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _workload_type_metadata_update(context, metadata_ref, metadata_values,
+                                   session=session)
+        else:
+            workload_type_metadata_create(context, metadata_values, session=session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                workload_type_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def workload_type_metadata_create(context, values, session=None):
+    """Create an WorkloadTypeMetadata object"""
+    metadata_ref = models.WorkloadTypeMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _workload_type_metadata_update(context, metadata_ref, values, session=session)
+
+
+def _workload_type_metadata_update(context, metadata_ref, values, session=None):
+    """
+    Used internally by workload_type_metadata_create and workload_type_metadata_update
+    """
+    if session == None: 
+        session = get_session()
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def workload_type_metadata_delete(context, metadata_ref, session=None):
+    """
+    Used internally by workload_type_metadata_create and workload_type_metadata_update
+    """
+    if session == None: 
+        session = get_session()
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+def _workload_type_update(context, values, workload_type_id, purge_metadata=False):
+    
+    metadata = values.pop('metadata', {})
+    
+    session = get_session()
+    if workload_type_id:
+        workload_type_ref = workload_type_get(context, workload_type_id, session)
+    else:
+        workload_type_ref = models.WorkloadTypes()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())        
+    
+    workload_type_ref.update(values)
+    workload_type_ref.save(session)
+    
+    _set_metadata_for_workload_type(context, workload_type_ref, metadata, purge_metadata)  
+      
+    return workload_type_ref
+
+
+@require_context
+def workload_type_create(context, values):
+    return _workload_type_update(context, values, None, False)
+
+@require_context
+def workload_type_update(context, id, values, purge_metadata=False):
+    return _workload_type_update(context, values, id, purge_metadata)
+
+@require_context
+def workload_types_get(context, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.WorkloadTypes)\
+                       .options(sa_orm.joinedload(models.WorkloadTypes.metadata))
+
+        #TODO(gbasava): filter out deleted workload_types if context disallows it
+        workload_types = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.WorkloadTypesNotFound()
+    
+    return workload_types
+
+@require_context
+def workload_type_get(context, id, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.WorkloadTypes)\
+                       .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
+                       .filter_by(id=id)
+
+        #TODO(gbasava): filter out deleted workload_types if context disallows it
+        workload_types = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.WorkloadTypesWithIdNotFound(id = id)
+
+    return workload_types
+
+@require_context
+def workload_type_delete(context, id):
+    session = get_session()
+    with session.begin():
+        session.query(models.WorkloadTypes).\
+            filter_by(id=id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+###############################################
 
 
 @require_context
 def workload_get(context, workload_id, session=None):
-    result = model_query(context, models.WorkloadMgr,
+    result = model_query(context, models.Workloads,
                              session=session, project_only=True).\
         filter_by(id=workload_id).\
         first()
 
     if not result:
-        raise exception.WorkloadMgrNotFound(workload_id=workload_id)
+        raise exception.WorkloadsNotFound(workload_id=workload_id)
 
     return result
 
 @require_context
 def workload_show(context, workload_id, session=None):
-    result = model_query(context, models.WorkloadMgr,
+    result = model_query(context, models.Workloads,
                              session=session, project_only=True).\
         filter_by(id=workload_id).\
         first()
     if not result:
-        raise exception.WorkloadMgrNotFound(workload_id=workload_id)
+        raise exception.WorkloadsNotFound(workload_id=workload_id)
 
     return result
 
 @require_admin_context
 def workload_get_all(context):
-    return model_query(context, models.WorkloadMgr).all()
+    return model_query(context, models.Workloads).all()
 
 
 @require_admin_context
 def workload_get_all_by_host(context, host):
-    return model_query(context, models.WorkloadMgr).filter_by(host=host).all()
+    return model_query(context, models.Workloads).filter_by(host=host).all()
 
 
 @require_context
 def workload_get_all_by_project(context, project_id):
     authorize_project_context(context, project_id)
 
-    return model_query(context, models.WorkloadMgr).\
+    return model_query(context, models.Workloads).\
         filter_by(project_id=project_id).all()
 
 
 @require_context
 def workload_create(context, values):
-    workload = models.WorkloadMgr()
+    workload = models.Workloads()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
     workload.update(values)
@@ -355,12 +489,12 @@ def workload_create(context, values):
 def workload_update(context, workload_id, values):
     session = get_session()
     with session.begin():
-        workload = model_query(context, models.WorkloadMgr,
+        workload = model_query(context, models.Workloads,
                              session=session, read_deleted="yes").\
             filter_by(id=workload_id).first()
 
         if not workload:
-            raise exception.WorkloadMgrNotFound(
+            raise exception.WorkloadsNotFound(
                 _("No workload with id %(workload_id)s") % locals())
 
         workload.update(values)
@@ -372,7 +506,7 @@ def workload_update(context, workload_id, values):
 def workload_delete(context, workload_id):
     session = get_session()
     with session.begin():
-        session.query(models.WorkloadMgr).\
+        session.query(models.Workloads).\
             filter_by(id=workload_id).\
             update({'status': 'deleted',
                     'deleted': True,
@@ -381,7 +515,7 @@ def workload_delete(context, workload_id):
 
 @require_context
 def workload_vms_create(context, values):
-    workload_vm = models.WorkloadMgrVMs()
+    workload_vm = models.WorkloadVMs()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
     workload_vm.update(values)
@@ -390,13 +524,13 @@ def workload_vms_create(context, values):
 
 @require_context
 def workload_vms_get(context, workload_id, session=None):
-    result = model_query(context, models.WorkloadMgrVMs,
+    result = model_query(context, models.WorkloadVMs,
                              session=session).\
         filter_by(workload_id=workload_id).\
         all()
 
     if not result:
-        raise exception.VMsofWorkloadMgrNotFound(workload_id=workload_id)
+        raise exception.VMsofWorkloadsNotFound(workload_id=workload_id)
 
     return result
 
@@ -404,7 +538,7 @@ def workload_vms_get(context, workload_id, session=None):
 def workload_vms_delete(context, vm_id, workload_id):
     session = get_session()
     with session.begin():
-        session.query(models.WorkloadMgrVMs).\
+        session.query(models.WorkloadVMs).\
             filter_by(vm_id=vm_id).\
             filter_by(workload_id=workload_id).\
             update({'status': 'deleted',
@@ -458,7 +592,7 @@ def scheduledjob_update(context, scheduledjob):
             filter_by(id=scheduledjob.id).first()
 
         if not dbjob:
-            raise exception.WorkloadMgrNotFound(
+            raise exception.WorkloadsNotFound(
                 _("No workload with id %s"), scheduledjob.id)
 
         dbjob.update(values)

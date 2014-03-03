@@ -38,6 +38,34 @@ def upgrade(migrate_engine):
         mysql_engine='InnoDB'
     )
 
+    workload_types = Table(
+        'workload_types', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable=False),
+        Column('user_id', String(length=255)),
+        Column('project_id', String(length=255)),
+        Column('display_name', String(length=255)),
+        Column('display_description', String(length=255)),
+        Column('status', String(length=255)),
+        mysql_engine='InnoDB'
+    )
+    
+    workload_type_metadata = Table(
+        'workload_type_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('workload_type_id', String(length=255), ForeignKey('workload_types.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('workload_type_id', 'key'),
+        mysql_engine='InnoDB'
+    )     
        
     workloads = Table(
         'workloads', meta,
@@ -53,6 +81,7 @@ def upgrade(migrate_engine):
         Column('display_name', String(length=255)),
         Column('display_description', String(length=255)),
         Column('vault_service', String(length=255)),
+        Column('workload_type_id', String(length=255), ForeignKey('workload_types.id')),
         Column('status', String(length=255)),
         mysql_engine='InnoDB'
     )
@@ -285,6 +314,8 @@ def upgrade(migrate_engine):
     # create all tables
     # Take care on create order for those with FK dependencies
     tables = [services,
+              workload_types,
+              workload_type_metadata,
               workloads,
               workload_vms,
               scheduled_jobs,
@@ -312,6 +343,8 @@ def upgrade(migrate_engine):
 
     if migrate_engine.name == "mysql":
         tables = ["services",
+                  "workload_types",
+                  "workload_type_metadata",
                   "workloads",
                   "workload_vms",
                   "scheduled_jobs",

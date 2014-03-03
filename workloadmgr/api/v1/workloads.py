@@ -39,7 +39,7 @@ def make_workload(elem):
 
 
 
-class WorkloadMgrTemplate(xmlutil.TemplateBuilder):
+class WorkloadTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('workload', selector='workload')
         make_workload(root)
@@ -48,7 +48,7 @@ class WorkloadMgrTemplate(xmlutil.TemplateBuilder):
         return xmlutil.MasterTemplate(root, 1, nsmap={alias: namespace})
 
 
-class WorkloadMgrsTemplate(xmlutil.TemplateBuilder):
+class WorkloadsTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('workloads')
         elem = xmlutil.SubTemplateElement(root, 'workload', selector='workloads')
@@ -85,7 +85,7 @@ class WorkloadMgrsController(wsgi.Controller):
         self.workload_api = workloadAPI.API()
         super(WorkloadMgrsController, self).__init__()
 
-    @wsgi.serializers(xml=WorkloadMgrTemplate)
+    @wsgi.serializers(xml=WorkloadTemplate)
     def show(self, req, id):
         """Return data about the given workload."""
         LOG.debug(_('show called for member %s'), id)
@@ -143,12 +143,12 @@ class WorkloadMgrsController(wsgi.Controller):
         return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
         #return {'snapshot': _translate_snapshot_detail_view(context, dict(new_snapshot.iteritems()))}
     
-    @wsgi.serializers(xml=WorkloadMgrsTemplate)
+    @wsgi.serializers(xml=WorkloadsTemplate)
     def index(self, req):
         """Returns a summary list of workloads."""
         return self._get_workloads(req, is_detail=False)
 
-    @wsgi.serializers(xml=WorkloadMgrsTemplate)
+    @wsgi.serializers(xml=WorkloadsTemplate)
     def detail(self, req):
         """Returns a detailed list of workloads."""
         return self._get_workloads(req, is_detail=True)
@@ -172,7 +172,7 @@ class WorkloadMgrsController(wsgi.Controller):
         return workloads
 
     @wsgi.response(202)
-    @wsgi.serializers(xml=WorkloadMgrTemplate)
+    @wsgi.serializers(xml=WorkloadTemplate)
     @wsgi.deserializers(xml=CreateDeserializer)
     def create(self, req, body):
         """Create a new workload."""
@@ -191,14 +191,19 @@ class WorkloadMgrsController(wsgi.Controller):
         vault_service = workload.get('vault_service', None)
         name = workload.get('name', None)
         description = workload.get('description', None)
-        hours = workload.get('hours', 24);
+        workload_type_id = workload.get('workload_type_id', None)
+        hours = workload.get('hours', 24)
 
         LOG.audit(_("Creating workload"), locals(), context=context)
 
         try:
-            new_workload = self.workload_api.workload_create(context, name, 
-                                                             description, instances,
-                                                             vault_service, hours)
+            new_workload = self.workload_api.workload_create(context, 
+                                                             name, 
+                                                             description, 
+                                                             instances,
+                                                             vault_service,
+                                                             workload_type_id, 
+                                                             hours)
             new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
         except exception.InvalidVolume as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))

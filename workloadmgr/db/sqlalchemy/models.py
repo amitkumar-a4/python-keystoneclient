@@ -24,8 +24,8 @@ FLAGS = flags.FLAGS
 BASE = declarative_base()
 
 
-class WorkloadMgrBase(object):
-    """Base class for WorkloadMgr Models."""
+class WorkloadsBase(object):
+    """Base class for Workloads Models."""
     __table_args__ = {'mysql_engine': 'InnoDB'}
     __table_initialized__ = False
     created_at = Column(DateTime, default=timeutils.utcnow)
@@ -86,7 +86,7 @@ class WorkloadMgrBase(object):
         return local.iteritems()
 
 
-class Service(BASE, WorkloadMgrBase):
+class Service(BASE, WorkloadsBase):
     """Represents a running service on a host."""
 
     __tablename__ = 'services'
@@ -98,14 +98,41 @@ class Service(BASE, WorkloadMgrBase):
     disabled = Column(Boolean, default=False)
     availability_zone = Column(String(255), default='workloadmgr')
 
-class WorkloadMgrNode(BASE, WorkloadMgrBase):
+class WorkloadsNode(BASE, WorkloadsBase):
     """Represents a running workloadmgr service on a host."""
 
     __tablename__ = 'workloadmgr_nodes'
     id = Column(Integer, primary_key=True)
     service_id = Column(Integer, ForeignKey('services.id'), nullable=True)
+    
+class WorkloadTypes(BASE, WorkloadsBase):
+    """Types of workloads"""
+    __tablename__ = 'workload_types'
+    id = Column(String(36), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
+
+    display_name = Column(String(255))
+    display_description = Column(String(255))
+    status = Column(String(255))    
+    
+class WorkloadTypeMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the workload type"""
+    __tablename__ = 'workload_type_metadata'
+    __table_args__ = (UniqueConstraint('workload_type_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    workload_type_id = Column(String(36), ForeignKey('workload_types.id'), nullable=False)
+    workload_type = relationship(WorkloadTypes, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)    
                           
-class WorkloadMgr(BASE, WorkloadMgrBase):
+class Workloads(BASE, WorkloadsBase):
     """Represents a workload of set of VMs."""
     __tablename__ = 'workloads'
     id = Column(String(36), primary_key=True)
@@ -122,10 +149,11 @@ class WorkloadMgr(BASE, WorkloadMgrBase):
     display_name = Column(String(255))
     display_description = Column(String(255))
     vault_service = Column(String(255))
+    workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
     status = Column(String(255)) 
     
 
-class WorkloadMgrVMs(BASE, WorkloadMgrBase):
+class WorkloadVMs(BASE, WorkloadsBase):
     """Represents vms of a workload"""
     __tablename__ = str('workload_vms')
     id = Column(String(255), primary_key=True)
@@ -138,7 +166,7 @@ class WorkloadMgrVMs(BASE, WorkloadMgrBase):
     vm_name = Column(String(255))
     workload_id = Column(String(255), ForeignKey('workloads.id'))
 
-class ScheduledJobs(BASE, WorkloadMgrBase):
+class ScheduledJobs(BASE, WorkloadsBase):
     """Represents a scheduled job"""
     __tablename__ = str('scheduled_jobs')
     id = Column(String(255), primary_key=True)
@@ -155,7 +183,7 @@ class ScheduledJobs(BASE, WorkloadMgrBase):
     kwargs = Column(String(1024))
     coalesce = Column(Boolean)
 
-class Snapshots(BASE, WorkloadMgrBase):
+class Snapshots(BASE, WorkloadsBase):
     """Represents a workload snapshots."""
 
     __tablename__ = 'snapshots'
@@ -174,7 +202,7 @@ class Snapshots(BASE, WorkloadMgrBase):
     display_description = Column(String(255))    
     status =  Column(String(32), nullable=False)
 
-class SnapshotVMs(BASE, WorkloadMgrBase):
+class SnapshotVMs(BASE, WorkloadsBase):
     """Represents vms of a workload snapshot"""
     __tablename__ = str('snapshot_vms')
     id = Column(String(255), primary_key=True)
@@ -188,7 +216,7 @@ class SnapshotVMs(BASE, WorkloadMgrBase):
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     status =  Column(String(32), nullable=False)
     
-class VMRecentSnapshot(BASE, WorkloadMgrBase):
+class VMRecentSnapshot(BASE, WorkloadsBase):
     """Represents most recent successful snapshot of a VM"""
     __tablename__ = str('vm_recent_snapshot')
 
@@ -199,7 +227,7 @@ class VMRecentSnapshot(BASE, WorkloadMgrBase):
     
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     
-class SnapshotVMResources(BASE, WorkloadMgrBase):
+class SnapshotVMResources(BASE, WorkloadsBase):
     """Represents vm resources of a workload"""
     __tablename__ = str('snapshot_vm_resources')
     id = Column(String(255), primary_key=True)
@@ -215,7 +243,7 @@ class SnapshotVMResources(BASE, WorkloadMgrBase):
     resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot)    
     status =  Column(String(32), nullable=False)
     
-class SnapshotVMResourceMetadata(BASE, WorkloadMgrBase):
+class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the snapshot of a VM Resource"""
     __tablename__ = 'snapshot_vm_resource_metadata'
     __table_args__ = (UniqueConstraint('snapshot_vm_resource_id', 'key'), {})
@@ -226,7 +254,7 @@ class SnapshotVMResourceMetadata(BASE, WorkloadMgrBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)    
 
-class VMDiskResourceSnaps(BASE, WorkloadMgrBase):
+class VMDiskResourceSnaps(BASE, WorkloadsBase):
     """Represents the snapshot of a VM Resource"""
     __tablename__ = str('vm_disk_resource_snaps')
     id = Column(String(255), primary_key=True)
@@ -243,7 +271,7 @@ class VMDiskResourceSnaps(BASE, WorkloadMgrBase):
     vault_service_metadata = Column(String(4096))
     status = Column(String(32), nullable=False)    
     
-class VMDiskResourceSnapMetadata(BASE, WorkloadMgrBase):
+class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the snapshot of a VM Resource"""
     __tablename__ = 'vm_disk_resource_snap_metadata'
     __table_args__ = (UniqueConstraint('vm_disk_resource_snap_id', 'key'), {})
@@ -254,7 +282,7 @@ class VMDiskResourceSnapMetadata(BASE, WorkloadMgrBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
     
-class VMNetworkResourceSnaps(BASE, WorkloadMgrBase):
+class VMNetworkResourceSnaps(BASE, WorkloadsBase):
     """Represents the  snapshots of a VM Network Resource"""
     __tablename__ = str('vm_network_resource_snaps')
     vm_network_resource_snap_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'), primary_key=True)
@@ -266,7 +294,7 @@ class VMNetworkResourceSnaps(BASE, WorkloadMgrBase):
     pickle = Column(String(4096))
     status = Column(String(32), nullable=False)    
     
-class VMNetworkResourceSnapMetadata(BASE, WorkloadMgrBase):
+class VMNetworkResourceSnapMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the snapshot of a VM Network Resource"""
     __tablename__ = 'vm_network_resource_snap_metadata'
     __table_args__ = (UniqueConstraint('vm_network_resource_snap_id', 'key'), {})
@@ -277,7 +305,7 @@ class VMNetworkResourceSnapMetadata(BASE, WorkloadMgrBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)    
     
-class Restores(BASE, WorkloadMgrBase):
+class Restores(BASE, WorkloadsBase):
     """Represents a restore of a workload snapshots."""
 
     __tablename__ = 'restores'
@@ -296,7 +324,7 @@ class Restores(BASE, WorkloadMgrBase):
     display_description = Column(String(255))    
     status =  Column(String(32), nullable=False)
 
-class RestoredVMs(BASE, WorkloadMgrBase):
+class RestoredVMs(BASE, WorkloadsBase):
     """Represents restored vms of a workload snapshot"""
     __tablename__ = str('restored_vms')
     id = Column(String(255), primary_key=True)
@@ -310,7 +338,7 @@ class RestoredVMs(BASE, WorkloadMgrBase):
     restore_id = Column(String(255), ForeignKey('restores.id'))
     status =  Column(String(32), nullable=False)
     
-class RestoredVMResources(BASE, WorkloadMgrBase):
+class RestoredVMResources(BASE, WorkloadsBase):
     """Represents vm resources of a restored snapshot"""
     __tablename__ = str('restored_vm_resources')
     id = Column(String(255), primary_key=True)
@@ -325,7 +353,7 @@ class RestoredVMResources(BASE, WorkloadMgrBase):
     resource_name = Column(String(255)) #vda etc.
     status =  Column(String(32), nullable=False)
     
-class RestoredVMResourceMetadata(BASE, WorkloadMgrBase):
+class RestoredVMResourceMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the restore of a VM Resource"""
     __tablename__ = 'restored_vm_resource_metadata'
     __table_args__ = (UniqueConstraint('restored_vm_resource_id', 'key'), {})
@@ -347,11 +375,15 @@ def register_models():
     from sqlalchemy import create_engine
     models = (Service,
               VaultServices,
-              WorkloadMgr,
-              WorkloadMgrVMs,
+              WorkloadTypes,
+              WorkloadTypeMetadata,
+              Workloads,
+              WorkloadVMs,
               ScheduledJobs,
               Snapshots,
               SnapshotVMs,
+              SnapshotVMResources,
+              SnapshotVMResourceMetadata,
               VMDiskResourceSnaps,
               VMDiskResourceSnapMetadata,
               VMNetworkResourceSnaps,

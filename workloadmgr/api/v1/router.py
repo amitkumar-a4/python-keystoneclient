@@ -15,6 +15,7 @@ from workloadmgr.api.v1 import workloads
 from workloadmgr.api.v1 import snapshots
 from workloadmgr.api.v1 import restores
 from workloadmgr.api.v1 import testbubbles
+from workloadmgr.api.v1 import workloadtypes
 
 LOG = logging.getLogger(__name__)
 
@@ -33,14 +34,71 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='show')
 
         mapper.redirect("", "/")
-
+        ###################################################################################################
+        self.resources['workload_types'] = workloadtypes.create_resource(ext_mgr)
+        #detail list of workload_types
+        mapper.resource("workload_types_1", "workload_types",
+                        controller=self.resources['workload_types'],
+                        collection={'detail': 'GET'},
+                        member={'action': 'POST'})
         
+               
+        #get the list of workload_types
+        mapper.connect("workload_types_2",
+                       "/{project_id}/workload_types",
+                       controller=self.resources['workload_types'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the detail list of workload_types
+        mapper.connect("workload_types_3",
+                       "/{project_id}/workload_types/detail",
+                       controller=self.resources['workload_types'],
+                       action='detail',
+                       conditions={"method": ['GET']})  
+        
+        #get the specified workload_type
+        mapper.connect("workload_types_4",
+                       "/{project_id}/workload_types/{id}",
+                       controller=self.resources['workload_types'],
+                       action='show',
+                       conditions={"method": ['GET']})  
+        
+        #delete a workload_type
+        mapper.connect("delete_workload_types",
+                       "/{project_id}/workload_types/{id}",
+                       controller=self.resources['workload_types'],
+                       action='delete',
+                       conditions={"method": ['DELETE']})         
+                
+        ###################################################################################################
         self.resources['workloads'] = workloads.create_resource()
         #detail list of workloads
-        mapper.resource("workloads", "workloads",
+        mapper.resource("workloads_1", "workloads",
                         controller=self.resources['workloads'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
+        
+        #get the list of workloads
+        mapper.connect("workloads_2",
+                       "/{project_id}/workloads",
+                       controller=self.resources['workloads'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the detail list of workloads
+        mapper.connect("workloads_3",
+                       "/{project_id}/workloads/detail",
+                       controller=self.resources['workloads'],
+                       action='detail',
+                       conditions={"method": ['GET']})  
+        
+        #get the specified workload
+        mapper.connect("workloads_4",
+                       "/{project_id}/workloads/{id}",
+                       controller=self.resources['workloads'],
+                       action='show',
+                       conditions={"method": ['GET']})        
         
         #take a snapshot of the workload
         mapper.connect("workload_snapshot",
@@ -167,7 +225,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='detail',
                        conditions={"method": ['GET']})  
         
-        #get the specified snapshot
+        #get the specified testbubble
         mapper.connect("testbubble_4",
                        "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
                        controller=self.resources['testbubbles'],

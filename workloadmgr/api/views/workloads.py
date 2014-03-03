@@ -34,9 +34,9 @@ class ViewBuilder(common.ViewBuilder):
                 'id': workload['id'],
                 'name': workload['display_name'],
                 'description': workload['display_description'],
+                'workload_type_id': workload['workload_type_id'], 
                 'instances': workload['vm_ids'],
-                'links': self._get_links(request,
-                                         workload['id']),
+                'links': self._get_links(request, workload['id']),
             },
         }
 
@@ -61,6 +61,7 @@ class ViewBuilder(common.ViewBuilder):
                 'host': workload.get('host'),
                 'availability_zone': workload.get('availability_zone'),
                 'vault_service': workload.get('vault_service'),
+                'workload_type_id': workload.get('workload_type_id'),
                 'name': workload.get('display_name'),
                 'description': workload.get('display_description'),
                 'interval': workload.get('hours'),
