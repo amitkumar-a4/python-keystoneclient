@@ -101,7 +101,20 @@ def service_update(context, service_id, values):
     return IMPL.service_update(context, service_id, values)
 
 ###################
+def workload_type_create(context, values):
+    return IMPL.workload_type_create(context, values)
 
+def workload_type_update(context, id, values, purge_metadata=False):
+    return IMPL.workload_type_update(context, id, values, purge_metadata)
+
+def workload_types_get(context, session=None):
+    return IMPL.workload_types_get(context, session=None)
+
+def workload_type_get(context, id, session=None):
+    return IMPL.workload_type_get(context, id, session=None)
+
+def workload_type_delete(context, id):
+    return IMPL.workload_type_delete(context, id)
 
 def workload_get(context, workload_id):
     """Get a workload or raise if it does not exist."""

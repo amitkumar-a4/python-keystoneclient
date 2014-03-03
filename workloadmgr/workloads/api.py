@@ -29,6 +29,48 @@ class API(base.Base):
     def __init__(self, db_driver=None):
         self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
         super(API, self).__init__(db_driver)
+        
+    def workload_type_get(self, context, workload_type_id):
+        workload_type = self.db.workload_type_get(context, workload_type_id)
+        workload_type_dict = dict(workload_type.iteritems())
+        return workload_type_dict
+
+    def workload_type_show(self, context, workload_type_id):
+        workload_type = self.db.workload_type_get(context, workload_type_id)
+        workload_type_dict = dict(workload_type.iteritems())
+        return workload_type_dict
+    
+    def workload_type_get_all(self, context, search_opts={}):
+        workload_types = self.db.workload_types_get(context)
+        return workload_types
+    
+    def workload_type_create(self, context, name, description, metadata):
+        """
+        Create a workload_type. No RPC call is made
+        """
+        options = {'user_id': context.user_id,
+                   'project_id': context.project_id,
+                   'display_name': name,
+                   'display_description': description,
+                   'status': 'creating',
+                   'metadata': metadata,}
+
+        workload_type = self.db.workload_type_create(context, options)
+        return workload_type
+    
+    def workload_type_delete(self, context, workload_type_id):
+        """
+        Delete a workload_type. No RPC call is made
+        """
+        workload_type = self.workload_type_get(context, workload_type_id)
+        if workload_type['status'] not in ['available', 'error']:
+            msg = _('WorkloadType status must be available or error')
+            raise exception.InvalidWorkloadMgr(reason=msg)
+
+        #TODO(giri): check if this workload_type is referenced by other workloads
+                    
+        self.db.workload_type_delete(context, workload_type_id)
+        
 
     def workload_get(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
@@ -58,7 +100,8 @@ class API(base.Base):
         return workloads
     
     def workload_create(self, context, name, description, instances,
-               vault_service, hours=int(24), availability_zone=None):
+                        vault_service, workload_type_id,
+                        hours=int(24), availability_zone=None):
         """
         Make the RPC call to create a workload.
         """
@@ -77,6 +120,7 @@ class API(base.Base):
                    'hours':hours,
                    'status': 'creating',
                    'vault_service': vault_service,
+                   'workload_type_id': workload_type_id,
                    'host': socket.gethostname(), }
 
         workload = self.db.workload_create(context, options)

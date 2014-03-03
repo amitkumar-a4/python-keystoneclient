@@ -831,7 +831,6 @@ class Resource(wsgi.Application):
         # Run pre-processing extensions
         response, post = self.pre_process_extensions(extensions,
                                                      request, action_args)
-
         if not response:
             try:
                 with ResourceExceptionHandler():
