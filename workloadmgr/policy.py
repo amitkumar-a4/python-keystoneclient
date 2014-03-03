@@ -7,6 +7,7 @@
 
 from oslo.config import cfg
 
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import policy

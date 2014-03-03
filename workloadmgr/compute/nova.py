@@ -15,6 +15,7 @@ import os
 import imp
 import pkg_resources
 
+from workloadmgr.openstack.common.gettextutils import _
 from novaclient import exceptions as nova_exception
 from novaclient import service_catalog
 from novaclient import client
