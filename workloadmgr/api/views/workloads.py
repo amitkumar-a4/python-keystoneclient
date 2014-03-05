@@ -60,7 +60,6 @@ class ViewBuilder(common.ViewBuilder):
                 'project_id': workload.get('project_id'),
                 'host': workload.get('host'),
                 'availability_zone': workload.get('availability_zone'),
-                'vault_service': workload.get('vault_service'),
                 'workload_type_id': workload.get('workload_type_id'),
                 'name': workload.get('display_name'),
                 'description': workload.get('display_description'),

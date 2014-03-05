@@ -28,7 +28,6 @@ def make_workload(elem):
     elem.set('id')
     elem.set('status')
     elem.set('size')
-    elem.set('vault_service')
     elem.set('vm_id')
     elem.set('object_count')
     elem.set('availability_zone')
@@ -67,8 +66,7 @@ class CreateDeserializer(wsgi.MetadataXMLDeserializer):
         workload = {}
         workload_node = self.find_first_child_named(node, 'workload')
 
-        attributes = ['vault_service', 'display_name',
-                      'display_description', 'instance_id']
+        attributes = ['display_name', 'display_description']
 
         for attr in attributes:
             if workload_node.getAttribute(attr):
@@ -189,7 +187,6 @@ class WorkloadMgrsController(wsgi.Controller):
         except KeyError:
             msg = _("Incorrect request body format")
             raise exc.HTTPBadRequest(explanation=msg)
-        vault_service = workload.get('vault_service', None)
         name = workload.get('name', None)
         description = workload.get('description', None)
         workload_type_id = workload.get('workload_type_id', None)
@@ -202,7 +199,6 @@ class WorkloadMgrsController(wsgi.Controller):
                                                              name, 
                                                              description, 
                                                              instances,
-                                                             vault_service,
                                                              workload_type_id,
                                                              metadata, 
                                                              hours)

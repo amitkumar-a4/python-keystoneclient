@@ -1644,7 +1644,6 @@ class VMwareVMOps(object):
                                              'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
                                              'metadata': vm_disk_resource_snap_metadata,       
                                              'top':  True,
-                                             'vault_service_id' : '1',
                                              'status': 'creating'}     
                                                  
             vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values) 

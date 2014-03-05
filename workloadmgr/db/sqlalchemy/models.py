@@ -148,7 +148,6 @@ class Workloads(BASE, WorkloadsBase):
     availability_zone = Column(String(255))
     display_name = Column(String(255))
     display_description = Column(String(255))
-    vault_service = Column(String(255))
     workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
     status = Column(String(255)) 
   
@@ -276,7 +275,6 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     snapshot_vm_resource_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'))
     vm_disk_resource_snap_backing_id = Column(String(255), ForeignKey('vm_disk_resource_snaps.id'))
     top = Column(Boolean, default=False)
-    vault_service_id = Column(String(255))
     vault_service_url = Column(String(4096))    
     vault_service_metadata = Column(String(4096))
     status = Column(String(32), nullable=False)    

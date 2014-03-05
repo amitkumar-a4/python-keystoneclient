@@ -80,7 +80,6 @@ def upgrade(migrate_engine):
         Column('availability_zone', String(length=255)),
         Column('display_name', String(length=255)),
         Column('display_description', String(length=255)),
-        Column('vault_service', String(length=255)),
         Column('workload_type_id', String(length=255), ForeignKey('workload_types.id')),
         Column('status', String(length=255)),
         mysql_engine='InnoDB'
@@ -216,7 +215,6 @@ def upgrade(migrate_engine):
         Column('snapshot_vm_resource_id', String(length=255), ForeignKey('snapshot_vm_resources.id')),
         Column('vm_disk_resource_snap_backing_id', String(length=255), ForeignKey('vm_disk_resource_snaps.id')),
         Column('top', Boolean, default=False),
-        Column('vault_service_id', String(255)),
         Column('vault_service_url', String(4096)),    
         Column('vault_service_metadata', String(4096)),         
         Column('status', String(length=32), nullable=False),

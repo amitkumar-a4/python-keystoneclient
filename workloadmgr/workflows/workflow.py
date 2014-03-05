@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (C) 2012 Trilio Data, Inc. All Rights Reserved.
 #

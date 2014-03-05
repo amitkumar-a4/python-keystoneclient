@@ -35,15 +35,12 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
-
 from workloadmgr.vault import vault
+from workloadmgr.workflows import mongodbflow
 
 LOG = logging.getLogger(__name__)
 
 workloads_manager_opts = [
-    cfg.StrOpt('vault_service',
-               default='vault_service',
-               help='vault_service'),
 ]
 
 scheduler_config = {'standalone': 'True'}
@@ -65,7 +62,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     RPC_API_VERSION = '1.0'
 
     def __init__(self, service_name=None, *args, **kwargs):
-
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
         self.scheduler.start()
@@ -407,7 +403,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             LOG.info(_('create_workload started, %s:' %workload_id))
             self.db.workload_update(context, 
                                     workload_id, 
-                                    {'host': self.host,'service': FLAGS.vault_service})
+                                    {'host': self.host})
 
             schjob = self.scheduler.add_interval_job(context, workload_callback, hours=24,
                                      name=workload['display_name'], args=[workload_id], 
@@ -432,6 +428,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Take a snapshot of the workload
         """
         LOG.info(_('snapshot of workload started, snapshot_id %s' %snapshot_id))
+        
         try:
             compute_service = nova.API(production=True)
             instances = compute_service.get_servers(context,admin=True)  
@@ -452,7 +449,35 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshot.snapshot_type = 'full'
 
             self.db.snapshot_update(context, snapshot.id, {'snapshot_type': snapshot.snapshot_type})
+           
+            ############################################
+            """
+            context_dict = dict([('%s' % key, value)
+                              for (key, value) in context.to_dict().iteritems()])            
+            context_dict['conf'] =  None # RpcContext object looks for this during init
+    
+            store = {
+                "connection": FLAGS.sql_connection,     # taskflow persistence connection
+                "context_dict": context_dict,           # context dictionary
+                "snapshot_id": snapshot_id,             # snapshot_id
+                "workload_id": snapshot.workload_id,    # workload_id
                 
+                "host": "mongodb1",                     # one of the nodes of mongodb cluster
+                "port": 27017,                          # listening port of mongos service
+                "username": "ubuntu",                   # mongodb admin user
+                "password": "ubuntu",                   # mongodb admin password
+                "hostuser": "ubuntu",                   # username on the host for ssh operations
+                "hostpassword": "",                     # username on the host for ssh operations
+                "sshport" : 22,                         # ssh port that defaults to 22
+                "usesudo" : True,                       # use sudo when shutdown and restart of mongod instances
+            }
+            
+            workflow = mongodbflow.MongoDBWorkflow("testflow", store)
+            import pdb; pdb.set_trace()
+            workflow.execute() 
+            """
+            ###########################################
+            
             workload = self.db.workload_get(context, snapshot.workload_id)
             self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
             vault_service = vault.get_vault_service(context)
