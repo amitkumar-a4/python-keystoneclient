@@ -778,9 +778,8 @@ def snapshot_vm_create(context, values):
     return snapshot_vm
 
 @require_context
-def snapshot_vm_get(context, snapshot_id, session=None):
-    result = model_query(context, models.SnapshotVMs,
-                             session=session).\
+def snapshot_vms_get(context, snapshot_id, session=None):
+    result = model_query(context, models.SnapshotVMs,session=session).\
         filter_by(snapshot_id=snapshot_id).\
         all()
 
@@ -788,6 +787,23 @@ def snapshot_vm_get(context, snapshot_id, session=None):
         raise exception.VMsOfSnapshotNotFound(snapshot_id=snapshot_id)
 
     return result
+
+@require_context
+def snapshot_vm_get(context, vm_id, snapshot_id, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.SnapshotVMs)\
+                       .filter_by(vm_id=vm_id)\
+                       .filter_by(snapshot_id=snapshot_id)
+
+        #TODO(gbasava): filter out deleted snapshot vm if context disallows it
+        snapshot_vm = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.VMsOfSnapshotNotFound(snapshot_id = snapshot_id)
+    
+    return snapshot_vm            
 
 @require_context
 def snapshot_vm_update(context, snapshot_vm_id, values):

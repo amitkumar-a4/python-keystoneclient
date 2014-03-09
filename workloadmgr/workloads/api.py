@@ -199,7 +199,7 @@ class API(base.Base):
         snapshot_details  = dict(rv.iteritems())
         instances = []
         try:
-            vms = self.db.snapshot_vm_get(context, snapshot_id)
+            vms = self.db.snapshot_vms_get(context, snapshot_id)
             for vm in vms:
                 instances.append(dict(vm.iteritems()))
         except Exception as ex:
@@ -212,7 +212,7 @@ class API(base.Base):
         snapshot_details  = dict(rv.iteritems())
         instances = []
         try:
-            vms = self.db.snapshot_vm_get(context, snapshot_id)
+            vms = self.db.snapshot_vms_get(context, snapshot_id)
             for vm in vms:
                 instances.append(dict(vm.iteritems()))
         except Exception as ex:

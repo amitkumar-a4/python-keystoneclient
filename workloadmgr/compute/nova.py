@@ -349,7 +349,19 @@ class API(base.Base):
             return novaclient(context, self._production).servers.suspend(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
-            return         
+            return
+        
+    def pause(self, context, server):
+        """
+        Pause the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context, self._production).servers.pause(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return                   
 
     def resume(self, context, server):
         """

@@ -16,20 +16,27 @@ from taskflow import exceptions
 
 from workloadmgr.openstack.common import log as logging
 
+import vmtasks
+import workflow
+
+def InitFlow(store):
+    pass
+
 class ParallelWorkflow(workflow.Workflow):
     """"
-      Parallel workflow
+      Parallel Workflow
     """
 
-    def __init__(self, name):
-        super(Workflow, self).__init__(name)
-        self._topology = []
-        self._vms = []
+    def __init__(self, name, store):
+        super(ParallelWorkflow, self).__init__(name)
+        self._store = store
+        self._flow = InitFlow(self._store)
 
     def topology(self):
-        #
-        #
+        pass
 
     def details(self):
+        pass
 
     def discover(self):
+        pass

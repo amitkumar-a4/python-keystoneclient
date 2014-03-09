@@ -36,7 +36,9 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
-from workloadmgr.workflows import mongodbflow
+from workloadmgr.workflows.mongodbflow import MongoDBWorkflow
+from workloadmgr.workflows.serialworkflow import SerialWorkflow
+from workloadmgr.workflows.defaultworkflow import DefaultWorkflow
 
 LOG = logging.getLogger(__name__)
 
@@ -92,7 +94,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         subnets = []
         networks = []
         routers = []
-        for snapshot_vm in self.db.snapshot_vm_get(context, snapshot.id): 
+        for snapshot_vm in self.db.snapshot_vms_get(context, snapshot.id): 
             interfaces = compute_service.get_interfaces(context, snapshot_vm.vm_id)
             nics = []
             for interface in interfaces:
@@ -266,7 +268,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         network_service =  neutron.API(production=production)  
         snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot.id, snapshot.id)           
-        for snapshot_vm in self.db.snapshot_vm_get(context, snapshot.id):
+        for snapshot_vm in self.db.snapshot_vms_get(context, snapshot.id):
             snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)        
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type == 'nic':                
@@ -451,33 +453,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.snapshot_update(context, snapshot.id, {'snapshot_type': snapshot.snapshot_type})
            
             ############################################
-            """
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
-    
             store = {
-                "connection": FLAGS.sql_connection,     # taskflow persistence connection
-                "context_dict": context_dict,           # context dictionary
-                "snapshot_id": snapshot_id,             # snapshot_id
-                "workload_id": snapshot.workload_id,    # workload_id
-                
-                "host": "mongodb1",                     # one of the nodes of mongodb cluster
-                "port": 27017,                          # listening port of mongos service
-                "username": "ubuntu",                   # mongodb admin user
-                "password": "ubuntu",                   # mongodb admin password
-                "hostuser": "ubuntu",                   # username on the host for ssh operations
-                "hostpassword": "",                     # username on the host for ssh operations
-                "sshport" : 22,                         # ssh port that defaults to 22
-                "usesudo" : True,                       # use sudo when shutdown and restart of mongod instances
+                'connection': FLAGS.sql_connection,     # taskflow persistence connection
+                'context': context_dict,                # context dictionary
+                'snapshot': dict(snapshot.iteritems()), # snapshot dictionary
             }
-            
-            workflow = mongodbflow.MongoDBWorkflow("testflow", store)
-            import pdb; pdb.set_trace()
-            workflow.execute() 
-            """
+            workflow = DefaultWorkflow("DefaultWorkFlow", store)
+            self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
+            workflow.execute()
+            self.db.snapshot_update(context, snapshot.id, {'status': 'available'})
+            return 
+         
             ###########################################
-            
+            """
             workload = self.db.workload_get(context, snapshot.workload_id)
             self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
             vault_service = vault.get_vault_service(context)
@@ -535,6 +526,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self._snapshot_networks(context, True, snapshot)
             #TODO(gbasava): Check for the success (and update)                
             self.db.snapshot_update(context, snapshot.id, {'status': 'available'}) 
+            """
         
         except Exception as ex:
             msg = _("Error Creating Workload Snapshot %(snapshot_id)s with failure: %(exception)s")
@@ -576,7 +568,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             #restore each VM 
             #TODO(giri): If one VM restore fails, rollback the whole transaction
-            for vm in self.db.snapshot_vm_get(context, snapshot.id): 
+            for vm in self.db.snapshot_vms_get(context, snapshot.id): 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
                 restored_instance = virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
                 restored_vm_values = {'vm_id': restored_instance.id,

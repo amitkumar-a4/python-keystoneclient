@@ -685,30 +685,30 @@ class LibvirtDriver(driver.ComputeDriver):
         except Exception, ex:
             return        
         
-    def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+    def snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
         self._get_connection()
          
         if snapshot['snapshot_type'] == 'full' :
-            return self._snapshot_full(workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state)
+            return self._snapshot_full(workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state)
         else:
-            return self._snapshot_incremental(workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state)
+            return self._snapshot_incremental(workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state)
                   
 
-    def _snapshot_full(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+    def _snapshot_full(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         """
-        Prepares the backsup for the instance specified in snapshot_vm
+        snapshots the instance specified in vm_id
 
         :param workload: 
         :param snapshot: 
-        :param snapshot_vm: 
+        :param vm_id: 
         """
         # Todo - Check the min supported version of the QEMU and Libvirt 
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_PREPARE)    
             
-        instance_name = self.get_instance_name_by_uuid(snapshot_vm.vm_id)
-        snapshot_directory = os.path.join(CONF.instances_path, snapshot_vm.vm_id)
+        instance_name = self.get_instance_name_by_uuid(vm_id)
+        snapshot_directory = os.path.join(CONF.instances_path, vm_id)
         self.ensure_tree(hypervisor_hostname, snapshot_directory)
         snapshot_name = uuid.uuid4().hex
         snapshot_description = "snapshot_" + snapshot.id + "of_workload_" + workload.id
@@ -735,7 +735,7 @@ class LibvirtDriver(driver.ComputeDriver):
         for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():    
             src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': snapshot_vm.vm_id,
+                                           'vm_id': vm_id,
                                            'snapshot_id': snapshot.id,       
                                            'resource_type': 'disk',
                                            'resource_name':  dev,
@@ -782,7 +782,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
                                   'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                   'resource_name':  dev,
-                                  'snapshot_vm_id': snapshot_vm.vm_id,
+                                  'snapshot_vm_id': vm_id,
                                   'snapshot_id': snapshot.id}
                 vault_service_url = vault_service.store(vault_metadata, hypervisor_hostname, base_backing_path); 
                     
@@ -821,21 +821,21 @@ class LibvirtDriver(driver.ComputeDriver):
             update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
             update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
             
-    def _snapshot_incremental(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+    def _snapshot_incremental(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         """
-        Incremental snapshot of the instance specified in snapshot_vm
+        Incremental snapshot of the instance specified in vm_id
 
         :param workload: 
         :param snapshot: 
-        :param snapshot_vm: 
+        :param vm_id: 
         """
         #TODO(gbasava): Check if the previous full snapshot exists by calling vm_recent_snapshot_get
         
         if update_task_state:
             update_task_state(task_state=task_states.SNAPSHOT_START)    
             
-        instance_name = self.get_instance_name_by_uuid(snapshot_vm.vm_id)
-        snapshot_directory = os.path.join(CONF.instances_path, snapshot_vm.vm_id)
+        instance_name = self.get_instance_name_by_uuid(vm_id)
+        snapshot_directory = os.path.join(CONF.instances_path, vm_id)
         self.ensure_tree(hypervisor_hostname, snapshot_directory)
  
         snapshot_name = uuid.uuid4().hex
@@ -855,13 +855,13 @@ class LibvirtDriver(driver.ComputeDriver):
             update_task_state(task_state=task_states.SNAPSHOT_SNAPSHOT_CREATED)
         
         
-        vm_recent_snapshot = db.vm_recent_snapshot_get(context, snapshot_vm.vm_id)  
+        vm_recent_snapshot = db.vm_recent_snapshot_get(context, vm_id)  
          
                     
         for dev, snapshot_disk_path in dev_snapshot_disk_paths.iteritems():
             previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
                                                             context, 
-                                                            snapshot_vm.vm_id, 
+                                                            vm_id, 
                                                             vm_recent_snapshot.snapshot_id, 
                                                             dev)
             previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, 
@@ -870,7 +870,7 @@ class LibvirtDriver(driver.ComputeDriver):
             
             src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, snapshot_disk_path, basename=False)        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': snapshot_vm.vm_id,
+                                           'vm_id': vm_id,
                                            'snapshot_id': snapshot.id,       
                                            'resource_type': 'disk',
                                            'resource_name':  dev,
@@ -898,7 +898,7 @@ class LibvirtDriver(driver.ComputeDriver):
                               'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
                               'snapshot_vm_resource_id': snapshot_vm_resource.id,
                               'resource_name':  dev,
-                              'snapshot_vm_id': snapshot_vm.vm_id,
+                              'snapshot_vm_id': vm_id,
                               'snapshot_id': snapshot.id}
             vault_service_url = vault_service.store(vault_metadata, hypervisor_hostname, src_backing_path); 
                 
