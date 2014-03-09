@@ -1332,9 +1332,9 @@ def vm_network_resource_snaps_delete(context, snapshot_vm_network_resource_id):
                     'updated_at': literal_column('updated_at')})
             
 def get_metadata_value(metadata, key):
-    for metadata in metadata:
-        if metadata['key'] == key:
-            return metadata['value']
+    for kvpair in metadata:
+        if kvpair['key'] == key:
+            return kvpair['value']
     return None
 
 # Restore Functions

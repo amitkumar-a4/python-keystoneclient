@@ -182,8 +182,6 @@ class WorkloadMgrsController(wsgi.Controller):
 
         try:
             workload = body['workload']
-            instances = workload.get('instances', None)
-            metadata = workload.get('metadata', {})
         except KeyError:
             msg = _("Incorrect request body format")
             raise exc.HTTPBadRequest(explanation=msg)
@@ -191,6 +189,9 @@ class WorkloadMgrsController(wsgi.Controller):
         description = workload.get('description', None)
         workload_type_id = workload.get('workload_type_id', None)
         hours = workload.get('hours', 24)
+        instances = workload.get('instances', {})
+        metadata = workload.get('metadata', {})        
+        
 
         LOG.audit(_("Creating workload"), locals(), context=context)
 

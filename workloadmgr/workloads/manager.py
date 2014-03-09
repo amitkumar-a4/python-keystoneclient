@@ -36,9 +36,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
-from workloadmgr.workflows.mongodbflow import MongoDBWorkflow
-from workloadmgr.workflows.serialworkflow import SerialWorkflow
-from workloadmgr.workflows.defaultworkflow import DefaultWorkflow
+
 
 LOG = logging.getLogger(__name__)
 
@@ -56,6 +54,13 @@ def workload_callback(workload_id):
     """
     #TODO(gbasava): Implementation
 
+def get_class( kls ):
+    parts = kls.split('.')
+    module = ".".join(parts[:-1])
+    m = __import__( module )
+    for comp in parts[1:]:
+        m = getattr(m, comp)            
+    return m
 
 
 class WorkloadMgrManager(manager.SchedulerDependentManager):
@@ -461,7 +466,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'context': context_dict,                # context dictionary
                 'snapshot': dict(snapshot.iteritems()), # snapshot dictionary
             }
-            workflow = DefaultWorkflow("DefaultWorkFlow", store)
+            workload = self.db.workload_get(context, snapshot.workload_id)
+            for kvpair in workload.metadata:
+                store[kvpair['key']] = kvpair['value']
+                
+            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+            
+            #TODO(giri): implement a driver model for the workload types
+            workflow_class_name = ''
+            if(workload_type.display_name == 'DefaultWorkload'):
+                workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
+            elif(workload_type.display_name == 'SerialWorkload'):
+                workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
+            elif(workload_type.display_name == 'ParallelWorkload'):
+                workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
+            elif(workload_type.display_name == 'MongoDBWorkload'):
+                workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'                                
+ 
+            workflow_class = get_class(workflow_class_name)
+            workflow = workflow_class(workload_type.display_name, store)
             self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
             workflow.execute()
             self.db.snapshot_update(context, snapshot.id, {'status': 'available'})
