@@ -558,11 +558,40 @@ class MongoDBWorkflow(workflow.Workflow):
             c = MongoClient(hosts,
                         read_preference=ReadPreference.SECONDARY)
             status = c.admin.command('replSetGetStatus')
+            status["date"] = str(status["date"])
+            status["children"] = status.pop("members")
+            status["name"] = status.pop("set")
+            status["status"] = "OK:"+str(status["ok"])
+            status["input"] = []
+            status["input"].append([])
+            status["input"][0].append("myState")
+            status["input"][0].append(status["myState"])
+            for m in status["children"]:
+               m["optimeDate"] = str(m["optimeDate"])
+               m["status"] = m.pop("stateStr")
+               if ("lastHeartbeatRecv" in m):
+                   m["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
+               if ("lastHeartbeat" in m):
+                   m["lastHeartbeat"] = str(m["lastHeartbeat"])
+               if ("optime" in m):
+                   m["optime"] = str(m["optime"])
+               m["input"] = []
+               m["input"].append([])
+               m["input"].append([])
+               m["input"].append([])
+               if ("syncingTo" in m):
+                  m["input"][0].append("syncingTo")
+                  m["input"][0].append(m["syncingTo"])
+               m["input"][1].append("state")
+               m["input"][1].append(m["state"])
+               m["input"][2].append("health")
+               m["input"][2].append(m["health"])
             replicas.append(status)
 
         # Covert the topology into generic topology that can be 
         # returned as restful payload
-        return replicas
+        mongodb = {"name": "MongoDB", "children":replicas, "input":[]}
+        return mongodb
 
     def details(self):
         # Details the flow details based on the
@@ -593,15 +622,39 @@ class MongoDBWorkflow(workflow.Workflow):
 
 '''
 #test code
+import json
+
+#MongoDBWorkflow Requires the following inputs in store:
+
+store = {
+    'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8',
+    #'context': context_dict,                # context dictionary
+    #'snapshot': snapshot,                   # snapshot dictionary
+                    
+    # Instanceids will to be discovered automatically
+    'host': 'mongodb1',              # one of the nodes of mongodb cluster
+    'port': 27017,                   # listening port of mongos service
+    'username': 'ubuntu',            # mongodb admin user
+    'password': 'ubuntu',            # mongodb admin password
+    'hostuser': 'ubuntu',            # username on the host for ssh operations
+    'hostpassword': '',              # username on the host for ssh operations
+    'sshport' : 22,                  # ssh port that defaults to 22
+    'usesudo' : True,                # use sudo when shutdown and restart of mongod instances
+}
+
 c = nova.novaclient(None, production=True, admin=True);
-context = context.RequestContext('fc5e4f521b6a464ca401c456d59a3f61',
+context = context.RequestContext("fc5e4f521b6a464ca401c456d59a3f61",
                                  c.client.projectid,
                                  is_admin = True,
                                  auth_token=c.client.auth_token)
-mwf = MongoDBWorkflow('testflow', context, store)
+store["context"] = context.__dict__
+mwf = MongoDBWorkflow("testflow", context)
+print json.dumps(mwf.details())
+print json.dumps(mwf.discover())
+print json.dumps(mwf.topology())
+
 import pdb;pdb.set_trace()
-print mwf.details()
-print mwf.discover()
-print mwf.topology()
-#print mwf.execute()
+result = engines.load(mwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
+
+print mwf.execute()
 '''
