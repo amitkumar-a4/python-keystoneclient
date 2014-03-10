@@ -95,13 +95,13 @@ def InitFlow(store):
     # Unordered snapshot of VMs. 
     flow.add(vmtasks.UnorderedSnapshotVMs(store['instances']))
 
-    flow.add(vmtasks.UnorderedResumeVMs(store['instances']))
+    flow.add(vmtasks.UnorderedUnPauseVMs(store['instances']))
 
     # Now lazily copy the snapshots of VMs to tvault appliance
-    flow.add(vmtasks.UnorderedUploadSnapshots(store['instances']))
+    flow.add(vmtasks.UnorderedUploadSnapshot(store['instances']))
 
     # block commit any changes back to the snapshot
-    flow.add(vmtasks.UnorderedBlockCommit(store['instances']))
+    flow.add(vmtasks.UnorderedPostSnapshot(store['instances']))
 
     return flow
 

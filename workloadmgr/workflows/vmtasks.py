@@ -280,7 +280,31 @@ class PauseVM(task.Task):
     def revert(self, *args, **kwargs):
         # Resume VM
         print "Reverting PauseVM: " + kwargs['instance']['vm_id']
+        
+class UnPauseVM(task.Task):
 
+    def execute(self, context, instance):
+        # UnPause the VM
+        print "UnPauseVM: " + instance['vm_id']
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+        compute_service = nova.API(production=True)
+        compute_service.unpause(cntx, instance['vm_id'])
+
+    def revert(self, *args, **kwargs):
+        # Resume VM
+        print "Reverting UnPauseVM: " + kwargs['instance']['vm_id']        
+
+class SuspendVM(task.Task):
+
+    def execute(self, context, instance):
+        # Resume the VM
+        print "SuspendVM: " + instance['vm_id']
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+        compute_service = nova.API(production=True)
+        compute_service.suspend(cntx, instance['vm_id'])
+        
 class ResumeVM(task.Task):
 
     def execute(self, context, instance):
@@ -291,6 +315,12 @@ class ResumeVM(task.Task):
         compute_service = nova.API(production=True)
         compute_service.resume(cntx, instance['vm_id'])
 
+class PreSnapshot(task.Task):
+    def execute(self, context, instance, snapshot):
+        # pre processing of snapshot
+        print "PreSnapshot VM: " + instance['vm_id']
+        cntx = amqp.RpcContext.from_dict(context)
+        
 class SnapshotVM(task.Task):
 
     def execute(self, context, instance, snapshot):
@@ -312,16 +342,42 @@ class SnapshotVM(task.Task):
         
 class UploadSnapshot(task.Task):
 
-    def execute(self, context, instance):
+    def execute(self, context, instance, snapshot):
         # Upload snapshot data to swift endpoint
-        cntx = amqp.RpcContext.from_dict(context)
         print "UploadSnapshot VM: " + instance['vm_id']
-  
-class BlockCommit(task.Task):
-    def execute(self, context, instance):
-        # Upload snapshot data to swift endpoint
         cntx = amqp.RpcContext.from_dict(context)
-        print "BlockCommit VM: " + instance['vm_id']
+        db = WorkloadMgrDB().db
+        
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+        vault_service = vault.get_vault_service(cntx)
+        
+        if instance['hypervisor_type'] == 'QEMU': 
+            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        else: #TODO(giri) Check for all other hypervisor types
+            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+            
+        virtdriver.upload_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+        
+  
+class PostSnapshot(task.Task):
+    def execute(self, context, instance, snapshot):
+        # post processing of snapshot for ex. block commit
+        print "PostSnapshot VM: " + instance['vm_id']
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+        vault_service = vault.get_vault_service(cntx)
+        
+        if instance['hypervisor_type'] == 'QEMU': 
+            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        else: #TODO(giri) Check for all other hypervisor types
+            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+            
+        virtdriver.post_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+        db.vm_recent_snapshot_update(cntx, instance['vm_id'], {'snapshot_id': snapshot['id']})
 
 # Assume there is no ordering dependency between instances
 # pause each VM in parallel.
@@ -361,24 +417,31 @@ def LinearSnapshotVMs(instances):
 # Assume there is no ordering dependency between instances
 # resume each VM in parallel. Usually there should not be any
 # order in which vms should be resumed.
-def UnorderedResumeVMs(instances):
-    flow = uf.Flow("resumevmsuf")
+def UnorderedUnPauseVMs(instances):
+    flow = uf.Flow("unpausevmsuf")
     for index,item in enumerate(instances):
-        flow.add(ResumeVM("ResumeVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(UnPauseVM("UnpauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
     
     return flow
 
-def UnorderedUploadSnapshots(instances):
+def LinearUnPauseVMs(instances):
+    flow = lf.Flow("unpausevmslf")
+    for index,item in enumerate(instances):
+        flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+    
+    return flow
+
+def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("resumevmsuf")
     for index,item in enumerate(instances):
         flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
     
     return flow
 
-def UnorderedBlockCommit(instances):
+def UnorderedPostSnapshot(instances):
     flow = uf.Flow("resumevmsuf")
     for index,item in enumerate(instances):
-        flow.add(BlockCommit("BlockCommit_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
 
     return flow
 

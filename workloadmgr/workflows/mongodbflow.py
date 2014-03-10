@@ -471,7 +471,7 @@ def InitFlow(store):
     # common tasks library
     flow.add(vmtasks.UnorderedSnapshotVMs(store['instances']))
 
-    flow.add(vmtasks.UnorderedResumeVMs(store['instances']))
+    flow.add(vmtasks.UnorderedUnPauseVMs(store['instances']))
 
     # Restart the config servers so metadata changes can happen
     flow.add(ResumeConfigServer('ResumeConfigServer'))
@@ -484,10 +484,10 @@ def InitFlow(store):
     flow.add(EnableProfiling('EnableProfiling'))
 
     # Now lazily copy the snapshots of VMs to tvault appliance
-    flow.add(vmtasks.UnorderedUploadSnapshots(store['instances']))
+    flow.add(vmtasks.UnorderedUploadSnapshot(store['instances']))
 
     # block commit any changes back to the snapshot
-    flow.add(vmtasks.UnorderedBlockCommit(store['instances']))
+    flow.add(vmtasks.UnorderedPostSnapshot(store['instances']))
 
     return flow
 

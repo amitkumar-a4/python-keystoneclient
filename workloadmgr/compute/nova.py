@@ -351,6 +351,18 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception 
             return
         
+    def resume(self, context, server):
+        """
+        Resume the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """   
+    
+        try:
+            return novaclient(context, self._production).servers.resume(server=server) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return            
+        
     def pause(self, context, server):
         """
         Pause the server given the id
@@ -363,17 +375,17 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception 
             return                   
 
-    def resume(self, context, server):
+    def unpause(self, context, server):
         """
-        Resume the server given the id
+        UnPause the server given the id
         :param server: The :class:`Server` (or its ID) to query.
         """   
     
         try:
-            return novaclient(context, self._production).servers.resume(server=server) 
+            return novaclient(context, self._production).servers.unpause(server=server) 
         except Exception:
             #TODO(gbasava): Handle the exception 
-            return    
+            return
         
     def delete(self, context, server):
         """
