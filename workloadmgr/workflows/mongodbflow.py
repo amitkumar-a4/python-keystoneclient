@@ -200,7 +200,7 @@ class ShutdownConfigServer(task.Task):
     #'ok' : 1
     #}
     #'''
-    def execute(self, host, port, username, password, hostuser, hostpassword, sshport=22, usesudo=False):
+    def execute(self, host, port, username, password, hostusername, hostpassword, sshport=22, usesudo=False):
         # Get the list of config servers 
         # shutdown one of them
         self.client = connect_server(host, port, username, password)
@@ -223,7 +223,7 @@ class ShutdownConfigServer(task.Task):
             client = paramiko.SSHClient()
             client.load_system_host_keys()
             client.set_missing_host_key_policy(paramiko.WarningPolicy)
-            client.connect(cfghost, port=sshport, username=hostuser, password=hostpassword)
+            client.connect(cfghost, port=sshport, username=hostusername, password=hostpassword)
             
             stdin, stdout, stderr = client.exec_command(command)
             print stdout.read(),
@@ -250,7 +250,7 @@ class ShutdownConfigServer(task.Task):
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
                     client.set_missing_host_key_policy(paramiko.WarningPolicy)
-                    client.connect(cfghost, port=port, username=kwargs['hostuser'], password=kwargs['hostpassword'])
+                    client.connect(cfghost, port=port, username=kwargs['hostusername'], password=kwargs['hostpassword'])
                 
                     stdin, stdout, stderr = client.exec_command(command)
                     print stdout.read(),
@@ -261,7 +261,7 @@ class ShutdownConfigServer(task.Task):
 
 class ResumeConfigServer(task.Task):
 
-    def execute(self, cfgsrv, cfgsrvcmdline, hostuser, hostpassword, sshport=22, usesudo=False):
+    def execute(self, cfgsrv, cfgsrvcmdline, hostusername, hostpassword, sshport=22, usesudo=False):
         # Make sure all config servers are resumed
         cfghost = cfgsrv.split(':')[0]
         port = 22
@@ -277,7 +277,7 @@ class ResumeConfigServer(task.Task):
             client = paramiko.SSHClient()
             client.load_system_host_keys()
             client.set_missing_host_key_policy(paramiko.WarningPolicy)
-            client.connect(cfghost, port=sshport, username=hostuser, password=hostpassword)
+            client.connect(cfghost, port=sshport, username=hostusername, password=hostpassword)
     
             stdin, stdout, stderr = client.exec_command(command)
             print stdout.read(),
@@ -343,6 +343,14 @@ def secondaryhosts_to_backup(cntx, host, port, username, password):
 
     return hosts_to_backup
 
+def _append_unique(list, new_item, key):
+    for item in list:
+       if (item[key] == new_item[key]):
+           return
+
+    list.append(new_item)
+    return
+
 def get_vms(cntx, host, port, username, password):
     #
     # Creating connection to mongos server
@@ -404,15 +412,14 @@ def get_vms(cntx, host, port, username, password):
                     for hypervisor in hypervisors:
                         if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:host']:
                             hypervisor_hostname = hypervisor.hypervisor_hostname
-                            hypervisor_type = hypervisor_type
+                            hypervisor_type = hypervisor.hypervisor_type
                             break
                    
-                    vm = {'vm_id' : instance.id,
+                    _append_unique(vms, {'vm_id' : instance.id,
                           'vm_name' : instance.name,
                           'vm_flavor_id' : instance.flavor['id'],
                           'hypervisor_hostname' : hypervisor_hostname,
-                          'hypervisor_type' :  hypervisor_type}
-                    vms.append(vm)
+                          'hypervisor_type' :  hypervisor_type}, "vm_id")
     return vms
 
 """
@@ -427,7 +434,7 @@ MongoDBWorkflow Requires the following inputs in store:
     'port': 27017,                   # listening port of mongos service
     'username': 'ubuntu',            # mongodb admin user
     'password': 'ubuntu',            # mongodb admin password
-    'hostuser': 'ubuntu',            # username on the host for ssh operations
+    'hostusername': 'ubuntu',            # username on the host for ssh operations
     'hostpassword': '',              # username on the host for ssh operations
     'sshport' : 22,                  # ssh port that defaults to 22
     'usesudo' : True,                # use sudo when shutdown and restart of mongod instances
@@ -623,7 +630,7 @@ store = {
     'port': 27017,                   # listening port of mongos service
     'username': 'ubuntu',            # mongodb admin user
     'password': 'ubuntu',            # mongodb admin password
-    'hostuser': 'ubuntu',            # username on the host for ssh operations
+    'hostusername': 'ubuntu',            # username on the host for ssh operations
     'hostpassword': '',              # username on the host for ssh operations
     'sshport' : 22,                  # ssh port that defaults to 22
     'usesudo' : True,                # use sudo when shutdown and restart of mongod instances
