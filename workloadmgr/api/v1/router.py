@@ -69,7 +69,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workload_types/{id}",
                        controller=self.resources['workload_types'],
                        action='delete',
-                       conditions={"method": ['DELETE']})         
+                       conditions={"method": ['DELETE']})    
+        
+        #discover workload_type instances
+        mapper.connect("workload_types_discover_instances",
+                       "/{project_id}/workload_types/{id}/discover_instances",
+                       controller=self.resources['workload_types'],
+                       action='discover_instances',
+                       conditions={"method": ['POST']})
                 
         ###################################################################################################
         self.resources['workloads'] = workloads.create_resource()
@@ -106,6 +113,20 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='snapshot',
                        conditions={"method": ['POST']})
+        
+        #get the workflow of a workload
+        mapper.connect("workloads_workflow",
+                       "/{project_id}/workloads/{id}/workflow",
+                       controller=self.resources['workloads'],
+                       action='get_workflow',
+                       conditions={"method": ['GET']})   
+        
+        #get the topology of a workload
+        mapper.connect("workloads_topology",
+                       "/{project_id}/workloads/{id}/topology",
+                       controller=self.resources['workloads'],
+                       action='get_topology',
+                       conditions={"method": ['GET']}) 
         
         ###################################################################################################        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)

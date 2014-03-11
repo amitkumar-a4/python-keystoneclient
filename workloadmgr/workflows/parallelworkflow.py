@@ -19,8 +19,6 @@ from workloadmgr.openstack.common import log as logging
 import vmtasks
 import workflow
 
-def InitFlow(store):
-    pass
 
 class ParallelWorkflow(workflow.Workflow):
     """"
@@ -30,13 +28,36 @@ class ParallelWorkflow(workflow.Workflow):
     def __init__(self, name, store):
         super(ParallelWorkflow, self).__init__(name)
         self._store = store
-        self._flow = InitFlow(self._store)
+    
+    def initflow(self):
+        self._flow = lf.Flow('ParallelFlow')
 
     def topology(self):
-        pass
+        return dict(topology={})
 
     def details(self):
-        pass
+        # Details the flow details based on the
+        # current topology, number of VMs etc
+        def recurseflow(item):
+            if isinstance(item, task.Task):
+                return [{'name':str(item), 'type':'Task'}]
+
+            flowdetails = {}
+            flowdetails['name'] = str(item)
+            flowdetails['type'] = item.__class__.__name__
+            flowdetails['children'] = []
+            for it in item:
+                flowdetails['children'].append(recurseflow(it))
+
+            return flowdetails
+
+        workflow = recurseflow(self._flow)
+        return dict(workflow=workflow)
 
     def discover(self):
-        pass
+        return dict(instances=[])
+    
+    def execute(self):
+        vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
+        result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
+    

@@ -212,6 +212,29 @@ class WorkloadMgrsController(wsgi.Controller):
         retval = self._view_builder.summary(req, new_workload_dict)
         return retval
 
+    def get_workflow(self, req, id):
+        """Return workflow details of a given workload."""
+        LOG.debug(_('get_workflow called for member %s'), id)
+        context = req.environ['workloadmgr.context']
+
+        try:
+            workload_workflow = self.workload_api.workload_get_workflow(context, workload_id=id)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+
+        return workload_workflow
+    
+    def get_topology(self, req, id):
+        """Return topology of a given workload."""
+        LOG.debug(_('get_topology called for member %s'), id)
+        context = req.environ['workloadmgr.context']
+
+        try:
+            workload_topology = self.workload_api.workload_get_topology(context, workload_id=id)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+
+        return workload_topology    
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

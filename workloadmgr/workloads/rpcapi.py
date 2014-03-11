@@ -31,7 +31,34 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         super(WorkloadMgrAPI, self).__init__(
             topic=FLAGS.workloads_topic,
             default_version=self.BASE_RPC_API_VERSION)
+        
+    def workload_type_discover_instances(self, ctxt, host, workload_type_id, metadata):
+        LOG.debug("workload_type_discover_instances in rpcapi workload_type_id %s", workload_type_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        instances = self.call(ctxt,
+                              self.make_msg('workload_type_discover_instances', workload_type_id=workload_type_id, metadata=metadata),
+                              topic=topic)
+        return instances
 
+    def workload_get_topology(self, ctxt, host, workload_id):
+        LOG.debug("workload_get_topology in rpcapi workload_id %s", workload_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        topology = self.call(ctxt,
+                              self.make_msg('workload_get_topology', workload_id=workload_id),
+                              topic=topic)
+        return topology
+        
+    def workload_get_workflow_details(self, ctxt, host, workload_id):
+        LOG.debug("workload_get_workflow_details in rpcapi workload_id %s", workload_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        workflow = self.call(ctxt,
+                              self.make_msg('workload_get_workflow_details', workload_id=workload_id),
+                              topic=topic)
+        return workflow      
+                  
     def workload_create(self, ctxt, host, workload_id):
         LOG.debug("create_workload in rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)

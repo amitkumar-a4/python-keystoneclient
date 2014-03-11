@@ -51,25 +51,7 @@ class WorkloadMgrDB(base.Base):
     def __init__(self, host=None, db_driver=None):
         super(WorkloadMgrDB, self).__init__(db_driver)
         
-        
-class CreateVMSnapshotDBEntries(task.Task):
-
-    def execute(self, context, instances, snapshot):
-        #create an entry for the VM in the workloadmgr database
-        cntx = amqp.RpcContext.from_dict(context)
-        db = WorkloadMgrDB().db
-        for instance in instances:
-            options = {'vm_id': instance['vm_id'],
-                       'vm_name': instance['vm_name'],
-                       'snapshot_id': snapshot['id'],
-                       'snapshot_type': snapshot['snapshot_type'],
-                       'status': 'creating',}
-            snapshot_vm = db.snapshot_vm_create(cntx, options)
-            
-    def revert(self, *args, **kwargs):
-        # Resume VM
-        print "Reverting CreateVMSnapshotDBEntries"                    
-        
+       
 class SnapshotVMNetworks(task.Task):
 
     def _append_unique(self, list, new_item):
@@ -445,5 +427,15 @@ def UnorderedPostSnapshot(instances):
 
     return flow
 
-
+def CreateVMSnapshotDBEntries(context, instances, snapshot):
+    #create an entry for the VM in the workloadmgr database
+    cntx = amqp.RpcContext.from_dict(context)
+    db = WorkloadMgrDB().db
+    for instance in instances:
+        options = {'vm_id': instance['vm_id'],
+                   'vm_name': instance['vm_name'],
+                   'snapshot_id': snapshot['id'],
+                   'snapshot_type': snapshot['snapshot_type'],
+                   'status': 'creating',}
+        snapshot_vm = db.snapshot_vm_create(cntx, options)
 

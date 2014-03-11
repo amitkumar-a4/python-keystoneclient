@@ -158,5 +158,26 @@ class WorkloadTypesController(wsgi.Controller):
         retval = self._view_builder.summary(req, new_workload_type_dict)
         return retval    
     
+    def discover_instances(self, req, id, body):
+        """discover_instances of a workload_type using the metadata"""
+        LOG.debug(_('discover_instances of a workload_type %s'), id)
+
+        context = req.environ['workloadmgr.context']
+        try:
+            metadata = body['metadata']
+        except KeyError:
+            msg = _("Incorrect request body format. Missing metadata")
+            raise exc.HTTPBadRequest(explanation=msg)
+
+        LOG.audit(_("discover_instances of a workload_type %s"), locals(), context=context)
+
+        retval = None
+        try:
+            instances = self.workload_api.workload_type_discover_instances(context, id, metadata)
+        except exception:
+            pass
+ 
+        return instances                
+    
 def create_resource(ext_mgr):
     return wsgi.Resource(WorkloadTypesController(ext_mgr))

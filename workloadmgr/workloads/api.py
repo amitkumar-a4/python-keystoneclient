@@ -79,6 +79,14 @@ class API(base.Base):
                     
         self.db.workload_type_delete(context, workload_type_id)
         
+    def workload_type_discover_instances(self, context, workload_type_id, metadata):
+        """
+        Discover Instances of a workload_type. RPC call is made
+        """
+        return self.workloads_rpcapi.workload_type_discover_instances(context,
+                                                                      socket.gethostname(),
+                                                                      workload_type_id,
+                                                                      metadata) 
 
     def workload_get(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
@@ -173,6 +181,22 @@ class API(base.Base):
             raise exception.InvalidWorkloadMgr(reason=msg)
                     
         self.db.workload_delete(context, workload_id)
+        
+    def workload_get_workflow(self, context, workload_id):
+        """
+        Get the workflow of the workload. RPC call is made
+        """
+        return self.workloads_rpcapi.workload_get_workflow_details(context,
+                                                                   socket.gethostname(),
+                                                                   workload_id)    
+    def workload_get_topology(self, context, workload_id):
+        """
+        Get the topology of the workload. RPC call is made
+        """
+        return self.workloads_rpcapi.workload_get_topology(context,
+                                                           socket.gethostname(),
+                                                           workload_id)                
+             
 
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """

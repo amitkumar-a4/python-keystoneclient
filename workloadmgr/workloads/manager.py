@@ -54,15 +54,6 @@ def workload_callback(workload_id):
     """
     #TODO(gbasava): Implementation
 
-def get_class( kls ):
-    parts = kls.split('.')
-    module = ".".join(parts[:-1])
-    m = __import__( module )
-    for comp in parts[1:]:
-        m = getattr(m, comp)            
-    return m
-
-
 class WorkloadMgrManager(manager.SchedulerDependentManager):
     """Manages WorkloadMgr """
 
@@ -83,6 +74,30 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         LOG.info(_("Cleaning up incomplete operations"))
         
+    def _get_workflow_class(self, context, workload_type_id):
+        #TODO(giri): implement a driver model for the workload types
+        workload_type = self.db.workload_type_get(context, workload_type_id)
+        workflow_class_name = ''
+        if(workload_type.display_name == 'Default'):
+            workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
+        elif(workload_type.display_name == 'Serial'):
+            workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
+        elif(workload_type.display_name == 'Parallel'):
+            workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
+        elif(workload_type.display_name == 'MongoDB'):
+            workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
+        elif(workload_type.display_name == 'Hadoop'):
+            workflow_class_name = 'workloadmgr.workflows.mongodbflow.HadoopWorkflow' 
+        elif(workload_type.display_name == 'Cassandra'):
+            workflow_class_name = 'workloadmgr.workflows.mongodbflow.CassandraWorkflow'             
+                          
+        parts = workflow_class_name.split('.')
+        module = ".".join(parts[:-1])
+        workflow_class = __import__( module )
+        for comp in parts[1:]:
+            workflow_class = getattr(workflow_class, comp)            
+        return workflow_class        
+        
     def _append_unique(self, list, new_item):
         for item in list:
             if item['id'] == new_item['id']:
@@ -90,6 +105,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         list.append(new_item)
         
        
+
     def _get_metadata_value(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
@@ -239,6 +255,66 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     except Exception as err:
                         pass
         
+    def workload_type_discover_instances(self, context, workload_type_id, metadata):
+        """
+        Discover instances of a workload_type
+        """        
+        context_dict = dict([('%s' % key, value)
+                          for (key, value) in context.to_dict().iteritems()])            
+        context_dict['conf'] =  None # RpcContext object looks for this during init
+        store = {
+            'context': context_dict,                # context dictionary
+        }
+
+        for key in metadata:
+            store[key] = metadata[key]
+        
+        workflow_class = self._get_workflow_class(context, workload_type_id)
+        workflow = workflow_class("discover_instances", store)
+        instances = workflow.discover()
+        return instances   
+
+    def workload_get_topology(self, context, workload_id):
+        """
+        Return workload topology
+        """        
+        context_dict = dict([('%s' % key, value)
+                          for (key, value) in context.to_dict().iteritems()])            
+        context_dict['conf'] =  None # RpcContext object looks for this during init
+        store = {
+                'context': context_dict,                # context dictionary
+                'workload_id': workload_id,             # workload_id
+        }
+        workload = self.db.workload_get(context, workload_id)
+        for kvpair in workload.metadata:
+            store[kvpair['key']] = kvpair['value']
+            
+        workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+        workflow = workflow_class("workload_topology", store)
+        topology = workflow.topology()
+        return topology
+    
+    def workload_get_workflow_details(self, context, workload_id):
+        """
+        Return workload topology
+        """        
+        context_dict = dict([('%s' % key, value)
+                          for (key, value) in context.to_dict().iteritems()])            
+        context_dict['conf'] =  None # RpcContext object looks for this during init
+        store = {
+                'context': context_dict,                # context dictionary
+                'workload_id': workload_id,             # workload_id
+        }
+        workload = self.db.workload_get(context, workload_id)
+        for kvpair in workload.metadata:
+            store[kvpair['key']] = kvpair['value']
+            
+        workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+        workflow = workflow_class("workload_workflow_details", store)
+        workflow.initflow()
+        details = workflow.details()
+        return details
+        
     def workload_create(self, context, workload_id):
         """
         Create a scheduled workload in the workload scheduler
@@ -297,7 +373,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             self.db.snapshot_update(context, snapshot.id, {'snapshot_type': snapshot.snapshot_type})
            
-            ############################################
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
@@ -305,26 +380,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
                 'snapshot': dict(snapshot.iteritems()), # snapshot dictionary
+                'workload_id': snapshot.workload_id,    # workload_id                
             }
             workload = self.db.workload_get(context, snapshot.workload_id)
             for kvpair in workload.metadata:
                 store[kvpair['key']] = kvpair['value']
                 
-            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
-            
-            #TODO(giri): implement a driver model for the workload types
-            workflow_class_name = ''
-            if(workload_type.display_name == 'DefaultWorkload'):
-                workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
-            elif(workload_type.display_name == 'SerialWorkload'):
-                workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
-            elif(workload_type.display_name == 'ParallelWorkload'):
-                workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
-            elif(workload_type.display_name == 'MongoDBWorkload'):
-                workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'                                
- 
-            workflow_class = get_class(workflow_class_name)
-            workflow = workflow_class(workload_type.display_name, store)
+            workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+            workflow = workflow_class(workload.display_name, store)
+            workflow.initflow()
             self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
             workflow.execute()
             self.db.snapshot_update(context, snapshot.id, {'status': 'available'})

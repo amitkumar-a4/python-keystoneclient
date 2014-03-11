@@ -198,8 +198,8 @@ class ShutdownConfigServer(task.Task):
         #'shard0002' : 'node4:27021'
     #},
     #'ok' : 1
-   #}
-   #'''
+    #}
+    #'''
     def execute(self, host, port, username, password, hostuser, hostpassword, sshport=22, usesudo=False):
         # Get the list of config servers 
         # shutdown one of them
@@ -415,83 +415,7 @@ def get_vms(cntx, host, port, username, password):
                     vms.append(vm)
     return vms
 
-#
-# MongoDB flow is an directed acyclic flow. 
-# :param host - One of the mongo db node in the cluster that has mongos 
-#               service running and will be used to discover the mongo db
-#               shards, their replicas etc
-# : port - port at which mongos service is running
-# : usename/password - username and password to authenticate to the database
-#
-                 
-def InitFlow(store):
-    
-    cntx = amqp.RpcContext.from_dict(store['context'])
-    host = store['host']
-    port = store['port']
-    username = store['username']
-    password = store['password']
-    
-    
-    store['instances'] =  get_vms(cntx, host, port, username, password)
-    hosts_to_backup = secondaryhosts_to_backup(cntx, host, port, username, password)
-    for index,item in enumerate(store['instances']):
-        store['instance_'+str(index)] = item
-    for index, item in enumerate(hosts_to_backup):
-        store['secondary_'+str(index)] = item
-    
-    flow = lf.Flow('mongodbwf')
-    
-    #create an entry for the VM in the workloadmgr database
-    flow.add(vmtasks.CreateVMSnapshotDBEntries("CreateVMSnapshotDBEntries_" + store['snapshot']['id']))
-    
-    #create a network snapshot
-    flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks" + store['snapshot']['id']))
-    
-    #snapshot flavors of VMs
-    flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors" + store['snapshot']['id']))    
-
-    # Add disable profile task. Stopping balancer fails if profile process
-    # is running
-    flow.add(DisableProfiling('DisableProfiling', provides='proflevel'))
-
-    # This will be a flow that needs to be added to mongo db flow.
-    # This is a flow that pauses all related VMs in unordered pattern
-    flow.add(PauseDBInstances(hosts_to_backup))
-
-    flow.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
-
-    # This is an unordered pausing of VMs. This flow is created in
-    # common tasks library. This routine takes instance ids from 
-    # openstack. Workload manager should provide the list of 
-    # instance ids
-    flow.add(vmtasks.UnorderedPauseVMs(store['instances']))
-
-    # This is again unorder snapshot of VMs. This flow is implemented in
-    # common tasks library
-    flow.add(vmtasks.UnorderedSnapshotVMs(store['instances']))
-
-    flow.add(vmtasks.UnorderedUnPauseVMs(store['instances']))
-
-    # Restart the config servers so metadata changes can happen
-    flow.add(ResumeConfigServer('ResumeConfigServer'))
-
-    # unlock all locekd replicas so it starts receiving all updates from primary and
-    # will eventually get into sync with primary
-    flow.add(ResumeDBInstances(hosts_to_backup))
-
-    # enable profiling to the level before the flow started
-    flow.add(EnableProfiling('EnableProfiling'))
-
-    # Now lazily copy the snapshots of VMs to tvault appliance
-    flow.add(vmtasks.UnorderedUploadSnapshot(store['instances']))
-
-    # block commit any changes back to the snapshot
-    flow.add(vmtasks.UnorderedPostSnapshot(store['instances']))
-
-    return flow
-
-'''
+"""
 MongoDBWorkflow Requires the following inputs in store:
 
     'connection': FLAGS.sql_connection,     # taskflow persistence connection
@@ -507,7 +431,7 @@ MongoDBWorkflow Requires the following inputs in store:
     'hostpassword': '',              # username on the host for ssh operations
     'sshport' : 22,                  # ssh port that defaults to 22
     'usesudo' : True,                # use sudo when shutdown and restart of mongod instances
-'''
+"""
 
 class MongoDBWorkflow(workflow.Workflow):
     """
@@ -516,10 +440,71 @@ class MongoDBWorkflow(workflow.Workflow):
 
     def __init__(self, name, store):
         super(MongoDBWorkflow, self).__init__(name)
-        # Provide the initial variable inputs from the mysql database
-        #
         self._store = store
-        self._flow = InitFlow(self._store)
+
+    #
+    # MongoDB flow is an directed acyclic flow. 
+    # :param host - One of the mongo db node in the cluster that has mongos 
+    #               service running and will be used to discover the mongo db
+    #               shards, their replicas etc
+    # : port - port at which mongos service is running
+    # : usename/password - username and password to authenticate to the database
+    #
+    def initflow(self):
+        cntx = amqp.RpcContext.from_dict(self._store['context'])
+        self._store['instances'] =  get_vms(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        hosts_to_backup = secondaryhosts_to_backup(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        for index,item in enumerate(self._store['instances']):
+            self._store['instance_'+str(index)] = item
+        for index, item in enumerate(hosts_to_backup):
+            self._store['secondary_'+str(index)] = item
+        
+        self._flow = lf.Flow('mongodbwf')
+        
+        #create a network snapshot
+        self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
+        
+        #snapshot flavors of VMs
+        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))   
+    
+        # Add disable profile task. Stopping balancer fails if profile process
+        # is running
+        self._flow.add(DisableProfiling('DisableProfiling', provides='proflevel'))
+    
+        # This will be a flow that needs to be added to mongo db flow.
+        # This is a flow that pauses all related VMs in unordered pattern
+        self._flow.add(PauseDBInstances(hosts_to_backup))
+    
+        self._flow.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
+    
+        # This is an unordered pausing of VMs. This flow is created in
+        # common tasks library. This routine takes instance ids from 
+        # openstack. Workload manager should provide the list of 
+        # instance ids
+        self._flow.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
+    
+        # This is again unorder snapshot of VMs. This flow is implemented in
+        # common tasks library
+        self._flow.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
+    
+        # This is an unordered pausing of VMs.
+        self._flow.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+    
+        # Restart the config servers so metadata changes can happen
+        self._flow.add(ResumeConfigServer('ResumeConfigServer'))
+    
+        # unlock all locekd replicas so it starts receiving all updates from primary and
+        # will eventually get into sync with primary
+        self._flow.add(ResumeDBInstances(hosts_to_backup))
+    
+        # enable profiling to the level before the flow started
+        self._flow.add(EnableProfiling('EnableProfiling'))
+    
+        # Now lazily copy the snapshots of VMs to tvault appliance
+        self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))
+    
+        # block commit any changes back to the snapshot
+        self._flow.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
 
     def topology(self):
         # Discover the shards
@@ -567,37 +552,36 @@ class MongoDBWorkflow(workflow.Workflow):
             status["input"][0].append("myState")
             status["input"][0].append(status["myState"])
             for m in status["children"]:
-               m["optimeDate"] = str(m["optimeDate"])
-               m["status"] = m.pop("stateStr")
-               if ("lastHeartbeatRecv" in m):
-                   m["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
-               if ("lastHeartbeat" in m):
-                   m["lastHeartbeat"] = str(m["lastHeartbeat"])
-               if ("optime" in m):
-                   m["optime"] = str(m["optime"])
-               m["input"] = []
-               m["input"].append([])
-               m["input"].append([])
-               m["input"].append([])
-               if ("syncingTo" in m):
-                  m["input"][0].append("syncingTo")
-                  m["input"][0].append(m["syncingTo"])
-               m["input"][1].append("state")
-               m["input"][1].append(m["state"])
-               m["input"][2].append("health")
-               m["input"][2].append(m["health"])
+                m["optimeDate"] = str(m["optimeDate"])
+                m["status"] = m.pop("stateStr")
+                if ("lastHeartbeatRecv" in m):
+                    m["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
+                if ("lastHeartbeat" in m):
+                    m["lastHeartbeat"] = str(m["lastHeartbeat"])
+                if ("optime" in m):
+                    m["optime"] = str(m["optime"])
+                m["input"] = []
+                m["input"].append([])
+                m["input"].append([])
+                m["input"].append([])
+                if ("syncingTo" in m):
+                    m["input"][0].append("syncingTo")
+                    m["input"][0].append(m["syncingTo"])
+                m["input"][1].append("state")
+                m["input"][1].append(m["state"])
+                m["input"][2].append("health")
+                m["input"][2].append(m["health"])
             replicas.append(status)
 
         # Covert the topology into generic topology that can be 
         # returned as restful payload
         mongodb = {"name": "MongoDB", "children":replicas, "input":[]}
-        return mongodb
+        return dict(topology=mongodb)
 
     def details(self):
         # Details the flow details based on the
         # current topology, number of VMs etc
         def recurseflow(item):
-            
             if isinstance(item, task.Task):
                 return [{'name':str(item), 'type':'Task'}]
 
@@ -610,17 +594,20 @@ class MongoDBWorkflow(workflow.Workflow):
 
             return flowdetails
 
-        return recurseflow(self._flow)
+        workflow = recurseflow(self._flow)
+        return dict(workflow=workflow)
 
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        return get_vms(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        instances = get_vms(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        return dict(instances=instances)
 
     def execute(self):
+        vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
 
 
-'''
+"""
 #test code
 import json
 
@@ -657,4 +644,4 @@ import pdb;pdb.set_trace()
 result = engines.load(mwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
 
 print mwf.execute()
-'''
+"""

@@ -69,49 +69,13 @@ def get_vms(cntx, workload_id):
         vms.append(vm)
     return vms
 
-                 
-def InitFlow(store):
-    cntx = amqp.RpcContext.from_dict(store['context'])
-     
-    store['instances'] =  get_vms(cntx, store['snapshot']['workload_id'])
-    for index,item in enumerate(store['instances']):
-        store['instance_'+str(index)] = item
-
-  
-    flow = lf.Flow('DefaultFlow')
-    
-    #create an entry for the VM in the workloadmgr database
-    flow.add(vmtasks.CreateVMSnapshotDBEntries("CreateVMSnapshotDBEntries_" + store['snapshot']['id']))
-    
-    #create a network snapshot
-    flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks" + store['snapshot']['id']))
-    
-    #snapshot flavors of VMs
-    flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors" + store['snapshot']['id']))    
-
-    # This is an unordered pausing of VMs. 
-    flow.add(vmtasks.UnorderedPauseVMs(store['instances']))
-
-    # Unordered snapshot of VMs. 
-    flow.add(vmtasks.UnorderedSnapshotVMs(store['instances']))
-
-    flow.add(vmtasks.UnorderedUnPauseVMs(store['instances']))
-
-    # Now lazily copy the snapshots of VMs to tvault appliance
-    flow.add(vmtasks.UnorderedUploadSnapshot(store['instances']))
-
-    # block commit any changes back to the snapshot
-    flow.add(vmtasks.UnorderedPostSnapshot(store['instances']))
-
-    return flow
-
-'''
+"""
 SerialWorkflow Requires the following inputs in store:
 
     'connection': FLAGS.sql_connection,     # taskflow persistence connection
     'context': context_dict,                # context dictionary
     'snapshot': snapshot,                   # snapshot dictionary
-'''
+"""
 
 class DefaultWorkflow(workflow.Workflow):
     """
@@ -121,16 +85,46 @@ class DefaultWorkflow(workflow.Workflow):
     def __init__(self, name, store):
         super(DefaultWorkflow, self).__init__(name)
         self._store = store
-        self._flow = InitFlow(self._store)
+        
 
+    def initflow(self):
+        cntx = amqp.RpcContext.from_dict(self._store['context'])
+        self._store['instances'] =  get_vms(cntx, self._store['workload_id'])
+        for index,item in enumerate(self._store['instances']):
+            self._store['instance_'+str(index)] = item
+      
+        self._flow = lf.Flow('DefaultFlow')
+        
+        #create a network snapshot
+        self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
+        
+        #snapshot flavors of VMs
+        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))    
+    
+        # This is an unordered pausing of VMs. 
+        self._flow.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
+    
+        # Unordered snapshot of VMs. 
+        self._flow.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
+    
+        # This is an unordered unpasuing of VMs. 
+        self._flow.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+    
+        # Now lazily copy the snapshots of VMs to tvault appliance
+        self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))
+    
+        # block commit any changes back to the snapshot
+        self._flow.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
+    
+          
     def topology(self):
-        pass
+        topology = {'test3':'test3', 'test4':'test4'}
+        return dict(topology=topology)
 
     def details(self):
         # Details the flow details based on the
         # current topology, number of VMs etc
         def recurseflow(item):
-            
             if isinstance(item, task.Task):
                 return [{'name':str(item), 'type':'Task'}]
 
@@ -143,12 +137,15 @@ class DefaultWorkflow(workflow.Workflow):
 
             return flowdetails
 
-        return recurseflow(self._flow)
+        workflow = recurseflow(self._flow)
+        return dict(workflow=workflow)
 
     def discover(self):
-        cntx = amqp.RpcContext.from_dict(self._store['context'])
-        return get_vms(cntx, self._store['snapshot']['workload_id'])
+        #instances =  [{'vm_id': '1'}, {'vm_id': '2'}]
+        instances = []
+        return dict(instances=instances)
 
     def execute(self):
+        vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
 
