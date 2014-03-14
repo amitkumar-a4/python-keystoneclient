@@ -126,11 +126,11 @@ class DefaultWorkflow(workflow.Workflow):
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                return [{'name':str(item), 'type':'Task'}]
+                return {'name':str(item), 'type':'Task'}
 
             flowdetails = {}
             flowdetails['name'] = str(item)
-            flowdetails['type'] = item.__class__.__name__
+            flowdetails['type'] = str(item).split('.')[2]
             flowdetails['children'] = []
             for it in item:
                 flowdetails['children'].append(recurseflow(it))
