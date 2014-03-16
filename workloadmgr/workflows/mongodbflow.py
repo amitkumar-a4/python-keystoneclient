@@ -525,7 +525,7 @@ class MongoDBWorkflow(workflow.Workflow):
         #
         # Creating connection to mongos server
         #
-        print 'Connecting to mongos server ', store['host']
+        print 'Connecting to mongos server ', self._store['host']
         connection = connect_server(self._store['host'], self._store['port'], self._store['username'], self._store['password'])
         print ''
 
@@ -590,11 +590,11 @@ class MongoDBWorkflow(workflow.Workflow):
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                return [{'name':str(item), 'type':'Task'}]
+                return {'name':str(item), 'type':'Task'}
 
             flowdetails = {}
             flowdetails['name'] = str(item)
-            flowdetails['type'] = item.__class__.__name__
+            flowdetails['type'] = str(item).split('.')[2]
             flowdetails['children'] = []
             for it in item:
                 flowdetails['children'].append(recurseflow(it))
