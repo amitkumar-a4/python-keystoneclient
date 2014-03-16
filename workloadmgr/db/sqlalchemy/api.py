@@ -806,12 +806,12 @@ def snapshot_vm_get(context, vm_id, snapshot_id, session=None):
     return snapshot_vm            
 
 @require_context
-def snapshot_vm_update(context, snapshot_vm_id, values):
+def snapshot_vm_update(context, vm_id, snapshot_id, values):
     session = get_session()
     with session.begin():
-        snapshot_vm = model_query(context, models.SnapshotVMs,
-                             session=session, read_deleted="yes").\
-            filter_by(id=snapshot_vm_id).first()
+        snapshot_vm = model_query(context, models.SnapshotVMs, session=session, read_deleted="yes")\
+                               .filter_by(vm_id=vm_id)\
+                               .filter_by(snapshot_id=snapshot_id).first()
 
         if not snapshot_vm:
             raise exception.SnapshotNotFound(

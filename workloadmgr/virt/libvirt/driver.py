@@ -51,6 +51,7 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
+from workloadmgr.db import base
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -516,38 +517,6 @@ class LibvirtDriver(driver.ComputeDriver):
                       [target.get("dev")
                        for target in doc.findall('devices/disk/target')])  
         
-    def get_instance_disks_info(self, instance_name):
-        """
-        Note that this function takes an instance name.
-        Returns a list of all block devices for this domain.
-        "[{'dev':'vda', 'path':'filepath'},...]"        
-        """
-
-                
-
-        domain = self._lookup_by_name(instance_name)
-        xml = domain.XMLDesc(0)
-
-        disk_info = []
-        doc = etree.fromstring(xml)
-        disk_nodes = doc.findall('.//devices/disk')
-        path_nodes = doc.findall('.//devices/disk/source')
-        driver_nodes = doc.findall('.//devices/disk/driver')
-        target_nodes = doc.findall('.//devices/disk/target')
-
-        for cnt, path_node in enumerate(path_nodes):
-            disk_type = disk_nodes[cnt].get('type')
-            path = path_node.get('file')
-            dev = target_nodes[cnt].attrib['dev']
-
-            if not path:
-                LOG.debug(_('skipping disk for %s as it does not have a path'),instance_name)
-                continue
-
-            disk_info.append({'dev': dev, 
-                              'path': path})
-        return disk_info              
-
     def ensure_tree(self, host, path):
         """Create a directory (and any ancestor directories required)
         :param path: Directory to create
@@ -565,40 +534,7 @@ class LibvirtDriver(driver.ComputeDriver):
             #TODO(giri): handle exception
             pass       
         
-    def snapshot_create_as(self, host, instance_name, snapshot_name, snapshot_description, dev_snapshot_disk_paths):
-        """Atomic disk only external snapshots of an instance
-        Todo: use virDomainSnapshotCreateXML instead of virsh
-
-        :param instance: instance to snapshot
-        :param snapshot_name: Name of snapshot
-        :param snapshot_description: Description of snapshot
-        :param snapshot_disk_paths: list of the new snapshot_disk_paths
-        """
-        diskspecs = []
-        for dev, snapshot in dev_snapshot_disk_paths.iteritems():
-            diskspecs = diskspecs + ['--diskspec', dev + ',snapshot=external,file=' + snapshot]
-
-        virsh_cmd = ['ssh', 'root@' + host,
-                     'virsh', 'snapshot-create-as', 
-                     instance_name, snapshot_name, 
-                     snapshot_description, 
-                     '--disk-only', '--atomic'] + diskspecs
-        utils.execute(*virsh_cmd, run_as_root=False)
-
-
-    def snapshot_delete(self, host, instance_name, snapshot_name, metadata = False):
-        """delete the snapshot
-        Todo: use virDomainXXX instead of virsh
-
-        :param instance: instance of snapshot
-        :param snapshot_name: Name of snapshot
-        :param metadata: If True, delete the metadata only
-        """
-        virsh_cmd = ['ssh', 'root@' + host, 'virsh', 'snapshot-delete', instance_name, snapshot_name] 
-        if metadata :
-            virsh_cmd = virsh_cmd + ['--metadata']
-        utils.execute(*virsh_cmd, run_as_root=False)
-        
+       
     def rebase_qcow2(self, host, backing_file_base, backing_file_top):
         """rebase the backing_file_top to backing_file_base using unsafe mode
         :param backing_file_base: backing file to rebase to
@@ -616,7 +552,9 @@ class LibvirtDriver(driver.ComputeDriver):
         if host == 'localhost':
             utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=False)
         else:
-            utils.execute('ssh', 'root@' + host, 'qemu-img', 'commit', backing_file_top, run_as_root=False)        
+            utils.execute('ssh', 'root@' + host, 'qemu-img', 'commit', backing_file_top, run_as_root=False)       
+
+           
 
     def rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
         """
@@ -663,22 +601,6 @@ class LibvirtDriver(driver.ComputeDriver):
             return commit_to.replace(".vmdk", "-flat.vmdk")      
 
                      
-    def blockcommit(self, host, instance, dev, backing_file_base, backing_file_top):
-        """block commit the changes from top to base
-        Todo: use virDomainXXX instead of virsh
-
-        :param instance: instance to blockcommit
-        :param dev: block device name
-        :param backing_file_base: base to commit into
-        :param backing_file_top: top file to commit from
-        """
-
-        virsh_cmd = ['ssh', 'root@' + host, 'virsh', 'blockcommit', '--domain', 
-                     instance, dev, '--wait', '--base', backing_file_base, 
-                     '--top', backing_file_top]
-
-        utils.execute(*virsh_cmd, run_as_root=False)
-        
     def shutdown_instance(self, instance):
         instance_name = self.get_instance_name_by_uuid(instance.id)
         virt_dom = self._lookup_by_name(instance_name)
@@ -717,238 +639,8 @@ class LibvirtDriver(driver.ComputeDriver):
         except Exception, ex:
             return        
         
-    def pre_snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        """
-        block commit
-        """
-        CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
-        self._get_connection()
-                
-    def snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        """
-        snapshots the instance specified in vm_id
-        """
-        CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
-        self._get_connection()
 
-        # Todo - Check the min supported version of the QEMU and Libvirt 
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_PREPARE)    
-            
-        instance_name = self.get_instance_name_by_uuid(vm_id)
-        snapshot_directory = os.path.join(CONF.instances_path, vm_id)
-        self.ensure_tree(hypervisor_hostname, snapshot_directory)
-        snapshot_name = uuid.uuid4().hex
-        snapshot_description = "snapshot_" + snapshot.id + "of_workload_" + workload.id
-        dev_snapshot_disk_paths = {} # Dictionary that holds dev and snapshot_disk_path
-        devices = self.get_disks(instance_name)
-        for device in devices:
-            dev_snapshot_disk_paths.setdefault(device, 
-                        snapshot_directory + '/' + snapshot_name + '_' + device + '.qcow2' )
 
-        self.snapshot_create_as(hypervisor_hostname, instance_name, snapshot_name, 
-                                snapshot_description, dev_snapshot_disk_paths)
-        # TODO(giri): handle the failure of snapshot_create_as
-        
-        #delete snapshot : metadata only
-        self.snapshot_delete(hypervisor_hostname, instance_name, snapshot_name, True)
-        
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_SNAPSHOT_CREATED)
-            
-        return                  
-
-    def upload_snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
-        self._get_connection()
-         
-        if snapshot['snapshot_type'] == 'full' :
-            return self._upload_snapshot_full(workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state)
-        else:
-            return self._upload_snapshot_incremental(workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state)
-
-    def _upload_snapshot_full(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        """
-        uploads the snapshot
-        """
-        # stream the backing files of the new snapshots
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_UPLOAD_INPROGESS)
-                        
-        instance_name = self.get_instance_name_by_uuid(vm_id)
-        disks_info = self.get_instance_disks_info(instance_name)
-        for disk_info in disks_info:    
-            src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, disk_info['path'], basename=False)        
-            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': vm_id,
-                                           'snapshot_id': snapshot.id,       
-                                           'resource_type': 'disk',
-                                           'resource_name': disk_info['dev'],
-                                           'metadata': {},
-                                           'status': 'creating'}
-
-            snapshot_vm_resource = db.snapshot_vm_resource_create(context, 
-                                                snapshot_vm_resource_values)                                                
-            
-            src_backings = [] # using list as a stack for the disk backings
-            while (src_backing_path != None):
-                src_backings.append(src_backing_path)
-                src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, src_backing_path, basename=False)
-            
-            base_backing_path = None
-            vm_disk_resource_snap_id = None
-            if(len(src_backings) > 0):
-                base_backing_path = src_backings.pop() 
-            while (base_backing_path != None):
-                top_backing_path = None
-                if(len(src_backings) > 0):
-                    top_backing_path = src_backings.pop()
-                    
-                # create an entry in the vm_disk_resource_snaps table
-                vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
-                vm_disk_resource_snap_id = str(uuid.uuid4())
-                vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
-                if(disk_info['dev'] == 'vda' and top_backing_path == None):
-                    vm_disk_resource_snap_metadata.setdefault('base_image_ref','TODO')                    
-                vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
-                vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
-                                                 'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                 'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
-                                                 'metadata': vm_disk_resource_snap_metadata,       
-                                                 'top':  (top_backing_path == None),
-                                                 'status': 'creating'}     
-                                                             
-                vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
-                #upload to vault service
-                vault_service_url = None
-                
-                #with utils.temporary_chown(base_backing_path):
-                vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
-                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
-                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                  'resource_name':  disk_info['dev'],
-                                  'snapshot_vm_id': vm_id,
-                                  'snapshot_id': snapshot.id}
-                vault_service_url = vault_service.store(vault_metadata, hypervisor_hostname, base_backing_path); 
-                    
-                    
-                # update the entry in the vm_disk_resource_snap table
-                vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
-                                                'vault_service_metadata' : 'None',
-                                                'status': 'available'} 
-                db.vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
-                base_backing_path = top_backing_path
-
-            db.snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'status': 'available',})
-                    
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
-            update_task_state(task_state=task_states.SNAPSHOT_COMPLETE)
-            
-    def _upload_snapshot_incremental(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        """
-        Incremental snapshot of the instance specified in vm_id
-        """
-        # stream the backing files of the new snapshots
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_UPLOAD_INPROGESS)
-                        
-        instance_name = self.get_instance_name_by_uuid(vm_id)
-        disks_info = self.get_instance_disks_info(instance_name)        
-        vm_recent_snapshot = db.vm_recent_snapshot_get(context, vm_id)  
-        for disk_info in disks_info:
-            previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            context, 
-                                                            vm_id, 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk_info['dev'])
-            previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, 
-                                                                        previous_snapshot_vm_resource.id)
-                 
-            
-            src_backing_path = libvirt_utils.get_disk_backing_file(hypervisor_hostname, disk_info['path'], basename=False)        
-            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': vm_id,
-                                           'snapshot_id': snapshot.id,       
-                                           'resource_type': 'disk',
-                                           'resource_name':  disk_info['dev'],
-                                           'metadata': {},
-                                           'status': 'creating'}
-
-            snapshot_vm_resource = db.snapshot_vm_resource_create(context, snapshot_vm_resource_values)                                                
-            # create an entry in the vm_disk_resource_snaps table
-            vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
-            vm_disk_resource_snap_id = str(uuid.uuid4())
-            vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
-            vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
-            vm_disk_resource_snap_values = {'id': vm_disk_resource_snap_id,
-                                         'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                         'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
-                                         'metadata': vm_disk_resource_snap_metadata,       
-                                         'top':  True,
-                                         'status': 'creating'}     
-                                                         
-            vm_disk_resource_snap = db.vm_disk_resource_snap_create(context, vm_disk_resource_snap_values)                
-            #upload to vault service
-            vault_service_url = None
-            vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
-                              'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
-                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                              'resource_name':  disk_info['dev'],
-                              'snapshot_vm_id': vm_id,
-                              'snapshot_id': snapshot.id}
-            vault_service_url = vault_service.store(vault_metadata, hypervisor_hostname, src_backing_path); 
-                
-            # update the entry in the vm_disk_resource_snap table
-            vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
-                                            'vault_service_metadata' : 'None',
-                                            'status': 'available'}
-            db.vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'status': 'available',}) 
-            
-            db.snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'status': 'available',})
-                
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_UPLOADING_FINISH)
-
-    def post_snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        """
-        block commit
-        """
-        CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
-        self._get_connection()
-        
-        # Todo - Check the min supported version of the QEMU and Libvirt 
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_BLOCKCOMMIT_INPROGESS)
-                        
-        instance_name = self.get_instance_name_by_uuid(vm_id)
-        disks_info = self.get_instance_disks_info(instance_name)  
-        state = self.get_info(instance_name)['state']       
-        for disk_info in disks_info:  
-            if snapshot['snapshot_type'] == 'full':          
-                if disk_info['dev'] == 'vda': 
-                    #TODO(giri): Base image can be shared by multiple instances...should leave a minimum of 
-                    # two qcow2 files in front of the base image
-                    continue
-            
-            #TODO(gbasava): Walk the qcow2 for each disk device and commit and intermediate qcow2 files into base
-            backing_file = libvirt_utils.get_disk_backing_file(hypervisor_hostname, disk_info['path'], basename=False)
-            backing_file_backing = libvirt_utils.get_disk_backing_file(hypervisor_hostname, backing_file, basename=False)
-            
-            if (backing_file_backing != None and backing_file_backing != backing_file):
-                if (state == power_state.RUNNING or state == power_state.PAUSED ): 
-                    # if the instance is running we will do a blockcommit
-                    self.blockcommit(hypervisor_hostname, instance_name, disk_info['dev'], backing_file_backing, backing_file)
-                    self.delete_if_exists(hypervisor_hostname, backing_file)
-                elif (state == power_state.SHUTDOWN or  state == power_state.SUSPENDED ): #commit and rebase
-                    self.commit_qcow2(hypervisor_hostname, backing_file)
-                    self.delete_if_exists(hypervisor_hostname, backing_file)                     
-                    self.rebase_qcow2(hypervisor_hostname, backing_file_backing, disk_info['path'])
-                #else: TODO(gbasava): investigate and handle other powerstates     
-                    
-        if update_task_state:
-            update_task_state(task_state=task_states.SNAPSHOT_BLOCKCOMMIT_FINISH)
-            
     def _get_pit_resource_id(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:

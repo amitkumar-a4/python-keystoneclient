@@ -209,8 +209,8 @@ def snapshot_vms_get(context, snapshot_id, session=None):
 def snapshot_vm_get(context, vm_id, snapshot_id, session=None):
     return IMPL.snapshot_vm_get(context, vm_id, snapshot_id, session)
 
-def snapshot_vm_update(context, snapshot_vm_id, values):
-    return IMPL.snapshot_vm_update(context, snapshot_vm_id, values)
+def snapshot_vm_update(context, vm_id, snapshot_id, values):
+    return IMPL.snapshot_vm_update(context, vm_id, snapshot_id, values)
 
 def snapshot_vm_delete(context, vm_id, snapshot_id):
     return IMPL.snapshot_vm_delete(context, vm_id, snapshot_id)

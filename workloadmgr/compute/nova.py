@@ -493,17 +493,68 @@ class API(base.Base):
         except Exception:
             #TODO(gbasava): Handle the exception   
             return              
-                          
-    def vast_instance(self, context, server):
+
+    def vast_prepare(self, context, server, params):
         """
-        VAST an interfaces
+        PREPARE to VAST an instance
         :param server: The :class:`Server` (or its ID) to query.
         """        
         try:
             extensions = _discover_extensions('1.1')
-            return novaclient(context, self._production, extensions=extensions).contego.vast_instance(server=server) 
+            return novaclient(context, self._production, extensions=extensions).contego.vast_prepare(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return                      
+                          
+    def vast_instance(self, context, server, params):
+        """
+        VAST an instance
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_instance(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            return  
         
+    def vast_get_info(self, context, server, params):
+        """
+        Get components of a VASTed instance
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_get_info(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            return          
+        
+    def vast_data(self, context, server, params):
+        """
+        Read a component of a VASTed instance
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_data(server=server, params=params, do_checksum=True) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            return   
+
+    def vast_finalize(self, context, server, params):
+        """
+        Finalize the VAST
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_finalize(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            return                      

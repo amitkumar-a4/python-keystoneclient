@@ -51,7 +51,6 @@ class WorkloadMgrDB(base.Base):
     def __init__(self, host=None, db_driver=None):
         super(WorkloadMgrDB, self).__init__(db_driver)
         
-       
 class SnapshotVMNetworks(task.Task):
 
     def _append_unique(self, list, new_item):
@@ -302,6 +301,21 @@ class PreSnapshot(task.Task):
         # pre processing of snapshot
         print "PreSnapshot VM: " + instance['vm_id']
         cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+        vault_service = vault.get_vault_service(cntx)
+        
+        if instance['hypervisor_type'] == 'QEMU': 
+            compute_service = nova.API(production=True)
+            vast_params = {'test1': 'test1','test2': 'test2'}
+            compute_service.vast_prepare(context, instance['vm_id'], vast_params) 
+        else: 
+            #TODO(giri) Check for all other hypervisor types
+            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+            #TODO(giri): implement this for VMware
+            #virtdriver.pre_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
         
 class SnapshotVM(task.Task):
 
@@ -313,14 +327,17 @@ class SnapshotVM(task.Task):
         
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
-        vault_service = vault.get_vault_service(cntx)
         
         if instance['hypervisor_type'] == 'QEMU': 
-            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        else: #TODO(giri) Check for all other hypervisor types
+            compute_service = nova.API(production=True)
+            vast_params = {'snapshot_id': snapshot_obj.id,
+                           'workload_id': workload_obj.id}
+            compute_service.vast_instance(cntx, instance['vm_id'], vast_params) 
+        else: 
+            #TODO(giri) Check for all other hypervisor types
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            
-        virtdriver.snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+            #TODO(giri): implement this for VMware
+            #virtdriver.snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
         
 class UploadSnapshot(task.Task):
 
@@ -335,11 +352,84 @@ class UploadSnapshot(task.Task):
         vault_service = vault.get_vault_service(cntx)
         
         if instance['hypervisor_type'] == 'QEMU': 
-            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        else: #TODO(giri) Check for all other hypervisor types
+            compute_service = nova.API(production=True)
+            vault_service = vault.get_vault_service(cntx)
+            disks_info = compute_service.vast_get_info(cntx, instance['vm_id'], {})['info']
+            for disk_info in disks_info:    
+                snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                               'vm_id': instance['vm_id'],
+                                               'snapshot_id': snapshot_obj.id,       
+                                               'resource_type': 'disk',
+                                               'resource_name': disk_info['dev'],
+                                               'metadata': {},
+                                               'status': 'creating'}
+    
+                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
+               
+                                
+                vm_disk_resource_snap_id = None
+                if snapshot['snapshot_type'] != 'full':
+                    vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                            cntx, 
+                                                            instance['vm_id'], 
+                                                            vm_recent_snapshot.snapshot_id, 
+                                                            disk_info['dev'])
+                    previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                    vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+
+                base_backing_path = None
+                if(len(disk_info['backings']) > 0):
+                    if snapshot['snapshot_type'] != 'full':
+                        base_backing_path = disk_info['backings'][0]
+                    else:
+                        base_backing_path = disk_info['backings'].pop() 
+                while (base_backing_path != None):
+                    top_backing_path = None
+                    if snapshot['snapshot_type'] == 'full':
+                        if(len(disk_info['backings']) > 0):
+                            top_backing_path = disk_info['backings'].pop()
+                        
+                    # create an entry in the vm_disk_resource_snaps table
+                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
+                    vm_disk_resource_snap_id = str(uuid.uuid4())
+                    vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
+                    if(disk_info['dev'] == 'vda' and top_backing_path == None):
+                        vm_disk_resource_snap_metadata.setdefault('base_image_ref','TODO')                    
+                    vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
+                    
+                    top = (top_backing_path == None)
+                    vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
+                                                     'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                     'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                                     'metadata': vm_disk_resource_snap_metadata,       
+                                                     'top':  top,
+                                                     'status': 'creating'}     
+                                                                 
+                    vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)                
+                    #upload to vault service
+                    vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                      'resource_name':  disk_info['dev'],
+                                      'snapshot_vm_id': instance['vm_id'],
+                                      'snapshot_id': snapshot_obj.id}
+                    vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'host': instance['hypervisor_hostname'], 'port': '8899', 'path': base_backing_path['path']})
+                    vault_service_url = vault_service.store(vault_metadata, vast_data); 
+                    # update the entry in the vm_disk_resource_snap table
+                    vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
+                                                    'vault_service_metadata' : 'None',
+                                                    'status': 'available'} 
+                    db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+                    base_backing_path = top_backing_path
+    
+                db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available',})
+            db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'status': 'available',})
+        else: 
+            #TODO(giri) Check for all other hypervisor types
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            
-        virtdriver.upload_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+            #TODO(giri): implement this for VMware
+            virtdriver.upload_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
         
   
 class PostSnapshot(task.Task):
@@ -349,16 +439,15 @@ class PostSnapshot(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
-        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
-        vault_service = vault.get_vault_service(cntx)
-        
         if instance['hypervisor_type'] == 'QEMU': 
-            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        else: #TODO(giri) Check for all other hypervisor types
+            compute_service = nova.API(production=True)
+            compute_service.vast_finalize(cntx,instance['vm_id'], {}) 
+        else: 
+            #TODO(giri) Check for all other hypervisor types
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            
-        virtdriver.post_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+            #TODO(giri): implement this for VMware
+            #virtdriver.post_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+        
         db.vm_recent_snapshot_update(cntx, instance['vm_id'], {'snapshot_id': snapshot['id']})
 
 # Assume there is no ordering dependency between instances

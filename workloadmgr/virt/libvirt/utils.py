@@ -8,7 +8,7 @@ import os
 from oslo.config import cfg
 from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.virt.libvirt import images
+from workloadmgr.virt.libvirt import qemuimages
 
 libvirt_opts = [
 
@@ -25,7 +25,7 @@ def get_disk_backing_file(host, path, basename=True):
     :param path: Path to the disk image
     :returns: a path to the image's backing store
     """
-    backing_file = images.qemu_img_info(host, path).backing_file
+    backing_file = qemuimages.qemu_img_info(host, path).backing_file
     if backing_file and basename:
         backing_file = os.path.basename(backing_file)
 
