@@ -381,13 +381,33 @@ class API(base.Base):
             compute_service = nova.API(production=True)        
             
         for instance in restore_details['instances']:
-            compute_service.delete(context, instance['id']) 
+            try:
+                compute_service.delete(context, instance['id']) 
+            except Exception as exception:
+                msg = _("Error deleting instance %(instance_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'instance_id': instance['id'], 'exception': exception})
+                LOG.exception(exception)
         for router in restore_details['routers']:
-            network_service.delete_router(context,router['id'])
+            try:
+                network_service.delete_router(context,router['id'])
+            except Exception as exception:
+                msg = _("Error deleting router %(router_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'router_id': router['id'], 'exception': exception})
+                LOG.exception(exception)                
         for subnet in restore_details['subnets']:
-            network_service.delete_subnet(context,subnet['id'])
+            try:
+                network_service.delete_subnet(context,subnet['id'])
+            except Exception as exception:
+                msg = _("Error deleting subnet %(subnet_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'subnet_id': subnet['id'], 'exception': exception})
+                LOG.exception(exception)                   
         for network in restore_details['networks']:
-            network_service.delete_network(context,network['id'])
+            try:
+                network_service.delete_network(context,network['id'])
+            except Exception as exception:
+                msg = _("Error deleting network %(network_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'network_id': network['id'], 'exception': exception})
+                LOG.exception(exception)                  
 
         self.db.restore_delete(context, restore_id)
         
