@@ -87,9 +87,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         elif(workload_type.display_name == 'MongoDB'):
             workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
         elif(workload_type.display_name == 'Hadoop'):
-            workflow_class_name = 'workloadmgr.workflows.mongodbflow.HadoopWorkflow' 
+            workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
         elif(workload_type.display_name == 'Cassandra'):
-            workflow_class_name = 'workloadmgr.workflows.mongodbflow.CassandraWorkflow'             
+            workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
                           
         parts = workflow_class_name.split('.')
         module = ".".join(parts[:-1])

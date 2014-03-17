@@ -82,8 +82,7 @@ def getShards(conn):
         shards = collection.find()
         return shards
     except Exception, e:
-        print '\tOops!  There was an error.  Try again...'
-        print '\t',e
+        LOG.error('There was an error getting shards:' + str(e) + 'Try again...')
 
 class DisableProfiling(task.Task):
 
