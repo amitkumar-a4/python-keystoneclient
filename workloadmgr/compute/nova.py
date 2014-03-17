@@ -557,4 +557,30 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
+            return  
+                            
+    def testbubble_attach_volume(self, context, server, params):
+        """
+        Attach a volume to testbubble instance
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.testbubble_attach_volume(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            return                      
+
+    def testbubble_reboot_instance(self, context, server, params):
+        """
+        Simple reboot of a testbubble instance
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.testbubble_reboot_instance(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
             return                      

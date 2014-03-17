@@ -414,7 +414,7 @@ class UploadSnapshot(task.Task):
                                       'resource_name':  disk_info['dev'],
                                       'snapshot_vm_id': instance['vm_id'],
                                       'snapshot_id': snapshot_obj.id}
-                    vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'host': instance['hypervisor_hostname'], 'port': '8899', 'path': base_backing_path['path']})
+                    vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path']})
                     vault_service_url = vault_service.store(vault_metadata, vast_data); 
                     # update the entry in the vm_disk_resource_snap table
                     vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,

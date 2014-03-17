@@ -600,47 +600,6 @@ class LibvirtDriver(driver.ComputeDriver):
         else:
             return commit_to.replace(".vmdk", "-flat.vmdk")      
 
-                     
-    def shutdown_instance(self, instance):
-        instance_name = self.get_instance_name_by_uuid(instance.id)
-        virt_dom = self._lookup_by_name(instance_name)
-        virt_dom.shutdown()
-
-    def reboot_instance(self, instance):
-        instance_name = self.get_instance_name_by_uuid(instance.id)
-        virt_dom = self._lookup_by_name(instance_name)
-        virt_dom.reboot(0)
-        
-    def attach_volume(self, instance, diskpath, mountpoint):
-        instance_name = self.get_instance_name_by_uuid(instance.id)
-        virt_dom = self._lookup_by_name(instance_name)
-        disk_dev = mountpoint.rpartition("/")[2]
-        conf = vconfig.LibvirtConfigGuestDisk()
-        conf.driver_cache = 'writethrough'
-        conf.driver_name = 'qemu'
-        conf.device_type = 'disk'
-        conf.driver_format = "raw"
-        conf.driver_cache = "none"
-        conf.target_dev = disk_dev
-        conf.target_bus = 'scsi'
-        #conf.serial = 'serial'
-        conf.source_type = 'file'
-        conf.source_path = diskpath         
-
-        try:
-            # NOTE(vish): We can always affect config because our
-            #             domains are persistent, but we should only
-            #             affect live if the domain is running.
-            flags = libvirt.VIR_DOMAIN_AFFECT_CONFIG
-            state = LIBVIRT_POWER_STATE[virt_dom.info()[0]]
-            if state == power_state.RUNNING:
-                flags |= libvirt.VIR_DOMAIN_AFFECT_LIVE
-            virt_dom.attachDeviceFlags(conf.to_xml(), flags)
-        except Exception, ex:
-            return        
-        
-
-
     def _get_pit_resource_id(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
@@ -860,23 +819,11 @@ class LibvirtDriver(driver.ComputeDriver):
                 compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + devname))
                 time.sleep(15)
             else:
-                instance_dir = libvirt_utils.get_instance_path(restored_instance.id)
-                utils.move_file(restored_volume, instance_dir)
-                restored_volume = os.path.join(instance_dir, os.path.basename(restored_volume))
+                params = {'path': restored_volume, 'mountpoint': '/dev/' + devname}
+                compute_service.testbubble_attach_volume(context, restored_instance.id, params)
                 
-                #Get the restored instance using admin context.
-                restored_instance_admin_context = compute_service.get_server_by_id(context, restored_instance.id , admin=True)
-                hypervisor_hostname = restored_instance_admin_context.__dict__['OS-EXT-SRV-ATTR:host']
-                CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
-                self._get_connection()                     
-                self.attach_volume(restored_instance, restored_volume, ('/dev/' + devname))
         if test == True:
-            #Get the restored instance using admin context.
-            restored_instance_admin_context = compute_service.get_server_by_id(context, restored_instance.id , admin=True)            
-            hypervisor_hostname = restored_instance_admin_context.__dict__['OS-EXT-SRV-ATTR:host']
-            CONF.libvirt_uri = 'qemu+ssh://root@' + hypervisor_hostname + '/system' 
-            self._get_connection()            
-            self.reboot_instance(restored_instance) 
+            compute_service.testbubble_reboot_instance(context, restored_instance.id, {'reboot_type':'SIMPLE'})
             time.sleep(10)
             LOG.debug(_("Test Restore Completed"))
         else:            
