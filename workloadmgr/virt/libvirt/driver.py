@@ -645,7 +645,9 @@ class LibvirtDriver(driver.ComputeDriver):
                 new_network = new_net_resources[pit_id]
                 nic_info = {}
                 nic_info.setdefault('net-id', new_network['id']) 
-                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+                #TODO(giri): the ip address sometimes may not be available due to one of the router or network
+                #interfaces taking them over
+                #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
                 nics.append(nic_info)                        
         
         volume_service = cinder.API()                       
@@ -790,6 +792,8 @@ class LibvirtDriver(driver.ComputeDriver):
         while restored_instance.status != 'ACTIVE':
             time.sleep(30)
             restored_instance =  compute_service.get_server_by_id(context, restored_instance.id)
+            if restored_instance.status == 'ERROR':
+                raise Exception(_("Error creating the test bubble instance"))
         
         if test == True:
             # We will not powerdown the VM if we are doing a test restore.
@@ -829,6 +833,8 @@ class LibvirtDriver(driver.ComputeDriver):
         else:            
             compute_service.start(context, restored_instance.id)  
             LOG.debug(_("Restore Completed"))
+         
+        #TODO(giri): Execuete teh follwing in a finally block    
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
