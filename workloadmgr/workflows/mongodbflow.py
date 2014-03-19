@@ -524,16 +524,14 @@ class MongoDBWorkflow(workflow.Workflow):
         #
         # Creating connection to mongos server
         #
-        print 'Connecting to mongos server ', self._store['host']
+        LOG.debug(_( 'Connecting to mongos server ' + self._store['host']))
         connection = connect_server(self._store['host'], self._store['port'], self._store['username'], self._store['password'])
-        print ''
 
         #
         # Getting sharding information
         #
-        print 'Getting sharding configuration'
+        LOG.debug(_( 'Getting sharding configuration'))
         shards = getShards(connection)
-        print ''
 
         # Get the replica set for each shard
         replicas = []

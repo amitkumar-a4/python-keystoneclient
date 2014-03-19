@@ -66,6 +66,41 @@ def connect_server(host, port, user, password):
         LOG.error(_( 'There was an error connecting to hadoop namenode. Error %s. Try again...'), str(e))
     return client
 
+def gethadoopcfg(connection):
+    stdin, stdout, stderr = connection.exec_command("hadoop/bin/hadoop dfsadmin -report")
+    dfsout = stdout.read(),
+
+    #parse dfs output for hadoop nodes
+    dfsout = dfsout[0].split("\n")
+    line = '-------------------------------------------------'
+    hcluster = dfsout[:dfsout.index(line)]
+    dfsout = dfsout[dfsout.index(line) + 1:]
+    totalnode = int(dfsout.pop(0).split(":")[1].strip().split(" ")[0])
+
+    hcfg = {}
+    for h in hcluster:
+        if len(h.split(":")) == 2:
+           hcfg[h.split(":")[0]] = h.split(":")[1]
+       
+    dfsout.pop(0)
+    datanodes = []
+    for _ in range(totalnode):
+       x = dfsout.index("")
+       node = dfsout[:x]
+       datanodes.append(node)
+       x = x + 2
+       dfsout = dfsout[x:]
+
+    hnodes = []
+    for node in datanodes:
+       dnode = {}
+       for s in node:
+          dnode[s.split(":")[0].strip()] = s.split(":")[1]
+       hnodes.append(dnode)
+
+    return {'hconfig': hcfg, 'hnodes':hnodes }
+
+
 def getnodenames(connection):
     stdin, stdout, stderr = connection.exec_command("hadoop/bin/hadoop dfsadmin -report")
     dfsout = stdout.read(),
@@ -265,7 +300,31 @@ class HadoopWorkflow(workflow.Workflow):
 
 
     def topology(self):
-        return dict(topology={})
+
+        LOG.debug(_( 'Connecting to hadoop nameserver ' + self._store['Namenode']))
+        connection = connect_server(self._store['Namenode'], int(self._store['NamenodeSSHPort']), self._store['Username'], self._store['Password'])
+        LOG.debug(_( 'Connected to hadoop name server: ' + self._store['Namenode']))
+
+        hadoopcfg = gethadoopcfg(connection)
+
+        # Covert the topology into generic topology that can be 
+        # returned as restful payload
+
+        hadoopstatus = []
+        hadoopstatus.append(['Capacity', hadoopcfg['hconfig']['Configured Capacity']])
+        hadoopstatus.append(['Remaining', hadoopcfg['hconfig']['DFS Remaining']])
+        hadoopstatus.append(['Used', hadoopcfg['hconfig']['DFS Used']])
+
+        for node in hadoopcfg['hnodes']:
+            node["name"] = node.pop("Name")
+            node["status"] = str(node["Decommission Status"])
+            node["input"] = []
+            node["input"].append(['Capacity', node['Configured Capacity']])
+            node["input"].append(['Used', node['DFS Used']])
+            node["input"].append(['Remaining', node['DFS Remaining']])
+
+        hadoop = {"name": "Hadoop", "children":hadoopcfg['hnodes'], "input":hadoopstatus}
+        return dict(topology=hadoop)
 
     def details(self):
         # workflow details based on the
@@ -310,21 +369,21 @@ store = {
     'Password': 'ubuntu',         # namenode password if ssh key is not set
 }
 
-c = nova.novaclient(None, production=True, admin=True);
-context = context.RequestContext("c852956b1d5743fb81a350a31282d32e", #admin user id
-                                 c.client.projectid,
-                                 is_admin = True,
-                                 auth_token=c.client.auth_token)
-store["context"] = context.__dict__
-store["context"]["conf"] = None
+#c = nova.novaclient(None, production=True, admin=True);
+#context = context.RequestContext("1c4c73dfb2724ef7a4e659999db40be5", #admin user id
+                                 #c.client.projectid,
+                                 #is_admin = True,
+                                 #auth_token=c.client.auth_token)
+#store["context"] = context.__dict__
+#store["context"]["conf"] = None
 hwf = HadoopWorkflow("testflow", store)
-print json.dumps(hwf.discover())
-hwf.initflow()
-print json.dumps(hwf.details())
+#print json.dumps(hwf.discover())
+#hwf.initflow()
+#print json.dumps(hwf.details())
 print json.dumps(hwf.topology())
 
-import pdb;pdb.set_trace()
-result = engines.load(hwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
+#import pdb;pdb.set_trace()
+#result = engines.load(hwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
 
-print hwf.execute()
+#print hwf.execute()
 """
