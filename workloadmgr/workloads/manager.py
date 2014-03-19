@@ -37,8 +37,10 @@ from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 
+from workloadmgr import autolog
 
 LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 workloads_manager_opts = [
 ]
@@ -121,7 +123,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         for snapshot_vm_resource in snapshot_vm_common_resources:
             if snapshot_vm_resource.resource_pit_id == pit_id:
                 return snapshot_vm_resource            
-                    
+
+    @autolog.log_method(logger=Logger)                    
     def _restore_networks(self, context, production, snapshot, restore, new_net_resources):
         """
         Restore the networking configuration of VMs of the snapshot
@@ -254,7 +257,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         network_service.router_add_gateway(context,new_router['id'], new_ext_network['id'])
                     except Exception as err:
                         pass
-        
+    
+    @autolog.log_method(logger=Logger)        
     def workload_type_discover_instances(self, context, workload_type_id, metadata):
         """
         Discover instances of a workload_type
@@ -274,6 +278,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         instances = workflow.discover()
         return instances   
 
+    @autolog.log_method(logger=Logger)
     def workload_get_topology(self, context, workload_id):
         """
         Return workload topology
@@ -294,6 +299,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         topology = workflow.topology()
         return topology
     
+    @autolog.log_method(logger=Logger)    
     def workload_get_workflow_details(self, context, workload_id):
         """
         Return workload topology
@@ -314,7 +320,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workflow.initflow()
         details = workflow.details()
         return details
-        
+    
+
+    @autolog.log_method(Logger, 'WorkloadMgrManager.workload_create')
     def workload_create(self, context, workload_id):
         """
         Create a scheduled workload in the workload scheduler
@@ -323,7 +331,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload = self.db.workload_get(context, workload_id)
             vm = self.db.workload_vms_get(context, workload_id)
 
-            LOG.info(_('create_workload started, %s:' %workload_id))
             self.db.workload_update(context, 
                                     workload_id, 
                                     {'host': self.host})
@@ -344,15 +351,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                  'availability_zone': self.az,
                                  'schedule_job_id':schjob.id})
         
-        LOG.info(_('create_workload finished. workload: %s'), workload_id)
 
+    @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
         """
         Take a snapshot of the workload
         """
-        LOG.info(_('snapshot of workload started, snapshot_id %s' %snapshot_id))
-        
         try:
+            self.db.snapshot_update(context, 
+                                    snapshot_id, 
+                                    {'progress_percent': 0, 
+                                     'progress_msg': 'Snapshot of workload is starting',
+                                     'status': 'starting'
+                                    })
+            
             snapshot = self.db.snapshot_get(context, snapshot_id)
             snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, snapshot.workload_id)
             full_snapshot_exists = False
@@ -385,42 +397,78 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow_class = self._get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
             workflow.initflow()
-            self.db.snapshot_update(context, snapshot.id, {'status': 'executing'})
+            self.db.snapshot_update(context, 
+                                    snapshot_id, 
+                                    {'progress_percent': 0, 
+                                     'progress_msg': 'Snapshot of workload is starting',
+                                     'status': 'executing'
+                                    })            
             workflow.execute()
-            self.db.snapshot_update(context, snapshot.id, {'status': 'available'})
+            self.db.snapshot_update(context, 
+                                    snapshot_id, 
+                                    {'progress_percent': 100, 
+                                     'progress_msg': 'Snapshot of workload is complete',
+                                     'status': 'available'
+                                    })             
             return 
          
         except Exception as ex:
-            msg = _("Error Creating Workload Snapshot %(snapshot_id)s with failure: %(exception)s")
-            LOG.debug(msg, {'snapshot_id': snapshot_id, 'exception': ex})
+            msg = _("Error creating workload snapshot %(snapshot_id)s with failure: %(exception)s") %{
+                    'snapshot_id': snapshot_id, 'exception': ex,}
+            LOG.debug(msg)
             LOG.exception(ex)
-            self.db.snapshot_update(context, snapshot.id, {'status': 'error'}) 
+            self.db.snapshot_update(context, 
+                                    snapshot_id, 
+                                    {'progress_percent': 100, 
+                                     'progress_msg': '',
+                                     'error_msg': msg,
+                                     'status': 'error'
+                                    })             
             return;          
             
-
+    @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
         """
         Delete an existing workload
         """
-        LOG.info(_('deleting workload: %s'), workload_id)
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
         for snapshot in snapshots:
             self.snapshot_delete(context, snapshot['id'])
         self.db.workload_delete(context, workload_id)
 
 
+    @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, restore_id):
         """
         Restore VMs and all its LUNs from a snapshot
         """
-        LOG.info(_('restore_snapshot started, restore id: %(restore_id)s') % locals())
         try:
+            restore_type = 'restore'
+
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
             
+            restore_type = restore.restore_type
+            
+            if restore_type == 'test':
+                self.db.restore_update( context, 
+                            restore_id, 
+                            {'progress_percent': 0, 
+                             'progress_msg': 'Create testbubble from snapshot is starting',
+                             'status': 'starting'
+                            })  
+            else:
+                self.db.restore_update( context, 
+                            restore_id, 
+                            {'progress_percent': 0, 
+                             'progress_msg': 'Restore from snapshot is starting',
+                             'status': 'starting'
+                            })                           
+
+            
             new_net_resources = {}
-            if restore.restore_type == 'test':
+            if restore_type == 'test':
                 self._restore_networks(context, False, snapshot, restore, new_net_resources)
             else:
                 self._restore_networks(context, True, snapshot, restore, new_net_resources)    
@@ -437,25 +485,50 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'status': 'available'}
                 restored_vm = self.db.restored_vm_create(context,restored_vm_values)    
           
-            self.db.restore_update(context, restore.id, {'status': 'completed'})
-        except Exception as ex:
-            msg = _("Error Restoring %(restore_id)s with failure: %(exception)s")
-            LOG.debug(msg, {'restore_id': restore_id, 'exception': ex})
-            LOG.exception(ex)
-            self.db.restore_update(context, restore.id, {'status': 'error'}) 
-            return;  
+            if restore_type == 'test':
+                self.db.restore_update( context, 
+                            restore_id, 
+                            {'progress_percent': 100, 
+                             'progress_msg': 'Create testbubble from snapshot is complete',
+                             'status': 'completed'
+                            })  
+            else:
+                self.db.restore_update( context, 
+                            restore_id, 
+                            {'progress_percent': 100, 
+                             'progress_msg': 'Restore from snapshot is complete',
+                             'status': 'completed'
+                            })                         
 
+        except Exception as ex:
+            if restore_type == 'test':
+                msg = _("Error creating test bubble %(restore_id)s with failure: %(exception)s") %{
+                        'restore_id': restore_id, 'exception': ex,}
+            else:
+                msg = _("Error restoring %(restore_id)s with failure: %(exception)s") %{
+                        'restore_id': restore_id, 'exception': ex,}
+            LOG.debug(msg)
+            LOG.exception(ex)
+            self.db.restore_update( context, 
+                                    restore_id, 
+                                    {'progress_percent': 100, 
+                                     'progress_msg': '',
+                                     'error_msg': msg,
+                                     'status': 'error'
+                                    })             
+            return;                  
+
+    @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """
         Delete an existing snapshot
         """
-        LOG.info(_('deleting snapshot %s'), snapshot_id)        
         self.db.snapshot_delete(context, snapshot_id)
-        
+
+    @autolog.log_method(logger=Logger)        
     def restore_delete(self, context, restore_id):
         """
         Delete an existing restore 
         """
-        LOG.info(_('deleting restore %s'), restore_id)
         self.db.restore_delete(context, restore_id)        
  

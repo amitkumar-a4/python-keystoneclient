@@ -144,7 +144,11 @@ def upgrade(migrate_engine):
         Column('project_id', String(length=255)),
         Column('snapshot_type', String(length=32), primary_key=False, nullable= False),
         Column('display_name', String(length=255)),
-        Column('display_description', String(length=255)),        
+        Column('display_description', String(length=255)),
+        Column('size', Integer),
+        Column('progress_percent', Integer),   
+        Column('progress_msg', String(length=255)),
+        Column('error_msg', String(length=255)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -159,6 +163,7 @@ def upgrade(migrate_engine):
         Column('vm_id', String(length=255), nullable= False),
         Column('vm_name', String(length=255), nullable= False),
         Column('snapshot_id', String(length=255), ForeignKey('snapshots.id')),
+        Column('size', Integer),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -185,7 +190,8 @@ def upgrade(migrate_engine):
         Column('snapshot_id', String(length=255), ForeignKey('snapshots.id')),
         Column('resource_type', String(length=255)),
         Column('resource_name', String(length=255)),
-        Column('resource_pit_id', String(length=255)),                
+        Column('resource_pit_id', String(length=255)),
+        Column('size', Integer),                
         Column('status', String(length=32), nullable=False),
         UniqueConstraint('vm_id', 'snapshot_id', 'resource_name'),
         mysql_engine='InnoDB'
@@ -216,7 +222,8 @@ def upgrade(migrate_engine):
         Column('vm_disk_resource_snap_backing_id', String(length=255), ForeignKey('vm_disk_resource_snaps.id')),
         Column('top', Boolean, default=False),
         Column('vault_service_url', String(4096)),    
-        Column('vault_service_metadata', String(4096)),         
+        Column('vault_service_metadata', String(4096)),
+        Column('size', Integer),         
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )        
@@ -273,7 +280,10 @@ def upgrade(migrate_engine):
         Column('project_id', String(length=255)),
         Column('restore_type', String(length=32), primary_key=False, nullable= False),
         Column('display_name', String(length=255)),
-        Column('display_description', String(length=255)),        
+        Column('display_description', String(length=255)),
+        Column('progress_percent', Integer),   
+        Column('progress_msg', String(length=255)),
+        Column('error_msg', String(length=255)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )

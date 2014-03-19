@@ -847,9 +847,6 @@ def vm_recent_snapshot_get(context, vm_id, session=None):
         filter_by(vm_id=vm_id).\
         first()
 
-    if not result:
-        raise exception.VMRecentSnapshotNotFound(vm_id=vm_id)
-
     return result
 
 @require_context

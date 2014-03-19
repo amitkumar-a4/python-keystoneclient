@@ -256,6 +256,9 @@ class HadoopWorkflow(workflow.Workflow):
     
         # enable profiling to the level before the flow started
         self._flow.add(DisableSafemode('DisableSafemode'))
+
+        #calculate the size of the snapshot
+        self._flow.add(vmtasks.SnapshotDataSize("SnapshotDataSize"))        
     
         # Now lazily copy the snapshots of VMs to tvault appliance
         self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))

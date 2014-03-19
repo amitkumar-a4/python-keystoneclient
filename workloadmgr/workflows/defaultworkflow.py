@@ -109,6 +109,9 @@ class DefaultWorkflow(workflow.Workflow):
     
         # This is an unordered unpasuing of VMs. 
         self._flow.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+        
+        #calculate the size of the snapshot
+        self._flow.add(vmtasks.SnapshotDataSize("SnapshotDataSize"))        
     
         # Now lazily copy the snapshots of VMs to tvault appliance
         self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))

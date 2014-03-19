@@ -208,7 +208,11 @@ class Snapshots(BASE, WorkloadsBase):
     workload_id = Column(String(255), ForeignKey('workloads.id'))
     snapshot_type = Column(String(32), nullable=False)
     display_name = Column(String(255))
-    display_description = Column(String(255))    
+    display_description = Column(String(255))
+    size = Column(Integer)
+    progress_percent = Column(Integer)
+    progress_msg = Column(String(255))
+    error_msg =  Column(String(4096))   
     status =  Column(String(32), nullable=False)
 
 class SnapshotVMs(BASE, WorkloadsBase):
@@ -223,6 +227,7 @@ class SnapshotVMs(BASE, WorkloadsBase):
     vm_id = Column(String(255))
     vm_name = Column(String(255))
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
+    size = Column(Integer)
     status =  Column(String(32), nullable=False)
     
 class VMRecentSnapshot(BASE, WorkloadsBase):
@@ -249,7 +254,8 @@ class SnapshotVMResources(BASE, WorkloadsBase):
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     resource_type = Column(String(255)) #disk, network, definition
     resource_name = Column(String(255)) #vda etc.
-    resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot)    
+    resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot) 
+    size = Column(Integer)       
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
@@ -277,6 +283,7 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     top = Column(Boolean, default=False)
     vault_service_url = Column(String(4096))    
     vault_service_metadata = Column(String(4096))
+    size = Column(Integer)    
     status = Column(String(32), nullable=False)    
     
 class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):
@@ -329,7 +336,10 @@ class Restores(BASE, WorkloadsBase):
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     restore_type = Column(String(32), nullable=False)
     display_name = Column(String(255))
-    display_description = Column(String(255))    
+    display_description = Column(String(255))  
+    progress_percent = Column(Integer)
+    progress_msg = Column(String(255))
+    error_msg =  Column(String(4096))   
     status =  Column(String(32), nullable=False)
 
 class RestoredVMs(BASE, WorkloadsBase):

@@ -46,7 +46,12 @@ class ViewBuilder(common.ViewBuilder):
             d['routers'] = restore['routers']  
         d['links'] = self._get_links(request, restore['id'])
         d['name'] = restore['display_name']
-        d['description'] =  restore['display_description']        
+        d['description'] =  restore['display_description']
+        d['progress_percent'] =  snapshot['progress_percent']          
+        d['progress_msg'] =  snapshot['progress_msg'] 
+        d['error_msg'] =  snapshot['error_msg'] 
+
+                
         return {'restore': d}        
 
 

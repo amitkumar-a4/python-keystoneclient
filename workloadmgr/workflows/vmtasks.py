@@ -18,8 +18,6 @@ import time
 import uuid
 import cPickle as pickle
 
-logging.basicConfig(level=logging.ERROR)
-
 top_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                        os.pardir,
                                        os.pardir))
@@ -38,6 +36,11 @@ from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.virt import driver
 from workloadmgr.vault import vault
+from workloadmgr.openstack.common import log as logging
+from workloadmgr import autolog
+
+LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 @contextlib.contextmanager
 def show_time(name):
@@ -60,8 +63,14 @@ class SnapshotVMNetworks(task.Task):
         list.append(new_item)
         
     def execute(self, context, instances, snapshot):
+        return self.execute_with_log(context, instances, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)    
+
+    @autolog.log_method(Logger, 'SnapshotVMNetworks.execute')
+    def execute_with_log(self, context, instances, snapshot):
         # Snapshot the networking configuration of VMs
-        print "NetworkSnapshot:"
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
@@ -221,13 +230,20 @@ class SnapshotVMNetworks(task.Task):
                                                          
             vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
 
-    def revert(self, *args, **kwargs):
-        # Resume VM
-        print "Reverting NetworkSnapshot"
+    @autolog.log_method(Logger, 'SnapshotVMNetworks.revert') 
+    def revert_with_log(self, *args, **kwargs):
+        pass
         
 class SnapshotVMFlavors(task.Task):
 
     def execute(self, context, instances, snapshot):
+        return self.execute_with_log(context, instances, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs) 
+      
+    @autolog.log_method(Logger, 'SnapshotVMFlavors.execute')
+    def execute_with_log(self, context, instances, snapshot):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
@@ -243,63 +259,102 @@ class SnapshotVMFlavors(task.Task):
                                            'metadata': metadata,
                                            'status': 'available'}
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)                                     
-                 
-    def revert(self, *args, **kwargs):
-        # Resume VM
-        print "Reverting SnapshotVMFlavors"
+          
+    @autolog.log_method(Logger, 'SnapshotVMFlavors.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
                             
 class PauseVM(task.Task):
 
     def execute(self, context, instance):
+        return self.execute_with_log(context, instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs) 
+    
+    @autolog.log_method(Logger, 'PauseVM.execute')
+    def execute_with_log(self, context, instance):
         # Pause the VM
-        print "PauseVM: " + instance['vm_id']
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
         compute_service.pause(cntx, instance['vm_id'])
 
-    def revert(self, *args, **kwargs):
-        # Resume VM
-        print "Reverting PauseVM: " + kwargs['instance']['vm_id']
+    @autolog.log_method(Logger, 'PauseVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
         
 class UnPauseVM(task.Task):
 
     def execute(self, context, instance):
+        return self.execute_with_log(context, instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'UnPauseVM.execute')
+    def execute_with_log(self, context, instance):
         # UnPause the VM
-        print "UnPauseVM: " + instance['vm_id']
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
         compute_service.unpause(cntx, instance['vm_id'])
 
-    def revert(self, *args, **kwargs):
-        # Resume VM
-        print "Reverting UnPauseVM: " + kwargs['instance']['vm_id']        
+    @autolog.log_method(Logger, 'UnPauseVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass     
 
 class SuspendVM(task.Task):
 
     def execute(self, context, instance):
+        return self.execute_with_log(context, instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'SuspendVM.execute')
+    def execute_with_log(self, context, instance):
         # Resume the VM
-        print "SuspendVM: " + instance['vm_id']
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
         compute_service.suspend(cntx, instance['vm_id'])
-        
+
+    @autolog.log_method(Logger, 'SuspendVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass     
+            
 class ResumeVM(task.Task):
 
     def execute(self, context, instance):
+        return self.execute_with_log(context, instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'ResumeVM.execute')
+    def execute_with_log(self, context, instance):
         # Resume the VM
-        print "ResumeVM: " + instance['vm_id']
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
         compute_service.resume(cntx, instance['vm_id'])
 
+    @autolog.log_method(Logger, 'ResumeVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass     
+    
 class PreSnapshot(task.Task):
+
     def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'PreSnapshot.execute')
+    def execute_with_log(self, context, instance, snapshot):
         # pre processing of snapshot
-        print "PreSnapshot VM: " + instance['vm_id']
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
@@ -316,12 +371,22 @@ class PreSnapshot(task.Task):
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             #TODO(giri): implement this for VMware
             #virtdriver.pre_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
-        
+
+    @autolog.log_method(Logger, 'PreSnapshot.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass     
+           
 class SnapshotVM(task.Task):
 
     def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'SnapshotVM.execute')
+    def execute_with_log(self, context, instance, snapshot):
         # Snapshot the VM
-        print "SnapshotVM: " + instance['vm_id']
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
@@ -338,12 +403,94 @@ class SnapshotVM(task.Task):
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
             #TODO(giri): implement this for VMware
             #virtdriver.snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+
+    @autolog.log_method(Logger, 'SnapshotVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass     
+                
+class SnapshotDataSize(task.Task):
+
+    def execute(self, context, instances, snapshot):
+        return self.execute_with_log(context, instances, snapshot)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)    
+    
+    @autolog.log_method(Logger, 'GetSnapshotDataSize.execute')    
+    def execute_with_log(self, context, instances, snapshot):
+        # Snapshot the VM
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
         
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+
+        snapshot_data_size = 0;
+        for instance in instances:
+            vm_data_size = 0;
+            if instance['hypervisor_type'] == 'QEMU': 
+                compute_service = nova.API(production=True)
+                disks_info = compute_service.vast_get_info(cntx, instance['vm_id'], {})['info']
+                for disk_info in disks_info:
+                    vm_disk_size = 0
+                    pop_backings = True
+                    vm_disk_resource_snap_id = None
+                    if snapshot['snapshot_type'] != 'full':
+                        vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+                        if vm_recent_snapshot:
+                            previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                    cntx, 
+                                                                    instance['vm_id'], 
+                                                                    vm_recent_snapshot.snapshot_id, 
+                                                                    disk_info['dev'])
+                            previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                            vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+                            pop_backings = False
+    
+                    if len(disk_info['backings']) > 0 and pop_backings == True:
+                        base_backing_path = disk_info['backings'].pop()
+                    else:
+                        base_backing_path = disk_info['backings'][0]
+                    
+                    
+                    while (base_backing_path != None):
+                        top_backing_path = None
+                        if len(disk_info['backings']) > 0 and pop_backings == True:
+                            top_backing_path = disk_info['backings'].pop()
+                             
+                        vm_disk_size = vm_disk_size + base_backing_path['size']
+                        base_backing_path = top_backing_path
+
+                    vm_data_size = vm_data_size + vm_disk_size
+ 
+                        
+            else: 
+                #TODO(giri) Check for all other hypervisor types
+                virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+                #TODO(giri): implement this for VMware
+                #virtdriver.snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
+
+                
+            db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': vm_data_size,})
+            snapshot_data_size = snapshot_data_size + vm_data_size
+        db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
+        return snapshot_data_size
+            
+    @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
+    def revert_with_log(self, *args, **kwargs):
+        pass    
+            
 class UploadSnapshot(task.Task):
 
     def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'UploadSnapshot.execute')    
+    def execute_with_log(self, context, instance, snapshot):
         # Upload snapshot data to swift endpoint
-        print "UploadSnapshot VM: " + instance['vm_id']
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
@@ -355,7 +502,9 @@ class UploadSnapshot(task.Task):
             compute_service = nova.API(production=True)
             vault_service = vault.get_vault_service(cntx)
             disks_info = compute_service.vast_get_info(cntx, instance['vm_id'], {})['info']
-            for disk_info in disks_info:    
+
+            for disk_info in disks_info:
+                vm_disk_size = 0
                 snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                                'vm_id': instance['vm_id'],
                                                'snapshot_id': snapshot_obj.id,       
@@ -366,29 +515,30 @@ class UploadSnapshot(task.Task):
     
                 snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
                
-                                
+                
+                pop_backings = True                
                 vm_disk_resource_snap_id = None
                 if snapshot['snapshot_type'] != 'full':
                     vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
-                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            cntx, 
-                                                            instance['vm_id'], 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk_info['dev'])
-                    previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
-                    vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+                    if vm_recent_snapshot:
+                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                cntx, 
+                                                                instance['vm_id'], 
+                                                                vm_recent_snapshot.snapshot_id, 
+                                                                disk_info['dev'])
+                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                        vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+                        pop_backings = False
 
-                base_backing_path = None
-                if(len(disk_info['backings']) > 0):
-                    if snapshot['snapshot_type'] != 'full':
-                        base_backing_path = disk_info['backings'][0]
-                    else:
-                        base_backing_path = disk_info['backings'].pop() 
+                if len(disk_info['backings']) > 0 and pop_backings == True:
+                    base_backing_path = disk_info['backings'].pop()
+                else:
+                    base_backing_path = disk_info['backings'][0]
+
                 while (base_backing_path != None):
                     top_backing_path = None
-                    if snapshot['snapshot_type'] == 'full':
-                        if(len(disk_info['backings']) > 0):
-                            top_backing_path = disk_info['backings'].pop()
+                    if len(disk_info['backings']) > 0 and pop_backings == True:
+                        top_backing_path = disk_info['backings'].pop()
                         
                     # create an entry in the vm_disk_resource_snaps table
                     vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
@@ -404,6 +554,7 @@ class UploadSnapshot(task.Task):
                                                      'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
                                                      'metadata': vm_disk_resource_snap_metadata,       
                                                      'top':  top,
+                                                     'size': base_backing_path['size'],                                                     
                                                      'status': 'creating'}     
                                                                  
                     vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)                
@@ -413,17 +564,34 @@ class UploadSnapshot(task.Task):
                                       'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                       'resource_name':  disk_info['dev'],
                                       'snapshot_vm_id': instance['vm_id'],
-                                      'snapshot_id': snapshot_obj.id}
+                                      'snapshot_id': snapshot_obj.id,}
                     vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path']})
-                    vault_service_url = vault_service.store(vault_metadata, vast_data); 
+                    
+                    snapshot_obj = db.snapshot_update(  cntx, 
+                                                        snapshot_obj.id, 
+                                                        {'progress_msg': 'Uploading '+ disk_info['dev'] + 'of VM:' + instance['vm_id'],
+                                                         'status': 'uploading'
+                                                        })
+           
+                    vault_service_url = vault_service.store(vault_metadata, vast_data);
+                    percent = ((snapshot_obj.size * snapshot_obj.progress_percent) + (100 * base_backing_path['size']))/snapshot_obj.size                     
+                    snapshot_obj = db.snapshot_update(  cntx, 
+                                                        snapshot_obj.id, 
+                                                        {'progress_percent': percent, 
+                                                         'progress_msg': 'Uploaded '+ disk_info['dev'] + 'of VM:' + instance['vm_id'],
+                                                         'status': 'uploading'
+                                                        })            
+                    
+                     
                     # update the entry in the vm_disk_resource_snap table
                     vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                                     'vault_service_metadata' : 'None',
                                                     'status': 'available'} 
                     db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+                    vm_disk_size = vm_disk_size + base_backing_path['size']
                     base_backing_path = top_backing_path
     
-                db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available',})
+                db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vm_disk_size})
             db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'status': 'available',})
         else: 
             #TODO(giri) Check for all other hypervisor types
@@ -431,11 +599,21 @@ class UploadSnapshot(task.Task):
             #TODO(giri): implement this for VMware
             virtdriver.upload_snapshot(workload_obj, snapshot_obj, instance['vm_id'], instance['hypervisor_hostname'], vault_service, db, cntx)
         
-  
+    @autolog.log_method(Logger, 'UploadSnapshot.revert')    
+    def revert_with_log(self, *args, **kwargs):
+        pass
+      
 class PostSnapshot(task.Task):
+
     def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'PostSnapshot.execute')    
+    def execute_with_log(self, context, instance, snapshot):
         # post processing of snapshot for ex. block commit
-        print "PostSnapshot VM: " + instance['vm_id']
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
@@ -452,6 +630,11 @@ class PostSnapshot(task.Task):
 
 # Assume there is no ordering dependency between instances
 # pause each VM in parallel.
+
+    @autolog.log_method(Logger, 'PostSnapshot.revert')    
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
     for index,item in enumerate(instances):
@@ -503,14 +686,14 @@ def LinearUnPauseVMs(instances):
     return flow
 
 def UnorderedUploadSnapshot(instances):
-    flow = uf.Flow("resumevmsuf")
+    flow = uf.Flow("uploadsnapshotuf")
     for index,item in enumerate(instances):
         flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
     
     return flow
 
 def UnorderedPostSnapshot(instances):
-    flow = uf.Flow("resumevmsuf")
+    flow = uf.Flow("postsnapshotuf")
     for index,item in enumerate(instances):
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
 

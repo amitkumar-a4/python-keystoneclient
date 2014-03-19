@@ -69,7 +69,12 @@ class ViewBuilder(common.ViewBuilder):
             d['instances'] = instances
         d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
-        d['description'] =  snapshot['display_description']          
+        d['description'] =  snapshot['display_description']
+        d['size'] = snapshot['size']
+        d['progress_percent'] =  snapshot['progress_percent']          
+        d['progress_msg'] =  snapshot['progress_msg'] 
+        d['error_msg'] =  snapshot['error_msg'] 
+
         return {'snapshot': d}      
 
     def _list_view(self, func, request, snapshots):
