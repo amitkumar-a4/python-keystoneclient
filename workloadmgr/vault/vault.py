@@ -10,6 +10,7 @@
 import os
 import StringIO
 import types
+import time
 from ctypes import *
 
 import eventlet
@@ -23,6 +24,7 @@ from workloadmgr.openstack.common import fileutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.vault import swift
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 LOG = logging.getLogger(__name__)
 
@@ -98,36 +100,43 @@ class VaultBackupService(base.Base):
         self.copy_remote_file(src_host, file_to_snapshot_path, copy_to_file_path, tvault_fs = True)  
         return copy_to_file_path    
     
-    def store_local(self, snapshot_metadata, iterator):
-        """Backup from the given iterator to local filesystem using the given snapshot metadata."""
-        copy_to_file_path = self.get_snapshot_file_path(snapshot_metadata)
-        head, tail = os.path.split(copy_to_file_path)
-        fileutils.ensure_tree(head)
-        vault_file = open(copy_to_file_path, 'wb') 
-        #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
-        for chunk in iterator:
-            vault_file.write(chunk)
-        vault_file.close()    
-
-        return copy_to_file_path    
-    
     def store(self, snapshot_metadata, iterator):
         """Backup from the given iterator to trilioFS using the given snapshot metadata."""
-        if FLAGS.wlm_vault_local:
-            return self.store_local(snapshot_metadata, iterator)
-        from workloadmgr.vault.glusterapi import gfapi
-        volume = gfapi.Volume("localhost", "vault")
-        volume.mount() 
-        
         copy_to_file_path = self.get_snapshot_file_path(snapshot_metadata) 
         head, tail = os.path.split(copy_to_file_path)
-        volume.mkdir(head.encode('ascii','ignore'))
-        copy_to_file_path_handle = volume.creat(copy_to_file_path.encode('ascii','ignore'), os.O_RDWR, 0644)
+        if FLAGS.wlm_vault_local:
+            fileutils.ensure_tree(head)
+            vault_file = open(copy_to_file_path, 'wb') 
+        else:
+            from workloadmgr.vault.glusterapi import gfapi
+            volume = gfapi.Volume("localhost", "vault")
+            volume.mount() 
+            volume.mkdir(head.encode('ascii','ignore'))
+            vault_file = volume.creat(copy_to_file_path.encode('ascii','ignore'), os.O_RDWR, 0644)
+        
         #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
+        db = WorkloadMgrDB().db
+        snapshot_obj = db.snapshot_get(self.context, snapshot_metadata['snapshot_id'])
+        uploaded_size_incremental = 0
         for chunk in iterator:
-            copy_to_file_path_handle.write(chunk)
-        copy_to_file_path_handle.close() 
-        return copy_to_file_path           
+            vault_file.write(chunk)
+            uploaded_size_incremental = uploaded_size_incremental + len(chunk)
+            #update every 5MB
+            if uploaded_size_incremental > (5 * 1024 * 1024):
+                snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
+                uploaded_size_incremental = 0
+        
+        vault_file.close()
+        
+        if uploaded_size_incremental > 0:
+            snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
+            uploaded_size_incremental = 0
+
+        LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
+        LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
+        LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
+                
+        return copy_to_file_path   
         
          
     def restore_local(self, snapshot_metadata, restore_to_file_path):

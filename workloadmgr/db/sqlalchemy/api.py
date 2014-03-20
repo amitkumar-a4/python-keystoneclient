@@ -8,6 +8,7 @@
 import datetime
 import uuid
 import warnings
+import threading
 
 import sqlalchemy
 import sqlalchemy.orm as sa_orm
@@ -34,6 +35,8 @@ from workloadmgr.apscheduler import job
 FLAGS = flags.FLAGS
 
 LOG = logging.getLogger(__name__)
+
+lock = threading.Lock()
 
 
 def is_admin_context(context):
@@ -737,24 +740,42 @@ def snapshot_create(context, values):
     snapshot = models.Snapshots()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
+    if not values.get('size'):
+        values['size'] = 0
+    if not values.get('uploaded_size'):
+        values['uploaded_size'] = 0
+    if not values.get('progress_percent'):
+        values['progress_percent'] = 0    
     snapshot.update(values)
     snapshot.save()
     return snapshot
 
 @require_context
 def snapshot_update(context, snapshot_id, values):
-    session = get_session()
-    with session.begin():
-        snapshot = model_query(context, models.Snapshots,
-                             session=session, read_deleted="yes").\
-            filter_by(id=snapshot_id).first()
-
-        if not snapshot:
-            raise exception.SnapshotNotFound(
-                _("No snapshot with id %(snapshot_id)s") % locals())
-
-        snapshot.update(values)
-        snapshot.save(session=session)
+    try:
+        lock.acquire()
+        session = get_session()
+        with session.begin():
+            snapshot = model_query(context, models.Snapshots,
+                                 session=session, read_deleted="yes").\
+                filter_by(id=snapshot_id).first()
+    
+            if not snapshot:
+                lock.release()
+                raise exception.SnapshotNotFound(
+                    _("No snapshot with id %(snapshot_id)s") % locals())
+    
+            if not values.get('uploaded_size'):
+                if values.get('uploaded_size_incremental'):
+                    values['uploaded_size'] =  snapshot.uploaded_size + values.get('uploaded_size_incremental') 
+                    if not values.get('progress_percent'):
+                        values['progress_percent'] = (100 * values.get('uploaded_size'))/snapshot.size
+    
+    
+            snapshot.update(values)
+            snapshot.save(session=session)
+    finally:
+        lock.release()
     return snapshot
 
 @require_context
@@ -773,6 +794,9 @@ def snapshot_vm_create(context, values):
     snapshot_vm = models.SnapshotVMs()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
+    if not values.get('size'):
+        values['size'] = 0
+        
     snapshot_vm.update(values)
     snapshot_vm.save()
     return snapshot_vm
@@ -950,6 +974,8 @@ def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge
         snapshot_vm_resource_ref = snapshot_vm_resource_get(context, snapshot_vm_resource_id, session)
     else:
         snapshot_vm_resource_ref = models.SnapshotVMResources()
+        if not values.get('size'):
+            values['size'] = 0        
     
     snapshot_vm_resource_ref.update(values)
     snapshot_vm_resource_ref.save(session)
@@ -1108,6 +1134,8 @@ def _vm_disk_resource_snap_update(context, values, snapshot_vm_resource_id, purg
         vm_disk_resource_snap_ref = vm_disk_resource_snap_get(context, snapshot_vm_resource_id, session)
     else:
         vm_disk_resource_snap_ref = models.VMDiskResourceSnaps()
+        if not values.get('size'):
+            values['size'] = 0
 
     vm_disk_resource_snap_ref.update(values)
     vm_disk_resource_snap_ref.save(session)
@@ -1181,7 +1209,7 @@ def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session=None):
 
 
 @require_context
-def vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id):
+def vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id, session=None):
     if session == None: 
         session = get_session()
     with session.begin():
@@ -1289,7 +1317,7 @@ def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session=None
     try:
         query = session.query(models.VMNetworkResourceSnaps)\
                        .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
-                       .filter_by(vm_network_resource_snap_id==snapshot_vm_resource_id)
+                       .filter_by(vm_network_resource_snap_id=snapshot_vm_resource_id)
 
         #TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_network_resource_snaps = query.all()
@@ -1382,24 +1410,41 @@ def restore_create(context, values):
     restore = models.Restores()
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())
+    if not values.get('size'):
+        values['size'] = 0        
+    if not values.get('uploaded_size'):
+        values['uploaded_size'] = 0
+    if not values.get('progress_percent'):
+        values['progress_percent'] = 0         
     restore.update(values)
     restore.save()
     return restore
 
 @require_context
 def restore_update(context, restore_id, values):
-    session = get_session()
-    with session.begin():
-        restore = model_query(context, models.Restores,
-                             session=session, read_deleted="yes").\
-            filter_by(id=restore_id).first()
-
-        if not restore:
-            raise exception.RestoreNotFound(
-                _("No restore with id %(restore_id)s") % locals())
-
-        restore.update(values)
-        restore.save(session=session)
+    try:
+        lock.acquire()
+        session = get_session()
+        with session.begin():
+            restore = model_query(context, models.Restores,
+                                 session=session, read_deleted="yes").\
+                filter_by(id=restore_id).first()
+    
+            if not restore:
+                lock.release()
+                raise exception.RestoreNotFound(
+                    _("No restore with id %(restore_id)s") % locals())
+                
+            if not values.get('uploaded_size'):
+                if values.get('uploaded_size_incremental'):
+                    values['uploaded_size'] =  restore.uploaded_size + values.get('uploaded_size_incremental') 
+                    if not values.get('progress_percent'):
+                        values['progress_percent'] = (100 * values.get('uploaded_size'))/restore.size
+    
+            restore.update(values)
+            restore.save(session=session)
+    finally:
+        lock.release()
     return restore
 
 @require_context

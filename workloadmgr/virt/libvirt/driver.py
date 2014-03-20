@@ -52,6 +52,7 @@ from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 from workloadmgr.db import base
+from workloadmgr import autolog
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -59,6 +60,7 @@ native_Queue = patcher.original("Queue")
 libvirt = None
 
 LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 libvirt_opts = [
     cfg.StrOpt('libvirt_type',
@@ -605,11 +607,34 @@ class LibvirtDriver(driver.ComputeDriver):
             if metadata['key'] == key:
                 pit_id = metadata['value']
                 return pit_id
+
+    def instance_restore_size(self, snapshot_vm, db, context):
+        """
+        calculate the restore data size
+        """  
+        instance_size = 0          
+        snapshot_vm_resources = db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot_vm.snapshot_id)
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type != 'disk':
+                continue
+            vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
+            instance_size = instance_size + vm_disk_resource_snap.size
+            while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                instance_size = instance_size + vm_disk_resource_snap_backing.size
+                vm_disk_resource_snap  = vm_disk_resource_snap_backing                           
+
+        return instance_size          
     
+    @autolog.log_method(Logger, 'libvirt.driver.snapshot_restore')    
     def snapshot_restore(self, workload, snapshot, restore, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
         """
         Restores the specified instance from a snapshot
-        """  
+        """
+        msg = 'Creating VM ' + snapshot_vm.vm_id + ' from snapshot ' + snapshot.id  
+        LOG.debug(msg)
+        db.restore_update(context, restore.id, {'progress_msg': msg, 'status': 'executing'})  
+                
         if restore.restore_type == 'test':
             test = True
             compute_service = nova.API(production=False)
@@ -621,6 +646,8 @@ class LibvirtDriver(driver.ComputeDriver):
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
         snapshot_vm_resources = db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)
 
+
+        LOG.debug('Restoring VM Flavor')
         #vm flavor
         restored_compute_flavor = compute_service.get_flavor_by_name(context, 'm1.small')
         for snapshot_vm_resource in snapshot_vm_resources:
@@ -635,6 +662,7 @@ class LibvirtDriver(driver.ComputeDriver):
                         break
                 break                                       
 
+        LOG.debug('Identifying networking resources')
         #network resources
         nics = []
         for snapshot_vm_resource in snapshot_vm_resources:
@@ -676,7 +704,9 @@ class LibvirtDriver(driver.ComputeDriver):
                               'resource_name':  snapshot_vm_resource.resource_name,
                               'snapshot_vm_id': snapshot_vm_resource.vm_id,
                               'snapshot_id': snapshot_vm_resource.snapshot_id}
+            LOG.debug('Restoring ' + vm_disk_resource_snap.vault_service_url)
             vault_service.restore(vault_metadata, restored_file_path)
+            LOG.debug('Restored ' + vm_disk_resource_snap.vault_service_url)
             if vm_disk_resource_snap.vm_disk_resource_snap_backing_id is None:
                 self.rebase_vmdk(restored_file_path,
                                  db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
@@ -699,7 +729,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'resource_name':  snapshot_vm_resource_backing.resource_name,
                                   'snapshot_vm_id': snapshot_vm_resource_backing.vm_id,
                                   'snapshot_id': snapshot_vm_resource_backing.snapshot_id}
-                vault_service.restore(vault_metadata, restored_file_path_backing)     
+                LOG.debug('Restoring ' + vm_disk_resource_snap_backing.vault_service_url)
+                vault_service.restore(vault_metadata, restored_file_path_backing)
+                LOG.debug('Restored ' + vm_disk_resource_snap_backing.vault_service_url)     
                 #rebase
                 if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
                     self.rebase_qcow2('localhost', restored_file_path_backing, restored_file_path)
@@ -718,6 +750,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 while commit_queue.empty() is not True:
                     file_to_commit = commit_queue.get_nowait()
                     try:
+                        LOG.debug('Commiting QCOW2 ' + file_to_commit)
                         self.commit_qcow2('localhost', file_to_commit)
                     except Exception, ex:
                         pass                       
@@ -727,9 +760,14 @@ class LibvirtDriver(driver.ComputeDriver):
                     file_to_commit = restored_file_path
                     commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
                     commit_to = commit_to.replace(" ", "")
+                    LOG.debug('Commiting VMDK ' + file_to_commit)
                     restored_file_path = self.commit_vmdk(file_to_commit, commit_to, test)
-                    
-                
+            
+            LOG.debug('Uploading image and volumes of instance ' + snapshot_vm.vm_id + ' from snapshot ' + snapshot.id)        
+            db.restore_update(context, restore.id, 
+                              {'progress_msg': 'Uploading image and volumes of instance ' + snapshot_vm.vm_id + ' from snapshot ' + snapshot.id,
+                               'status': 'uploading' 
+                              })                  
 
             #upload to glance
             with file(restored_file_path) as image_file:
@@ -766,14 +804,17 @@ class LibvirtDriver(driver.ComputeDriver):
                 else:
                     image_service = glance.get_default_image_service(production=True)
                 if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
+                    LOG.debug('Uploading image ' + restored_file_path)
                     restored_image = image_service.create(context, image_metadata, image_file)
+                    restore = db.restore_update(context, restore.id, {'uploaded_size_incremental': restored_image['size']})
                 else:
                     if test == False:
                         #TODO(gbasava): Request a feature in cinder to create volume from a file.
                         #As a workaround we will create the image and covert that to cinder volume
-    
+                        LOG.debug('Uploading image ' + image_file)
                         restored_volume_image = image_service.create(context, image_metadata, image_file)
                         restored_volume_name = uuid.uuid4().hex
+                        LOG.debug('Creating volume from image ' + image_file)
                         restored_volume = volume_service.create(context, math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)), restored_volume_name, 'from workloadmgr', None, restored_volume_image['id'], None, None, None)
                         device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
                        
@@ -781,6 +822,8 @@ class LibvirtDriver(driver.ComputeDriver):
                         #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
                         time.sleep(30)
                         image_service.delete(context, restored_volume_image['id'])
+                        
+                        restore = db.restore_update(context, restore.id, {'uploaded_size_incremental': restored_image['size']})
                     else:
                         device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_file_path)                        
 
@@ -788,6 +831,7 @@ class LibvirtDriver(driver.ComputeDriver):
         #create nova instance
         restored_instance_name = snapshot_vm.vm_name + '_of_snapshot_' + snapshot.id + '_' + uuid.uuid4().hex[:6]
         restored_compute_image = compute_service.get_image(context, restored_image['id'])
+        LOG.debug('Creatng Instance ' + restored_instance_name)        
         restored_instance = compute_service.create_server(context, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=nics)
         while restored_instance.status != 'ACTIVE':
             time.sleep(30)
@@ -818,8 +862,10 @@ class LibvirtDriver(driver.ComputeDriver):
             if test == False:
                 while restored_volume['status'] != 'available':
                     #TODO:(giri) need a timeout to exit
+                    LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
                     time.sleep(30)
                     restored_volume = volume_service.get(context, restored_volume['id'])
+                LOG.debug('Attaching volume ' + restored_volume['id'])
                 compute_service.attach_volume(context, restored_instance.id, restored_volume['id'], ('/dev/' + devname))
                 time.sleep(15)
             else:
@@ -844,5 +890,9 @@ class LibvirtDriver(driver.ComputeDriver):
             except OSError as exc:
                 pass 
          
+        db.restore_update(context,restore.id, 
+                          {'progress_msg': 'Created VM ' + snapshot_vm.vm_id + ' from snapshot ' + snapshot.id,
+                           'status': 'executing'
+                          })           
         return restored_instance          
 

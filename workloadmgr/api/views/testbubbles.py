@@ -71,7 +71,11 @@ class ViewBuilder(common.ViewBuilder):
             d['routers'] = testbubble['routers']                                
         d['links'] = self._get_links(request, testbubble['id'])
         d['name'] = testbubble['display_name']
-        d['description'] =  testbubble['display_description']         
+        d['description'] =  testbubble['display_description']
+        d['progress_percent'] =  testbubble['progress_percent']          
+        d['progress_msg'] =  testbubble['progress_msg'] 
+        d['error_msg'] =  testbubble['error_msg'] 
+
         return {'testbubble': d}        
 
     def _list_view(self, func, request, testbubbles):

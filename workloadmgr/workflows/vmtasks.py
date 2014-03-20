@@ -31,7 +31,7 @@ from taskflow import task
 from taskflow.utils import reflection
 
 from workloadmgr.openstack.common.rpc import amqp
-from workloadmgr.db import base
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.virt import driver
@@ -49,11 +49,7 @@ def show_time(name):
     end = time.time()
     print(" -- %s took %0.3f seconds" % (name, end - start))
 
-class WorkloadMgrDB(base.Base):
-
-    def __init__(self, host=None, db_driver=None):
-        super(WorkloadMgrDB, self).__init__(db_driver)
-        
+       
 class SnapshotVMNetworks(task.Task):
 
     def _append_unique(self, list, new_item):
@@ -427,11 +423,13 @@ class SnapshotDataSize(task.Task):
 
         snapshot_data_size = 0;
         for instance in instances:
+            LOG.debug(_("instance: %(instance_id)s") %{'instance_id': instance['vm_id'],})
             vm_data_size = 0;
             if instance['hypervisor_type'] == 'QEMU': 
                 compute_service = nova.API(production=True)
                 disks_info = compute_service.vast_get_info(cntx, instance['vm_id'], {})['info']
                 for disk_info in disks_info:
+                    LOG.debug(_("    disk: %(disk)s") %{'disk': disk_info['dev'],})
                     vm_disk_size = 0
                     pop_backings = True
                     vm_disk_resource_snap_id = None
@@ -457,11 +455,17 @@ class SnapshotDataSize(task.Task):
                         top_backing_path = None
                         if len(disk_info['backings']) > 0 and pop_backings == True:
                             top_backing_path = disk_info['backings'].pop()
-                             
+                        LOG.debug(_("        backing_file: %(backing_file)s") %{'backing_file': os.path.basename(base_backing_path['path']),})
+                        LOG.debug(_("        vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
+                        LOG.debug(_("        backing_size: %(backing_size)s") %{'backing_size': base_backing_path['size'],})     
                         vm_disk_size = vm_disk_size + base_backing_path['size']
+                        LOG.debug(_("        vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
                         base_backing_path = top_backing_path
 
+                    LOG.debug(_("    vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
+                    LOG.debug(_("    vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
                     vm_data_size = vm_data_size + vm_disk_size
+                    LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
  
                         
             else: 
@@ -472,8 +476,13 @@ class SnapshotDataSize(task.Task):
 
                 
             db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': vm_data_size,})
+            LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
+            LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
             snapshot_data_size = snapshot_data_size + vm_data_size
+            LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
+
         db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
+        LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
         return snapshot_data_size
             
     @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
@@ -519,6 +528,7 @@ class UploadSnapshot(task.Task):
                 pop_backings = True                
                 vm_disk_resource_snap_id = None
                 if snapshot['snapshot_type'] != 'full':
+                    #TODO(giri): the disk can be a new disk than the previous snapshot  
                     vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                     if vm_recent_snapshot:
                         previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
@@ -528,7 +538,8 @@ class UploadSnapshot(task.Task):
                                                                 disk_info['dev'])
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
-                        pop_backings = False
+                        if previous_snapshot_vm_resource.status == 'available':
+                            pop_backings = False
 
                 if len(disk_info['backings']) > 0 and pop_backings == True:
                     base_backing_path = disk_info['backings'].pop()
@@ -565,24 +576,20 @@ class UploadSnapshot(task.Task):
                                       'resource_name':  disk_info['dev'],
                                       'snapshot_vm_id': instance['vm_id'],
                                       'snapshot_id': snapshot_obj.id,}
+    
                     vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path']})
                     
-                    snapshot_obj = db.snapshot_update(  cntx, 
-                                                        snapshot_obj.id, 
-                                                        {'progress_msg': 'Uploading '+ disk_info['dev'] + 'of VM:' + instance['vm_id'],
+                    snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
+                                                        {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                          'status': 'uploading'
                                                         })
-           
+                    LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + '; backing file:' + os.path.basename(base_backing_path['path'])))
                     vault_service_url = vault_service.store(vault_metadata, vast_data);
-                    percent = ((snapshot_obj.size * snapshot_obj.progress_percent) + (100 * base_backing_path['size']))/snapshot_obj.size                     
-                    snapshot_obj = db.snapshot_update(  cntx, 
-                                                        snapshot_obj.id, 
-                                                        {'progress_percent': percent, 
-                                                         'progress_msg': 'Uploaded '+ disk_info['dev'] + 'of VM:' + instance['vm_id'],
+                    snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
+                                                        {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                          'status': 'uploading'
-                                                        })            
+                                                        })                           
                     
-                     
                     # update the entry in the vm_disk_resource_snap table
                     vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
                                                     'vault_service_metadata' : 'None',

@@ -130,6 +130,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Restore the networking configuration of VMs of the snapshot
         nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
         """
+        self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks...', 'status': 'executing'})            
         network_service =  neutron.API(production=production)  
         snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot.id, snapshot.id)           
         for snapshot_vm in self.db.snapshot_vms_get(context, snapshot.id):
@@ -257,6 +258,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         network_service.router_add_gateway(context,new_router['id'], new_ext_network['id'])
                     except Exception as err:
                         pass
+        self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks completed', 'status': 'executing'})                     
     
     @autolog.log_method(logger=Logger)        
     def workload_type_discover_instances(self, context, workload_type_id, metadata):
@@ -464,8 +466,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             {'progress_percent': 0, 
                              'progress_msg': 'Restore from snapshot is starting',
                              'status': 'starting'
-                            })                           
+                            })
+            
+            restore_size = 0
+            for vm in self.db.snapshot_vms_get(context, snapshot.id):    
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+                instance_size = virtdriver.instance_restore_size(vm, self.db, context)
+                restore_size =  restore_size +  instance_size 
 
+            self.db.restore_update( context, restore_id, {'size': restore_size})                
             
             new_net_resources = {}
             if restore_type == 'test':
@@ -478,11 +487,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #TODO(giri): If one VM restore fails, rollback the whole transaction
             for vm in self.db.snapshot_vms_get(context, snapshot.id): 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+                self.db.restore_update( context, restore.id, {'progress_msg': 'Creating VM:' + vm.vm_id, 'status': 'executing'}) 
                 restored_instance = virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
                 restored_vm_values = {'vm_id': restored_instance.id,
                                       'vm_name':  restored_instance.name,    
                                       'restore_id': restore.id,
                                       'status': 'available'}
+                self.db.restore_update( context, restore.id, {'progress_msg': 'Created VM:' + vm.vm_id, 'status': 'executing'})
                 restored_vm = self.db.restored_vm_create(context,restored_vm_values)    
           
             if restore_type == 'test':
@@ -490,14 +501,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             restore_id, 
                             {'progress_percent': 100, 
                              'progress_msg': 'Create testbubble from snapshot is complete',
-                             'status': 'completed'
+                             'status': 'available'
                             })  
             else:
                 self.db.restore_update( context, 
                             restore_id, 
                             {'progress_percent': 100, 
                              'progress_msg': 'Restore from snapshot is complete',
-                             'status': 'completed'
+                             'status': 'available'
                             })                         
 
         except Exception as ex:

@@ -369,7 +369,7 @@ class API(base.Base):
         Delete a workload restore. RPC call may be required
         """
         restore_details = self.restore_show(context, restore_id)
-        if restore_details['status'] not in ['completed', 'error']:
+        if restore_details['status'] not in ['available', 'error']:
             msg = _('Restore or Testbubble status must be completed or error')
             raise exception.InvalidWorkloadMgr(reason=msg)
 
