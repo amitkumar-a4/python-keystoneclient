@@ -443,7 +443,8 @@ class SnapshotDataSize(task.Task):
                                                                     disk_info['dev'])
                             previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                             vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
-                            pop_backings = False
+                            if previous_snapshot_vm_resource.status == 'available':
+                                pop_backings = False
     
                     if len(disk_info['backings']) > 0 and pop_backings == True:
                         base_backing_path = disk_info['backings'].pop()
