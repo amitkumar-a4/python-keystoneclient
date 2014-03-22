@@ -33,6 +33,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
+from workloadmgr import utils
 
 import vmtasks
 import workflow
@@ -134,14 +135,6 @@ def getnodenames(connection):
 
     return nodenames
 
-def _append_unique(list, new_item, key):
-    for item in list:
-       if (item[key] == new_item[key]):
-           return
-
-    list.append(new_item)
-    return
-
 def get_hadoop_nodes(cntx, host, port, username, password):
     #
     # Creating connection to hadoop namenode 
@@ -196,11 +189,12 @@ def get_hadoop_nodes(cntx, host, port, username, password):
                             hypervisor_type = hypervisor.hypervisor_type
                             break
                    
-                    _append_unique(vms, {'vm_id' : instance.id,
-                          'vm_name' : instance.name,
-                          'vm_flavor_id' : instance.flavor['id'],
-                          'hypervisor_hostname' : hypervisor_hostname,
-                          'hypervisor_type' :  hypervisor_type}, "vm_id")
+                    utils.append_unique(vms, {'vm_id' : instance.id,
+                                              'vm_name' : instance.name,
+                                              'vm_flavor_id' : instance.flavor['id'],
+                                              'hypervisor_hostname' : hypervisor_hostname,
+                                              'hypervisor_type' :  hypervisor_type}, 
+                                        "vm_id")
     return vms
 
 class EnableSafemode(task.Task):

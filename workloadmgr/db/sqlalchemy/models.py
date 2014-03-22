@@ -148,6 +148,7 @@ class Workloads(BASE, WorkloadsBase):
     availability_zone = Column(String(255))
     display_name = Column(String(255))
     display_description = Column(String(255))
+    environment = String(36)
     workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
     status = Column(String(255)) 
   

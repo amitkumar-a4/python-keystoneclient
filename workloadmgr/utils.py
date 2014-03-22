@@ -362,142 +362,6 @@ def generate_uid(topic, size=8):
     return '%s-%s' % (topic, ''.join(choices))
 
 
-# Default symbols to use for passwords. Avoids visually confusing characters.
-# ~6 bits per symbol
-DEFAULT_PASSWORD_SYMBOLS = ('23456789',  # Removed: 0,1
-                            'ABCDEFGHJKLMNPQRSTUVWXYZ',   # Removed: I, O
-                            'abcdefghijkmnopqrstuvwxyz')  # Removed: l
-
-
-# ~5 bits per symbol
-EASIER_PASSWORD_SYMBOLS = ('23456789',  # Removed: 0, 1
-                           'ABCDEFGHJKLMNPQRSTUVWXYZ')  # Removed: I, O
-
-
-def last_completed_audit_period(unit=None):
-    """This method gives you the most recently *completed* audit period.
-
-    arguments:
-            units: string, one of 'hour', 'day', 'month', 'year'
-                    Periods normally begin at the beginning (UTC) of the
-                    period unit (So a 'day' period begins at midnight UTC,
-                    a 'month' unit on the 1st, a 'year' on Jan, 1)
-                    unit string may be appended with an optional offset
-                    like so:  'day@18'  This will begin the period at 18:00
-                    UTC.  'month@15' starts a monthly period on the 15th,
-                    and year@3 begins a yearly one on March 1st.
-
-
-    returns:  2 tuple of datetimes (begin, end)
-              The begin timestamp of this audit period is the same as the
-              end of the previous."""
-    if not unit:
-        unit = FLAGS.volume_usage_audit_period
-
-    offset = 0
-    if '@' in unit:
-        unit, offset = unit.split("@", 1)
-        offset = int(offset)
-
-    rightnow = timeutils.utcnow()
-    if unit not in ('month', 'day', 'year', 'hour'):
-        raise ValueError('Time period must be hour, day, month or year')
-    if unit == 'month':
-        if offset == 0:
-            offset = 1
-        end = datetime.datetime(day=offset,
-                                month=rightnow.month,
-                                year=rightnow.year)
-        if end >= rightnow:
-            year = rightnow.year
-            if 1 >= rightnow.month:
-                year -= 1
-                month = 12 + (rightnow.month - 1)
-            else:
-                month = rightnow.month - 1
-            end = datetime.datetime(day=offset,
-                                    month=month,
-                                    year=year)
-        year = end.year
-        if 1 >= end.month:
-            year -= 1
-            month = 12 + (end.month - 1)
-        else:
-            month = end.month - 1
-        begin = datetime.datetime(day=offset, month=month, year=year)
-
-    elif unit == 'year':
-        if offset == 0:
-            offset = 1
-        end = datetime.datetime(day=1, month=offset, year=rightnow.year)
-        if end >= rightnow:
-            end = datetime.datetime(day=1,
-                                    month=offset,
-                                    year=rightnow.year - 1)
-            begin = datetime.datetime(day=1,
-                                      month=offset,
-                                      year=rightnow.year - 2)
-        else:
-            begin = datetime.datetime(day=1,
-                                      month=offset,
-                                      year=rightnow.year - 1)
-
-    elif unit == 'day':
-        end = datetime.datetime(hour=offset,
-                                day=rightnow.day,
-                                month=rightnow.month,
-                                year=rightnow.year)
-        if end >= rightnow:
-            end = end - datetime.timedelta(days=1)
-        begin = end - datetime.timedelta(days=1)
-
-    elif unit == 'hour':
-        end = rightnow.replace(minute=offset, second=0, microsecond=0)
-        if end >= rightnow:
-            end = end - datetime.timedelta(hours=1)
-        begin = end - datetime.timedelta(hours=1)
-
-    return (begin, end)
-
-
-def generate_password(length=20, symbolgroups=DEFAULT_PASSWORD_SYMBOLS):
-    """Generate a random password from the supplied symbol groups.
-
-    At least one symbol from each group will be included. Unpredictable
-    results if length is less than the number of symbol groups.
-
-    Believed to be reasonably secure (with a reasonable password length!)
-
-    """
-    r = random.SystemRandom()
-
-    # NOTE(jerdfelt): Some password policies require at least one character
-    # from each group of symbols, so start off with one random character
-    # from each symbol group
-    password = [r.choice(s) for s in symbolgroups]
-    # If length < len(symbolgroups), the leading characters will only
-    # be from the first length groups. Try our best to not be predictable
-    # by shuffling and then truncating.
-    r.shuffle(password)
-    password = password[:length]
-    length -= len(password)
-
-    # then fill with random characters from all symbol groups
-    symbols = ''.join(symbolgroups)
-    password.extend([r.choice(symbols) for _i in xrange(length)])
-
-    # finally shuffle to ensure first x characters aren't from a
-    # predictable group
-    r.shuffle(password)
-
-    return ''.join(password)
-
-
-def generate_username(length=20, symbolgroups=DEFAULT_PASSWORD_SYMBOLS):
-    # Use the same implementation as the password generation.
-    return generate_password(length, symbolgroups)
-
-
 def last_octet(address):
     return int(address.split('.')[-1])
 
@@ -1368,4 +1232,10 @@ def move_file(src, dest):
     
 def copy_file(src, dest):
     execute('cp', src, dest)    
+    
+def append_unique(list, new_item):
+    for item in list:
+        if item['id'] == new_item['id']:
+            return
+    list.append(new_item)    
   

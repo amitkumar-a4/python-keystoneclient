@@ -36,6 +36,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
+from workloadmgr.workflows import vmtasks_openstack
 
 from workloadmgr import autolog
 
@@ -76,6 +77,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         LOG.info(_("Cleaning up incomplete operations"))
         
+    def _get_snapshot_size_of_vm(self, context, snapshot_vm):
+        """
+        calculate the restore data size
+        """  
+        instance_size = 0          
+        snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot_vm.snapshot_id)
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type != 'disk':
+                continue
+            vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
+            instance_size = instance_size + vm_disk_resource_snap.size
+            while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+                vm_disk_resource_snap_backing = self.db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                instance_size = instance_size + vm_disk_resource_snap_backing.size
+                vm_disk_resource_snap  = vm_disk_resource_snap_backing                           
+
+        return instance_size                  
+        
     def _get_workflow_class(self, context, workload_type_id):
         #TODO(giri): implement a driver model for the workload types
         workload_type = self.db.workload_type_get(context, workload_type_id)
@@ -100,166 +119,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow_class = getattr(workflow_class, comp)            
         return workflow_class        
         
-    def _append_unique(self, list, new_item):
-        for item in list:
-            if item['id'] == new_item['id']:
-                return
-        list.append(new_item)
-        
-       
-
     def _get_metadata_value(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
                 return metadata['value']
                 
-    def _get_pit_resource_id(self, vm_network_resource_snap, key):
-        for metadata in vm_network_resource_snap.metadata:
-            if metadata['key'] == key:
-                pit_id = metadata['value']
-                return pit_id
-            
-    def _get_pit_resource(self, snapshot_vm_common_resources, pit_id):
-        for snapshot_vm_resource in snapshot_vm_common_resources:
-            if snapshot_vm_resource.resource_pit_id == pit_id:
-                return snapshot_vm_resource            
-
-    @autolog.log_method(logger=Logger)                    
-    def _restore_networks(self, context, production, snapshot, restore, new_net_resources):
-        """
-        Restore the networking configuration of VMs of the snapshot
-        nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
-        """
-        self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks...', 'status': 'executing'})            
-        network_service =  neutron.API(production=production)  
-        snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot.id, snapshot.id)           
-        for snapshot_vm in self.db.snapshot_vms_get(context, snapshot.id):
-            snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot.id)        
-            for snapshot_vm_resource in snapshot_vm_resources:
-                if snapshot_vm_resource.resource_type == 'nic':                
-                    vm_nic_snapshot = self.db.vm_network_resource_snap_get(context, snapshot_vm_resource.id)
-                    #private network
-                    pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'network_id')
-                    if pit_id in new_net_resources:
-                        new_network = new_net_resources[pit_id]
-                    else:
-                        vm_nic_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_network.id)
-                        network = pickle.loads(str(vm_nic_network_snapshot.pickle))
-                        params = {'name': network['name'] + '_' + restore.id,
-                                  'tenant_id': context.tenant,
-                                  'admin_state_up': network['admin_state_up'],
-                                  'shared': network['shared'],
-                                  'router:external': network['router:external']} 
-                        new_network = network_service.create_network(context,**params)
-                        new_net_resources.setdefault(pit_id,new_network)
-                        restored_vm_resource_values = {'id': new_network['id'],
-                                                       'vm_id': restore.id,
-                                                       'restore_id': restore.id,       
-                                                       'resource_type': 'network',
-                                                       'resource_name':  new_network['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                                        
-                        
-                    #private subnet
-                    pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'subnet_id')
-                    if pit_id in new_net_resources:
-                        new_subnet = new_net_resources[pit_id]
-                    else:
-                        vm_nic_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
-                        subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                        params = {'name': subnet['name'] + '_' + restore.id,
-                                  'network_id': new_network['id'],
-                                  'tenant_id': context.tenant,
-                                  'cidr': subnet['cidr'],
-                                  'ip_version': subnet['ip_version']} 
-                        new_subnet = network_service.create_subnet(context,**params)
-                        new_net_resources.setdefault(pit_id,new_subnet)
-                        restored_vm_resource_values = {'id': new_subnet['id'],
-                                                       'vm_id': restore.id,
-                                                       'restore_id': restore.id,       
-                                                       'resource_type': 'subnet',
-                                                       'resource_name':  new_subnet['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                              
-    
-                    #external network
-                    pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'ext_network_id')
-                    if pit_id in new_net_resources:
-                        new_ext_network = new_net_resources[pit_id]
-                    else:
-                        vm_nic_ext_network = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_ext_network_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_network.id)
-                        ext_network = pickle.loads(str(vm_nic_ext_network_snapshot.pickle))
-                        params = {'name': ext_network['name'] + '_' + restore.id,
-                                  'admin_state_up': ext_network['admin_state_up'],
-                                  'shared': ext_network['shared'],
-                                  'router:external': ext_network['router:external']} 
-                        new_ext_network = network_service.create_network(context,**params)
-                        new_net_resources.setdefault(pit_id,new_ext_network)
-                        restored_vm_resource_values = {'id': new_ext_network['id'],
-                                                       'vm_id': restore.id,
-                                                       'restore_id': restore.id,       
-                                                       'resource_type': 'network',
-                                                       'resource_name':  new_ext_network['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                             
-                        
-                    #external subnet
-                    pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'ext_subnet_id')
-                    if pit_id in new_net_resources:
-                        new_ext_subnet = new_net_resources[pit_id]
-                    else:
-                        vm_nic_ext_subnet = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_ext_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_ext_subnet.id)
-                        ext_subnet = pickle.loads(str(vm_nic_ext_subnet_snapshot.pickle))
-                        params = {'name': ext_subnet['name'] + '_' + restore.id,
-                                  'network_id': new_ext_network['id'],
-                                  'cidr': ext_subnet['cidr'],
-                                  'ip_version': ext_subnet['ip_version']} 
-                        new_ext_subnet = network_service.create_subnet(context,**params)
-                        new_net_resources.setdefault(pit_id,new_ext_subnet)
-                        restored_vm_resource_values = {'id': new_ext_subnet['id'],
-                                                       'vm_id': restore.id,
-                                                       'restore_id': restore.id,       
-                                                       'resource_type': 'subnet',
-                                                       'resource_name':  new_ext_subnet['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                              
-                        
-                    #router
-                    pit_id = self._get_pit_resource_id(vm_nic_snapshot, 'router_id')
-                    if pit_id in new_net_resources:
-                        new_router = new_net_resources[pit_id]
-                    else:
-                        vm_nic_router = self._get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_router_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_router.id)
-                        router = pickle.loads(str(vm_nic_router_snapshot.pickle))
-                        params = {'name': router['name'] + '_' + restore.id,
-                                  'tenant_id': context.tenant} 
-                        new_router = network_service.create_router(context,**params)
-                        new_net_resources.setdefault(pit_id,new_router)
-                        restored_vm_resource_values = {'id': new_router['id'],
-                                                       'vm_id': restore.id,
-                                                       'restore_id': restore.id,       
-                                                       'resource_type': 'router',
-                                                       'resource_name':  new_router['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = self.db.restored_vm_resource_create(context,restored_vm_resource_values)                                   
-                    
-                    try:
-                        network_service.router_add_interface(context,new_router['id'], subnet_id=new_subnet['id'])
-                        network_service.router_add_gateway(context,new_router['id'], new_ext_network['id'])
-                    except Exception as err:
-                        pass
-        self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks completed', 'status': 'executing'})                     
-    
     @autolog.log_method(logger=Logger)        
     def workload_type_discover_instances(self, context, workload_type_id, metadata):
         """
@@ -323,7 +187,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         details = workflow.details()
         return details
     
-
     @autolog.log_method(Logger, 'WorkloadMgrManager.workload_create')
     def workload_create(self, context, workload_id):
         """
@@ -353,7 +216,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                  'availability_zone': self.az,
                                  'schedule_job_id':schjob.id})
         
-
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
         """
@@ -438,15 +300,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.snapshot_delete(context, snapshot['id'])
         self.db.workload_delete(context, workload_id)
 
-
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, restore_id):
         """
         Restore VMs and all its LUNs from a snapshot
         """
+        restore_type = 'restore'
         try:
-            restore_type = 'restore'
-
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
@@ -468,33 +328,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                              'status': 'starting'
                             })
             
-            restore_size = 0
-            for vm in self.db.snapshot_vms_get(context, snapshot.id):    
-                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-                instance_size = virtdriver.instance_restore_size(vm, self.db, context)
-                restore_size =  restore_size +  instance_size 
-
+            self.db.restore_update(context, restore.id, {'status': 'executing'})
+                         
+            restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))                      
             self.db.restore_update( context, restore_id, {'size': restore_size})                
             
-            new_net_resources = {}
-            if restore_type == 'test':
-                self._restore_networks(context, False, snapshot, restore, new_net_resources)
-            else:
-                self._restore_networks(context, True, snapshot, restore, new_net_resources)    
-            vault_service = vault.get_vault_service(context)
-            
-            #restore each VM 
+            self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks...', 'status': 'executing'})            
+            restored_net_resources = vmtasks_openstack.restore_networks( context, self.db, dict(restore.iteritems())) 
+            self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks completed', 'status': 'executing'})
+
+
             #TODO(giri): If one VM restore fails, rollback the whole transaction
             for vm in self.db.snapshot_vms_get(context, snapshot.id): 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-                self.db.restore_update( context, restore.id, {'progress_msg': 'Creating VM:' + vm.vm_id, 'status': 'executing'}) 
-                restored_instance = virtdriver.snapshot_restore(workload, snapshot, restore, vm, vault_service, new_net_resources, self.db, context)
-                restored_vm_values = {'vm_id': restored_instance.id,
-                                      'vm_name':  restored_instance.name,    
-                                      'restore_id': restore.id,
-                                      'status': 'available'}
-                self.db.restore_update( context, restore.id, {'progress_msg': 'Created VM:' + vm.vm_id, 'status': 'executing'})
-                restored_vm = self.db.restored_vm_create(context,restored_vm_values)    
+                vmtasks_openstack.restore_vm(context, self.db, {'vm_id': vm.vm_id, 'vm_name': vm.vm_name}, dict(restore.iteritems()),  restored_net_resources)
           
             if restore_type == 'test':
                 self.db.restore_update( context, 
