@@ -257,7 +257,7 @@ def snapshot_vm(cntx, db, instance, snapshot):
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         return virtdriver.snapshot_vm(cntx, db, instance, snapshot) 
 
-@autolog.log_method(Logger, 'vmtasks_openstack.snapshot_data_size')
+@autolog.log_method(Logger, 'vmtasks_openstack.compute_snapshot_data_size')
 def compute_snapshot_data_size(cntx, db, instances, snapshot):  
         
     snapshot_obj = db.snapshot_get(cntx, snapshot['id'])

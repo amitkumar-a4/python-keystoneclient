@@ -7,7 +7,7 @@
 SQLAlchemy models for workloadmgr data.
 """
 
-from sqlalchemy import Column, Integer, String, Text, schema, UniqueConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Text, schema, UniqueConstraint
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import ForeignKey, DateTime, Boolean
@@ -210,8 +210,8 @@ class Snapshots(BASE, WorkloadsBase):
     snapshot_type = Column(String(32), nullable=False)
     display_name = Column(String(255))
     display_description = Column(String(255))
-    size = Column(Integer)
-    uploaded_size = Column(Integer)    
+    size = Column(BigInteger)
+    uploaded_size = Column(BigInteger)    
     progress_percent = Column(Integer)
     progress_msg = Column(String(255))
     error_msg =  Column(String(4096))   
@@ -229,7 +229,7 @@ class SnapshotVMs(BASE, WorkloadsBase):
     vm_id = Column(String(255))
     vm_name = Column(String(255))
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
-    size = Column(Integer)
+    size = Column(BigInteger)
     status =  Column(String(32), nullable=False)
     
 class VMRecentSnapshot(BASE, WorkloadsBase):
@@ -257,7 +257,7 @@ class SnapshotVMResources(BASE, WorkloadsBase):
     resource_type = Column(String(255)) #disk, network, definition
     resource_name = Column(String(255)) #vda etc.
     resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot) 
-    size = Column(Integer)       
+    size = Column(BigInteger)       
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
@@ -285,7 +285,7 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     top = Column(Boolean, default=False)
     vault_service_url = Column(String(4096))    
     vault_service_metadata = Column(String(4096))
-    size = Column(Integer)    
+    size = Column(BigInteger)    
     status = Column(String(32), nullable=False)    
     
 class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):
@@ -339,8 +339,8 @@ class Restores(BASE, WorkloadsBase):
     restore_type = Column(String(32), nullable=False)
     display_name = Column(String(255))
     display_description = Column(String(255))
-    size = Column(Integer)    
-    uploaded_size = Column(Integer)  
+    size = Column(BigInteger)    
+    uploaded_size = Column(BigInteger)  
     progress_percent = Column(Integer)
     progress_msg = Column(String(255))
     error_msg =  Column(String(4096))   

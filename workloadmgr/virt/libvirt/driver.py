@@ -699,6 +699,7 @@ class LibvirtDriver(driver.ComputeDriver):
     
                 if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
                     LOG.debug('Uploading image ' + restored_file_path)
+                    import pdb; pdb.set_trace()
                     restored_image = image_service.create(cntx, image_metadata, image_file)
                     restore = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
                 else:
@@ -796,7 +797,8 @@ class LibvirtDriver(driver.ComputeDriver):
         else:
             LOG.debug(_("Restore Completed"))
          
-        #TODO(giri): Execuete teh follwing in a finally block    
+        #TODO(giri): Execuete teh following in a finally block
+        """    
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
@@ -805,6 +807,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 shutil.rmtree(temp_directory)
             except OSError as exc:
                 pass 
+        """
          
         db.restore_update(cntx,restore_obj.id, 
                           {'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,

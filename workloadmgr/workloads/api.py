@@ -17,6 +17,7 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
+from workloadmgr.image import glance
 
 
 FLAGS = flags.FLAGS
@@ -378,11 +379,16 @@ class API(base.Base):
             compute_service = nova.API(production=False)
         else:
             network_service =  neutron.API(production=True)
-            compute_service = nova.API(production=True)        
+            compute_service = nova.API(production=True)
+            
+        image_service = glance.get_default_image_service(production= (restore_details['restore_type'] != 'test'))                    
             
         for instance in restore_details['instances']:
             try:
+                vm = compute_service.get_server_by_id(context, instance['id'])
                 compute_service.delete(context, instance['id']) 
+                image_service.delete(context, vm.image['id'])
+                #TODO(giri): delete the cinder volumes
             except Exception as exception:
                 msg = _("Error deleting instance %(instance_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'instance_id': instance['id'], 'exception': exception})
