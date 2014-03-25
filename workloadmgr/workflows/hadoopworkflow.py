@@ -194,7 +194,7 @@ def get_hadoop_nodes(cntx, host, port, username, password):
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'hypervisor_hostname' : hypervisor_hostname,
                                               'hypervisor_type' :  hypervisor_type}, 
-                                        "vm_id")
+                                        key="vm_id")
     return vms
 
 class EnableSafemode(task.Task):
