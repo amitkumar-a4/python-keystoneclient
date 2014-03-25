@@ -1233,9 +1233,9 @@ def move_file(src, dest):
 def copy_file(src, dest):
     execute('cp', src, dest)    
     
-def append_unique(list, new_item):
+def append_unique(list, new_item, key="id"):
     for item in list:
-        if item['id'] == new_item['id']:
+        if item[key] == new_item[key]:
             return
     list.append(new_item)    
   
