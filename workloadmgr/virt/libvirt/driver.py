@@ -39,9 +39,7 @@ from oslo.config import cfg
 
 from workloadmgr import utils
 from workloadmgr import exception
-from workloadmgr.virt import event as virtevent
-from workloadmgr.virt.libvirt import utils as libvirt_utils
-from workloadmgr.virt.libvirt import config as vconfig
+from workloadmgr.virt import qemuimages
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import fileutils
 from workloadmgr.virt import power_state
@@ -51,7 +49,6 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
-from workloadmgr.db import base
 from workloadmgr import autolog
 
 from workloadmgr.workflows import vmtasks_openstack
@@ -364,25 +361,6 @@ class LibvirtDriver(driver.ComputeDriver):
                       [target.get("dev")
                        for target in doc.findall('devices/disk/target')])  
         
-    def rebase_qcow2(self, host, backing_file_base, backing_file_top):
-        """rebase the backing_file_top to backing_file_base using unsafe mode
-        :param backing_file_base: backing file to rebase to
-        :param backing_file_top: top file to rebase
-        """
-        if host == 'localhost':
-            utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=False)
-        else:
-            utils.execute('ssh', 'root@' + host, 'qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=False)   
-
-    def commit_qcow2(self, host, backing_file_top):
-        """rebase the backing_file_top to backing_file_base
-         :param backing_file_top: top file to commit from to its base
-        """
-        if host == 'localhost':
-            utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=False)
-        else:
-            utils.execute('ssh', 'root@' + host, 'qemu-img', 'commit', backing_file_top, run_as_root=False)       
-
     def rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
         """
         rebase the top to base
@@ -631,7 +609,22 @@ class LibvirtDriver(driver.ComputeDriver):
                 LOG.debug('Restored ' + vm_disk_resource_snap_backing.vault_service_url)     
                 #rebase
                 if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
-                    self.rebase_qcow2('localhost', restored_file_path_backing, restored_file_path)
+                    image_info = qemuimages.qemu_img_info(restored_file_path)
+                    image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
+                    #covert the raw image to qcow2
+                    if image_backing_info.file_format == 'raw':
+                        converted = os.path.join(os.path.dirname(restored_file_path_backing), str(uuid.uuid4()))
+                        LOG.debug('Converting ' + restored_file_path_backing + ' to QCOW2')  
+                        qemuimages.convert_image(restored_file_path_backing, converted, 'qcow2')
+                        LOG.debug('Finished Converting ' + restored_file_path_backing + ' to QCOW2')
+                        utils.delete_if_exists(restored_file_path_backing)
+                        shutil.move(converted, restored_file_path_backing)
+                        image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
+                    #increase the size of the base image
+                    if image_backing_info.virtual_size < image_info.virtual_size :
+                        qemuimages.resize_image(restored_file_path_backing, image_info.virtual_size)  
+                    #rebase the image                            
+                    qemuimages.rebase_qcow2(restored_file_path_backing, restored_file_path)
                 elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
                     self.rebase_vmdk(restored_file_path_backing,
                                      db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_data_file_name'),
@@ -650,7 +643,7 @@ class LibvirtDriver(driver.ComputeDriver):
                         LOG.debug('Commiting QCOW2 ' + file_to_commit)
                         self.commit_qcow2('localhost', file_to_commit)
                     except Exception, ex:
-                        pass                       
+                        LOG.exception(ex)                       
                     if restored_file_path != file_to_commit:
                         utils.delete_if_exists(file_to_commit)
             elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
@@ -699,7 +692,6 @@ class LibvirtDriver(driver.ComputeDriver):
     
                 if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
                     LOG.debug('Uploading image ' + restored_file_path)
-                    import pdb; pdb.set_trace()
                     restored_image = image_service.create(cntx, image_metadata, image_file)
                     restore = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
                 else:
@@ -798,7 +790,6 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.debug(_("Restore Completed"))
          
         #TODO(giri): Execuete teh following in a finally block
-        """    
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
@@ -807,7 +798,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 shutil.rmtree(temp_directory)
             except OSError as exc:
                 pass 
-        """
+
          
         db.restore_update(cntx,restore_obj.id, 
                           {'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,

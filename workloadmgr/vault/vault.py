@@ -25,6 +25,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.vault import swift
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+from workloadmgr.virt import qemuimages
 
 LOG = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ wlm_vault_opts = [
 
 FLAGS = flags.FLAGS
 FLAGS.register_opts(wlm_vault_opts)
+
 
 class VaultBackupService(base.Base):
     def __init__(self, context):
@@ -142,7 +144,11 @@ class VaultBackupService(base.Base):
     def restore_local(self, snapshot_metadata, restore_to_file_path):
         """Restore a snapshot from the local filesystem."""
         copy_from_file_path = self.get_snapshot_file_path(snapshot_metadata)
-        utils.copy_file(copy_from_file_path, restore_to_file_path)
+        image_attr = qemuimages.qemu_img_info(copy_from_file_path)
+        if image_attr.file_format == 'raw':
+            qemuimages.convert_image(copy_from_file_path, restore_to_file_path, 'qcow2')
+        else:        
+            utils.copy_file(copy_from_file_path, restore_to_file_path)
         return    
         
     def restore(self, snapshot_metadata, restore_to_file_path):

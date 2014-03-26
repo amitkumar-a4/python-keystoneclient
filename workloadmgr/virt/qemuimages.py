@@ -160,14 +160,13 @@ class QemuImgInfo(object):
         return contents
 
 
-def qemu_img_info(host, path):
+def qemu_img_info(path):
     """Return an object containing the parsed output from qemu-img info."""
     #TODO(giri): check if the remote file exists
     #if not os.path.exists(path):
     #    return QemuImgInfo()
 
     out, err = utils.execute('env', 'LC_ALL=C', 'LANG=C', 
-                             'ssh', 'root@' + host, 
                              'qemu-img', 'info', path)
     return QemuImgInfo(out)
 
@@ -224,3 +223,34 @@ def fetch_to_raw(context, image_href, path, user_id, project_id):
                 os.rename(staged, path)
         else:
             os.rename(path_tmp, path)
+            
+def rebase_qcow2(backing_file_base, backing_file_top, run_as_root=False):
+    """rebase the backing_file_top to backing_file_base using unsafe mode
+    :param backing_file_base: backing file to rebase to
+    :param backing_file_top: top file to rebase
+    """
+    utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=run_as_root)
+
+def commit_qcow2(backing_file_top, run_as_root=False):
+    """rebase the backing_file_top to backing_file_base
+     :param backing_file_top: top file to commit from to its base
+    """
+    utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=run_as_root)
+    
+def resize_image(path, new_size, run_as_root=False):
+    """rebase the backing_file_top to backing_file_base
+     :param backing_file_top: top file to commit from to its base
+    """
+    utils.execute('qemu-img', 'resize', path, new_size, run_as_root=run_as_root)    
+    
+def get_disk_backing_file(path, basename=True):
+    """Get the backing file of a disk image
+
+    :param path: Path to the disk image
+    :returns: a path to the image's backing store
+    """
+    backing_file = qemu_img_info(path).backing_file
+    if backing_file and basename:
+        backing_file = os.path.basename(backing_file)
+
+    return backing_file    

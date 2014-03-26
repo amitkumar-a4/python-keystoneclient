@@ -17,21 +17,6 @@ libvirt_opts = [
 CONF = cfg.CONF
 CONF.register_opts(libvirt_opts)
 LOG = logging.getLogger(__name__)
-
-
-def get_disk_backing_file(host, path, basename=True):
-    """Get the backing file of a disk image
-
-    :param path: Path to the disk image
-    :returns: a path to the image's backing store
-    """
-    backing_file = qemuimages.qemu_img_info(host, path).backing_file
-    if backing_file and basename:
-        backing_file = os.path.basename(backing_file)
-
-    return backing_file
-
-
    
 def get_instance_path(instance_id, relative=False):
     """Determine the correct path for instance storage.
