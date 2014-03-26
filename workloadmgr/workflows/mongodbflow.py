@@ -32,7 +32,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
-from workloadmgr.utils
+from workloadmgr import utils
 
 import vmtasks
 import workflow
