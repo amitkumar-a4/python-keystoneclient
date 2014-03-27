@@ -581,7 +581,8 @@ class LibvirtDriver(driver.ComputeDriver):
                               'snapshot_vm_resource_id': snapshot_vm_resource.id,
                               'resource_name':  snapshot_vm_resource.resource_name,
                               'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                              'snapshot_id': snapshot_vm_resource.snapshot_id}
+                              'snapshot_id': snapshot_vm_resource.snapshot_id,
+                              'restore_id': restore_obj.id}
             LOG.debug('Restoring ' + vm_disk_resource_snap.vault_service_url)
             vault_service.restore(vault_metadata, restored_file_path)
             LOG.debug('Restored ' + vm_disk_resource_snap.vault_service_url)
@@ -606,7 +607,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'snapshot_vm_resource_id': snapshot_vm_resource_backing.id,
                                   'resource_name':  snapshot_vm_resource_backing.resource_name,
                                   'snapshot_vm_id': snapshot_vm_resource_backing.vm_id,
-                                  'snapshot_id': snapshot_vm_resource_backing.snapshot_id}
+                                  'snapshot_id': snapshot_vm_resource_backing.snapshot_id,
+                                  'restore_id': restore_obj.id}
                 LOG.debug('Restoring ' + vm_disk_resource_snap_backing.vault_service_url)
                 vault_service.restore(vault_metadata, restored_file_path_backing)
                 LOG.debug('Restored ' + vm_disk_resource_snap_backing.vault_service_url)     
@@ -698,9 +700,22 @@ class LibvirtDriver(driver.ComputeDriver):
                 if restore['restore_type'] == 'test':
                     shutil.move(restored_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
                     restored_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
-                with file(restored_file_path) as image_file:
-                    restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
-                restore = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})                    
+                    with file(restored_file_path) as image_file:
+                        restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
+                else:
+                    restored_image = image_service.update(cntx, 
+                                                          restored_image['id'], 
+                                                          image_metadata, 
+                                                          utils.ChunkedFile(restored_file_path,
+                                                                            {'function': db.restore_update,
+                                                                             'context': cntx,
+                                                                             'id':restore_obj.id}
+                                                                            )
+                                                      )
+                restore_obj = db.restore_get(cntx, restore_obj.id)
+                LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
+                LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
+                LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
             else:
                 if test == False:
                     #TODO(gbasava): Request a feature in cinder to create volume from a file.
@@ -718,14 +733,14 @@ class LibvirtDriver(driver.ComputeDriver):
                     time.sleep(30)
                     image_service.delete(cntx, restored_volume_image['id'])
                     
-                    restore = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
+                    restore_obj = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
                 else:
                     device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_file_path)                        
 
             progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
                 'message_color': autolog.BROWN,
                 'message': "Restore Progress: ",
-                'progress_percent': str(restore.progress_percent),
+                'progress_percent': str(restore_obj.progress_percent),
                 'normal_color': autolog.NORMAL,
             }) 
             LOG.debug( progress)    
@@ -740,7 +755,7 @@ class LibvirtDriver(driver.ComputeDriver):
             time.sleep(30)
             restored_instance =  compute_service.get_server_by_id(cntx, restored_instance.id)
             if restored_instance.status == 'ERROR':
-                raise Exception(_("Error creating the test bubble instance"))
+                raise Exception(_("Error creating instance " + restored_instance.id))
         
         if test == True:
             # We will not powerdown the VM if we are doing a test restore.

@@ -126,6 +126,7 @@ class VaultBackupService(base.Base):
             #update every 5MB
             if uploaded_size_incremental > (5 * 1024 * 1024):
                 snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
+                LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
                 uploaded_size_incremental = 0
         
         vault_file.close()
@@ -147,8 +148,22 @@ class VaultBackupService(base.Base):
         image_attr = qemuimages.qemu_img_info(copy_from_file_path)
         if image_attr.file_format == 'raw':
             qemuimages.convert_image(copy_from_file_path, restore_to_file_path, 'qcow2')
+            WorkloadMgrDB().db.restore_update(  self.context, 
+                                                snapshot_metadata['restore_id'], 
+                                                {'uploaded_size_incremental': os.path.getsize(copy_from_file_path)})
         else:        
-            utils.copy_file(copy_from_file_path, restore_to_file_path)
+            restore_to_file = open(restore_to_file_path, 'wb')
+            for chunk in utils.ChunkedFile(copy_from_file_path, {'function': WorkloadMgrDB().db.restore_update,
+                                                                 'context': self.context,
+                                                                 'id':snapshot_metadata['restore_id']}):
+                restore_to_file.write(chunk)
+            restore_to_file.close()
+
+        restore_obj = WorkloadMgrDB().db.restore_get(self.context, snapshot_metadata['restore_id'])
+        LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
+        LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
+        LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})
+           
         return    
         
     def restore(self, snapshot_metadata, restore_to_file_path):

@@ -1239,3 +1239,63 @@ def append_unique(list, new_item, key="id"):
             return
     list.append(new_item)    
   
+class ChunkedFile(object):
+    """
+    something that can iterate over a large file
+    """
+
+    CHUNKSIZE = 65536
+
+    def __init__(self, filepath, update=None):
+        self.filepath = filepath
+        self.fp = open(self.filepath, 'rb')
+        self.update = update
+        self.uploaded_size_incremental = 0
+        
+    def _update(self, size):
+        self.uploaded_size_incremental = self.uploaded_size_incremental + size
+        if self.update and ((self.uploaded_size_incremental > (5 * 1024 * 1024)) or (self.tell() == os.SEEK_END)):
+            object = self.update['function'](self.update['context'], 
+                                             self.update['id'], 
+                                             {'uploaded_size_incremental': self.uploaded_size_incremental})
+            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+            self.uploaded_size_incremental = 0
+
+    def __iter__(self):
+        """Return an iterator over the file"""
+        try:
+            if self.fp:
+                while True:
+                    chunk = self.fp.read(ChunkedFile.CHUNKSIZE)
+                    if chunk:
+                        self._update(len(chunk))
+                        yield chunk
+                    else:
+                        break
+        finally:
+            self.close()
+            
+    def __len__(self):
+        return os.path.getsize(self.filepath)  
+    
+    def tell(self):
+        if self.fp:
+            return self.fp.tell()
+    
+    def seek(self, offset, whence=os.SEEK_SET):
+        if self.fp:
+            return self.fp.seek(offset,whence)
+    
+    def read(self, size):
+        if self.fp:
+            data = self.fp.read(size)
+            if data:
+                self._update(len(data))
+            return data            
+            
+    
+    def close(self):
+        """Close the internal file pointer"""
+        if self.fp:
+            self.fp.close()
+            self.fp = None
