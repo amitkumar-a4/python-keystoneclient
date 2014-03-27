@@ -314,10 +314,10 @@ class CassandraWorkflow(workflow.Workflow):
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                return {'name':str(item), 'type':'Task'}
+                return {'name':str(item).split("==")[0], 'type':'Task'}
 
             flowdetails = {}
-            flowdetails['name'] = str(item)
+            flowdetails['name'] = str(item).split("==")[0]
             flowdetails['type'] = str(item).split('.')[2]
             flowdetails['children'] = []
             for it in item:
@@ -360,12 +360,12 @@ context = context.RequestContext("4ca3ffa7849a4665b73e114907986e58", #admin user
 store["context"] = context.__dict__
 store["context"]["conf"] = None
 cwf = CassandraWorkflow("testflow", store)
-print json.dumps(cwf.discover())
-print json.dumps(cwf.topology())
+#print json.dumps(cwf.discover())
+#print json.dumps(cwf.topology())
 cwf.initflow()
+import pdb;pdb.set_trace()
 print json.dumps(cwf.details())
 
-#import pdb;pdb.set_trace()
 #result = engines.load(cwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
 
 #print cwf.execute()

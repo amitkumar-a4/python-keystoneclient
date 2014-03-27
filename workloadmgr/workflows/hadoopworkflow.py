@@ -331,7 +331,7 @@ class HadoopWorkflow(workflow.Workflow):
                 return {'name':str(item), 'type':'Task'}
 
             flowdetails = {}
-            flowdetails['name'] = str(item)
+            flowdetails['name'] = str(item).split("==")[0]
             flowdetails['type'] = str(item).split('.')[2]
             flowdetails['children'] = []
             for it in item:
