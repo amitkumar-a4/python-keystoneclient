@@ -82,7 +82,10 @@ libvirt_opts = [
                     'before uploading them to image service'),
     cfg.StrOpt('libvirt_type',
                default='kvm',
-               help='Libvirt domain type (valid options are: kvm)'),                
+               help='Libvirt domain type (valid options are: kvm)'),
+    cfg.StrOpt('glance_images_path',
+               default='/opt/stack/data/nova/instances/_base',
+               help='Location of the images for: nova, glance and wlm'),                      
     ]
 
 CONF = cfg.CONF
@@ -578,7 +581,8 @@ class LibvirtDriver(driver.ComputeDriver):
                               'snapshot_vm_resource_id': snapshot_vm_resource.id,
                               'resource_name':  snapshot_vm_resource.resource_name,
                               'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                              'snapshot_id': snapshot_vm_resource.snapshot_id}
+                              'snapshot_id': snapshot_vm_resource.snapshot_id,
+                              'restore_id': restore_obj.id}
             LOG.debug('Restoring ' + vm_disk_resource_snap.vault_service_url)
             vault_service.restore(vault_metadata, restored_file_path)
             LOG.debug('Restored ' + vm_disk_resource_snap.vault_service_url)
@@ -603,7 +607,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'snapshot_vm_resource_id': snapshot_vm_resource_backing.id,
                                   'resource_name':  snapshot_vm_resource_backing.resource_name,
                                   'snapshot_vm_id': snapshot_vm_resource_backing.vm_id,
-                                  'snapshot_id': snapshot_vm_resource_backing.snapshot_id}
+                                  'snapshot_id': snapshot_vm_resource_backing.snapshot_id,
+                                  'restore_id': restore_obj.id}
                 LOG.debug('Restoring ' + vm_disk_resource_snap_backing.vault_service_url)
                 vault_service.restore(vault_metadata, restored_file_path_backing)
                 LOG.debug('Restored ' + vm_disk_resource_snap_backing.vault_service_url)     
@@ -641,7 +646,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     file_to_commit = commit_queue.get_nowait()
                     try:
                         LOG.debug('Commiting QCOW2 ' + file_to_commit)
-                        self.commit_qcow2('localhost', file_to_commit)
+                        qemuimages.commit_qcow2(file_to_commit)
                     except Exception, ex:
                         LOG.exception(ex)                       
                     if restored_file_path != file_to_commit:
@@ -660,67 +665,85 @@ class LibvirtDriver(driver.ComputeDriver):
                               })                  
     
             #upload to glance
-            with file(restored_file_path) as image_file:
-                if db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk':
-                    image_metadata = {'is_public': False,
-                                      'status': 'active',
-                                      'name': snapshot_vm_resource.id,
-                                      #'disk_format' : 'ami',
-                                      'disk_format' : 'vmdk', 
-                                      'container_format' : 'bare',
-                                      'properties': {
-                                                     'hw_disk_bus' : 'scsi',
-                                                     'vmware_adaptertype' : 'lsiLogic',
-                                                     'vmware_disktype': 'preallocated',
-                                                     'image_location': 'TODO',
-                                                     'image_state': 'available',
-                                                     'owner_id': cntx.project_id}
-                                      }
+            if db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk':
+                image_metadata = {'is_public': False,
+                                  'status': 'active',
+                                  'name': snapshot_vm_resource.id,
+                                  #'disk_format' : 'ami',
+                                  'disk_format' : 'vmdk', 
+                                  'container_format' : 'bare',
+                                  'properties': {
+                                                 'hw_disk_bus' : 'scsi',
+                                                 'vmware_adaptertype' : 'lsiLogic',
+                                                 'vmware_disktype': 'preallocated',
+                                                 'image_location': 'TODO',
+                                                 'image_state': 'available',
+                                                 'owner_id': cntx.project_id}
+                                  }
+            else:
+                image_metadata = {'is_public': False,
+                                  'status': 'active',
+                                  'name': snapshot_vm_resource.id,
+                                  'disk_format' : 'qcow2',
+                                  'container_format' : 'bare',
+                                  'properties': {
+                                                 'hw_disk_bus' : 'virtio',
+                                                 'image_location': 'TODO',
+                                                 'image_state': 'available',
+                                                 'owner_id': cntx.project_id}
+                                  }
+                
+
+            if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
+                LOG.debug('Uploading image ' + restored_file_path)
+                restored_image = image_service.create(cntx, image_metadata)
+                if restore['restore_type'] == 'test':
+                    shutil.move(restored_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
+                    restored_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
+                    with file(restored_file_path) as image_file:
+                        restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
                 else:
-                    image_metadata = {'is_public': False,
-                                      'status': 'active',
-                                      'name': snapshot_vm_resource.id,
-                                      'disk_format' : 'qcow2',
-                                      'container_format' : 'bare',
-                                      'properties': {
-                                                     'hw_disk_bus' : 'virtio',
-                                                     'image_location': 'TODO',
-                                                     'image_state': 'available',
-                                                     'owner_id': cntx.project_id}
-                                      }
-                    
-    
-                if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
-                    LOG.debug('Uploading image ' + restored_file_path)
-                    restored_image = image_service.create(cntx, image_metadata, image_file)
-                    restore = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
-                else:
-                    if test == False:
-                        #TODO(gbasava): Request a feature in cinder to create volume from a file.
-                        #As a workaround we will create the image and covert that to cinder volume
+                    restored_image = image_service.update(cntx, 
+                                                          restored_image['id'], 
+                                                          image_metadata, 
+                                                          utils.ChunkedFile(restored_file_path,
+                                                                            {'function': db.restore_update,
+                                                                             'context': cntx,
+                                                                             'id':restore_obj.id}
+                                                                            )
+                                                      )
+                restore_obj = db.restore_get(cntx, restore_obj.id)
+                LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
+                LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
+                LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
+            else:
+                if test == False:
+                    #TODO(gbasava): Request a feature in cinder to create volume from a file.
+                    #As a workaround we will create the image and covert that to cinder volume
+                    with file(restored_file_path) as image_file:
                         LOG.debug('Uploading image ' + image_file)
                         restored_volume_image = image_service.create(cntx, image_metadata, image_file)
-                        restored_volume_name = uuid.uuid4().hex
-                        LOG.debug('Creating volume from image ' + image_file)
-                        restored_volume = volume_service.create(cntx, math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)), restored_volume_name, 'from workloadmgr', None, restored_volume_image['id'], None, None, None)
-                        device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
-                       
-                        #delete the image...it is not needed anymore
-                        #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
-                        time.sleep(30)
-                        image_service.delete(cntx, restored_volume_image['id'])
-                        
-                        restore = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
-                    else:
-                        device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_file_path)                        
+                    restored_volume_name = uuid.uuid4().hex
+                    LOG.debug('Creating volume from image ' + image_file)
+                    restored_volume = volume_service.create(cntx, math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)), restored_volume_name, 'from workloadmgr', None, restored_volume_image['id'], None, None, None)
+                    device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
+                   
+                    #delete the image...it is not needed anymore
+                    #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
+                    time.sleep(30)
+                    image_service.delete(cntx, restored_volume_image['id'])
+                    
+                    restore_obj = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
+                else:
+                    device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_file_path)                        
 
-                progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
-                    'message_color': autolog.BROWN,
-                    'message': "Restore Progress: ",
-                    'progress_percent': str(restore.progress_percent),
-                    'normal_color': autolog.NORMAL,
-                }) 
-                LOG.debug( progress)    
+            progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
+                'message_color': autolog.BROWN,
+                'message': "Restore Progress: ",
+                'progress_percent': str(restore_obj.progress_percent),
+                'normal_color': autolog.NORMAL,
+            }) 
+            LOG.debug( progress)    
                     
         #create nova instance
         restored_instance_name = instance['vm_name'] + '_of_snapshot_' + snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
@@ -732,7 +755,7 @@ class LibvirtDriver(driver.ComputeDriver):
             time.sleep(30)
             restored_instance =  compute_service.get_server_by_id(cntx, restored_instance.id)
             if restored_instance.status == 'ERROR':
-                raise Exception(_("Error creating the test bubble instance"))
+                raise Exception(_("Error creating instance " + restored_instance.id))
         
         if test == True:
             # We will not powerdown the VM if we are doing a test restore.

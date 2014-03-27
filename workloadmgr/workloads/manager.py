@@ -330,8 +330,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             self.db.restore_update(context, restore.id, {'status': 'executing'})
                          
-            restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))                      
-            self.db.restore_update( context, restore_id, {'size': restore_size})                
+            restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
+            if restore_type == 'test':                     
+                self.db.restore_update( context, restore_id, {'size': restore_size})
+            else:
+                self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})                                
             
             self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks...', 'status': 'executing'})            
             restored_net_resources = vmtasks_openstack.restore_networks( context, self.db, dict(restore.iteritems())) 
