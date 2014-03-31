@@ -206,13 +206,13 @@ class ClearSnapshot(task.Task):
 def UnorderedSnapshotNode(instances):
     flow = uf.Flow("snapshotnodeuf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotNode("SnapshotNode" + item['vm_name']))
+        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name']))
     return flow
 
 def UnorderedClearSnapshot(instances):
     flow = uf.Flow("clearsnapshotuf")
     for index,item in enumerate(instances):
-        flow.add(ClearSnapshot("ClearSnapshot" + item['vm_name']))
+        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name']))
     return flow
 
 class CassandraWorkflow(workflow.Workflow):
