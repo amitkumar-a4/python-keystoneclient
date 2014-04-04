@@ -402,7 +402,7 @@ def get_vms(cntx, host, port, username, password):
                     hypervisor_hostname = None
                     hypervisor_type = None
                     for hypervisor in hypervisors:
-                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:host']:
+                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
                             hypervisor_hostname = hypervisor.hypervisor_hostname
                             hypervisor_type = hypervisor.hypervisor_type
                             break
@@ -412,7 +412,7 @@ def get_vms(cntx, host, port, username, password):
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'hypervisor_hostname' : hypervisor_hostname,
                                               'hypervisor_type' :  hypervisor_type}, 
-                                        "vm_id")
+                                              "vm_id")
     return vms
 
 """
@@ -501,7 +501,7 @@ class MongoDBWorkflow(workflow.Workflow):
         self._flow.add(EnableProfiling('EnableProfiling'))
 
         #calculate the size of the snapshot
-        self._flow.add(vmtasks.SnapshotDataSize("SnapshotDataSize"))        
+        self._flow.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
 
         # Now lazily copy the snapshots of VMs to tvault appliance
         self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))

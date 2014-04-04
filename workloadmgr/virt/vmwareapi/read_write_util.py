@@ -167,6 +167,19 @@ class VMwareHTTPReadFile(VMwareHTTPFile):
         conn = urllib2.urlopen(request)
         VMwareHTTPFile.__init__(self, conn)
 
+    def __iter__(self):
+        """Return an iterator for reading"""
+        try:
+            if self.file_handle:
+                while True:
+                    chunk = self.read(READ_CHUNKSIZE)
+                    if chunk:
+                        yield chunk
+                    else:
+                        break
+        finally:
+            self.close()
+            
     def read(self, chunk_size):
         """Read a chunk of data."""
         # We are ignoring the chunk size passed for we want the pipe to hold

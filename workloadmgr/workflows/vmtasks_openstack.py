@@ -257,90 +257,42 @@ def snapshot_vm(cntx, db, instance, snapshot):
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         return virtdriver.snapshot_vm(cntx, db, instance, snapshot) 
 
-@autolog.log_method(Logger, 'vmtasks_openstack.compute_snapshot_data_size')
-def compute_snapshot_data_size(cntx, db, instances, snapshot):  
+@autolog.log_method(Logger, 'vmtasks_openstack.get_snapshot_data_size')
+def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):  
         
-    snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
-
-    snapshot_data_size = 0;
-    for instance in instances:
-        LOG.debug(_("instance: %(instance_id)s") %{'instance_id': instance['vm_id'],})
-        vm_data_size = 0;
-        if instance['hypervisor_type'] == 'QEMU': 
-            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            disks_info = virtdriver.get_snapshot_disk_info(cntx, db, instance, snapshot)
-        else: 
-            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-            disks_info = virtdriver.get_snapshot_disk_info(cntx, db, instance, snapshot)
-             
-        for disk_info in disks_info:
-            LOG.debug(_("    disk: %(disk)s") %{'disk': disk_info['dev'],})
-            vm_disk_size = 0
-            pop_backings = True
-            vm_disk_resource_snap_id = None
-            if snapshot['snapshot_type'] != 'full':
-                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
-                if vm_recent_snapshot:
-                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            cntx, 
-                                                            instance['vm_id'], 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk_info['dev'])
-                    previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
-                    vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
-                    if previous_snapshot_vm_resource.status == 'available':
-                        pop_backings = False
-
-            if len(disk_info['backings']) > 0 and pop_backings == True:
-                base_backing_path = disk_info['backings'].pop()
-            else:
-                base_backing_path = disk_info['backings'][0]
+    LOG.debug(_("instance: %(instance_id)s") %{'instance_id': instance['vm_id'],})
+    vm_data_size = 0;
+    if instance['hypervisor_type'] == 'QEMU': 
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        vm_data_size = virtdriver.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+    else: 
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        vm_data_size = virtdriver.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+         
+    LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
+    return vm_data_size
+        
             
-            
-            while (base_backing_path != None):
-                top_backing_path = None
-                if len(disk_info['backings']) > 0 and pop_backings == True:
-                    top_backing_path = disk_info['backings'].pop()
-                LOG.debug(_("        backing_file: %(backing_file)s") %{'backing_file': os.path.basename(base_backing_path['path']),})
-                LOG.debug(_("        vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
-                LOG.debug(_("        backing_size: %(backing_size)s") %{'backing_size': base_backing_path['size'],})     
-                vm_disk_size = vm_disk_size + base_backing_path['size']
-                LOG.debug(_("        vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
-                base_backing_path = top_backing_path
-
-            LOG.debug(_("    vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
-            LOG.debug(_("    vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
-            vm_data_size = vm_data_size + vm_disk_size
-            LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
-
-        db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': vm_data_size,})
-        LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
-        LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
-        snapshot_data_size = snapshot_data_size + vm_data_size
-        LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
-
-    LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
-    return snapshot_data_size
             
 @autolog.log_method(Logger, 'vmtasks_openstack.upload_snapshot')
-def upload_snapshot(cntx, db, instance, snapshot):
+def upload_snapshot(cntx, db, instance, snapshot, snapshot_data):
 
     if instance['hypervisor_type'] == 'QEMU': 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        virtdriver.upload_snapshot(cntx, db, instance, snapshot)
+        virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
     else: 
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        virtdriver.upload_snapshot(cntx, db, instance, snapshot)     
+        virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)     
 
 @autolog.log_method(Logger, 'vmtasks_openstack.post_snapshot')
-def post_snapshot(cntx, db, instance, snapshot):
+def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
         
     if instance['hypervisor_type'] == 'QEMU': 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot)
+        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
     else: 
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot)  
+        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)  
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):

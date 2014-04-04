@@ -48,8 +48,8 @@ def pre_snapshot_vm(cntx, db, instance, snapshot):
 def snapshot_vm(cntx, db, instance, snapshot):
     return None
     
-@autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_data_size')
-def compute_snapshot_data_size(cntx, db, instances, snapshot):
+@autolog.log_method(Logger, 'vmtasks_vcloud.get_snapshot_data_size')
+def get_snapshot_data_size(cntx, db, instance, snapshot):
     return None
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.upload_snapshot')

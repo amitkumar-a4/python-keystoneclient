@@ -152,7 +152,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                     hypervisor_hostname = None
                     hypervisor_type = None
                     for hypervisor in hypervisors:
-                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:host']:
+                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
                             hypervisor_hostname = hypervisor.hypervisor_hostname
                             hypervisor_type = hypervisor.hypervisor_type
                             break
@@ -259,7 +259,7 @@ class CassandraWorkflow(workflow.Workflow):
         self._flow.add(UnorderedClearSnapshot(self._store['instances']))
 
         #calculate the size of the snapshot
-        self._flow.add(vmtasks.SnapshotDataSize("SnapshotDataSize"))        
+        self._flow.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
     
         # Now lazily copy the snapshots of VMs to tvault appliance
         self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))

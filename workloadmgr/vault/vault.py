@@ -146,7 +146,7 @@ class VaultBackupService(base.Base):
         """Restore a snapshot from the local filesystem."""
         copy_from_file_path = self.get_snapshot_file_path(snapshot_metadata)
         image_attr = qemuimages.qemu_img_info(copy_from_file_path)
-        if image_attr.file_format == 'raw':
+        if snapshot_metadata['disk_format'] == 'qcow2' and image_attr.file_format == 'raw':
             qemuimages.convert_image(copy_from_file_path, restore_to_file_path, 'qcow2')
             WorkloadMgrDB().db.restore_update(  self.context, 
                                                 snapshot_metadata['restore_id'], 

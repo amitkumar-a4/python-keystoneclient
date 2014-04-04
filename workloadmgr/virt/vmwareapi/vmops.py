@@ -58,6 +58,8 @@ from workloadmgr.virt.vmwareapi import vim_util
 from workloadmgr.virt.vmwareapi import vm_util
 from workloadmgr.virt.vmwareapi import vmware_images
 from workloadmgr.virt.vmwareapi import read_write_util
+from workloadmgr.vault import vault
+from workloadmgr import autolog
 
 
 vmware_vif_opts = [
@@ -77,6 +79,7 @@ CONF.register_opts(vmware_vif_opts, vmware_group)
 CONF.import_opt('vnc_enabled', 'nova.vnc')
 
 LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 VMWARE_POWER_STATES = {
                    'poweredOff': power_state.SHUTDOWN,
@@ -1427,6 +1430,304 @@ class VMwareVMOps(object):
         """Unplug VIFs from networks."""
         pass
     
+    def _replace_last(self, source_string, replace_what, replace_with):
+        head, sep, tail = source_string.rpartition(replace_what)
+        return head + replace_with + tail      
+  
+    @autolog.log_method(Logger, 'vmwareapi.vmops.pre_snapshot_vm')
+    def pre_snapshot_vm(self, cntx, db, instance, snapshot):
+        pass 
+        
+    @autolog.log_method(Logger, 'vmwareapi.vmops.snapshot_vm')
+    def snapshot_vm(self, cntx, db, instance, snapshot):  
+        
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                    'vm_name': instance['vm_name']
+                                                    })
+        
+        hardware_devices = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
+                                                      "VirtualMachine", "config.hardware.device")
+        disk_info = vm_util.get_disks(hardware_devices)
+    
+        snapshot_task = self._session._call_method(
+                    self._session._get_vim(),
+                    "CreateSnapshot_Task", vm_ref,
+                    name="snapshot_id:%s" % snapshot['id'],
+                    description="Trilio VAST Snapshot",
+                    memory=False,
+                    quiesce=True)
+        self._session._wait_for_task(instance['vm_id'], snapshot_task)
+        return disk_info
+      
+                    
+    @autolog.log_method(Logger, 'vmwareapi.vmops.get_snapshot_disk_info')
+    def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data):
+        
+        return snapshot_data
+            
+    @autolog.log_method(Logger, 'vmwareapi.vmops.get_snapshot_data_size')
+    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
+        
+        def _get_vmdk_file_size(file_path, datastore_name):
+            tmp, vmdk_descriptor_file = vm_util.split_datastore_path(file_path)
+            try:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name()[1],
+                                                        datastore_name,
+                                                        cookies,
+                                                        vmdk_data_file)
+            
+            except Exception as ex:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-flat.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name()[1],
+                                                        datastore_name,
+                                                        cookies,
+                                                        vmdk_data_file)                     
+                     
+            vmdk_file_size = int(vmdk_data_file_handle.get_size())
+            return vmdk_file_size            
+       
+        vm_data_size = 0
+        cookies = self._session._get_vim().client.options.transport.cookiejar
+        for disk in  snapshot_data:         
+            full = True
+            if snapshot['snapshot_type'] != 'full':
+                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+                if vm_recent_snapshot:
+                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                            cntx, 
+                                                            instance['vm_id'], 
+                                                            vm_recent_snapshot.snapshot_id, 
+                                                            disk['label'])
+                    if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
+                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                        if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
+                            vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+                            full = False                           
+                        
+
+            vm_data_size = vm_data_size +_get_vmdk_file_size(disk['vmdk_file_path'], disk['datastore_name'])
+            if full:
+                for backing in disk['backings']:
+                    vm_data_size = vm_data_size +_get_vmdk_file_size(backing['vmdk_file_path'], backing['datastore_name'])                    
+          
+                                     
+                    
+        return vm_data_size 
+    
+    @autolog.log_method(Logger, 'vmwareapi.vmops..upload_snapshot')
+    def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
+        
+        def _check_if_tmp_folder_exists(disk):
+            # Copy the contents of the VM that were there just before the
+            # snapshot was taken
+            ds_ref_ret = vim_util.get_dynamic_property(
+                                    self._session._get_vim(),
+                                    vm_ref,
+                                    "VirtualMachine",
+                                    "datastore")
+            if ds_ref_ret is None:
+                raise exception.DatastoreNotFound()
+            ds_ref = ds_ref_ret.ManagedObjectReference[0]
+            ds_browser = vim_util.get_dynamic_property(
+                                       self._session._get_vim(),
+                                       ds_ref,
+                                       "Datastore",
+                                       "browser")
+            # Check if the vmware-tmp folder exists or not. If not, create one
+            tmp_folder_path = vm_util.build_datastore_path(disk['datastore_name'],
+                                                           "vmware-tmp")
+            if not self._path_exists(ds_browser, tmp_folder_path):
+                self._mkdir(vm_util.build_datastore_path(disk['datastore_name'],
+                                                         "vmware-tmp"))                 
+        
+        def _copy_vmdk_content(disk):
+            # Copy the contents of the disk (or disks, if there were snapshots
+            # done earlier) to a temporary vmdk file.
+            copy_spec = self.get_copy_virtual_disk_spec(client_factory,
+                                                        'lsiLogic', #disk['adapter_type'],
+                                                        'thin') #disk['disk_type'])
+            LOG.debug(_('Copying disk ' + disk['vmdk_file_path']))
+            copy_disk_task = self._session._call_method(
+                self._session._get_vim(),
+                "CopyVirtualDisk_Task",
+                service_content.virtualDiskManager,
+                sourceName=disk['vmdk_file_path'],
+                sourceDatacenter=dc_ref,
+                destName=dest_vmdk_file_location,
+                destDatacenter=dc_ref,
+                destSpec=copy_spec,
+                force=False)
+            self._session._wait_for_task(instance['vm_id'], copy_disk_task)
+            LOG.debug(_('Copied disk ' + disk['vmdk_file_path']))
+           
+        def _clean_temp_data():
+            """
+            Delete temporary vmdk files generated in snapshot handling
+            operations.
+            """
+            # Delete the temporary vmdk created above.
+            LOG.debug(_("Deleting temporary vmdk file " + dest_vmdk_file_location))
+            remove_disk_task = self._session._call_method(
+                self._session._get_vim(),
+                "DeleteVirtualDisk_Task",
+                service_content.virtualDiskManager,
+                name=dest_vmdk_file_location,
+                datacenter=dc_ref)
+            self._session._wait_for_task(instance['vm_id'], remove_disk_task)
+            LOG.debug(_("Deleted temporary vmdk file " + dest_vmdk_file_location))
+
+        
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        vault_service = vault.get_vault_service(cntx)
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                        'vm_name': instance['vm_name']
+                                        }) 
+        client_factory = self._session._get_vim().client.factory
+        service_content = self._session._get_vim().get_service_content()
+        
+        for disk in  snapshot_data: 
+            vm_disk_size = 0
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': instance['vm_id'],
+                                           'snapshot_id': snapshot_obj.id,       
+                                           'resource_type': 'disk',
+                                           'resource_name':  disk['label'],
+                                           'metadata': {},
+                                           'status': 'creating'}
+    
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
+                                                                  snapshot_vm_resource_values)                                                
+             
+            
+            _check_if_tmp_folder_exists(disk)
+            # Generate a random vmdk file name to which the coalesced vmdk content
+            # will be copied to. A random name is chosen so that we don't have
+            # name clashes.
+            random_name = str(uuid.uuid4())
+            dest_vmdk_file_location = vm_util.build_datastore_path(disk['datastore_name'],
+                                                                   "vmware-tmp/%s.vmdk" % random_name)
+            dc_ref = self._get_datacenter_ref_and_name()[0]
+            cookies = self._session._get_vim().client.options.transport.cookiejar
+            
+            full = True
+            vm_disk_resource_snap_id = None
+            if snapshot['snapshot_type'] != 'full':
+                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+                if vm_recent_snapshot:
+                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                            cntx, 
+                                                            instance['vm_id'], 
+                                                            vm_recent_snapshot.snapshot_id, 
+                                                            disk['label'])
+                    if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
+                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                        if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
+                            vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+                            full = False                             
+
+                        
+            if full:
+                _copy_vmdk_content(disk)
+                vmdk_descriptor_file = "vmware-tmp/%s.vmdk" % random_name
+                vmdk_data_file = "vmware-tmp/%s-flat.vmdk" % random_name
+            else:
+                tmp, vmdk_descriptor_file = vm_util.split_datastore_path(disk['vmdk_file_path'])
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
+                
+            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
+
+            vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                    self._session._host_ip,
+                                                    self._get_datacenter_ref_and_name()[1],
+                                                    disk['datastore_name'],
+                                                    cookies,
+                                                    vmdk_descriptor_file)
+            vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
+            #TODO(giri): throw exception if the size is more than 65536    
+            vmdk_descriptor = vmdk_descriptor_file_handle.read(vmdk_descriptor_file_size)
+            vmdk_descriptor_file_handle.close()
+            
+            vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                    self._session._host_ip,
+                                                    self._get_datacenter_ref_and_name()[1],
+                                                    disk['datastore_name'],
+                                                    cookies,
+                                                    vmdk_data_file)
+            vm_disk_size = vm_disk_size + int(vmdk_data_file_handle.get_size())            
+                
+            # create an entry in the vm_disk_resource_snaps table
+            vm_disk_resource_snap_id = str(uuid.uuid4())
+            vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
+            vm_disk_resource_snap_metadata.setdefault('disk_format','vmdk')
+            vm_disk_resource_snap_metadata.setdefault('vmware_disktype','thin')
+            vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','lsiLogic')
+            vm_disk_resource_snap_metadata.setdefault('vmdk_descriptor',vmdk_descriptor)
+            vm_disk_resource_snap_metadata.setdefault('vmdk_data_file_name',vmdk_data_file)
+            vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
+                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                             'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                             'metadata': vm_disk_resource_snap_metadata,       
+                                             'top':  True,
+                                             'size': int(vmdk_data_file_handle.get_size()),                                             
+                                             'status': 'creating'}     
+                                                 
+            vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values) 
+    
+            vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                              'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                              'resource_name':  disk['label'],
+                              'snapshot_vm_id': instance['vm_id'],
+                              'snapshot_id': snapshot_obj.id}
+
+
+            
+            snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
+                                                {'progress_msg': 'Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                                 'status': 'uploading'
+                                                })            
+            LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'] + '; backing file:' + vmdk_data_file))
+            vault_service_url = vault_service.store(vault_metadata, vmdk_data_file_handle);
+            snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
+                                                {'progress_msg': 'Uploaded '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                                 'status': 'uploading'
+                                                })   
+            vmdk_data_file_handle.close()         
+
+         
+            if full:
+                _clean_temp_data()
+                        
+            # update the entry in the vm_disk_resource_snap table
+            vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
+                                            'vault_service_metadata' : 'None',
+                                            'status': 'available'} 
+            db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+            
+            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vm_disk_size})
+
+    @autolog.log_method(Logger, 'vmwareapi.vmops.post_snapshot_vm')
+    def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
+        
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                    'vm_name': instance['vm_name']
+                                                    })
+        currentSnapshot = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
+                                                      "VirtualMachine", "snapshot.currentSnapshot")        
+        if currentSnapshot:
+            remove_snapshot_task = self._session._call_method(
+                                    self._session._get_vim(),
+                                    "RemoveSnapshot_Task", currentSnapshot,
+                                    removeChildren=False)
+            self._session._wait_for_task(instance['vm_id'], remove_snapshot_task)
+                
+        pass                
+    
     def snapshot(self, workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state = None):
         """Create snapshot from a running VM instance"""
     
@@ -1666,6 +1967,7 @@ class VMwareVMOps(object):
                                             'vault_service_metadata' : 'None',
                                             'status': 'completed'} 
             vm_disk_resource_snap.update(vm_disk_resource_snap_values)
+            
             
             
 

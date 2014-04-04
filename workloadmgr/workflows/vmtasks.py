@@ -217,29 +217,33 @@ class SnapshotVM(task.Task):
         
     @autolog.log_method(Logger, 'SnapshotVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        pass     
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'], {'snapshot_id': kwargs['snapshot']['id']})
+  
                 
 class SnapshotDataSize(task.Task):
 
-    def execute(self, context, instances, snapshot):
-        return self.execute_with_log(context, instances, snapshot)
+    def execute(self, context, instance, snapshot, snapshot_data):
+        return self.execute_with_log(context, instance, snapshot, snapshot_data)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)    
     
     @autolog.log_method(Logger, 'GetSnapshotDataSize.execute')    
-    def execute_with_log(self, context, instances, snapshot):
+    def execute_with_log(self, context, instance, snapshot, snapshot_data):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
         if True:
-            snapshot_data_size = vmtasks_openstack.compute_snapshot_data_size(cntx, db, instances, snapshot)
+            vm_data_size = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         else:
-            snapshot_data_size = vmtasks_vcloud.compute_snapshot_data_size(cntx, db, instances, snapshot)
+            vm_data_size = vmtasks_vcloud.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         
-        db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
+        db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': vm_data_size,})
+        
                 
     @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
     def revert_with_log(self, *args, **kwargs):
@@ -247,23 +251,29 @@ class SnapshotDataSize(task.Task):
             
 class UploadSnapshot(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, instance, snapshot, snapshot_data):
+        return self.execute_with_log(context, instance, snapshot, snapshot_data)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'UploadSnapshot.execute')    
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, instance, snapshot, snapshot_data):
         # Upload snapshot data to swift endpoint
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
+        snapshot_data_size = 0
+        for vm in db.snapshot_vms_get(cntx, snapshot_obj.id):
+            snapshot_data_size = snapshot_data_size + vm.size 
+        LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
+        db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
+        
         if True:
-            return vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot)
+            return vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
-            return vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot)
+            return vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
         
         db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'status': 'available',})        
                 
@@ -273,24 +283,25 @@ class UploadSnapshot(task.Task):
       
 class PostSnapshot(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, instance, snapshot, snapshot_data):
+        return self.execute_with_log(context, instance, snapshot, snapshot_data)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'PostSnapshot.execute')    
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, instance, snapshot, snapshot_data):
         # post processing of snapshot for ex. block commit
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
         if True:
-            ret_val = vmtasks_openstack.post_snapshot(cntx, db, instance, snapshot)
+            ret_val = vmtasks_openstack.post_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
-            ret_val = vmtasks_vcloud.post_snapshot(cntx, db, instance, snapshot)        
-        
+            ret_val = vmtasks_vcloud.post_snapshot(cntx, db, instance, snapshot, snapshot_data)        
+
         db.vm_recent_snapshot_update(cntx, instance['vm_id'], {'snapshot_id': snapshot['id']})
+
         return ret_val
 
     @autolog.log_method(Logger, 'PostSnapshot.revert')    
@@ -317,7 +328,8 @@ def LinearPauseVMs(instances):
 def UnorderedSnapshotVMs(instances):
     flow = uf.Flow("snapshotvmuf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index)), 
+                            provides='snapshot_data_' + str(index)))
     
     return flow
 
@@ -326,7 +338,8 @@ def UnorderedSnapshotVMs(instances):
 def LinearSnapshotVMs(instances):
     flow = lf.Flow("snapshotvmlf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index)), 
+                            provides='snapshot_data_' + str(index)))
     
     return flow
 
@@ -347,17 +360,27 @@ def LinearUnPauseVMs(instances):
     
     return flow
 
+def UnorderedSnapshotDataSize(instances):
+    flow = uf.Flow("snapshotdatasizeuf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict))
+    
+    return flow
+
 def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("uploadsnapshotuf")
     for index,item in enumerate(instances):
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
 
 def UnorderedPostSnapshot(instances):
     flow = uf.Flow("postsnapshotuf")
     for index,item in enumerate(instances):
-        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
+        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
 

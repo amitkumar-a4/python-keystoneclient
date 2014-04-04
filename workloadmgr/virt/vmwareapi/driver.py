@@ -27,9 +27,11 @@ from workloadmgr.virt.vmwareapi import vim_util
 from workloadmgr.virt.vmwareapi import vm_util
 from workloadmgr.virt.vmwareapi import vmops
 from workloadmgr.virt.vmwareapi import volumeops
+from workloadmgr import autolog
 
 
 LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 vmwareapi_opts = [
     cfg.StrOpt('host_ip',
@@ -373,10 +375,6 @@ class VMwareESXDriver(driver.ComputeDriver):
         uuids = self._vmops.list_instances()
         return [uuid for uuid in uuids if uuidutils.is_uuid_like(uuid)]
     
-            
-
-
-
 class VMwareVCDriver(VMwareESXDriver):
     """The ESX host connection object."""
 
@@ -730,6 +728,37 @@ class VMwareVCDriver(VMwareESXDriver):
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.unplug_vifs(instance, network_info)
 
+    @autolog.log_method(Logger, 'vmwareapi.driver.pre_snapshot_vm')
+    def pre_snapshot_vm(self, cntx, db, instance, snapshot):
+        pass 
+    
+    @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_vm')
+    def snapshot_vm(self, cntx, db, instance, snapshot): 
+        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
+        return _vmops.snapshot_vm(cntx, db, instance, snapshot)
+           
+    @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_disk_info')
+    def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
+        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
+        disks_info = _vmops.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)['info']
+        return disks_info 
+    
+    @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_data_size')
+    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):     
+        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
+        vm_data_size = _vmops.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+        return vm_data_size 
+    
+    @autolog.log_method(Logger, 'vmwareapi.driver..upload_snapshot')
+    def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
+        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
+        return _vmops.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+            
+    @autolog.log_method(Logger, 'vmwareapi.driver.post_snapshot_vm')
+    def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
+        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
+        return _vmops.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
+           
     def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
         #_vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops = self._get_vmops_for_compute_node(hypervisor_hostname) #('domain-c26(td-sea-clu01)'    )

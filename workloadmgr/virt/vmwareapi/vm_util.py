@@ -344,8 +344,8 @@ def get_disks(hardware_devices):
             disk = {}
             disk['label'] = device.deviceInfo.label
             disk['capacityInKB'] = device.capacityInKB
-            if device.backing.__class__.__name__ == \
-                    "VirtualDiskFlatVer2BackingInfo":
+            backings = [] # using list as a stack for the disk backings            
+            if device.backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo":
                 disk['vmdk_file_path'] = device.backing.fileName
                 disk['datastore_name'] = split_datastore_path(device.backing.fileName)[0]
                 disk['vmdk_controler_key'] = device.controllerKey
@@ -356,6 +356,25 @@ def get_disks(hardware_devices):
                         disk['disk_type'] = "eagerZeroedThick"
                     else:
                         disk['disk_type'] = "preallocated"
+                    
+                if hasattr(device.backing, 'parent'):
+                    parent = device.backing.parent
+                else:
+                    parent = None                
+     
+                while (parent != None):
+                    if parent.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo":
+                        backing = {}
+                        backing['vmdk_file_path'] = parent.fileName
+                        backing['datastore_name'] = split_datastore_path(parent.fileName)[0]
+                        backings.append(backing)
+                        if hasattr(parent, 'parent'):
+                            parent = parent.parent
+                        else:
+                            parent = None        
+                    else:
+                        break
+            disk['backings'] = backings                     
             disk['unit_number'] = device.unitNumber
             disk['adapter_type'] = adapter_type_dict.get(disk['vmdk_controler_key'], "")
             disks.append(disk)
@@ -698,7 +717,6 @@ def get_vm_ref(session, instance):
     if vm_ref is None:
         raise exception.InstanceNotFound(instance_id=instance['uuid'])
     return vm_ref
-
 
 def get_host_ref_from_id(session, host_id, property_list=None):
     """Get a host reference object for a host_id string."""

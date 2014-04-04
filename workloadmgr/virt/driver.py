@@ -160,20 +160,25 @@ def load_compute_driver(virtapi, compute_driver=None):
 def compute_driver_matches(match):
     return CONF.compute_driver.endswith(match)
 
-def pre_snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+def pre_snapshot_vm(self, cntx, db, instance, snapshot):
     raise NotImplementedError()
  
-def snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+def snapshot_vm(self, cntx, db, instance, snapshot): 
     raise NotImplementedError()  
 
-def upload_snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
     raise NotImplementedError()
 
-def post_snapshot(self, workload, snapshot, vm_id, hypervisor_hostname, vault_service, db, context, update_task_state = None):
+def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
+    raise NotImplementedError()    
+
+def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
+    raise NotImplementedError()
+
+def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
     raise NotImplementedError()   
     
-def snapshot_restore(self, workload, snapshot, restore, snapshot_vm, vault_service, new_net_resources, db, context, update_task_state = None):
-    
+def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_compute_flavor, restored_nics):
     raise NotImplementedError()        
     
 

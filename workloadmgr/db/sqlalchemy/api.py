@@ -1024,14 +1024,12 @@ def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resou
                        .filter_by(resource_name=resource_name)
 
         #TODO(gbasava): filter out deleted snapshots if context disallows it
-        snapshot_vm_resources = query.first()
+        snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourcesWithNameNotFound(vm_id = vm_id, 
-                                                        snapshot_id = snapshot_id,
-                                                        resource_name = resource_name)
+        snapshot_vm_resource = None
 
-    return snapshot_vm_resources
+    return snapshot_vm_resource
 
 @require_context
 def snapshot_vm_resource_get(context, id, session=None):
@@ -1125,13 +1123,13 @@ def vm_disk_resource_snap_metadata_delete(context, metadata_ref, session=None):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _vm_disk_resource_snap_update(context, values, snapshot_vm_resource_id, purge_metadata=False):
+def _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, purge_metadata=False):
     
     metadata = values.pop('metadata', {})
     
     session = get_session()
-    if snapshot_vm_resource_id:
-        vm_disk_resource_snap_ref = vm_disk_resource_snap_get(context, snapshot_vm_resource_id, session)
+    if vm_disk_resource_snap_id:
+        vm_disk_resource_snap_ref = vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session)
     else:
         vm_disk_resource_snap_ref = models.VMDiskResourceSnaps()
         if not values.get('size'):
@@ -1151,9 +1149,9 @@ def vm_disk_resource_snap_create(context, values):
     return _vm_disk_resource_snap_update(context, values, None, False)
 
 @require_context
-def vm_disk_resource_snap_update(context, snapshot_vm_resource_id, values, purge_metadata=False):
+def vm_disk_resource_snap_update(context, vm_disk_resource_snap_id, values, purge_metadata=False):
    
-    return _vm_disk_resource_snap_update(context, values, snapshot_vm_resource_id, purge_metadata)
+    return _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, purge_metadata)
 
 @require_context
 def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, session=None):
@@ -1186,7 +1184,7 @@ def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id, session=None
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapsNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
+        vm_disk_resource_snap = None
     
     return vm_disk_resource_snap
 
@@ -1197,7 +1195,7 @@ def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session=None):
     try:
         query = session.query(models.VMDiskResourceSnaps)\
                        .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(id= vm_disk_resource_snap_id)
+                       .filter_by(id=vm_disk_resource_snap_id)
 
         #TODO(gbasava): filter out deleted resource snapshots if context disallows it
         vm_disk_resource_snap = query.one()
@@ -1282,13 +1280,13 @@ def vm_network_resource_snap_metadata_delete(context, metadata_ref, session=None
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _vm_network_resource_snap_update(context, values, snapshot_vm_resource_id, purge_metadata=False):
+def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata=False):
     
     metadata = values.pop('metadata', {})
     
     session = get_session()
-    if snapshot_vm_resource_id:
-        vm_network_resource_snap_ref = vm_network_resource_snap_get(context, snapshot_vm_resource_id, session)
+    if vm_network_resource_snap_id:
+        vm_network_resource_snap_ref = vm_network_resource_snap_get(context, vm_network_resource_snap_id, session)
     else:
         vm_network_resource_snap_ref = models.VMNetworkResourceSnaps()
     
@@ -1306,9 +1304,9 @@ def vm_network_resource_snap_create(context, values):
     return _vm_network_resource_snap_update(context, values, None, False)
 
 @require_context
-def vm_network_resource_snap_update(context, snapshot_vm_resource_id, values, purge_metadata=False):
+def vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata=False):
    
-    return _vm_network_resource_snap_update(context, values, snapshot_vm_resource_id, purge_metadata)
+    return _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata)
 
 @require_context
 def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session=None):
@@ -1328,19 +1326,19 @@ def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session=None
     return vm_network_resource_snaps
 
 @require_context
-def vm_network_resource_snap_get(context, snapshot_vm_resource_id, session=None):
+def vm_network_resource_snap_get(context, vm_network_resource_snap_id, session=None):
     if session == None: 
         session = get_session()
     try:
         query = session.query(models.VMNetworkResourceSnaps)\
                        .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
-                       .filter_by(vm_network_resource_snap_id=snapshot_vm_resource_id)
+                       .filter_by(vm_network_resource_snap_id=vm_network_resource_snap_id)
 
         #TODO(gbasava): filter out deleted resource snapshots if context disallows it
         vm_network_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapsNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
+        raise 
     
     return vm_network_resource_snap
 
