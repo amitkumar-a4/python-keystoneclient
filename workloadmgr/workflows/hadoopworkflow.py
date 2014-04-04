@@ -328,10 +328,18 @@ class HadoopWorkflow(workflow.Workflow):
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                return {'name':str(item), 'type':'Task'}
+                taskdetails = {'name':item._name.split("_")[0], 'type':'Task'}
+                taskdetails['input'] = []
+                if len(item._name.split('_')) == 2:
+                    nodename = item._name.split("_")[1]
+                    for n in nodes['instances']:
+                       if n['vm_id'] == nodename:
+                          nodename = n['vm_name']
+                    taskdetails['input'] = [['vm', nodename]]
+                return taskdetails
 
             flowdetails = {}
-            flowdetails['name'] = str(item)
+            flowdetails['name'] = str(item).split("==")[0]
             flowdetails['type'] = str(item).split('.')[2]
             flowdetails['children'] = []
             for it in item:
@@ -339,6 +347,7 @@ class HadoopWorkflow(workflow.Workflow):
 
             return flowdetails
 
+        nodes = self.discover()
         workflow = recurseflow(self._flow)
         return dict(workflow=workflow)
 
