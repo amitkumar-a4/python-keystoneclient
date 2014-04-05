@@ -713,7 +713,7 @@ def get_vm_ref(session, instance):
     """Get reference to the VM through uuid or vm name."""
     vm_ref = get_vm_ref_from_uuid(session, instance['uuid'])
     if not vm_ref:
-        vm_ref = get_vm_ref_from_name(session, instance['name'])
+        vm_ref = get_vm_ref_from_name(session, instance['vm_name'])
     if vm_ref is None:
         raise exception.InstanceNotFound(instance_id=instance['uuid'])
     return vm_ref

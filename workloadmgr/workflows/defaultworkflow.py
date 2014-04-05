@@ -61,7 +61,6 @@ def get_vms(cntx, workload_id):
         if vm_hypervisor == None:
             pass #TODO(giri): Throw exception
                    
-        import pdb;pdb.set_trace()
         vm = {'vm_id' : vm_instance.id,
               'vm_name' : vm_instance.name,
               'vm_flavor_id' : vm_instance.flavor['id'],
