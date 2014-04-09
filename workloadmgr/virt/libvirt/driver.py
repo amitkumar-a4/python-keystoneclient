@@ -804,12 +804,14 @@ class LibvirtDriver(driver.ComputeDriver):
         restored_compute_image = compute_service.get_image(cntx, restored_image['id'])
         LOG.debug('Creatng Instance ' + restored_instance_name)        
         restored_instance = compute_service.create_server(cntx, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=restored_nics)
-        while restored_instance.status != 'ACTIVE':
+        
+        while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
             time.sleep(30)
             restored_instance =  compute_service.get_server_by_id(cntx, restored_instance.id)
-            if restored_instance.status == 'ERROR':
-                raise Exception(_("Error creating instance " + restored_instance.id))
+            if hasattr(restored_instance,'status'):
+                if restored_instance.status == 'ERROR':
+                    raise Exception(_("Error creating instance " + restored_instance.id))
         
         if test == True:
             # We will not powerdown the VM if we are doing a test restore.

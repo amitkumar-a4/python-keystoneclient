@@ -215,15 +215,19 @@ def snapshot_vm_flavors(cntx, db, instances, snapshot):
           
 @autolog.log_method(Logger, 'vmtasks_openstack.pause_vm')
 def pause_vm(cntx, db, instance):
-                                
     compute_service = nova.API(production=True)
-    compute_service.pause(cntx, instance['vm_id'])
+    if instance['hypervisor_type'] == 'VMware vCenter Server':
+        suspend_vm(cntx, db, instance)
+    else:
+        compute_service.pause(cntx, instance['vm_id'])
 
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
 def unpause_vm(cntx, db, instance):
-    
     compute_service = nova.API(production=True)
-    compute_service.unpause(cntx, instance['vm_id'])
+    if instance['hypervisor_type'] == 'VMware vCenter Server':
+        resume_vm(cntx, db, instance)
+    else:
+        compute_service.unpause(cntx, instance['vm_id'])
 
 @autolog.log_method(Logger, 'vmtasks_openstack.suspend_vm')
 def suspend_vm(cntx, db, instance):
