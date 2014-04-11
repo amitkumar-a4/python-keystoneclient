@@ -1498,6 +1498,8 @@ class VMwareVMOps(object):
             if snapshot['snapshot_type'] != 'full':
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
+                    #TODO(giri): the disk colud have changed between the snapshots
+                    #TODO(giri): handle the snapshots created out side of WLM                    
                     previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
                                                             cntx, 
                                                             instance['vm_id'], 
@@ -1506,7 +1508,7 @@ class VMwareVMOps(object):
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
-                            vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
+                            vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
                             full = False                           
                         
 
@@ -1607,6 +1609,7 @@ class VMwareVMOps(object):
         vault_service = vault.get_vault_service(cntx)
         cookies = self._session._get_vim().client.options.transport.cookiejar
                 
+                
         for disk in snapshot_data: 
             vm_disk_size = 0
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
@@ -1624,6 +1627,8 @@ class VMwareVMOps(object):
             if snapshot['snapshot_type'] != 'full':
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
+                    #TODO(giri): the disk colud have changed between the snapshots
+                    #TODO(giri): handle the snapshots created out side of WLM
                     previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
                                                             cntx, 
                                                             instance['vm_id'], 
@@ -1633,9 +1638,8 @@ class VMwareVMOps(object):
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
                             vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
-                            full = False                             
+                            full = False                           
 
-                        
             if full:
                 for backing in disk['backings']:
                     vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(backing['vmdk_file_path'], 
@@ -1652,19 +1656,36 @@ class VMwareVMOps(object):
     @autolog.log_method(Logger, 'vmwareapi.vmops.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
         
-        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                    'vm_name': instance['vm_name']
-                                                    })
-        currentSnapshot = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
-                                                      "VirtualMachine", "snapshot.currentSnapshot")        
-        if currentSnapshot:
-            remove_snapshot_task = self._session._call_method(
-                                    self._session._get_vim(),
-                                    "RemoveSnapshot_Task", currentSnapshot,
-                                    removeChildren=False)
-            self._session._wait_for_task(instance['vm_id'], remove_snapshot_task)
+        def _get_snapshot_to_remove(snapshot_list):
+            snapshot_to_remove = None
+            if snapshot_list:    
+                for vmw_snapshot in snapshot_list:
+                    if vmw_snapshot.name == ('snapshot_id:' + vm_recent_snapshot.snapshot_id) :
+                        snapshot_to_remove = vmw_snapshot.snapshot
+                        break
+                    if hasattr(vmw_snapshot, 'childSnapshotList'):
+                        snapshot_to_remove = _get_snapshot_to_remove(vmw_snapshot.childSnapshotList)
+                        if snapshot_to_remove:
+                            break
+            return snapshot_to_remove             
+
+        vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+        if vm_recent_snapshot:
+            vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                        'vm_name': instance['vm_name']
+                                                        })
+            root_snapshot_array = self._session._call_method(vim_util,"get_dynamic_property", vm_ref, "VirtualMachine", "snapshot.rootSnapshotList")
+           
+            if root_snapshot_array and len(root_snapshot_array) > 0 : 
+                snapshot_to_remove = _get_snapshot_to_remove(root_snapshot_array[0])
+                if snapshot_to_remove :
+                    remove_snapshot_task = self._session._call_method(
+                                            self._session._get_vim(),
+                                            "RemoveSnapshot_Task", snapshot_to_remove,
+                                            removeChildren=False)
+                    self._session._wait_for_task(instance['vm_id'], remove_snapshot_task)
+ 
                 
-        pass                
     
 
 class VMwareVCVMOps(VMwareVMOps):

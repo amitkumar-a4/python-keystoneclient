@@ -44,6 +44,10 @@ class ViewBuilder(common.ViewBuilder):
             d['subnets'] = restore['subnets']
         if 'routers' in restore:
             d['routers'] = restore['routers']  
+        if 'flavors' in restore:
+            d['flavors'] = restore['flavors']
+        if 'flavors' in restore:
+            d['flavors'] = restore['flavors']             
         d['links'] = self._get_links(request, restore['id'])
         d['name'] = restore['display_name']
         d['description'] =  restore['display_description']

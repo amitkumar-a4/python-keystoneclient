@@ -335,6 +335,7 @@ class API(base.Base):
         networks_list = []
         subnets_list = []
         routers_list = []
+        flavors_list = []
         try:
             resources = self.db.restored_vm_resources_get(context, restore_id, restore_id)
             for resource in resources:
@@ -343,12 +344,15 @@ class API(base.Base):
                 elif resource.resource_type == 'subnet':
                     subnets_list.append({'id':resource.id, 'name':resource.resource_name})
                 elif resource.resource_type == 'router':
-                    routers_list.append({'id':resource.id, 'name':resource.resource_name})                                    
+                    routers_list.append({'id':resource.id, 'name':resource.resource_name})   
+                elif resource.resource_type == 'flavor':
+                    flavors_list.append({'id':resource.id, 'name':resource.resource_name}) 
         except Exception as ex:
             pass        
         restore_details.setdefault('networks', networks_list) 
         restore_details.setdefault('subnets', subnets_list)
         restore_details.setdefault('routers', routers_list) 
+        restore_details.setdefault('flavors', flavors_list) 
                 
         return restore_details
     
@@ -413,7 +417,15 @@ class API(base.Base):
             except Exception as exception:
                 msg = _("Error deleting network %(network_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'network_id': network['id'], 'exception': exception})
-                LOG.exception(exception)                  
+                LOG.exception(exception) 
+                
+        for flavor in restore_details['flavors']:
+            try:
+                compute_service.delete_flavor(context,flavor['id'])
+            except Exception as exception:
+                msg = _("Error deleting flavor %(flavor_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'flavor_id': flavor['id'], 'exception': exception})
+                LOG.exception(exception)                                     
 
         self.db.restore_delete(context, restore_id)
         
