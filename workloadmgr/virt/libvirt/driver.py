@@ -564,7 +564,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'resource_name':  disk_info['dev'],
                                   'snapshot_vm_id': instance['vm_id'],
                                   'snapshot_id': snapshot_obj.id,}
-
+                
                 vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path']})
                 
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
@@ -572,7 +572,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                      'status': 'uploading'
                                                     })
                 LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + '; backing file:' + os.path.basename(base_backing_path['path'])))
-                vault_service_url = vault_service.store(vault_metadata, vast_data);
+                vault_service_url = vault_service.store(vault_metadata, vast_data, vast_data._size);
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
                                                     {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
