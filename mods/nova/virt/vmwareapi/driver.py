@@ -205,9 +205,9 @@ class VMwareESXDriver(driver.ComputeDriver):
 
     def destroy(self, instance, network_info, block_device_info=None,
                 destroy_disks=True, context=None):
-        for md in instance['metadata']:
-            if md['key'] == 'imported_from_vcenter' and md['value'] == 'True':
-               return
+        md = instance['metadata']
+        if md['imported_from_vcenter'] == 'True':
+            return
         """Destroy VM instance."""
         self._vmops.destroy(instance, network_info, destroy_disks)
 
@@ -685,9 +685,9 @@ class VMwareVCDriver(VMwareESXDriver):
 
     def destroy(self, instance, network_info, block_device_info=None,
                  destroy_disks=True, context=None):
-        for md in instance['metadata']:
-            if md['key'] == 'imported_from_vcenter' and md['value'] == 'True':
-               return
+        md = instance['metadata']
+        if md['imported_from_vcenter'] == 'True':
+            return
         """Destroy VM instance."""
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.destroy(instance, network_info, destroy_disks)

@@ -1753,7 +1753,6 @@ class API(base.Base):
 
         check_policy(context, "get_all", target)
         check_policy(context, "get_all_tenants", target)
-        import pdb;pdb.set_trace()
         if 'deep_discover' in search_opts and search_opts['deep_discover']:
 
            search_opts.pop('deep_discover', None)
@@ -1811,9 +1810,10 @@ class API(base.Base):
                  continue
    
               requested_networks = []
-              for vcnet in vm['networks']:
-                 for net in networks:
-                    if not net['router:external'] and net['name'] == vcnet['name']:
+              #for vcnet in vm['networks']:
+              for net in networks:
+                    #if not net['router:external'] and net['name'] == vcnet['name']:
+                    if not net['router:external'] and net['name'] == 'private':
                        requested_networks.append((net['id'], None, None))
                        break
 
