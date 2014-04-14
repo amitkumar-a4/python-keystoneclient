@@ -42,7 +42,9 @@ class ViewBuilder(common.ViewBuilder):
         if 'subnets' in testbubble:
             d['subnets'] = testbubble['subnets']
         if 'routers' in testbubble:
-            d['routers'] = testbubble['routers']  
+            d['routers'] = testbubble['routers'] 
+        if 'flavors' in testbubble:
+            d['flavors'] = testbubble['flavors']             
         d['links'] = self._get_links(request, testbubble['id'])
         d['name'] = testbubble['display_name']
         d['description'] =  testbubble['display_description']         
@@ -68,7 +70,9 @@ class ViewBuilder(common.ViewBuilder):
         if 'subnets' in testbubble:
             d['subnets'] = testbubble['subnets']
         if 'routers' in testbubble:
-            d['routers'] = testbubble['routers']                                
+            d['routers'] = testbubble['routers']
+        if 'flavors' in testbubble:
+            d['flavors'] = testbubble['flavors']                                            
         d['links'] = self._get_links(request, testbubble['id'])
         d['name'] = testbubble['display_name']
         d['description'] =  testbubble['display_description']

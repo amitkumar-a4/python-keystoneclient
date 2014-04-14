@@ -38,6 +38,8 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from swiftclient import client as swift
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+from workloadmgr.virt import qemuimages
 
 LOG = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ wlm_swift_opts = [
                default='http://localhost:8080/v1/AUTH_',
                help='The URL of the Swift endpoint'),
     cfg.StrOpt('wlm_swift_container',
-               default='wlm_snapshots',
+               default='vast_snapshots',
                help='The default Swift container to use for workload snapshots'),
     cfg.IntOpt('wlm_swift_object_size',
                default=524288000,
@@ -119,25 +121,18 @@ class SwiftBackupService(base.Base):
             LOG.debug(_('container %s exists') % container)
             return True
 
-    def _create_container(self, context, snapshot_metadata):
-        snapshot_id = snapshot_metadata['snapshot_id']
-        container = snapshot_metadata['snapshot_id']
-        LOG.debug(_('_create_container started, container: %(container)s,'
-                    'snapshot: %(snapshot_id)s') % locals())
+    def _create_container(self, context, container):
         if container is None:
             container = FLAGS.wlm_swift_container
         if not self._check_container_exists(container):
             self.conn.put_container(container)
         return container
 
-                                     
     def _generate_swift_object_name_prefix(self, snapshot_metadata):
-        az = 'az_zone1' #TODO(gbasava): Fix with right parameters later
-        jobrun = 'jobrun_%s' % (snapshot_metadata['snapshot_id'])
+        jobrun = 'snapshot_%s' % (snapshot_metadata['snapshot_id'])
         vm_id = 'vm_id_%s' % (snapshot_metadata['snapshot_vm_id'])
         vm_res_id = 'vm_res_id_%s_%s' % (snapshot_metadata['snapshot_vm_resource_id'],
                                          snapshot_metadata['resource_name'])
-        timestamp = timeutils.strtime(fmt="%Y%m%d%H%M%S")
         prefix = jobrun + '/' + vm_id + '/' + vm_res_id
         LOG.debug(_('_generate_swift_object_name_prefix: %s') % prefix)
         return prefix
@@ -190,56 +185,40 @@ class SwiftBackupService(base.Base):
         LOG.debug(_('_read_metadata finished (%s)') % metadata)
         return metadata
 
-    def store(self, snapshot_metadata, file_to_snapshot_path):
+    def store(self, snapshot_metadata, iterator, size):
         """Backup the given file to swift using the given snapshot metadata."""
            
         try:
-            container = self._create_container(self.context, snapshot_metadata)
+            container = self._create_container(self.context, FLAGS.wlm_swift_container)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
         
         object_prefix = self._generate_swift_object_name_prefix(snapshot_metadata)
-        fileobj = file(file_to_snapshot_path)
-        
-        file_to_snapshot_size = os.path.getsize(file_to_snapshot_path)
 
         object_id = 1
         object_list = []
         object_name = None
+        uploaded_size=0
         #TODO(gbasava): make this only one file snapshot...dynamic large object
-        while True:
-            time.sleep(10)
-            data_block_size_bytes = self.data_block_size_bytes
+        while uploaded_size < size:
+            time.sleep(5)
             object_name = '%s/%s_%05d' % (object_prefix, snapshot_metadata['vm_disk_resource_snap_id'], object_id)
             obj = {}
             obj[object_name] = {}
-            obj[object_name]['offset'] = fileobj.tell()
-            data = fileobj.read(data_block_size_bytes)
-            obj[object_name]['length'] = len(data)
-            if data == '':
-                break
-            LOG.debug(_('reading chunk of data from volume'))
-            if self.compressor is not None:
-                algorithm = FLAGS.wlm_compression_algorithm.lower()
-                obj[object_name]['compression'] = algorithm
-                data_size_bytes = len(data)
-                data = self.compressor.compress(data)
-                comp_size_bytes = len(data)
-                LOG.debug(_('compressed %(data_size_bytes)d bytes of data'
-                            ' to %(comp_size_bytes)d bytes using '
-                            '%(algorithm)s') % locals())
+            
+            obj[object_name]['offset'] = uploaded_size
+            if size - uploaded_size >= self.data_block_size_bytes:
+                obj[object_name]['length'] = self.data_block_size_bytes
             else:
-                LOG.debug(_('not compressing data'))
-                obj[object_name]['compression'] = 'none'
+                obj[object_name]['length'] = size - uploaded_size
 
-            reader = StringIO.StringIO(data)
-            LOG.debug(_('About to put_object'))
             try:
-                etag = self.conn.put_object(container, object_name, reader)
+                etag = self.conn.put_object(container, object_name, iterator, obj[object_name]['length'])
             except socket.error as err:
                 raise exception.SwiftConnectionFailed(reason=str(err))
-            LOG.debug(_('swift MD5 for %(object_name)s: %(etag)s') % locals())
+            uploaded_size = uploaded_size + obj[object_name]['length']
+            """
             md5 = hashlib.md5(data).hexdigest()
             obj[object_name]['md5'] = md5
             LOG.debug(_('snapshot MD5 for %(object_name)s: %(md5)s') % locals())
@@ -248,24 +227,23 @@ class SwiftBackupService(base.Base):
                         'swift %(etag)s is not the same as MD5 of object sent '
                         'to swift %(md5)s') % locals()
                 raise exception.InvalidBackup(reason=err)
+            """
             object_list.append(obj)
             object_id += 1
             LOG.debug(_('Calling eventlet.sleep(0)'))
             eventlet.sleep(0)
         
-        fileobj.close()
         try:
             self._write_metadata(snapshot_metadata, container, object_list)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
-        #LOG.debug(_('snapshot %s finished.') % snapshot_metadata['vm_disk_resource_snap_id'])
         return object_name
 
     def _restore_v1(self, snapshot_metadata, restore_to_file_path):
         """Restore a v1 swift volume snapshot from swift."""
 
         try:
-            container = self._create_container(self.context, snapshot_metadata)
+            container = self._create_container(self.context, FLAGS.wlm_swift_container)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
@@ -297,15 +275,7 @@ class SwiftBackupService(base.Base):
                 (resp, body) = self.conn.get_object(container, object_name)
             except socket.error as err:
                 raise exception.SwiftConnectionFailed(reason=str(err))
-            compression_algorithm = metadata_object[object_name]['compression']
-            decompressor = self._get_compressor(compression_algorithm)
-            if decompressor is not None:
-                LOG.debug(_('decompressing data using %s algorithm') %
-                          compression_algorithm)
-                decompressed = decompressor.decompress(body)
-                fileobj.write(decompressed)
-            else:
-                fileobj.write(body)
+            fileobj.write(body)
 
             # force flush every write to avoid long blocking write on close
             fileobj.flush()
@@ -318,20 +288,10 @@ class SwiftBackupService(base.Base):
         
     def restore(self, snapshot_metadata, restore_to_file_path):
         """Restore to the given file from swift."""
-     
-        """
-        try:
-            container = self._create_container(self.context, snapshot_metadata)
-        except socket.error as err:
-            raise exception.SwiftConnectionFailed(reason=str(err))
-        
-        object_prefix = self._generate_swift_object_name_prefix(snapshot_metadata)
-         """
        
         self._restore_v1(snapshot_metadata, restore_to_file_path)
         
-        LOG.debug(_('restore of snapshot %s finished.') % snapshot_metadata['snapshot_id'])
-
+ 
     def delete(self, snapshot):
         """Delete the given snapshot from swift."""
         container = snapshot['container']

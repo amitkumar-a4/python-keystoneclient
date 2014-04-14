@@ -480,7 +480,35 @@ class API(base.Base):
             return novaclient(context, self._production).flavors.get(id) 
         except Exception:
             #TODO(gbasava): Handle the exception   
-            return  
+            return 
+
+    def create_flavor(self, context, name, memory, vcpus, 
+                      root_gb, ephemeral_gb):
+        
+        """
+        Create a new flavor
+        
+        :rtype: :class:`Flavor`
+        """   
+   
+        try:
+            return novaclient(context, self._production, True).flavors.create(name, 
+                                                memory, vcpus, root_gb, flavorid="auto", 
+                                                ephemeral = ephemeral_gb)
+        except Exception:
+            #TODO(gbasava): Handle the exception   
+            return         
+
+    def delete_flavor(self, context, id):
+        """
+        Delete the falvor given the flavor name
+        """   
+    
+        try:
+            return novaclient(context, self._production, True).flavors.delete(id) 
+        except Exception:
+            #TODO(gbasava): Handle the exception 
+            return
                
     def get_interfaces(self, context, server):   
         """

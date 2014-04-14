@@ -11,6 +11,7 @@ specific flows
 
 import os
 import uuid
+import time
 import cPickle as pickle
 
 from workloadmgr.openstack.common import log as logging
@@ -215,21 +216,37 @@ def snapshot_vm_flavors(cntx, db, instances, snapshot):
           
 @autolog.log_method(Logger, 'vmtasks_openstack.pause_vm')
 def pause_vm(cntx, db, instance):
-                                
     compute_service = nova.API(production=True)
-    compute_service.pause(cntx, instance['vm_id'])
+    if instance['hypervisor_type'] == 'VMware vCenter Server':
+        suspend_vm(cntx, db, instance)
+    else:
+        compute_service.pause(cntx, instance['vm_id'])
+        instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+        while hasattr(instance_ref,'status') and instance_ref.status != 'PAUSED':
+            instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+            if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
+                raise Exception(_("Error suspending instance " + instance_ref.id))        
 
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
 def unpause_vm(cntx, db, instance):
-    
     compute_service = nova.API(production=True)
-    compute_service.unpause(cntx, instance['vm_id'])
+    if instance['hypervisor_type'] == 'VMware vCenter Server':
+        resume_vm(cntx, db, instance)
+    else:
+        compute_service.unpause(cntx, instance['vm_id'])
 
 @autolog.log_method(Logger, 'vmtasks_openstack.suspend_vm')
 def suspend_vm(cntx, db, instance):
     
     compute_service = nova.API(production=True)
     compute_service.suspend(cntx, instance['vm_id'])
+    instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+    while hasattr(instance_ref,'status') and instance_ref.status != 'SUSPENDED':
+        time.sleep(5)
+        instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+        if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
+            raise Exception(_("Error suspending instance " + instance_ref.id))
+    
 
 @autolog.log_method(Logger, 'vmtasks_openstack.resume_vm')
 def resume_vm(cntx, db, instance):
@@ -303,20 +320,34 @@ def restore_vm_flavor(cntx, db, instance, restore):
     compute_service = nova.API(production = (restore['restore_type'] != 'test'))
     restored_compute_flavor = None
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
+    
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'flavor':
             snapshot_vm_flavor = db.snapshot_vm_resource_get(cntx, snapshot_vm_resource.id)
+            vcpus = db.get_metadata_value(snapshot_vm_flavor.metadata, 'vcpus')
+            ram = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ram')
+            disk = db.get_metadata_value(snapshot_vm_flavor.metadata, 'disk')
+            ephemeral = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral')            
             for flavor in compute_service.get_flavors(cntx):
-                if ((str(flavor.vcpus) ==  db.get_metadata_value(snapshot_vm_flavor.metadata, 'vcpus')) and
-                    (str(flavor.ram) ==  db.get_metadata_value(snapshot_vm_flavor.metadata, 'ram')) and
-                    (str(flavor.disk) ==  db.get_metadata_value(snapshot_vm_flavor.metadata, 'disk')) and
-                    (str(flavor.ephemeral) == db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral'))):
+                if ((str(flavor.vcpus) ==  vcpus) and
+                    (str(flavor.ram) ==  ram) and
+                    (str(flavor.disk) ==  disk) and
+                    (str(flavor.ephemeral) == ephemeral)):
                     restored_compute_flavor = flavor
                     break
             break
     if not restored_compute_flavor:
         #TODO(giri):create a new flavor
-        restored_compute_flavor = compute_service.get_flavor_by_name(cntx, 'm1.small')
+        name = str(uuid.uuid4())
+        restored_compute_flavor = compute_service.create_flavor(cntx, name, ram, vcpus, disk, ephemeral)
+        restored_vm_resource_values = {'id': restored_compute_flavor.id,
+                                       'vm_id': restore['id'],
+                                       'restore_id': restore['id'],       
+                                       'resource_type': 'flavor',
+                                       'resource_name':  name,
+                                       'metadata': {},
+                                       'status': 'available'}
+        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)         
     return restored_compute_flavor 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.get_vm_nics')

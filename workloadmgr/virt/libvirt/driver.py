@@ -368,27 +368,35 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         rebase the top to base
         """
-        
         base_path, base_filename = os.path.split(base)
         orig_base_path, orig_base_filename = os.path.split(orig_base)
-        os.rename(base, os.path.join(base_path,orig_base_filename))
-        if top_descriptor is not None:
-            top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
-            base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
-        with open(base, "w") as base_descriptor_file:
-            base_descriptor_file.write("%s"%base_descriptor)
+        base_extent_path = base_path
+        base_extent_filename = base_filename + '.extent' 
+        if(os.path.isfile(os.path.join(base_extent_path,base_extent_filename)) == False):
+            os.rename(base, os.path.join(base_extent_path,base_extent_filename)) 
+            base_descriptor = base_descriptor.replace((' "' + orig_base_filename +'"'), (' "' + base_extent_filename +'"'))
+            if top_descriptor is not None:
+                top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
+                base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
+            with open(base, "w") as base_descriptor_file:
+                base_descriptor_file.write("%s"%base_descriptor)
+
         
         if top_descriptor is not None:
             top_path, top_filename = os.path.split(top)
             orig_top_path, orig_top_filename = os.path.split(orig_top)
-            if(os.path.isfile(os.path.join(top_path,orig_top_filename))):
+            top_extent_path = top_path
+            top_extent_filename = top_filename + '.extent'             
+            if(os.path.isfile(os.path.join(top_extent_path,top_extent_filename))):
                 with open(top, "r") as top_descriptor_file:
                     top_descriptor =  top_descriptor_file.read() 
             else:
-                os.rename(top, os.path.join(top_path,orig_top_filename))
+                os.rename(top, os.path.join(top_extent_path,top_extent_filename))
+                top_descriptor = top_descriptor.replace((' "' + orig_top_filename +'"'), (' "' + top_extent_filename +'"'))
+ 
             top_descriptor = re.sub(r'parentFileNameHint="([^"]*)"', "parentFileNameHint=\"%s\""%base, top_descriptor)
             with open(top, "w") as top_descriptor_file:
-                top_descriptor_file.write("%s"%top_descriptor)            
+                top_descriptor_file.write("%s"%top_descriptor)                            
  
     def commit_vmdk(self, file_to_commit, commit_to, test):
         """rebase the backing_file_top to backing_file_base
@@ -402,14 +410,17 @@ class LibvirtDriver(driver.ComputeDriver):
         else:
             utils.execute( 'env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
                            'vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
-            
+        
         utils.chmod(commit_to, '0664')
         utils.chmod(commit_to.replace(".vmdk", "-flat.vmdk"), '0664')
+        return commit_to.replace(".vmdk", "-flat.vmdk")
+        """
         if test:
             utils.execute('qemu-img', 'convert', '-f', 'vmdk', '-O', 'raw', commit_to, commit_to.replace(".vmdk", ".img"), run_as_root=False)
             return commit_to.replace(".vmdk", ".img")
         else:
-            return commit_to.replace(".vmdk", "-flat.vmdk")      
+            return commit_to.replace(".vmdk", "-flat.vmdk") 
+        """     
 
     @autolog.log_method(Logger, 'libvirt.driver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
@@ -553,7 +564,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'resource_name':  disk_info['dev'],
                                   'snapshot_vm_id': instance['vm_id'],
                                   'snapshot_id': snapshot_obj.id,}
-
+                
                 vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path']})
                 
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
@@ -561,7 +572,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                      'status': 'uploading'
                                                     })
                 LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + '; backing file:' + os.path.basename(base_backing_path['path'])))
-                vault_service_url = vault_service.store(vault_metadata, vast_data);
+                vault_service_url = vault_service.store(vault_metadata, vast_data, vast_data._size);
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
                                                     {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
@@ -645,8 +656,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                      db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'),
                                      None,
                                      None,
-                                     None)               
-                                           
+                                     None)
+                    commit_queue.put(restored_file_path)               
+            
             while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
@@ -706,7 +718,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     if restored_file_path != file_to_commit:
                         utils.delete_if_exists(file_to_commit)
             elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
-                    file_to_commit = restored_file_path
+                    file_to_commit = commit_queue.get_nowait()
                     commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
                     commit_to = commit_to.replace(" ", "")
                     LOG.debug('Commiting VMDK ' + file_to_commit)
@@ -804,12 +816,14 @@ class LibvirtDriver(driver.ComputeDriver):
         restored_compute_image = compute_service.get_image(cntx, restored_image['id'])
         LOG.debug('Creatng Instance ' + restored_instance_name)        
         restored_instance = compute_service.create_server(cntx, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=restored_nics)
-        while restored_instance.status != 'ACTIVE':
+        
+        while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
             time.sleep(30)
             restored_instance =  compute_service.get_server_by_id(cntx, restored_instance.id)
-            if restored_instance.status == 'ERROR':
-                raise Exception(_("Error creating instance " + restored_instance.id))
+            if hasattr(restored_instance,'status'):
+                if restored_instance.status == 'ERROR':
+                    raise Exception(_("Error creating instance " + restored_instance.id))
         
         if test == True:
             # We will not powerdown the VM if we are doing a test restore.
