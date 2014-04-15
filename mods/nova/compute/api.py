@@ -1810,9 +1810,10 @@ class API(base.Base):
                  continue
    
               requested_networks = []
-              for vcnet in vm['networks']:
-                 for net in networks:
-                    if not net['router:external'] and net['name'] == vcnet['name']:
+              #for vcnet in vm['networks']:
+              for net in networks:
+                    #if not net['router:external'] and net['name'] == vcnet['name']:
+                    if not net['router:external'] and net['name'] == 'private':
                        requested_networks.append((net['id'], None, None))
                        break
 
