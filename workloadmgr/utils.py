@@ -1299,3 +1299,4 @@ class ChunkedFile(object):
         if self.fp:
             self.fp.close()
             self.fp = None
+            
