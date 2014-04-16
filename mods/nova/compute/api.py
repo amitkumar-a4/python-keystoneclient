@@ -1725,7 +1725,12 @@ class API(base.Base):
            for d in devices[0]:
               if str(d.__class__).find('suds.sudsobject.VirtualE1000') != -1:
                  for n in i['networks']:
-                    if d.backing.deviceName is n['name']:
+                    netid = ""
+                    if str(d.backing.__class__).find('suds.sudsobject.VirtualEthernetCardDistributedVirtualPortBackingInfo') != -1:
+                        netid = d.backing.port.portgroupKey
+                    elif str(d.backing.__class__).find('suds.sudsobject.VirtualEthernetCardNetworkBackingInfo') != -1:
+                        netid = d.backing.network.value
+                    if netid == n['netid']:
                        n['macAddress'] = d.macAddress
               if str(d.__class__).find('suds.sudsobject.VirtualDisk') != -1:
                  # This will feed bdm, but how do we identify the root disk. Explore later
