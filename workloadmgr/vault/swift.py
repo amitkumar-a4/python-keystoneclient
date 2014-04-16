@@ -51,7 +51,7 @@ wlm_swift_opts = [
                default='vast_snapshots',
                help='The default Swift container to use for workload snapshots'),
     cfg.IntOpt('wlm_swift_object_size',
-               default=524288000,
+               default=2 * 1024 * 1024 * 1024,
                help='The size in bytes of Swift snapshot objects'),
     cfg.IntOpt('wlm_swift_retry_attempts',
                default=3,
@@ -66,6 +66,30 @@ wlm_swift_opts = [
 
 FLAGS = flags.FLAGS
 FLAGS.register_opts(wlm_swift_opts)
+
+class ReadWrapper(object):
+
+    def __init__(self, obj_with_read, update=None):    
+        
+        self.inner_read = None
+        if hasattr(obj_with_read, 'read'):
+            self.inner_read = obj_with_read.read
+            obj_with_read.read = self._read_wrap
+        self.update = update
+        self.uploaded_size_incremental = 0
+
+    def _read_wrap(self, chunk_size):
+        chunk = self.inner_read(chunk_size)
+        read_size = len(chunk)
+        self.uploaded_size_incremental = self.uploaded_size_incremental + read_size
+        if self.update and ((self.uploaded_size_incremental > (5 * 1024 * 1024)) or (read_size < chunk_size)):
+            object = self.update['function'](self.update['context'], 
+                                             self.update['id'], 
+                                             {'uploaded_size_incremental': self.uploaded_size_incremental})
+            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+            self.uploaded_size_incremental = 0
+
+        return chunk
 
 
 class SwiftBackupService(base.Base):
@@ -106,6 +130,8 @@ class SwiftBackupService(base.Base):
                                      preauthtoken=self.context.auth_token,
                                      starting_backoff=self.swift_backoff)
         super(SwiftBackupService, self).__init__(db_driver)
+
+
 
     def _check_container_exists(self, container):
         LOG.debug(_('_check_container_exists: container: %s') % container)
@@ -193,6 +219,9 @@ class SwiftBackupService(base.Base):
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
+        read_wrapper = ReadWrapper(iterator, {'function': WorkloadMgrDB().db.snapshot_update,
+                                              'context': self.context,
+                                              'id':snapshot_metadata['snapshot_id']})
         
         object_prefix = self._generate_swift_object_name_prefix(snapshot_metadata)
 
@@ -212,7 +241,7 @@ class SwiftBackupService(base.Base):
                 obj[object_name]['length'] = self.data_block_size_bytes
             else:
                 obj[object_name]['length'] = size - uploaded_size
-
+            
             try:
                 etag = self.conn.put_object(container, object_name, iterator, obj[object_name]['length'])
             except socket.error as err:
@@ -272,11 +301,22 @@ class SwiftBackupService(base.Base):
         for metadata_object in metadata_objects:
             object_name = metadata_object.keys()[0]
             try:
-                (resp, body) = self.conn.get_object(container, object_name)
+                (resp, body) = self.conn.get_object(container, object_name, resp_chunk_size = 65536)
             except socket.error as err:
                 raise exception.SwiftConnectionFailed(reason=str(err))
-            fileobj.write(body)
-
+            
+            uploaded_size_incremental = 0
+            for chunk in body:
+                fileobj.write(chunk)
+                read_size = len(chunk)
+                uploaded_size_incremental = uploaded_size_incremental + read_size
+                if ((uploaded_size_incremental > (5 * 1024 * 1024)) or (read_size < 65536)):
+                    object = WorkloadMgrDB().db.restore_update(self.context, 
+                                                               snapshot_metadata['restore_id'], 
+                                                               {'uploaded_size_incremental': uploaded_size_incremental})
+                    LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+                    uploaded_size_incremental = 0                
+                
             # force flush every write to avoid long blocking write on close
             fileobj.flush()
             os.fsync(fileobj.fileno())
