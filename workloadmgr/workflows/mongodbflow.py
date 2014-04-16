@@ -294,7 +294,7 @@ def PauseDBInstances(hosts_list):
  
     for index, h in enumerate(hosts_list):
         host_info = h['secondaryReplica'].split(':')
-        flow.add(PauseDBInstance('PauseDBInstance' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'username', 'password']))
+        flow.add(PauseDBInstance('PauseDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'username', 'password']))
 
     return flow
 
@@ -303,7 +303,7 @@ def ResumeDBInstances(hosts_list):
  
     for index, h in enumerate(hosts_list):
         host_info = h['secondaryReplica'].split(':')
-        flow.add(ResumeDBInstance('ResumeDBInstance' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'username', 'password']))
+        flow.add(ResumeDBInstance('ResumeDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'username', 'password']))
 
     return flow
 
@@ -555,6 +555,10 @@ class MongoDBWorkflow(workflow.Workflow):
             for m in status["children"]:
                 m["optimeDate"] = str(m["optimeDate"])
                 m["status"] = m.pop("stateStr")
+                if ('electionDate' in m):
+                    m.pop('electionDate')
+                if ('electionTime' in m):
+                    m.pop('electionTime')
                 if ("lastHeartbeatRecv" in m):
                     m["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
                 if ("lastHeartbeat" in m):
@@ -580,14 +584,22 @@ class MongoDBWorkflow(workflow.Workflow):
         return dict(topology=mongodb)
 
     def details(self):
-        # Details the flow details based on the
+        # workflow details based on the
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                return {'name':str(item), 'type':'Task'}
+                taskdetails = {'name':item._name.split("_")[0], 'type':'Task'}
+                taskdetails['input'] = []
+                if len(item._name.split('_')) == 2:
+                    nodename = item._name.split("_")[1]
+                    for n in nodes['instances']:
+                       if n['vm_id'] == nodename:
+                          nodename = n['vm_name']
+                    taskdetails['input'] = [['vm', nodename]]
+                return taskdetails
 
             flowdetails = {}
-            flowdetails['name'] = str(item)
+            flowdetails['name'] = str(item).split("==")[0]
             flowdetails['type'] = str(item).split('.')[2]
             flowdetails['children'] = []
             for it in item:
@@ -595,6 +607,7 @@ class MongoDBWorkflow(workflow.Workflow):
 
             return flowdetails
 
+        nodes = self.discover()
         workflow = recurseflow(self._flow)
         return dict(workflow=workflow)
 
@@ -607,6 +620,7 @@ class MongoDBWorkflow(workflow.Workflow):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
 
+    #workloadmgr --os-auth-url http://$KEYSTONE_AUTH_HOST:5000/v2.0 --os-tenant-name demo --os-username demo --os-password $ADMIN_PASSWORD workload-type-create --metadata mongodb_username=string --metadata mongodb_password=password --metadata mongodb_host=string --metadata mongodb_port=string --metadata mongodb_hostusername=string --metadata mongodb_hostpassword=password --metadata mongodb_hostsshport=string --metadata mongodb_usesudo=boolean --metadata capabilities='discover:topology' --display-name "MongoDB" --display-description "MongoDB workload description"
 
 """
 #test code
