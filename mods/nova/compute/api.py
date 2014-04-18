@@ -838,11 +838,10 @@ class API(base.Base):
         if reservation_id is None:
             reservation_id = utils.generate_uid('r')
         security_groups = security_groups or ['default']
-        for key, value in metadata.iteritems():
-           if key == 'imported_from_vcenter' and value == 'True':
-              security_groups = []
-              break;
-
+        
+        if  metadata and 'imported_from_vcenter' in metadata and metadata['imported_from_vcenter'] == True:
+            security_groups = []
+                   
         min_count = min_count or 1
         max_count = max_count or min_count
         block_device_mapping = block_device_mapping or []
@@ -1760,79 +1759,80 @@ class API(base.Base):
         check_policy(context, "get_all_tenants", target)
         if 'deep_discover' in search_opts and search_opts['deep_discover']:
 
-           search_opts.pop('deep_discover', None)
-           vmware_vms = self._discover_vmware_vms(context)
+            search_opts.pop('deep_discover', None)
+            vmware_vms = self._discover_vmware_vms(context)
  
-           # Create flavors by vmware guid only if the flavor does not exists
-           for vm in vmware_vms:
-              try: 
-                 instance_type = flavors.get_flavor_by_name(vm['uuid'])
-              except:
-                 flavors.create(vm['flavor']['name'], vm['flavor']['memoryMBs'],
-                                vm['flavor']['vcpus'], vm['flavor']['rootgb'])
-
-           # Read existing networks
-           networks = self.network_api.get_all(context)
-
-           vcnets = {}
-           for vm in vmware_vms:
-              for vcnet in vm['networks']:
-                  vcnets[vcnet['name']] = vcnet['netid']
-
-           # Create networks that don't exists
-           for key, value in vcnets.iteritems():
-              found = 0
-              for net in networks:
-                 if net['name'] == key:
-                    found = 1  
-                    break
-              if not found:
-                 req = {'network': {'name': "{0}".format(key), 'admin_state_up': True}}
-                 self.network_api.create_network(context, req)
-
-                 
-           # first read existing entries from the database
-           existing_instances = self.get_all_bak(context, search_opts={'deleted':False})
-           for inst in existing_instances: 
-               inst['found'] = 0
-
-           images = self.image_service.detail(context)
-           if images is None or len(images) == 0:
-              return []
-
-           # refresh networks list
-           networks = self.network_api.get_all(context)
-
-           # Now create db instance for every vm discovered on the vcenter
-           for vm in vmware_vms:
-              found = 0
-              for inst in existing_instances: 
-                  if inst['display_name'] == vm['name']:
-                     found = 1
-                     inst['found'] = 1
-                     break
-              if found:
-                 continue
-   
-              requested_networks = []
-              #for vcnet in vm['networks']:
-              for net in networks:
+            # Create flavors by vmware guid only if the flavor does not exists
+            for vm in vmware_vms:
+                try: 
+                    instance_type = flavors.get_flavor_by_name(vm['uuid'])
+                except:
+                    flavors.create(vm['flavor']['name'], vm['flavor']['memoryMBs'],
+                                 vm['flavor']['vcpus'], vm['flavor']['rootgb'])
+            
+            # Read existing networks
+            networks = self.network_api.get_all(context)
+            
+            vcnets = {}
+            for vm in vmware_vms:
+                for vcnet in vm['networks']:
+                    vcnets[vcnet['name']] = vcnet['netid']
+            
+            # Create networks that don't exists
+            for key, value in vcnets.iteritems():
+                found = 0
+                for net in networks:
+                    if net['name'] == key:
+                        found = 1  
+                        break
+                if not found:
+                    req = {'network': {'name': "{0}".format(key), 'admin_state_up': True}}
+                    self.network_api.create_network(context, req)
+            
+                  
+            # first read existing entries from the database
+            existing_instances = self.get_all_bak(context, search_opts={'deleted':False})
+            for inst in existing_instances: 
+                inst['found'] = False
+            
+            images = self.image_service.detail(context)
+            if images is None or len(images) == 0:
+                return []
+            
+            # refresh networks list
+            networks = self.network_api.get_all(context)
+            
+            # Now create db instance for every vm discovered on the vcenter
+            for vm in vmware_vms:
+                vmware_vm_found = False
+                for inst in existing_instances: 
+                    if 'metadata' in inst and 'vmware_uuid' in inst['metadata']:
+                        if inst['metadata']['vmware_uuid'] == vm['uuid']:
+                            vmware_vm_found = True
+                            inst['found'] = True
+                            break
+                if vmware_vm_found:
+                    continue
+            
+                requested_networks = []
+                #for vcnet in vm['networks']:
+                for net in networks:
                     #if not net['router:external'] and net['name'] == vcnet['name']:
                     if not net['router:external'] and net['name'] == 'private':
-                       requested_networks.append((net['id'], None, None))
-                       break
-
-              instance_type = flavors.get_flavor_by_name(vm['uuid'])
-              self.create(context, instance_type,
-                          images[0]['id'],
-                          requested_networks=requested_networks,
-                          metadata = {'imported_from_vcenter':'True'},
-                          display_name=vm['name'], display_description=vm['name'])
-              
-           for inst in existing_instances:
-               if not inst['found']:
-                  instance = self.get(context, inst['uuid'], want_objects=True)
-                  self.delete(context, instance)
+                        requested_networks.append((net['id'], None, None))
+                        break
+            
+                instance_type = flavors.get_flavor_by_name(vm['uuid'])
+                self.create(context, instance_type,
+                           images[0]['id'],
+                           requested_networks=requested_networks,
+                           metadata = {'imported_from_vcenter':'True', 'vmware_uuid' : vm['uuid']},
+                           display_name=vm['name'], display_description=vm['name'])
+               
+            for inst in existing_instances:
+                if not inst['found']:
+                    instance = self.get(context, inst['uuid'], want_objects=True)
+                    self.delete(context, instance)
    
         return self.get_all_bak(context, search_opts=search_opts, sort_key=sort_key,
                         sort_dir=sort_dir, limit=limit, marker=marker, want_objects=want_objects)

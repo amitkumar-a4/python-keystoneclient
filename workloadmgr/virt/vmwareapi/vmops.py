@@ -1590,7 +1590,7 @@ class VMwareVMOps(object):
                                  'status': 'uploading'
                                 })            
             LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'] + '; backing file:' + vmdk_data_file))
-            vault_service_url = vault_service.store(vault_metadata, vmdk_data_file_handle, vmdk_data_file_handle.get_size());
+            vault_service_url = vault_service.store(vault_metadata, vmdk_data_file_handle, int(vmdk_data_file_handle.get_size()));
             db.snapshot_update( cntx, snapshot_obj.id, 
                                 {'progress_msg': 'Uploaded '+ disk['label'] + ' of VM:' + instance['vm_id'],
                                  'status': 'uploading'

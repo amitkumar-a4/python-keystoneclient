@@ -661,9 +661,22 @@ def get_vm_ref_from_uuid(session, instance_uuid):
                                     _get_object_for_value)
 
 
+def get_vm_ref_from_vmware_uuid(session, instance_uuid):
+    """Get reference to the VM with the uuid specified."""
+    vms = session._call_method(vim_util, "get_objects",
+                "VirtualMachine", ["config.uuid"])
+    
+    return _get_object_from_results(session, vms, instance_uuid,
+                                    _get_object_for_value)    
+
+
 def get_vm_ref(session, instance):
     """Get reference to the VM through uuid or vm name."""
-    vm_ref = get_vm_ref_from_uuid(session, instance['uuid'])
+    vm_ref = None
+    if hasattr(instance, 'metadata') and 'vmware_uuid' in instance.metadata:
+        vm_ref = get_vm_ref_from_vmware_uuid(session, instance.metadata['vmware_uuid'])
+    if not vm_ref:
+        vm_ref = get_vm_ref_from_uuid(session, instance['uuid'])
     if not vm_ref:
         vm_ref = get_vm_ref_from_name(session, instance['name'])
     if vm_ref is None:
