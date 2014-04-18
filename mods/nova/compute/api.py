@@ -1830,9 +1830,12 @@ class API(base.Base):
                            display_name=vm['name'], display_description=vm['name'])
                
             for inst in existing_instances:
-                if not inst['found']:
-                    instance = self.get(context, inst['uuid'], want_objects=True)
-                    self.delete(context, instance)
+                if not inst['found'] and 'metadata' in inst:
+                    for md in inst['metadata']:
+                        if md['key'] == 'imported_from_vcenter' and md['value'] == 'True':
+                            instance = self.get(context, inst['uuid'], want_objects=True)
+                            self.delete(context, instance)
+                            break
    
         return self.get_all_bak(context, search_opts=search_opts, sort_key=sort_key,
                         sort_dir=sort_dir, limit=limit, marker=marker, want_objects=want_objects)
