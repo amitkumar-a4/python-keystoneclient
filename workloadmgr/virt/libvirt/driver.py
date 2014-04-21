@@ -814,8 +814,14 @@ class LibvirtDriver(driver.ComputeDriver):
         #create nova instance
         restored_instance_name = instance['vm_name'] + '_of_snapshot_' + snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
         restored_compute_image = compute_service.get_image(cntx, restored_image['id'])
-        LOG.debug('Creatng Instance ' + restored_instance_name)        
-        restored_instance = compute_service.create_server(cntx, restored_instance_name, restored_compute_image, restored_compute_flavor, nics=restored_nics)
+        LOG.debug('Creating Instance ' + restored_instance_name) 
+        if test == True:   
+            availability_zone = 'nova'
+        else:
+            availability_zone = 'vmware_az'     
+        restored_instance = compute_service.create_server(cntx, restored_instance_name, 
+                                                          restored_compute_image, restored_compute_flavor, 
+                                                          nics=restored_nics, availability_zone=availability_zone)
         
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
