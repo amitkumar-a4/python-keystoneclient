@@ -796,8 +796,7 @@ class VMwareAPISession(object):
         """Creates a session with the VC/ESX host."""
 
         delay = 1
-
-        while True:
+        while True :
             try:
                 # Login and setup the session with the host for making
                 # API calls
@@ -829,6 +828,10 @@ class VMwareAPISession(object):
                     {'server': self._host_ip, 'seconds': delay})
                 time.sleep(delay)
                 delay = min(2 * delay, 60)
+                #WLM_MOD:BEGIN correct the infinite loop
+                if delay > 17:
+                    raise
+                #WLM_MOD:END
 
     def __del__(self):
         """Logs-out the session."""

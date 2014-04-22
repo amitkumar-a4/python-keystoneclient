@@ -343,7 +343,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             #TODO(giri): If one VM restore fails, rollback the whole transaction
             for vm in self.db.snapshot_vms_get(context, snapshot.id): 
-                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
                 vmtasks_openstack.restore_vm(context, self.db, {'vm_id': vm.vm_id, 'vm_name': vm.vm_name}, dict(restore.iteritems()),  restored_net_resources)
           
             if restore_type == 'test':

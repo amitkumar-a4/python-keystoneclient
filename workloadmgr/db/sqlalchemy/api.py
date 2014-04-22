@@ -1354,11 +1354,11 @@ def vm_network_resource_snaps_delete(context, snapshot_vm_network_resource_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
             
-def get_metadata_value(metadata, key):
+def get_metadata_value(metadata, key, default=None):
     for kvpair in metadata:
         if kvpair['key'] == key:
             return kvpair['value']
-    return None
+    return default
 
 # Restore Functions
 

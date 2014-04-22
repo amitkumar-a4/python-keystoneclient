@@ -1684,64 +1684,72 @@ class API(base.Base):
             instance = obj_base.obj_to_primitive(instance)
         return instance
 
+    #WLM_MOD:BEGIN function to discover vmware vms    
     def _discover_vmware_vms(self, context):
         # check if we can overload list_instnaces of VMware driver and call
         # the driver routine here
         from nova.virt import driver
         from nova.virt.vmwareapi import vm_util
-
-        cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
-        instances = cm.list_instances()
+        
         instance_list = []
-        for i in instances:
-           vmref = vm_util.get_vm_ref_from_name(cm._session, i)
-           uuid = vm_util.get_vm_uuid_from_vmref(cm._session, vmref)
-           memmbs = vm_util.get_vm_memmbs_from_vmref(cm._session, vmref)
-           vcpus = vm_util.get_vm_vcpus_from_vmref(cm._session, vmref)
-           vdisks = vm_util.get_vm_vdisks_from_vmref(cm._session, vmref)
-           rootgb = vm_util.get_vm_rootgb_from_vmref(cm._session, vmref) / 1024 /1024 /1024
-           if rootgb == 0:
-              rootgb = 1
-           host = vm_util.get_host_id_from_vm_ref(cm._session, vmref)
-           net_id = vm_util.get_network_id_from_vm_ref(cm._session, vmref)
-           host_ref = vm_util.get_host_ref_from_id(cm._session, host, None)
-           networks = []
-           for n in net_id:
-              networks.append({'netid':n, 'name':vm_util.get_network_ref_from_id(cm._session, n).propSet[0].val})
-
-           instance_list.append({ 'name':i, 
-                          'vmref':vmref,
-                          'hostid':host, 
-                          'uuid': uuid,
-                          'host_name': host_ref.propSet[0].val, 
-                          'networks': networks,
-                          'flavor': {'name': uuid, 'memoryMBs': memmbs, 'vcpus':vcpus, 'vdisks':vdisks, 'rootgb':rootgb}
-                        })
-
-        for i in instance_list:
-           devices = vm_util.get_vm_virtualdevices_from_vmref(cm._session, i['vmref'])
-           i['vdisks'] = []
-           for d in devices[0]:
-              if str(d.__class__).find('suds.sudsobject.VirtualE1000') != -1:
-                 for n in i['networks']:
-                    netid = ""
-                    if str(d.backing.__class__).find('suds.sudsobject.VirtualEthernetCardDistributedVirtualPortBackingInfo') != -1:
-                        netid = d.backing.port.portgroupKey
-                    elif str(d.backing.__class__).find('suds.sudsobject.VirtualEthernetCardNetworkBackingInfo') != -1:
-                        netid = d.backing.network.value
-                    if netid == n['netid']:
-                       n['macAddress'] = d.macAddress
-              if str(d.__class__).find('suds.sudsobject.VirtualDisk') != -1:
-                 # This will feed bdm, but how do we identify the root disk. Explore later
-                 # for now assume there is only one disk
-                 i['vdisks'].append({'capacity':d.capacityInKB, 
-                                     'label':d.deviceInfo.label, 
-                                     'summary':d.deviceInfo.summary, 
-                                     'filename': d.backing.fileName})
-                 i['flavor']['rootgb'] = d.capacityInKB/1024/1024
-
+        try:
+            cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+            instances = cm.list_instances()
+            
+            for i in instances:
+                vmref = vm_util.get_vm_ref_from_name(cm._session, i)
+                uuid = vm_util.get_vm_uuid_from_vmref(cm._session, vmref)
+                memmbs = vm_util.get_vm_memmbs_from_vmref(cm._session, vmref)
+                vcpus = vm_util.get_vm_vcpus_from_vmref(cm._session, vmref)
+                vdisks = vm_util.get_vm_vdisks_from_vmref(cm._session, vmref)
+                rootgb = vm_util.get_vm_rootgb_from_vmref(cm._session, vmref) / 1024 /1024 /1024
+                if rootgb == 0:
+                    rootgb = 1
+                host = vm_util.get_host_id_from_vm_ref(cm._session, vmref)
+                net_id = vm_util.get_network_id_from_vm_ref(cm._session, vmref)
+                host_ref = vm_util.get_host_ref_from_id(cm._session, host, None)
+                networks = []
+                for n in net_id:
+                    networks.append({'netid':n, 'name':vm_util.get_network_ref_from_id(cm._session, n).propSet[0].val})
+    
+                instance_list.append({ 'name':i, 
+                               'vmref':vmref,
+                               'hostid':host, 
+                               'uuid': uuid,
+                               'host_name': host_ref.propSet[0].val, 
+                               'networks': networks,
+                               'flavor': {'name': uuid, 'memoryMBs': memmbs, 'vcpus':vcpus, 'vdisks':vdisks, 'rootgb':rootgb}
+                             })
+    
+                for i in instance_list:
+                    devices = vm_util.get_vm_virtualdevices_from_vmref(cm._session, i['vmref'])
+                    i['vdisks'] = []
+                    for d in devices[0]:
+                        if str(d.__class__).find('suds.sudsobject.VirtualE1000') != -1:
+                            for n in i['networks']:
+                                netid = ""
+                                if str(d.backing.__class__).find('suds.sudsobject.VirtualEthernetCardDistributedVirtualPortBackingInfo') != -1:
+                                    netid = d.backing.port.portgroupKey
+                                elif str(d.backing.__class__).find('suds.sudsobject.VirtualEthernetCardNetworkBackingInfo') != -1:
+                                    netid = d.backing.network.value
+                                if netid == n['netid']:
+                                    n['macAddress'] = d.macAddress
+                        if str(d.__class__).find('suds.sudsobject.VirtualDisk') != -1:
+                            # This will feed bdm, but how do we identify the root disk. Explore later
+                            # for now assume there is only one disk
+                            i['vdisks'].append({'capacity':d.capacityInKB, 
+                                                'label':d.deviceInfo.label, 
+                                                'summary':d.deviceInfo.summary, 
+                                                'filename': d.backing.fileName})
+                            i['flavor']['rootgb'] = d.capacityInKB/1024/1024
+        except Exception as ex:
+            msg = _("Error discovering VMware VMs: %(exception)s") %{'exception': ex}
+            LOG.debug(msg)
+            LOG.exception(ex)
+      
         return instance_list
-
+    #WLM_MOD:END
+    
     def get_all(self, context, search_opts=None, sort_key='created_at',
                 sort_dir='desc', limit=None, marker=None, want_objects=False):
         # We may derive this class and overload this function to discover the

@@ -66,11 +66,13 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             if subnets_data['subnets'][0]:
                 utils.append_unique(subnets, subnets_data['subnets'][0])
                 nic.setdefault('subnet_id', subnets_data['subnets'][0]['id'])
+                nic.setdefault('subnet_name', subnets_data['subnets'][0]['name'])
     
             network = network_service.get_network(cntx,port_data['port']['network_id'])
             if network : 
                 utils.append_unique(networks, network)
                 nic.setdefault('network_id', network['id'])
+                nic.setdefault('network_name', network['name'])
             
             #Let's find our router
             routers_data = network_service.get_routers(cntx)
@@ -93,6 +95,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             if router_found:
                 utils.append_unique(routers, router_found)
                 nic.setdefault('router_id', router_found['id'])
+                nic.setdefault('router_name', router_found['name'])
                 if router_found['external_gateway_info'] and router_found['external_gateway_info']['network_id']:
                     search_opts = {'device_id': router_found['id'], 'network_id': router_found['external_gateway_info']['network_id']}
                     router_ext_ports_data = network_service.get_ports(cntx,**search_opts)
@@ -104,10 +107,12 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                         if ext_subnets_data['subnets'][0]:
                             utils.append_unique(subnets, ext_subnets_data['subnets'][0])
                             nic.setdefault('ext_subnet_id', ext_subnets_data['subnets'][0]['id'])
+                            nic.setdefault('ext_subnet_name', ext_subnets_data['subnets'][0]['name'])
                         ext_network = network_service.get_network(cntx,ext_port['network_id'])
                         if ext_network:
                             utils.append_unique(networks, ext_network)
                             nic.setdefault('ext_network_id', ext_network['id'])
+                            nic.setdefault('ext_network_name', ext_network['name'])
             nics.append(nic)
         #Store the nics in the DB
         for nic in nics:

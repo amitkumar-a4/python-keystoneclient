@@ -7,6 +7,7 @@
 Handles all requests relating to the  workloadmgr service.
 """
 import socket
+import cPickle as pickle
 
 from eventlet import greenthread
 
@@ -233,16 +234,60 @@ class API(base.Base):
         return snapshot_details
 
     def snapshot_show(self, context, snapshot_id):
+        def _get_pit_resource_id(metadata, key):
+            for metadata_item in metadata:
+                if metadata_item['key'] == key:
+                    pit_id = metadata_item['value']
+                    return pit_id
+                
+        def _get_pit_resource(snapshot_vm_common_resources, pit_id):
+            for snapshot_vm_resource in snapshot_vm_common_resources:
+                if snapshot_vm_resource.resource_pit_id == pit_id:
+                    return snapshot_vm_resource
+                         
         rv = self.db.snapshot_show(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
         instances = []
         try:
             vms = self.db.snapshot_vms_get(context, snapshot_id)
             for vm in vms:
-                instances.append(dict(vm.iteritems()))
+                instance = dict(vm.iteritems())
+                instance['nics'] = []
+                snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, vm.vm_id, snapshot_id)
+                snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot_id, snapshot_id)                
+                for snapshot_vm_resource in snapshot_vm_resources:                
+                    """ flavor """
+                    if snapshot_vm_resource.resource_type == 'flavor': 
+                        vm_flavor = snapshot_vm_resource
+                        instance['flavor'] = {'vcpus' : self.db.get_metadata_value(vm_flavor.metadata, 'vcpus'),
+                                              'ram' : self.db.get_metadata_value(vm_flavor.metadata, 'ram'),
+                                              'disk': self.db.get_metadata_value(vm_flavor.metadata, 'disk'),
+                                              'ephemeral': self.db.get_metadata_value(vm_flavor.metadata, 'ephemeral')
+                                              }
+                    """ nics """
+                    if snapshot_vm_resource.resource_type == 'nic':
+                        vm_nic_snapshot = self.db.vm_network_resource_snap_get(context, snapshot_vm_resource.id)
+                        nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
+                        nic = {'mac_address': nic_data['mac_address'],
+                               'ip_address': nic_data['ip_address'],}
+                        nic['network'] = {'id': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'),
+                                          'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name')}
+                        
+                        pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')                        
+                        vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
+                        vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
+                        subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
+                        nic['subnet'] = {'id' :subnet.get('id', None),
+                                         'name':subnet.get('name', None),
+                                         'cidr':subnet.get('cidr', None),
+                                         'ip_version':subnet.get('ip_version', None),
+                                         'gateway_ip':subnet.get('gateway_ip', None),
+                                         }
+                        instance['nics'].append(nic)
+                instances.append(instance)
         except Exception as ex:
             pass
-        snapshot_details.setdefault('instances', instances)    
+        snapshot_details['instances'] = instances    
         return snapshot_details
     
     def snapshot_get_all(self, context, workload_id=None):

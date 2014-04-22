@@ -211,10 +211,12 @@ class SnapshotVM(task.Task):
         db = WorkloadMgrDB().db
         
         if True:
-            return vmtasks_openstack.snapshot_vm(cntx, db, instance, snapshot)
+            ret_val = vmtasks_openstack.snapshot_vm(cntx, db, instance, snapshot)
         else:
-            return vmtasks_vcloud.snapshot_vm(cntx, db, instance, snapshot)
+            ret_val = vmtasks_vcloud.snapshot_vm(cntx, db, instance, snapshot)
         
+        return ret_val
+    
     @autolog.log_method(Logger, 'SnapshotVM.revert')
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
@@ -244,7 +246,7 @@ class SnapshotDataSize(task.Task):
         
         db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': vm_data_size,})
         
-                
+        return vm_data_size        
     @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
     def revert_with_log(self, *args, **kwargs):
         pass    
@@ -271,11 +273,13 @@ class UploadSnapshot(task.Task):
         db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
         
         if True:
-            return vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+            ret_val = vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
-            return vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+            ret_val = vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
         
-        db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'status': 'available',})        
+        db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'status': 'available',})  
+        
+        return ret_val      
                 
     @autolog.log_method(Logger, 'UploadSnapshot.revert')    
     def revert_with_log(self, *args, **kwargs):
