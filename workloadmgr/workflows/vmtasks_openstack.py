@@ -605,10 +605,15 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources):
     restored_compute_flavor = restore_vm_flavor(cntx, db, instance,restore)                      
 
     restored_nics = get_vm_nics( cntx, db, instance, restore, restored_net_resources)
-     
+    
+    restore_obj = db.restore_get(cntx, restore['id']) 
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = _get_instance_restore_options(restore_options, instance['vm_id'])
+         
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
     return virtdriver.restore_vm( cntx, db, instance, restore, 
                                   restored_net_resources,
                                   restored_compute_flavor,
-                                  restored_nics)
+                                  restored_nics,
+                                  instance_options)
     

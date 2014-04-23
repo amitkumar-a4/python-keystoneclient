@@ -85,7 +85,13 @@ libvirt_opts = [
                help='Libvirt domain type (valid options are: kvm)'),
     cfg.StrOpt('glance_images_path',
                default='/opt/stack/data/nova/instances/_base',
-               help='Location of the images for: nova, glance and wlm'),                      
+               help='Location of the images for: nova, glance and wlm'),   
+    cfg.StrOpt('default_tvault_availability_zone',
+               default='tvault_az',
+               help='TrilioVault availability zone'),                                      
+    cfg.StrOpt('default_production_availability_zone',
+               default='None',
+               help='TrilioVault availability zone'), 
     ]
 
 CONF = cfg.CONF
@@ -595,7 +601,7 @@ class LibvirtDriver(driver.ComputeDriver):
     
     @autolog.log_method(Logger, 'libvirt.driver.restore_vm')
     def restore_vm(self, cntx, db, instance, restore, restored_net_resources,
-                   restored_compute_flavor, restored_nics):    
+                   restored_compute_flavor, restored_nics, instance_options):    
         """
         Restores the specified instance from a snapshot
         """
@@ -815,10 +821,18 @@ class LibvirtDriver(driver.ComputeDriver):
         restored_instance_name = instance['vm_name'] + '_of_snapshot_' + snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
         restored_compute_image = compute_service.get_image(cntx, restored_image['id'])
         LOG.debug('Creating Instance ' + restored_instance_name) 
-        if test == True:   
-            availability_zone = 'nova'
-        else:
-            availability_zone = 'nova'     
+        
+        if instance_options and 'availability_zone' in instance_options:
+            availability_zone = instance_options['availability_zone']
+        else:   
+            if test == True:   
+                availability_zone = CONF.default_tvault_availability_zone
+            else:
+                if CONF.default_production_availability_zone == 'None':
+                    availability_zone = None
+                else:
+                    availability_zone = CONF.default_production_availability_zone
+                     
         restored_instance = compute_service.create_server(cntx, restored_instance_name, 
                                                           restored_compute_image, restored_compute_flavor, 
                                                           nics=restored_nics, availability_zone=availability_zone)
@@ -880,7 +894,7 @@ class LibvirtDriver(driver.ComputeDriver):
                               'restore_id': restore_obj.id,
                               'status': 'available'}
         restored_vm = db.restored_vm_create(cntx,restored_vm_values)    
-            
+        
         if test == True:
             LOG.debug(_("Test Restore Completed"))
         else:
