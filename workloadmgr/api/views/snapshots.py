@@ -40,10 +40,12 @@ class ViewBuilder(common.ViewBuilder):
                 instance = {'id':vm['vm_id'],
                             'name':vm['vm_name'],
                             'status':vm['status'],
-                            'flavor':vm['flavor'],
-                            'nics':vm['nics'],
-                            } 
-                instances.append(instance) 
+                            }
+                if 'flavor' in vm:
+                    instance['flavor'] = vm['flavor']
+                if 'nics' in vm:
+                    instance['nics'] = vm['nics']
+                instances.append(instance)   
             d['instances'] = instances
         d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
@@ -65,12 +67,16 @@ class ViewBuilder(common.ViewBuilder):
         if 'instances' in snapshot:
             instances = []
             for vm in snapshot['instances']:
-                instances.append({'id':vm['vm_id'],
-                                  'name':vm['vm_name'],
-                                  'status':vm['status'],
-                                  'flavor':vm['flavor'],
-                                  'nics':vm['nics'],
-                                  }) 
+                instance = {'id':vm['vm_id'],
+                            'name':vm['vm_name'],
+                            'status':vm['status'],
+                            }
+                if 'flavor' in vm:
+                    instance['flavor'] = vm['flavor']
+                if 'nics' in vm:
+                    instance['nics'] = vm['nics']
+                instances.append(instance)    
+                
             d['instances'] = instances
         d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
