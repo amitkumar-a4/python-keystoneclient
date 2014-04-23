@@ -277,12 +277,12 @@ class API(base.Base):
                         vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
                         vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
                         subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                        nic['subnet'] = {'id' :subnet.get('id', None),
-                                         'name':subnet.get('name', None),
-                                         'cidr':subnet.get('cidr', None),
-                                         'ip_version':subnet.get('ip_version', None),
-                                         'gateway_ip':subnet.get('gateway_ip', None),
-                                         }
+                        nic['network']['subnet'] = { 'id' :subnet.get('id', None),
+                                                     'name':subnet.get('name', None),
+                                                     'cidr':subnet.get('cidr', None),
+                                                     'ip_version':subnet.get('ip_version', None),
+                                                     'gateway_ip':subnet.get('gateway_ip', None),
+                                                     }
                         instance['nics'].append(nic)
                 instances.append(instance)
         except Exception as ex:

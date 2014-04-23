@@ -445,7 +445,7 @@ def restore_networks(cntx, db, restore):
         if nic_options:
             params = {'name': instance_options.get('name',''),
                       'ip_address': nic_options['ip_address'],
-                      'subnet_id': nic_options['subnet']['id'],
+                      'subnet_id': nic_options['network']['subnet']['id'],
                       'network_id': nic_options['network']['id'],
                       'tenant_id': cntx.tenant} 
             new_port = network_service.create_port(cntx, **params)
