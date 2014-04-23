@@ -113,6 +113,21 @@ class API(base.Base):
     def get_port(self, context, port_id):
         return get_client(context, admin=True, production=self._production).show_port(port_id)
     
+    def create_port(self, context, **kwargs):
+        """
+        Create a port on a specified network.
+        :param request: request context
+        :param network_id: network id a subnet is created on
+        :param device_id: (optional) device id attached to the port
+        :param tenant_id: (optional) tenant id of the port created
+        :param name: (optional) name of the port created
+        :returns: Port object
+        """
+        client = get_client(context, admin=True, production=self._production)
+        body = {'port': kwargs}
+        port = client.create_port(body=body).get('port')
+        return port    
+    
     def delete_port(self, context, port_id):
         return get_client(context, admin=True, production=self._production).delete_port(port_id)    
     

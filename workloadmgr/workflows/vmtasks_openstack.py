@@ -38,6 +38,13 @@ def _get_pit_resource(snapshot_vm_common_resources, pit_id):
         if snapshot_vm_resource.resource_pit_id == pit_id:
             return snapshot_vm_resource 
             
+def _get_instance_restore_options(restore_options, instance_id):
+    if 'instances' in restore_options:
+        for instance in restore_options['instances']:
+            if instance['id'] == instance_id:
+                return instance
+    return None
+                
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
 
@@ -319,28 +326,38 @@ def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
 
-    db.restore_update( cntx, restore['id'],
+    restore_obj = db.restore_update( cntx, restore['id'],
                        {'progress_msg': 'Restoring VM Flavor for Instance ' + instance['vm_id']})
-                    
+
     compute_service = nova.API(production = (restore['restore_type'] != 'test'))
-    restored_compute_flavor = None
-    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
     
-    for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type == 'flavor':
-            snapshot_vm_flavor = db.snapshot_vm_resource_get(cntx, snapshot_vm_resource.id)
-            vcpus = db.get_metadata_value(snapshot_vm_flavor.metadata, 'vcpus')
-            ram = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ram')
-            disk = db.get_metadata_value(snapshot_vm_flavor.metadata, 'disk')
-            ephemeral = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral')            
-            for flavor in compute_service.get_flavors(cntx):
-                if ((str(flavor.vcpus) ==  vcpus) and
-                    (str(flavor.ram) ==  ram) and
-                    (str(flavor.disk) ==  disk) and
-                    (str(flavor.ephemeral) == ephemeral)):
-                    restored_compute_flavor = flavor
-                    break
-            break
+    
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = _get_instance_restore_options(restore_options, instance['vm_id'])
+    if instance_options and 'flavor' in instance_options:
+        vcpus = instance_options['flavor']['vcpus']
+        ram = instance_options['flavor']['ram']
+        disk = instance_options['flavor']['disk']
+        ephemeral = instance_options['flavor']['ephemeral']          
+    else:    
+        snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type == 'flavor':
+                snapshot_vm_flavor = db.snapshot_vm_resource_get(cntx, snapshot_vm_resource.id)
+                vcpus = db.get_metadata_value(snapshot_vm_flavor.metadata, 'vcpus')
+                ram = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ram')
+                disk = db.get_metadata_value(snapshot_vm_flavor.metadata, 'disk')
+                ephemeral = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral')            
+                break
+            
+    restored_compute_flavor = None
+    for flavor in compute_service.get_flavors(cntx):
+        if ((str(flavor.vcpus) ==  vcpus) and
+            (str(flavor.ram) ==  ram) and
+            (str(flavor.disk) ==  disk) and
+            (str(flavor.ephemeral) == ephemeral)):
+            restored_compute_flavor = flavor
+            break            
     if not restored_compute_flavor:
         #TODO(giri):create a new flavor
         name = str(uuid.uuid4())
@@ -365,14 +382,18 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'nic':
             vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
-            #private network
-            pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
-            new_network = restored_net_resources[pit_id]
+            nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
-            nic_info.setdefault('net-id', new_network['id']) 
-            #TODO(giri): the ip address sometimes may not be available due to one of the router or network
-            #interfaces taking them over
-            #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+            if nic_data['mac_address'] in restored_net_resources:
+                nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
+            else:
+                #private network
+                pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
+                new_network = restored_net_resources[pit_id]
+                nic_info.setdefault('net-id', new_network['id']) 
+                #TODO(giri): the ip address sometimes may not be available due to one of the router or network
+                #interfaces taking them over
+                #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
             restored_nics.append(nic_info) 
     return restored_nics 
 
@@ -408,7 +429,41 @@ def restore_networks(cntx, db, restore):
     Restore the networking configuration of VMs of the snapshot
     nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
     """
-    db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
+   
+    def _get_nic_restore_options(restore_options, instance_id, mac_address):
+        instance_options = _get_instance_restore_options(restore_options, instance_id)
+        if instance_options and 'nics' in instance_options:
+            for nic_options in instance_options['nics']:
+                if nic_options['mac_address'] == mac_address:
+                    return nic_options
+        return None
+                
+    
+    def _get_nic_port_from_restore_options(restore_options, instance_id, mac_address):
+        instance_options = _get_instance_restore_options(restore_options, instance_id) 
+        nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
+        if nic_options:
+            params = {'name': instance_options.get('name',''),
+                      'ip_address': nic_options['ip_address'],
+                      'subnet_id': nic_options['subnet']['id'],
+                      'network_id': nic_options['network']['id'],
+                      'tenant_id': cntx.tenant} 
+            new_port = network_service.create_port(cntx, **params)
+            restored_vm_resource_values = {'id': new_port['id'],
+                                           'vm_id': restore['id'],
+                                           'restore_id': restore['id'],       
+                                           'resource_type': 'port',
+                                           'resource_name':  new_port['name'],
+                                           'metadata': {},
+                                           'status': 'available'}
+            restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)              
+            return new_port
+        
+        return None    
+          
+    
+    restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
+    restore_options = pickle.loads(str(restore_obj.pickle))
     restored_net_resources = {}
     network_service =  neutron.API(production=restore['restore_type'] != 'test')  
     snapshot_vm_common_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])           
@@ -417,6 +472,11 @@ def restore_networks(cntx, db, restore):
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'nic':                
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
+                nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
+                new_port = _get_nic_port_from_restore_options(restore_options, snapshot_vm.vm_id ,nic_data['mac_address'])
+                if new_port:
+                    restored_net_resources.setdefault(nic_data['mac_address'], new_port)
+                    continue
                 #private network
                 pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
                 if pit_id in restored_net_resources:

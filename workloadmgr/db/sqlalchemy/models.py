@@ -339,6 +339,7 @@ class Restores(BASE, WorkloadsBase):
     restore_type = Column(String(32), nullable=False)
     display_name = Column(String(255))
     display_description = Column(String(255))
+    pickle = Column(String(4096))
     size = Column(BigInteger)    
     uploaded_size = Column(BigInteger)  
     progress_percent = Column(Integer)

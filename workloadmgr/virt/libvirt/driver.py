@@ -818,7 +818,7 @@ class LibvirtDriver(driver.ComputeDriver):
         if test == True:   
             availability_zone = 'nova'
         else:
-            availability_zone = 'vmware_az'     
+            availability_zone = 'nova'     
         restored_instance = compute_service.create_server(cntx, restored_instance_name, 
                                                           restored_compute_image, restored_compute_flavor, 
                                                           nics=restored_nics, availability_zone=availability_zone)

@@ -158,15 +158,19 @@ class SnapshotsController(wsgi.Controller):
             if (body and 'testbubble' in body):
                 name = body['testbubble'].get('name', None)
                 description = body['testbubble'].get('description', None)
+                options = body['testbubble'].get('options', {})
             elif (body and 'restore' in body):
                 name = body['restore'].get('name', None)
                 description = body['restore'].get('description', None)
-                                                  
+                options = body['restore'].get('options', {})
+            
+                                              
             restore = self.workload_api.snapshot_restore(context, 
                                                          snapshot_id=id, 
                                                          test=test,
                                                          name=name, 
-                                                         description=description)
+                                                         description=description,
+                                                         options=options)
         except exception.InvalidInput as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.InvalidWorkloadMgr as error:

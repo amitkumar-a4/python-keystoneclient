@@ -282,6 +282,7 @@ def upgrade(migrate_engine):
         Column('restore_type', String(length=32), primary_key=False, nullable= False),
         Column('display_name', String(length=255)),
         Column('display_description', String(length=255)),
+        Column('pickle',String(length=4096)),        
         Column('size', BigInteger, nullable=False),             
         Column('uploaded_size', BigInteger, nullable=False),          
         Column('progress_percent', Integer, nullable=False),   

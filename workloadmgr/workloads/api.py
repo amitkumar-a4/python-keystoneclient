@@ -320,7 +320,7 @@ class API(base.Base):
 
         self.db.snapshot_delete(context, snapshot_id)
         
-    def snapshot_restore(self, context, snapshot_id, test, name, description):
+    def snapshot_restore(self, context, snapshot_id, test, name, description, options):
         """
         Make the RPC call to restore a snapshot.
         """
@@ -333,14 +333,15 @@ class API(base.Base):
         restore_type = "restore"
         if test:
             restore_type = "test"
-        options = {'user_id': context.user_id,
+        values = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'snapshot_id': snapshot_id,
                    'restore_type': restore_type,
                    'display_name': name,
                    'display_description': description,
+                   'pickle': pickle.dumps(options, 0),
                    'status': 'restoring',}
-        restore = self.db.restore_create(context, options)
+        restore = self.db.restore_create(context, values)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
         return restore
 
@@ -377,6 +378,7 @@ class API(base.Base):
             pass
         restore_details.setdefault('instances', instances) 
         
+        ports_list = []
         networks_list = []
         subnets_list = []
         routers_list = []
@@ -384,6 +386,8 @@ class API(base.Base):
         try:
             resources = self.db.restored_vm_resources_get(context, restore_id, restore_id)
             for resource in resources:
+                if resource.resource_type == 'port':
+                    ports_list.append({'id':resource.id, 'name':resource.resource_name})                
                 if resource.resource_type == 'network':
                     networks_list.append({'id':resource.id, 'name':resource.resource_name})
                 elif resource.resource_type == 'subnet':
@@ -394,6 +398,7 @@ class API(base.Base):
                     flavors_list.append({'id':resource.id, 'name':resource.resource_name}) 
         except Exception as ex:
             pass        
+        restore_details.setdefault('ports', ports_list)
         restore_details.setdefault('networks', networks_list) 
         restore_details.setdefault('subnets', subnets_list)
         restore_details.setdefault('routers', routers_list) 
@@ -442,20 +447,31 @@ class API(base.Base):
                 msg = _("Error deleting instance %(instance_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'instance_id': instance['id'], 'exception': exception})
                 LOG.exception(exception)
+                
+        for port in restore_details['ports']:
+            try:
+                network_service.delete_port(context,port['id'])
+            except Exception as exception:
+                msg = _("Error deleting port %(port_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'port_id': port['id'], 'exception': exception})
+                LOG.exception(exception)                 
+                                
         for router in restore_details['routers']:
             try:
                 network_service.delete_router(context,router['id'])
             except Exception as exception:
                 msg = _("Error deleting router %(router_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'router_id': router['id'], 'exception': exception})
-                LOG.exception(exception)                
+                LOG.exception(exception)  
+                              
         for subnet in restore_details['subnets']:
             try:
                 network_service.delete_subnet(context,subnet['id'])
             except Exception as exception:
                 msg = _("Error deleting subnet %(subnet_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'subnet_id': subnet['id'], 'exception': exception})
-                LOG.exception(exception)                   
+                LOG.exception(exception)      
+                             
         for network in restore_details['networks']:
             try:
                 network_service.delete_network(context,network['id'])
