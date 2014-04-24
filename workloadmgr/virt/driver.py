@@ -122,6 +122,12 @@ class ComputeDriver(object):
         #TODO(gbasava):Implementation
         return
 
+    def get_vcenter_info(self):
+        """
+        Discovers the datacenters, hosts, virtual machines, datastores and networks of a vCenter
+        """
+        raise NotImplementedError()
+
 
 
 def load_compute_driver(virtapi, compute_driver=None):

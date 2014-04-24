@@ -764,7 +764,10 @@ class VMwareVCDriver(VMwareESXDriver):
         _vmops = self._get_vmops_for_compute_node(hypervisor_hostname) #('domain-c26(td-sea-clu01)'    )
         _vmops.snapshot(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
  
-
+    def get_vcenter_info(self):
+        """
+        Discovers the datacenters, hosts, virtual machines, datastores and networks of a vCenter
+        """
 
 class VMwareAPISession(object):
     """
@@ -960,3 +963,5 @@ class VMwareAPISession(object):
             LOG.warn(_("In vmwareapi:_poll_task, Got this error %s") % excep)
             done.send_exception(excep)
             
+
+        

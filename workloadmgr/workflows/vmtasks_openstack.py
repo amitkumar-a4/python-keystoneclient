@@ -39,10 +39,11 @@ def _get_pit_resource(snapshot_vm_common_resources, pit_id):
             return snapshot_vm_resource 
             
 def _get_instance_restore_options(restore_options, instance_id):
-    if 'instances' in restore_options:
-        for instance in restore_options['instances']:
-            if instance['id'] == instance_id:
-                return instance
+    if restore_options and 'openstack' in restore_options:
+        if 'instances' in restore_options['openstack']:
+            for instance in restore_options['instances']:
+                if instance['id'] == instance_id:
+                    return instance
     return None
                 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
@@ -123,14 +124,14 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             nics.append(nic)
         #Store the nics in the DB
         for nic in nics:
-            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': instance['vm_id'],
-                                           'snapshot_id': snapshot['id'],       
-                                           'resource_type': 'nic',
-                                           'resource_name':  '',
-                                           'resource_pit_id': '',
-                                           'metadata': {},
-                                           'status': 'available'}
+            snapshot_vm_resource_values = { 'id': str(uuid.uuid4()),
+                                            'vm_id': instance['vm_id'],
+                                            'snapshot_id': snapshot['id'],       
+                                            'resource_type': 'nic',
+                                            'resource_name':  nic['mac_address'],
+                                            'resource_pit_id': '',
+                                            'metadata': {},
+                                            'status': 'available'}
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
                                                 snapshot_vm_resource_values)                                                
             # create an entry in the vm_network_resource_snaps table
