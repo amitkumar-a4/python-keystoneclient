@@ -278,8 +278,8 @@ def vm_network_resource_snap_get(context, snapshot_vm_resource_id, session=None)
 def vm_network_resource_snaps_delete(context, snapshot_vm_resource_id):
     return IMPL.vm_network_resource_snaps_delete(context, snapshot_vm_resource_id)
     
-def get_metadata_value(metadata, key):
-    return IMPL.get_metadata_value(metadata, key)
+def get_metadata_value(metadata, key, default=None):
+    return IMPL.get_metadata_value(metadata, key, default=None)
 
 def restore_get(context, restore_id, session=None):
     return IMPL.restore_get(context, restore_id, session)
