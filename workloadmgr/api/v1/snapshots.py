@@ -163,6 +163,7 @@ class SnapshotsController(wsgi.Controller):
                 name = body['restore'].get('name', None)
                 description = body['restore'].get('description', None)
                 options = body['restore'].get('options', {})
+                #options = body['recoveryoptions'].get('options', {})
             
                                               
             restore = self.workload_api.snapshot_restore(context, 

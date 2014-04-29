@@ -194,7 +194,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         try:
             workload = self.db.workload_get(context, workload_id)
-            vm = self.db.workload_vms_get(context, workload_id)
+            #vm = self.db.workload_vms_get(context, workload_id)
 
             self.db.workload_update(context, 
                                     workload_id, 
