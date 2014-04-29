@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 9)
 
 Package: workloadmanager
 Architecture: all
-Depends:
-Description: workloadmanager
+Depends: python-cinderclient, python-glanceclient, python-neutronclient, python-swiftclient, python-keystoneclient, python-novaclient
+Description: This is the package for workloadmanager
  hi this is contego greeting the world
 
