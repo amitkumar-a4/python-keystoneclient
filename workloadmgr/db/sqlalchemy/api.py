@@ -626,7 +626,7 @@ def workload_vms_get(context, workload_id, session=None):
         all()
 
     if not result:
-        raise exception.VMsofWorkloadsNotFound(workload_id=workload_id)
+        return []
 
     return result
 
