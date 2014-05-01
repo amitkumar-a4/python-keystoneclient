@@ -6,4 +6,5 @@
 
 
 class VirtAPI(object):
+    pass
 
