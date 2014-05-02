@@ -533,7 +533,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return                      
+            raise                      
                           
     def vast_instance(self, context, server, params):
         """
@@ -546,7 +546,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return  
+            raise  
         
     def vast_get_info(self, context, server, params):
         """
@@ -559,7 +559,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return          
+            raise          
         
     def vast_data(self, context, server, params):
         """
@@ -572,7 +572,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return   
+            raise   
 
     def vast_finalize(self, context, server, params):
         """
@@ -585,7 +585,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return  
+            raise  
                             
     def testbubble_attach_volume(self, context, server, params):
         """
@@ -598,7 +598,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return                      
+            raise                      
 
     def testbubble_reboot_instance(self, context, server, params):
         """
@@ -611,4 +611,4 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            return                      
+            raise                      

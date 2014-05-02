@@ -461,6 +461,9 @@ class MongoDBWorkflow(workflow.Workflow):
         
         self._flow = lf.Flow('mongodbwf')
         
+        # Check if any pre snapshot conditions 
+        self._flow.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))                
+        
         #create a network snapshot
         self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
         
