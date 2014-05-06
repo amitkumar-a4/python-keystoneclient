@@ -83,14 +83,14 @@ class SnapshotVMFlavors(task.Task):
                             
 class PauseVM(task.Task):
 
-    def execute(self, context, instance):
-        return self.execute_with_log(context, instance)
+    def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs) 
     
     @autolog.log_method(Logger, 'PauseVM.execute')
-    def execute_with_log(self, context, instance):
+    def execute_with_log(self, context, instance, snapshot):
         # Pause the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
@@ -102,18 +102,24 @@ class PauseVM(task.Task):
 
     @autolog.log_method(Logger, 'PauseVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        pass
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        if True:
+            return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
+        else:
+            return vmtasks_vcloud.unpause_vm(cntx, db, kwargs['instance'])  
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})             
         
 class UnPauseVM(task.Task):
 
-    def execute(self, context, instance):
-        return self.execute_with_log(context, instance)
+    def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'UnPauseVM.execute')
-    def execute_with_log(self, context, instance):
+    def execute_with_log(self, context, instance, snapshot):
         # UnPause the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
@@ -125,18 +131,20 @@ class UnPauseVM(task.Task):
 
     @autolog.log_method(Logger, 'UnPauseVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        pass     
-
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        
 class SuspendVM(task.Task):
 
-    def execute(self, context, instance):
-        return self.execute_with_log(context, instance)
+    def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'SuspendVM.execute')
-    def execute_with_log(self, context, instance):
+    def execute_with_log(self, context, instance, snapshot):
         # Resume the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
@@ -148,18 +156,25 @@ class SuspendVM(task.Task):
 
     @autolog.log_method(Logger, 'SuspendVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        pass     
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        if True:
+            return vmtasks_openstack.resume_vm(cntx, db, kwargs['instance'])
+        else:
+            return vmtasks_vcloud.resume_vm(cntx, db, kwargs['instance'])
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+
             
 class ResumeVM(task.Task):
 
-    def execute(self, context, instance):
-        return self.execute_with_log(context, instance)
+    def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'ResumeVM.execute')
-    def execute_with_log(self, context, instance):
+    def execute_with_log(self, context, instance, snapshot):
         # Resume the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
@@ -171,7 +186,9 @@ class ResumeVM(task.Task):
 
     @autolog.log_method(Logger, 'ResumeVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        pass     
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
     
 class PreSnapshot(task.Task):
 
@@ -194,7 +211,9 @@ class PreSnapshot(task.Task):
 
     @autolog.log_method(Logger, 'PreSnapshot.revert')
     def revert_with_log(self, *args, **kwargs):
-        pass     
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})  
            
 class SnapshotVM(task.Task):
 
@@ -221,6 +240,7 @@ class SnapshotVM(task.Task):
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})        
         db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'], {'snapshot_id': kwargs['snapshot']['id']})
   
                 
@@ -249,7 +269,9 @@ class SnapshotDataSize(task.Task):
         return vm_data_size        
     @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
     def revert_with_log(self, *args, **kwargs):
-        pass    
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',}) 
             
 class UploadSnapshot(task.Task):
 
@@ -283,7 +305,9 @@ class UploadSnapshot(task.Task):
                 
     @autolog.log_method(Logger, 'UploadSnapshot.revert')    
     def revert_with_log(self, *args, **kwargs):
-        pass
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
       
 class PostSnapshot(task.Task):
 
@@ -310,7 +334,9 @@ class PostSnapshot(task.Task):
 
     @autolog.log_method(Logger, 'PostSnapshot.revert')    
     def revert_with_log(self, *args, **kwargs):
-        pass
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
@@ -385,6 +411,14 @@ def UnorderedPostSnapshot(instances):
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
+
+    return flow
+
+def UnorderedPreSnapshot(instances):
+    flow = uf.Flow("presnapshotuf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(instance = "instance_" + str(index))
+        flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
 

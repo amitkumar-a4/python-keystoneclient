@@ -819,6 +819,8 @@ class LibvirtDriver(driver.ComputeDriver):
                     
         #create nova instance
         restored_instance_name = instance['vm_name'] + '_of_snapshot_' + snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
+        if instance_options and 'name' in instance_options:
+            restored_instance_name = instance_options['name']
         restored_compute_image = compute_service.get_image(cntx, restored_image['id'])
         LOG.debug('Creating Instance ' + restored_instance_name) 
         

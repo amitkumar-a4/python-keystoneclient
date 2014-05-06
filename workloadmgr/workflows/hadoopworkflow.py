@@ -261,6 +261,9 @@ class HadoopWorkflow(workflow.Workflow):
         
         self._flow = lf.Flow('hadoopwf')
         
+        # Check if any pre snapshot conditions 
+        self._flow.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))            
+        
         #create a network snapshot
         self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
         
@@ -269,12 +272,13 @@ class HadoopWorkflow(workflow.Workflow):
     
         # Enable safemode on the namenode
         self._flow.add(EnableSafemode('EnableSafemore', provides='safemode'))
-    
+        
         # This is an unordered pausing of VMs. This flow is created in
         # common tasks library. This routine takes instance ids from 
         # openstack. Workload manager should provide the list of 
         # instance ids
         self._flow.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
+        
     
         # This is again unorder snapshot of VMs. This flow is implemented in
         # common tasks library

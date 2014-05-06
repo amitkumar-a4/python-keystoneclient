@@ -95,15 +95,18 @@ class DefaultWorkflow(workflow.Workflow):
       
         self._flow = lf.Flow('DefaultFlow')
         
+        # Check if any pre snapshot conditions 
+        self._flow.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))           
+        
         #create a network snapshot
         self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
         
         #snapshot flavors of VMs
-        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))    
-    
+        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors")) 
+        
         # This is an unordered pausing of VMs. 
         self._flow.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
-    
+        
         # Unordered snapshot of VMs. 
         self._flow.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
     
