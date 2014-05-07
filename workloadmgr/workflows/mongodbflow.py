@@ -68,12 +68,12 @@ def connect_server(host, port, user, password, verbose=False):
             connection = MongoClient(host,port)
 
         if verbose:
-            print 'Connected to ', host, ' on port ',port, '...'
+            LOG.debug(_('Connected to ' + host +  ' on port ' + port +  '...'))
 
     except Exception, e:
-        print 'Oops!  There was an error.  Try again...'
-        print  e
-        #raise e
+        LOG.error(_('Oops!  There was an error.  Try again...'))
+        LOG.error(_(e))
+        raise e
     return connection
 
 def getShards(conn):
@@ -92,7 +92,7 @@ class DisableProfiling(task.Task):
         # Make sure profile is disabled, but also save current
         # profiling state in the flow record? so revert as well
         # as ResumeDB task sets the right profiling level
-        print 'DisableProfiling:'
+        LOG.debug(_('DisableProfiling:'))
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
         
@@ -114,7 +114,7 @@ class DisableProfiling(task.Task):
 class EnableProfiling(task.Task):
 
     def execute(self, host, port, username, password, proflevel):
-        print 'EnableProfiling'
+        LOG.debug(_('EnableProfiling'))
         self.client = connect_server(host, port, username, password)
     
         dbmap = self.client.admin.command('getShardMap')
@@ -131,10 +131,10 @@ class EnableProfiling(task.Task):
 class PauseDBInstance(task.Task):
 
     def execute(self, h, username, password):
-        print 'PauseDBInstance'
+        LOG.debug(_('PauseDBInstance'))
         # Flush the database and hold the write # lock the instance.
         host_info = h['secondaryReplica'].split(':')
-        print host_info
+        LOG.debug(_(host_info))
         self.client = connect_server(host_info[0], int(host_info[1]), '', '')
         self.client.fsync(lock = True)
     
@@ -148,16 +148,16 @@ class PauseDBInstance(task.Task):
 class ResumeDBInstance(task.Task):
 
     def execute(self, h, username, password):
-        print 'ResumeDBInstance'
+        LOG.debug(_('ResumeDBInstance'))
         host_info = h['secondaryReplica'].split(':')
-        print host_info
+        LOG.debug(_(host_info))
         self.client = connect_server(host_info[0], int(host_info[1]), '', '')
         self.client.unlock()
 
 class PauseBalancer(task.Task):
 
     def execute(self, host, port, username, password):
-        print 'PauseBalancer'
+        LOG.debug(_('PauseBalancer'))
         self.client = connect_server(host, port, username, password)
         # Pause the DB
         db = self.client.config
@@ -165,7 +165,7 @@ class PauseBalancer(task.Task):
         db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, true);
         balancer_info = db.locks.find_one({'_id': 'balancer'})
         while int(str(balancer_info['state'])) > 0:
-            print '\t\twaiting for migration'
+            LOG.debug(_('\t\twaiting for migration'))
             balancer_info = db.locks.find_one({'_id': 'balancer'})
     
     def revert(self, *args, **kwargs):
@@ -176,7 +176,7 @@ class PauseBalancer(task.Task):
 class ResumeBalancer(task.Task):
 
     def execute(self, host, port, username, password):
-        print 'ResumeBalancer'
+        LOG.debug(_('ResumeBalancer'))
         self.client = connect_server(host, port, username, password)
         # Resume DB
     
@@ -218,7 +218,7 @@ class ShutdownConfigServer(task.Task):
         if usesudo:
             command = 'sudo ' + command
         
-        print 'ShutdownConfigServer'
+        LOG.debug(_('ShutdownConfigServer'))
         try:
             client = paramiko.SSHClient()
             client.load_system_host_keys()
@@ -226,7 +226,7 @@ class ShutdownConfigServer(task.Task):
             client.connect(cfghost, port=sshport, username=hostusername, password=hostpassword)
             
             stdin, stdout, stderr = client.exec_command(command)
-            print stdout.read(),
+            LOG.debug(_(stdout.read()))
         finally:
             client.close()
     
@@ -235,7 +235,6 @@ class ShutdownConfigServer(task.Task):
 
         def revoke(self, *args, **kwargs):
             # Make sure all config servers are resumed
-            import pdb;pdb.set_trace()
             cfghost = kwargs['result']['cfgsrv'].split(':')[0]
             
             #ssh into the cfg host and start the config server
@@ -253,11 +252,11 @@ class ShutdownConfigServer(task.Task):
                     client.connect(cfghost, port=port, username=kwargs['hostusername'], password=kwargs['hostpassword'])
                 
                     stdin, stdout, stderr = client.exec_command(command)
-                    print stdout.read(),
+                    LOG.debug(_(stdout.read()))
                 finally:
                     client.close()
             
-            print 'ShutdownConfigServer:revert'
+            LOG.debug(_('ShutdownConfigServer:revert'))
 
 class ResumeConfigServer(task.Task):
 
@@ -280,12 +279,12 @@ class ResumeConfigServer(task.Task):
             client.connect(cfghost, port=sshport, username=hostusername, password=hostpassword)
     
             stdin, stdout, stderr = client.exec_command(command)
-            print stdout.read(),
+            LOG.debug(_(stdout.read()))
         finally:
             client.close()
     
         #ssh into the cfg host and start the config server
-        print 'ResumeConfigServer'
+        LOG.debug(_('ResumeConfigServer'))
 
 # Assume there is no ordering dependency between instances
 # pause each VM in parallel.
@@ -311,16 +310,14 @@ def secondaryhosts_to_backup(cntx, host, port, username, password):
     #
     # Creating connection to mongos server
     #
-    print 'Connecting to mongos server ', host
+    LOG.debug(_('Connecting to mongos server ' + host))
     connection = connect_server(host, port, username, password)
-    print ''
 
     #
     # Getting sharding information
     #
-    print 'Getting sharding configuration'
+    LOG.debug(_('Getting sharding configuration'))
     shards = getShards(connection)
-    print ''
 
     #
     # Getting the secondaries list
@@ -347,16 +344,14 @@ def get_vms(cntx, host, port, username, password):
     #
     # Creating connection to mongos server
     #
-    print 'Connecting to mongos server ', host
+    LOG.debug(_('Connecting to mongos server ' + host))
     connection = connect_server(host, port, username, password)
-    print ''
 
     #
     # Getting sharding information
     #
-    print 'Getting sharding configuration'
+    LOG.debug(_('Getting sharding configuration'))
     shards = getShards(connection)
-    print ''
 
     #
     # Getting the secondaries list
@@ -539,7 +534,7 @@ class MongoDBWorkflow(workflow.Workflow):
             hosts = str(s['host'])
             hosts = hosts.replace(str(s['_id']), '').strip()
             hosts = hosts.replace('/', '').strip()
-            print 'Getting secondary from hosts in ', hosts
+            LOG.debug(_('Getting secondary from hosts in ' + hosts))
             # Get the replica set for each shard
             c = MongoClient(hosts,
                         read_preference=ReadPreference.SECONDARY)

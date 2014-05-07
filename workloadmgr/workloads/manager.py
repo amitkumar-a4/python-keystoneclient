@@ -111,6 +111,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
         elif(workload_type.display_name == 'Cassandra'):
             workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
+        elif(workload_type.display_name == 'Composite'):
+            workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
                           
         parts = workflow_class_name.split('.')
         module = ".".join(parts[:-1])
