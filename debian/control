@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 9)
 
 Package: workloadmanager
 Architecture: all
-Depends: python-glanceclient, python-keystoneclient, python-novaclient, python-swiftclient, python-lxml, python-mqplib, python-anyjson, python-argparse, python-Babel, python-eventlet, python-greenlet, python-iso8601, python-kombu, python-lockfile, python-netaddr, python-oslo.config, python-paramiko, python-Paste, python-PasteDeploy, python-Routes, python-six, python-SQLAlchemy, python-sqlalchemy-migrate, python-stevedore, python-suds, python-WebOb, python-wsgiref
+Depends: python-glanceclient, python-keystoneclient, python-novaclient, python-swiftclient, python-lxml, python-amqplib, python-anyjson, python-argparse, python-Babel, python-eventlet, python-greenlet, python-iso8601, python-kombu, python-lockfile, python-netaddr, python-oslo.config, python-paramiko, python-Paste, python-PasteDeploy, python-Routes, python-six, python-stevedore, python-suds, python-WebOb, python-wsgiref, python-sqlalchemy
 Description: This is the package for workloadmanager
  hi this is contego greeting the world
 
