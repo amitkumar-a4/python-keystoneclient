@@ -79,25 +79,61 @@ def getnodeinfo(host, port, user, password):
     nodeinput.append(['Thrift', str(nodehash['Thrift active'])])
 
 def getcassandranodes(connection):
-    stdin, stdout, stderr = connection.exec_command("nodetool ring")
+    stdin, stdout, stderr = connection.exec_command("nodetool status")
     cassout = stdout.read(),
 
     cassout = cassout[0].replace(" KB", "KB")
-    #cassout= 'Address         DC          Rack        Status State   Load            Effective-Ownership Token                                      \n 124990069569720904109033691828482613006    \n 172.17.17.4     datacenter1 rack1       Up     Normal  26.9KB         0.00%               58281912783313757041398740202718796887     \n 172.17.17.2     datacenter1 rack1       Up     Normal  31.52KB        0.00%               78612805388309300046348770475254928516     \n 172.17.17.5     datacenter1 rack1       Up     Normal  26.9KB         0.00%               124990069569720904109033691828482613006    \n 172.17.17.6     datacenter1 rack2       Up     Normal  26.9KB         0.00%               58281912783313757041398740202718796887     \n 172.17.17.7     datacenter1 rack2       Up     Normal  31.52KB        0.00%               78612805388309300046348770475254928516     \n 172.17.17.8     datacenter1 rack2       Up     Normal  26.9KB         0.00%               124990069569720904109033691828482613006    \n 172.17.17.9     datacenter2 rack1       Up     Normal  26.9KB         0.00%               58281912783313757041398740202718796887     \n 172.17.17.10     datacenter2 rack1       Up     Normal  31.52KB        0.00%               78612805388309300046348770475254928516     \n 172.17.17.11     datacenter2 rack1       Up     Normal  26.9KB         0.00%               124990069569720904109033691828482613006    \n 172.17.17.12     datacenter2 rack2       Up     Normal  26.9KB         0.00%               58281912783313757041398740202718796887     \n 172.17.17.13     datacenter2 rack2       Up     Normal  31.52KB        0.00%               78612805388309300046348770475254928516     \n 172.17.17.14     datacenter2 rack2       Up     Normal  26.9KB         0.00%               124990069569720904109033691828482613006    \n'
-    #parse nodetool output for cassandra nodes
+    cassout = cassout.replace(" (", "(")
+    cassout = cassout.replace(" ID", "ID")
+ 
+    # Sample output
+    #cassout =Datacenter: 17
+    #==============
+    #Status=Up/Down
+    #|/ State=Normal/Leaving/Joining/Moving
+    #--  Address      Load       Owns (effective)  Host ID                               Token                                    Rack
+    #UN  172.17.17.2  55.56 KB   0.2%              7d62d900-f99d-4b88-8012-f06cb639fc02  0                                        17
+    #UN  172.17.17.4  76.59 KB   100.0%            75917649-6caa-4c66-b003-71c0eb8c09e8  -9210152678340971410                     17
+    #UN  172.17.17.5  86.46 KB   99.8%             a03a1287-7d32-42ed-9018-8206fc295dd9  -9218601096928798970                     17
 
     cassout = cassout.split("\n")
 
-    casskeys = cassout[0].split()
+    casskeys = cassout[4].split()
 
     cassnodes = []
-    for n in cassout[2:]:
+    for n in cassout[5:]:
         desc = n.split()
         if len(desc) == 0:
            continue
         node = {}
         for idx, k in enumerate(casskeys):
            node[k] = desc[idx]
+
+        # Sample output
+        # =============
+        # Token            : (invoke with -T/--tokens to see all 256 tokens)
+        # ID               : f64ced33-2c01-40a3-9979-cf0a0b60d7af
+        # Gossip active    : true
+        # Thrift active    : true
+        # Native Transport active: true
+        # Load             : 148.13 KB
+        # Generation No    : 1399521595
+        # Uptime (seconds) : 36394
+        # Heap Memory (MB) : 78.66 / 992.00
+        # Data Center      : 17
+        # Rack             : 17
+        # Exceptions       : 0
+        # Key Cache        : size 1400 (bytes), capacity 51380224 (bytes), 96 hits, 114 requests, 0.842 recent hit rate, 14400 save period in seconds
+        # Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds
+
+        stdin, stdout, stderr = connection.exec_command("nodetool -h " + node['Address'] + " info")
+        output = stdout.read()
+        output = output.split("\n")
+        for l in output:
+          fields = l.split(":")
+          if len(fields) > 1:
+             node[fields[0].strip()] = fields[1]
+
         cassnodes.append(node)
 
     return cassnodes
@@ -279,20 +315,20 @@ class CassandraWorkflow(workflow.Workflow):
         dcs = {'name': "Cassandra Cluster", "datacenters":{}, "input":[]}
         for n in cassnodes:
            # We discovered this datacenter for the first time, add it
-           if not n['DC'] in dcs["datacenters"]:
-              dcs['datacenters'][n['DC']] = {'name': n['DC'], "racks":{}, "input":[]}
+           if not n['Data Center'] in dcs["datacenters"]:
+              dcs['datacenters'][n['Data Center']] = {'name': n['Data Center'], "racks":{}, "input":[]}
 
            # We discovered this rack for the first time, add it
-           if not n['Rack'] in dcs["datacenters"][n['DC']]["racks"]:
-              dcs["datacenters"][n['DC']]["racks"][n['Rack']] = {'name': n['Rack'], "nodes":{}, "input":[]}
+           if not n['Rack'] in dcs["datacenters"][n['Data Center']]["racks"]:
+              dcs["datacenters"][n['Data Center']]["racks"][n['Rack']] = {'name': n['Rack'], "nodes":{}, "input":[]}
 
-           #if not n['Address'] in dcs["datacenters"][n['DC']]["racks"][n['Rack']]["nodes"]:
+           #if not n['Address'] in dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"]:
            n['name'] = n['Address']
            n['status'] = n.pop('Status', None)
            n["input"] = []
            n['input'].append(["Load", n['Load']])
-           n['input'].append(["State", n['State']])
-           dcs["datacenters"][n['DC']]["racks"][n['Rack']]["nodes"][n['Address']] = {'name': n['Address'], "node": n}
+           #n['input'].append(["State", n['State']])
+           dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"][n['Address']] = {'name': n['Address'], "node": n}
 
 
         dcs["children"] = []
@@ -317,7 +353,15 @@ class CassandraWorkflow(workflow.Workflow):
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                return {'name':str(item).split("==")[0], 'type':'Task'}
+                taskdetails = {'name':item._name.split("_")[0], 'type':'Task'}
+                taskdetails['input'] = []
+                if len(item._name.split('_')) == 2:
+                    nodename = item._name.split("_")[1]
+                    for n in nodes['instances']:
+                       if n['vm_id'] == nodename:
+                          nodename = n['vm_name']
+                    taskdetails['input'] = [['vm', nodename]]
+                return taskdetails
 
             flowdetails = {}
             flowdetails['name'] = str(item).split("==")[0]
@@ -328,6 +372,7 @@ class CassandraWorkflow(workflow.Workflow):
 
             return flowdetails
 
+        nodes = self.discover()
         workflow = recurseflow(self._flow)
         return dict(workflow=workflow)
 
