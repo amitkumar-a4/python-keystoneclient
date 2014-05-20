@@ -35,8 +35,6 @@ import workflow
 
 LOG = logging.getLogger(__name__)
 
-
-
 def get_vms(cntx, workload_id):
     db = vmtasks.WorkloadMgrDB().db
     
@@ -123,35 +121,6 @@ class DefaultWorkflow(workflow.Workflow):
         self._flow.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
     
           
-    def topology(self):
-        topology = {'test3':'test3', 'test4':'test4'}
-        return dict(topology=topology)
-
-    def details(self):
-        # Details the flow details based on the
-        # current topology, number of VMs etc
-        def recurseflow(item):
-            if isinstance(item, task.Task):
-                return {'name':str(item), 'type':'Task'}
-
-            flowdetails = {}
-            flowdetails['name'] = str(item)
-            flowdetails['type'] = str(item).split('.')[2]
-            flowdetails['children'] = []
-            for it in item:
-                flowdetails['children'].append(recurseflow(it))
-
-            return flowdetails
-
-        workflow = recurseflow(self._flow)
-        return dict(workflow=workflow)
-
-    def discover(self):
-        #instances =  [{'vm_id': '1'}, {'vm_id': '2'}]
-        instances = []
-        return dict(instances=instances)
-
     def execute(self):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
-
