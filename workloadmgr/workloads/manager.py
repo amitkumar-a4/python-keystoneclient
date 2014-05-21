@@ -37,6 +37,7 @@ from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 from workloadmgr.workflows import vmtasks_openstack
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 from workloadmgr import autolog
 
@@ -51,6 +52,32 @@ scheduler_config = {'standalone': 'True'}
 FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
 
+def get_workflow_class(context, workload_type_id):
+    #TODO(giri): implement a driver model for the workload types
+    workload_type = db = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
+    workflow_class_name = ''
+    if(workload_type.display_name == 'Default'):
+        workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
+    elif(workload_type.display_name == 'Serial'):
+        workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
+    elif(workload_type.display_name == 'Parallel'):
+        workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
+    elif(workload_type.display_name == 'MongoDB'):
+        workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
+    elif(workload_type.display_name == 'Hadoop'):
+        workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
+    elif(workload_type.display_name == 'Cassandra'):
+        workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
+    elif(workload_type.display_name == 'Composite'):
+        workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
+                      
+    parts = workflow_class_name.split('.')
+    module = ".".join(parts[:-1])
+    workflow_class = __import__( module )
+    for comp in parts[1:]:
+        workflow_class = getattr(workflow_class, comp)            
+    return workflow_class        
+    
 def workload_callback(workload_id):
     """
     Callback
@@ -95,31 +122,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         return instance_size                  
         
-    def _get_workflow_class(self, context, workload_type_id):
-        #TODO(giri): implement a driver model for the workload types
-        workload_type = self.db.workload_type_get(context, workload_type_id)
-        workflow_class_name = ''
-        if(workload_type.display_name == 'Default'):
-            workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
-        elif(workload_type.display_name == 'Serial'):
-            workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
-        elif(workload_type.display_name == 'Parallel'):
-            workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
-        elif(workload_type.display_name == 'MongoDB'):
-            workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
-        elif(workload_type.display_name == 'Hadoop'):
-            workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
-        elif(workload_type.display_name == 'Cassandra'):
-            workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
-        elif(workload_type.display_name == 'Composite'):
-            workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
-                          
-        parts = workflow_class_name.split('.')
-        module = ".".join(parts[:-1])
-        workflow_class = __import__( module )
-        for comp in parts[1:]:
-            workflow_class = getattr(workflow_class, comp)            
-        return workflow_class        
+
         
     def _get_metadata_value(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
@@ -141,7 +144,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         for key in metadata:
             store[key] = metadata[key]
         
-        workflow_class = self._get_workflow_class(context, workload_type_id)
+        workflow_class = get_workflow_class(context, workload_type_id)
         workflow = workflow_class("discover_instances", store)
         instances = workflow.discover()
         return instances   
@@ -162,7 +165,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         for kvpair in workload.metadata:
             store[kvpair['key']] = kvpair['value']
             
-        workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+        workflow_class = get_workflow_class(context, workload.workload_type_id)
         workflow = workflow_class("workload_topology", store)
         topology = workflow.topology()
         return topology
@@ -183,7 +186,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         for kvpair in workload.metadata:
             store[kvpair['key']] = kvpair['value']
             
-        workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+        workflow_class = get_workflow_class(context, workload.workload_type_id)
         workflow = workflow_class("workload_workflow_details", store)
         workflow.initflow()
         details = workflow.details()
@@ -260,7 +263,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             for kvpair in workload.metadata:
                 store[kvpair['key']] = kvpair['value']
                 
-            workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+            workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
             workflow.initflow()
             self.db.snapshot_update(context, 

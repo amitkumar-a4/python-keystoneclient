@@ -100,7 +100,7 @@ class SerialWorkflow(workflow.Workflow):
         _snapshotvms.add(vmtasks.LinearSnapshotVMs(self._store['instances']))
     
         # Unpause in reverse order
-        _snapshotvms.add(vmtasks.LinearUnPauseVMs(self._store['instances'].reverse()))
+        _snapshotvms.add(vmtasks.LinearUnPauseVMs(reversed(self._store['instances'])))
 
         super(SerialWorkflow, self).initflow(_snapshotvms)
           
