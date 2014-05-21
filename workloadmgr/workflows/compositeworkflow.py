@@ -27,6 +27,7 @@ from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 from workloadmgr.workloads import manager as workloadmgr
+from workloadmgr.workloads.manager import WorkloadMgrManager as wlmgr
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
 
@@ -45,6 +46,7 @@ class CompositeWorkflow(workflow.Workflow):
     def initflow(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
 
+        import pdb;pdb.set_trace()
         self._flow = lf.Flow('CompositeFlow')
 
         # all we have to do is call into individual workflow init routine
@@ -53,26 +55,39 @@ class CompositeWorkflow(workflow.Workflow):
         # once we achieve that we can unpause the vms and upload the
         # snapshot in any order
         # Dig into each workflow
-        for workload_id in self._store['workloadids']:
-            """
-            Return workload topology
-            """        
-            context_dict = dict([('%s' % key, value)
-                              for (key, value) in context.to_dict().iteritems()])            
-            context_dict['conf'] =  None # RpcContext object looks for this during init
-            store = {
-                    'context': context_dict,                # context dictionary
-                    'workload_id': workload_id,             # workload_id
-            }
-            workload = self.db.workload_get(context, workload_id)
-            for kvpair in workload.metadata:
-                store[kvpair['key']] = kvpair['value']
             
-            workflow_class = self._get_workflow_class(context, workload.workload_type_id)
+        workflows = []
+        for workload_id in self._store['Workloads'].split(","):
+            workflow_class = wlmgr._get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class("workload_workflow_details", store)
             workflow.initflow()
+            workflows.add(workflow)
+
+        # Aggregate presnapshot workflows from all workloads
+        presnapshot = uf.Flow(self.name + "#Presnapshot")
+        for workflow in workflows:
+            presnapshot.add(workflow.presnapshot)
+
+        # Aggregate snapshotmetadata workflows from all workloads
+        snapshotmetadata = uf.Flow(self.name + "#SnapshotMetadata")
+        for workflow in workflows:
+            snapshotmetadata.add(workflow.snapshotmetadata)
+
+        # Aggregate snapshotvms workflows from all workloads
+        # REVISIT: lf is hardcoded, but should be fed from the workload definition itself
+        snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
+        for workflow in workflows:
+            snapshotvms.add(workflow.snapshotvms)
+
+        # Aggregate snapshotmetadata workflows from all workloads
+        postsnapshot = uf.Flow(self.name + "#PostSnapshot")
+        for workflow in workflows:
+            postsnapshot.add(workflow.postsnapshot)
 
             self._flow.add(workflow._flow)
+
+        super(CompositeWorkflow, self).initflow(snapshotvms=snapshotvms, presnapshot=presnapshot, 
+                                                snapshotmetadata=snapshotmetadata, postsnapshot=postsnapshot)
         
     def topology(self):
         # Fill in the topology information later, perhaps combine 
@@ -80,38 +95,11 @@ class CompositeWorkflow(workflow.Workflow):
         topology = {'test3':'test3', 'test4':'test4'}
         return dict(topology=topology)
 
-    def details(self):
-        # workflow details based on the
-        # current topology, number of VMs etc
-        def recurseflow(item):
-            if isinstance(item, task.Task):
-                taskdetails = {'name':item._name.split("_")[0], 'type':'Task'}
-                taskdetails['input'] = []
-                if len(item._name.split('_')) == 2:
-                    nodename = item._name.split("_")[1]
-                    for n in nodes['instances']:
-                       if n['vm_id'] == nodename:
-                          nodename = n['vm_name']
-                    taskdetails['input'] = [['vm', nodename]]
-                return taskdetails
-
-            flowdetails = {}
-            flowdetails['name'] = str(item).split("==")[0]
-            flowdetails['type'] = str(item).split('.')[2]
-            flowdetails['children'] = []
-            for it in item:
-                flowdetails['children'].append(recurseflow(it))
-
-            return flowdetails
-
-        nodes = self.discover()
-        workflow = recurseflow(self._flow)
-        return dict(workflow=workflow)
-
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = []
-        for workload_id in self._store['workloadids']:
+        import pdb;pdb.set_trace()
+        for workload_id in self._store['Workloads'].split(","):
             """
             Return workload topology
             """        
@@ -133,5 +121,6 @@ class CompositeWorkflow(workflow.Workflow):
         return dict(instances=instances)
 
     def execute(self):
+        import pdb;pdb.set_trace()
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)

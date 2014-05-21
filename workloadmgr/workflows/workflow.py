@@ -58,12 +58,81 @@ class Workflow(object):
     """
 
     def __init__(self, name):
+        import pdb;pdb.set_trace()
         self._name = str(name)
+        self._flow = None
+        self._presnapshot = None
+        self._snapshotmetadata = None
+        self._snapshotvms = None
+        self._postsnapshot = None
+
+    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None):
+
+        if snapshotvms is None:
+           raise exception.UndefinedSnapshotVMsWorkflow("snapshotvms is None")
+
+        # Check if any pre snapshot conditions
+        if presnapshot is None:
+           self._presnapshot = lf.Flow(self.name + "#Presnapshot")
+           self._presnapshot.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))           
+        else:
+           self._presnapshot = presnapshot
+        
+        # These are snapshot metadata workflows
+        if snapshotmetadata is None:
+           # create a network snapshot
+           self._snapshotmetadata = lf.Flow(self.name + "#SnapshotMetadata")
+           self._snapshotmetadata.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
+        
+           #snapshot flavors of VMs
+           self._snapshotmetadata.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))
+        else:
+           self._snapshotmetadata = snapshotmetadata
+
+        self._snapshotvms = snapshotvms
+        
+        # This is the post snapshot workflow
+        if postsnapshot is None:
+           # calculate the size of the snapshot
+           self._postsnapshot = lf.Flow(self.name + "#Postsnapshot")
+           self._postsnapshot.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
+    
+           # Now lazily copy the snapshots of VMs to tvault appliance
+           self._postsnapshot.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))
+    
+           # block commit any changes back to the snapshot
+           self._postsnapshot.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
+        else:
+           self._postsnapshot = postsnapshot
+      
+        self._flow = lf.Flow(self.name)
+
+        self._flow.add(self._presnapshot, self._snapshotmetadata, self._snapshotvms, self._postsnapshot)
 
     @property
     def name(self):
         """A non-unique name for this workflow (human readable)."""
         return self._name
+
+    @property
+    def presnapshot(self):
+        """Returns references to presnapshot workflow."""
+        return self._presnapshot
+
+    @property
+    def snapshotmetadata(self):
+        """Returns references to snapshot metadata workflow."""
+        return self._snapshotmetadata
+
+    @property
+    def snapshotvms(self):
+        """Returns references to snapshotvms workflow."""
+        return self._presnapshot
+
+    @property
+    def postsnapshot(self):
+        """Returns references to postsnapshot workflow"""
+        return self._postsnapshot
 
     def __str__(self):
         lines = ["%s: %s" % (reflection.get_class_name(self), self.name)]

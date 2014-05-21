@@ -91,35 +91,18 @@ class SerialWorkflow(workflow.Workflow):
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+str(index)] = item
       
-        self._flow = lf.Flow('SerialFlow')
+        _snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
+
+        # This is a linear pausing of VMs. 
+        _snapshotvms.add(vmtasks.LinearPauseVMs(self._store['instances']))
         
-        # Check if any pre snapshot conditions 
-        self._flow.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))           
-        
-        #create a network snapshot
-        self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
-        
-        #snapshot flavors of VMs
-        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors")) 
-        
-        # This is an unordered pausing of VMs. 
-        self._flow.add(vmtasks.LinearPauseVMs(self._store['instances']))
-        
-        # Unordered snapshot of VMs. 
-        self._flow.add(vmtasks.LinearSnapshotVMs(self._store['instances']))
+        # linear snapshot of VMs. 
+        _snapshotvms.add(vmtasks.LinearSnapshotVMs(self._store['instances']))
     
-        # This is an unordered unpasuing of VMs. 
-        self._flow.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
-        
-        #calculate the size of the snapshot
-        self._flow.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
-    
-        # Now lazily copy the snapshots of VMs to tvault appliance
-        self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))
-    
-        # block commit any changes back to the snapshot
-        self._flow.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
-    
+        # Unpause in reverse order
+        _snapshotvms.add(vmtasks.LinearUnPauseVMs(self._store['instances'].reverse()))
+
+        super(SerialWorkflow, self).initflow(_snapshotvms)
           
     def execute(self):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
