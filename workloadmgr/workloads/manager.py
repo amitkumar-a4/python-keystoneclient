@@ -57,9 +57,7 @@ def get_workflow_class(context, workload_type_id):
     workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
     if workload_type_id:
         workload_type = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
-        if(workload_type.display_name == 'Default'):
-            workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
-        elif(workload_type.display_name == 'Serial'):
+        if(workload_type.display_name == 'Serial'):
             workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
         elif(workload_type.display_name == 'Parallel'):
             workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
