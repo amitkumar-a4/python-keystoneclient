@@ -35,7 +35,107 @@ import vmtasks_vcloud
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
-      
+class RestoreVMNetworks(task.Task):
+    def execute(self, context, restore):
+        return self.execute_with_log(context, restore)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)    
+
+    @autolog.log_method(Logger, 'RestoreVMNetworks.execute')
+    def execute_with_log(self, context, restore):
+        # Restore the networking configuration of VMs
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+        
+        if True:
+            return vmtasks_openstack.restore_vm_networks(cntx, db, restore)
+        else:
+            return vmtasks_vcloud.restore_vm_networks(cntx, db, restore)
+
+    @autolog.log_method(Logger, 'RestoreVMNetworks.revert') 
+    def revert_with_log(self, *args, **kwargs):
+        pass    
+
+class PreRestore(task.Task):
+
+    def execute(self, context, instance, restore):
+        return self.execute_with_log(context, instance, restore)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'PreRestore.execute')
+    def execute_with_log(self, context, instance, restore):
+        # pre processing of restore
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        
+        if True:
+            return vmtasks_openstack.pre_restore_vm(cntx, db, instance, restore)
+        else:
+            return vmtasks_vcloud.pre_restore_vm(cntx, db, instance, restore)
+
+    @autolog.log_method(Logger, 'PreRestore.revert')
+    def revert_with_log(self, *args, **kwargs):
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})      
+
+class RestoreVM(task.Task):
+
+    def execute(self, context, instance, restore, restored_net_resources):
+        return self.execute_with_log(context, instance, restore, restored_net_resources)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'RestoreVM.execute')
+    def execute_with_log(self, context, instance, restore, restored_net_resources):
+        # Snapshot the VM
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        
+        if True:
+            ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore, restored_net_resources)
+        else:
+            ret_val = vmtasks_vcloud.restore_vm(cntx, db, instance, restore, restored_net_resources)
+        
+        return ret_val
+    
+    @autolog.log_method(Logger, 'RestoreVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})        
+             
+class PostRestore(task.Task):
+
+    def execute(self, context, instance, restore):
+        return self.execute_with_log(context, instance, restore)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'PostRestore.execute')    
+    def execute_with_log(self, context, instance, restore):
+        # post processing of restore
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+
+        if True:
+            ret_val = vmtasks_openstack.post_restore_vm(cntx, db, instance, restore)
+        else:
+            ret_val = vmtasks_vcloud.post_restore_vm(cntx, db, instance, restore)        
+
+        return ret_val
+
+    @autolog.log_method(Logger, 'PostRestore.revert')    
+    def revert_with_log(self, *args, **kwargs):
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+              
 class SnapshotVMNetworks(task.Task):
         
     def execute(self, context, instances, snapshot):
@@ -164,7 +264,6 @@ class SuspendVM(task.Task):
             return vmtasks_vcloud.resume_vm(cntx, db, kwargs['instance'])
         db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
 
-            
 class ResumeVM(task.Task):
 
     def execute(self, context, instance, snapshot):
@@ -243,7 +342,6 @@ class SnapshotVM(task.Task):
         db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})        
         db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'], {'snapshot_id': kwargs['snapshot']['id']})
   
-                
 class SnapshotDataSize(task.Task):
 
     def execute(self, context, instance, snapshot, snapshot_data):
@@ -338,6 +436,15 @@ class PostSnapshot(task.Task):
         db = WorkloadMgrDB().db
         db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
 
+
+def UnorderedPreSnapshot(instances):
+    flow = uf.Flow("presnapshotuf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(instance = "instance_" + str(index))
+        flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
+
+    return flow
+
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
     for index,item in enumerate(instances):
@@ -346,6 +453,7 @@ def UnorderedPauseVMs(instances):
 
 # Assume there is dependency between instances
 # pause each VM in the order that appears in the array.
+
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
     for index,item in enumerate(instances):
@@ -414,14 +522,6 @@ def UnorderedPostSnapshot(instances):
 
     return flow
 
-def UnorderedPreSnapshot(instances):
-    flow = uf.Flow("presnapshotuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index))
-        flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
-
-    return flow
-
 def CreateVMSnapshotDBEntries(context, instances, snapshot):
     #create an entry for the VM in the workloadmgr database
     cntx = amqp.RpcContext.from_dict(context)
@@ -434,3 +534,36 @@ def CreateVMSnapshotDBEntries(context, instances, snapshot):
                    'status': 'creating',}
         snapshot_vm = db.snapshot_vm_create(cntx, options)
 
+
+def UnorderedPreRestore(instances):
+    flow = uf.Flow("prerestoreuf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(instance = "instance_" + str(index))
+        flow.add(PreRestore("PreRestore_" + item['vm_id'], rebind=rebind_dict))
+
+    return flow
+
+# Assume there is no ordering dependency between instances
+# restore each VM in parallel.
+def UnorderedRestoreVMs(instances):
+    flow = uf.Flow("restorevmuf")
+    for index,item in enumerate(instances):
+        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+    
+    return flow
+
+# Assume there is dependency between instances
+# snapshot each VM in the order that appears in the array.
+def LinearRestoreVMs(instances):
+    flow = lf.Flow("restorevmlf")
+    for index,item in enumerate(instances):
+        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+    
+    return flow
+def UnorderedPostRestore(instances):
+    flow = uf.Flow("postrestoreuf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(instance = "instance_" + str(index))
+        flow.add(PostRestore("PostRestore_" + item['vm_id'], rebind=rebind_dict))
+
+    return flow

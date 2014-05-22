@@ -839,7 +839,7 @@ def snapshot_vm_update(context, vm_id, snapshot_id, values):
 
         if not snapshot_vm:
             raise exception.SnapshotNotFound(
-                _("No snapshot VM with id %(snapshot_vm_id)s") % locals())
+                _("No snapshot VM with id %(vm_id)s") % locals())
 
         snapshot_vm.update(values)
         snapshot_vm.save(session=session)
@@ -1464,6 +1464,22 @@ def restored_vm_create(context, values):
     restored_vm.update(values)
     restored_vm.save()
     return restored_vm
+
+@require_context
+def restored_vm_update(context, vm_id, restore_id, values):
+    session = get_session()
+    with session.begin():
+        restore_vm = model_query(context, models.RestoredVMs, session=session, read_deleted="yes")\
+                               .filter_by(vm_id=vm_id)\
+                               .filter_by(restore_id=restore_id).first()
+
+        if not restore_vm:
+            raise exception.RestoreNotFound(
+                _("No restored VM with id %(vm_id)s") % locals())
+
+        restore_vm.update(values)
+        restore_vm.save(session=session)
+    return restore_vm
 
 @require_context
 def restored_vm_get(context, restore_id, session=None):

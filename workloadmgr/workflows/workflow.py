@@ -58,7 +58,6 @@ class Workflow(object):
     """
 
     def __init__(self, name):
-        import pdb;pdb.set_trace()
         self._name = str(name)
         self._flow = None
         self._presnapshot = None

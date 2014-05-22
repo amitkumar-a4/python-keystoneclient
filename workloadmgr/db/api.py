@@ -308,6 +308,9 @@ def restore_delete(context, restore_id):
 def restored_vm_create(context, values):
     return IMPL.restored_vm_create(context, values)
 
+def restored_vm_update(context, vm_id, restore_id, values):
+    return IMPL.restored_vm_update(context, vm_id, restore_id, values)
+
 def restored_vm_get(context, restore_id, session=None):
     return IMPL.restored_vm_get(context, restore_id, session)
 
