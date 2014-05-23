@@ -599,6 +599,10 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         return compute_service.vast_finalize(cntx, instance['vm_id'], {})
     
+    @autolog.log_method(Logger, 'libvirt.driver.pre_restore_vm')
+    def pre_restore_vm(self, cntx, db, instance, restore):
+        pass    
+    
     @autolog.log_method(Logger, 'libvirt.driver.restore_vm')
     def restore_vm(self, cntx, db, instance, restore, restored_net_resources,
                    restored_compute_flavor, restored_nics, instance_options):    
@@ -623,7 +627,6 @@ class LibvirtDriver(driver.ComputeDriver):
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
     
-                               
         #restore, rebase, commit & upload
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
@@ -663,8 +666,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                      None,
                                      None,
                                      None)
-                    commit_queue.put(restored_file_path)               
-            
+                    commit_queue.put(restored_file_path)  
+                                 
             while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
@@ -712,7 +715,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 commit_queue.put(restored_file_path)                                 
                 vm_disk_resource_snap = vm_disk_resource_snap_backing
                 restored_file_path = restored_file_path_backing
-            
+
             if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
                 while commit_queue.empty() is not True:
                     file_to_commit = commit_queue.get_nowait()
@@ -765,7 +768,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                  'owner_id': cntx.project_id}
                                   }
                 
-
+            
             if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
                 LOG.debug('Uploading image ' + restored_file_path)
                 restored_image = image_service.create(cntx, image_metadata)
@@ -919,3 +922,7 @@ class LibvirtDriver(driver.ComputeDriver):
                           })        
         db.restore_update( cntx, restore_obj.id, {'progress_msg': 'Created VM:' + restored_vm['vm_id'], 'status': 'executing'})
         return restored_vm          
+
+    @autolog.log_method(Logger, 'libvirt.driver.post_restore_vm')
+    def post_restore_vm(self, cntx, db, instance, restore):
+        pass    

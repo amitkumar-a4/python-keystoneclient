@@ -54,22 +54,21 @@ FLAGS.register_opts(workloads_manager_opts)
 
 def get_workflow_class(context, workload_type_id):
     #TODO(giri): implement a driver model for the workload types
-    workload_type = db = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
-    workflow_class_name = ''
-    if(workload_type.display_name == 'Default'):
-        workflow_class_name = 'workloadmgr.workflows.defaultworkflow.DefaultWorkflow'
-    elif(workload_type.display_name == 'Serial'):
-        workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
-    elif(workload_type.display_name == 'Parallel'):
-        workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
-    elif(workload_type.display_name == 'MongoDB'):
-        workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
-    elif(workload_type.display_name == 'Hadoop'):
-        workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
-    elif(workload_type.display_name == 'Cassandra'):
-        workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
-    elif(workload_type.display_name == 'Composite'):
-        workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
+    workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+    if workload_type_id:
+        workload_type = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
+        if(workload_type.display_name == 'Serial'):
+            workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
+        elif(workload_type.display_name == 'Parallel'):
+            workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
+        elif(workload_type.display_name == 'MongoDB'):
+            workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
+        elif(workload_type.display_name == 'Hadoop'):
+            workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
+        elif(workload_type.display_name == 'Cassandra'):
+            workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
+        elif(workload_type.display_name == 'Composite'):
+            workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
                       
     parts = workflow_class_name.split('.')
     module = ".".join(parts[:-1])
@@ -314,7 +313,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         try:
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
-            workload = self.db.workload_get(context, snapshot.workload_id)
             
             restore_type = restore.restore_type
             
@@ -339,17 +337,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if restore_type == 'test':                     
                 self.db.restore_update( context, restore_id, {'size': restore_size})
             else:
-                self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})                                
+                self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
+                
+            context_dict = dict([('%s' % key, value)
+                              for (key, value) in context.to_dict().iteritems()])            
+            context_dict['conf'] =  None # RpcContext object looks for this during init
+            store = {
+                'connection': FLAGS.sql_connection,     # taskflow persistence connection
+                'context': context_dict,                # context dictionary
+                'restore': dict(restore.iteritems()),   # restore dictionary
+            }
+                
+            workflow_class = get_workflow_class(context, None)
+            workflow = workflow_class(restore.display_name, store)
+            workflow.initflow()
+            workflow.execute()                                                
             
-            self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks...', 'status': 'executing'})            
-            restored_net_resources = vmtasks_openstack.restore_networks( context, self.db, dict(restore.iteritems())) 
-            self.db.restore_update( context, restore.id, {'progress_msg': 'Creating networks completed', 'status': 'executing'})
-
-
-            #TODO(giri): If one VM restore fails, rollback the whole transaction
-            for vm in self.db.snapshot_vms_get(context, snapshot.id): 
-                vmtasks_openstack.restore_vm(context, self.db, {'vm_id': vm.vm_id, 'vm_name': vm.vm_name}, dict(restore.iteritems()),  restored_net_resources)
-          
             if restore_type == 'test':
                 self.db.restore_update( context, 
                             restore_id, 
@@ -382,7 +385,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'error'
                                     })             
             return;                  
-
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """

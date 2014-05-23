@@ -308,10 +308,11 @@ class API(base.Base):
         Delete a workload snapshot. No RPC call required
         """
         snapshot = self.snapshot_get(context, snapshot_id)
+        """
         if snapshot['status'] not in ['available', 'error']:
             msg = _('Snapshot status must be available or error')
             raise exception.InvalidWorkloadMgr(reason=msg)
-        
+        """
         restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
         for restore in restores:
             if restore.restore_type == 'test':
@@ -424,6 +425,7 @@ class API(base.Base):
         Delete a workload restore. RPC call may be required
         """
         restore_details = self.restore_show(context, restore_id)
+        
         if restore_details['status'] not in ['available', 'error']:
             msg = _('Restore or Testbubble status must be completed or error')
             raise exception.InvalidWorkloadMgr(reason=msg)

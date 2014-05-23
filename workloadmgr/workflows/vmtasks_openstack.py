@@ -437,8 +437,18 @@ def get_restore_data_size(cntx, db, restore):
 
     return restore_size
 
+@autolog.log_method(Logger, 'vmtasks_openstack.pre_restore_vm')
+def pre_restore_vm(cntx, db, instance, restore):
+    # pre processing of restore
+    if instance['hypervisor_type'] == 'QEMU': 
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        return virtdriver.pre_restore_vm(cntx, db, instance, restore)    
+    else: 
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        return virtdriver.pre_restore_vm(cntx, db, instance, restore)  
+    
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_networks')                    
-def restore_networks(cntx, db, restore):
+def restore_vm_networks(cntx, db, restore):
     """
     Restore the networking configuration of VMs of the snapshot
     nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
@@ -673,3 +683,12 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources):
                                   restored_nics,
                                   instance_options)
     
+@autolog.log_method(Logger, 'vmtasks_openstack.post_restore_vm')
+def post_restore_vm(cntx, db, instance, restore):
+    # post processing of restore
+    if instance['hypervisor_type'] == 'QEMU': 
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        return virtdriver.post_restore_vm(cntx, db, instance, restore)    
+    else: 
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        return virtdriver.post_restore_vm(cntx, db, instance, restore)      

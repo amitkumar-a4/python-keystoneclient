@@ -77,12 +77,18 @@ def get_restore_data_size(cntx, db, restore):
     return None 
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_restore_data_size')                    
-def restore_networks(cntx, db, restore):
+def restore_vm_networks(cntx, db, restore):
     return None 
 
+@autolog.log_method(Logger, 'vmtasks_vcloud.pre_restore_vm')
+def pre_restore_vm(cntx, db, instance, restore):
+    return None
+    
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm')                    
-def restore_vm(cntx, db, instance, restore):
+def restore_vm(cntx, db, instance, restore, restored_net_resources):
     return None
 
- 
+@autolog.log_method(Logger, 'vmtasks_vcloud.post_restore_vm')
+def post_restore_vm(cntx, db, instance, restore):
+    return None 
     
