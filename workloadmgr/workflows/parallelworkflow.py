@@ -89,7 +89,7 @@ class ParallelWorkflow(workflow.Workflow):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['workload_id'])
         for index,item in enumerate(self._store['instances']):
-            self._store['instance_'+str(index)] = item
+            self._store['instance_'+ item['vm_id']] = item
       
         _snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
         

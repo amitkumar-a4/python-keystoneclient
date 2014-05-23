@@ -341,7 +341,7 @@ class PostSnapshot(task.Task):
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
     for index,item in enumerate(instances):
-        flow.add(PauseVM("PauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(PauseVM("PauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     return flow
 
 # Assume there is dependency between instances
@@ -349,7 +349,7 @@ def UnorderedPauseVMs(instances):
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
     for index,item in enumerate(instances):
-        flow.add(PauseVM("PauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(PauseVM("PauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     
     return flow
 
@@ -358,8 +358,8 @@ def LinearPauseVMs(instances):
 def UnorderedSnapshotVMs(instances):
     flow = uf.Flow("snapshotvmuf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index)), 
-                            provides='snapshot_data_' + str(index)))
+        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id']), 
+                            provides='snapshot_data_' + str(item['vm_id'])))
     
     return flow
 
@@ -368,8 +368,8 @@ def UnorderedSnapshotVMs(instances):
 def LinearSnapshotVMs(instances):
     flow = lf.Flow("snapshotvmlf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index)), 
-                            provides='snapshot_data_' + str(index)))
+        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id']), 
+                            provides='snapshot_data_' + str(item['vm_id'])))
     
     return flow
 
@@ -379,21 +379,21 @@ def LinearSnapshotVMs(instances):
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
     for index,item in enumerate(instances):
-        flow.add(UnPauseVM("UnpauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(UnPauseVM("UnpauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     
     return flow
 
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
     for index,item in enumerate(instances):
-        flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     
     return flow
 
 def UnorderedSnapshotDataSize(instances):
     flow = uf.Flow("snapshotdatasizeuf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
@@ -401,7 +401,7 @@ def UnorderedSnapshotDataSize(instances):
 def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("uploadsnapshotuf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
@@ -409,7 +409,7 @@ def UnorderedUploadSnapshot(instances):
 def UnorderedPostSnapshot(instances):
     flow = uf.Flow("postsnapshotuf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index), snapshot_data = "snapshot_data_" + str(index))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
@@ -417,7 +417,7 @@ def UnorderedPostSnapshot(instances):
 def UnorderedPreSnapshot(instances):
     flow = uf.Flow("presnapshotuf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'])
         flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow

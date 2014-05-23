@@ -267,44 +267,28 @@ class CassandraWorkflow(workflow.Workflow):
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+str(index)] = item
         
-        self._flow = lf.Flow('cassandrawf')
+        snapshotvms = lf.Flow('cassandrawf')
         
-        # Check if any pre snapshot conditions 
-        self._flow.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))         
-        
-        #create a network snapshot
-        self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
-        
-        #snapshot flavors of VMs
-        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))   
-    
         # Enable safemode on the namenode
-        self._flow.add(UnorderedSnapshotNode(self._store['instances']))
+        snapshotvms.add(UnorderedSnapshotNode(self._store['instances']))
     
         # This is an unordered pausing of VMs. This flow is created in
         # common tasks library. This routine takes instance ids from 
         # openstack. Workload manager should provide the list of 
         # instance ids
-        self._flow.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
+        snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
     
         # This is again unorder snapshot of VMs. This flow is implemented in
         # common tasks library
-        self._flow.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
+        snapshotvms.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
     
         # This is an unordered pausing of VMs.
-        self._flow.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+        snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
     
         # enable profiling to the level before the flow started
-        self._flow.add(UnorderedClearSnapshot(self._store['instances']))
+        snapshotvms.add(UnorderedClearSnapshot(self._store['instances']))
 
-        #calculate the size of the snapshot
-        self._flow.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
-    
-        # Now lazily copy the snapshots of VMs to tvault appliance
-        self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))
-    
-        # block commit any changes back to the snapshot
-        self._flow.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
+        super(CassandraWorkflow, self).initflow(snapshotvms)
 
 
     def topology(self):

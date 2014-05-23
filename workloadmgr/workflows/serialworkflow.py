@@ -59,11 +59,13 @@ def get_vms(cntx, workload_id):
         if vm_hypervisor == None:
             pass #TODO(giri): Throw exception
                    
-        vm = {'vm_id' : vm_instance.id,
+        vm = {
+              'vm_id' : vm_instance.id,
               'vm_name' : vm_instance.name,
               'vm_flavor_id' : vm_instance.flavor['id'],
               'hypervisor_hostname' : vm_hypervisor.hypervisor_hostname,
-              'hypervisor_type' :  vm_hypervisor.hypervisor_type}
+              'hypervisor_type' :  vm_hypervisor.hypervisor_type
+             }
         vms.append(vm)
     return vms
 
@@ -89,7 +91,7 @@ class SerialWorkflow(workflow.Workflow):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['workload_id'])
         for index,item in enumerate(self._store['instances']):
-            self._store['instance_'+str(index)] = item
+            self._store['instance_'+item['vm_id']] = item
       
         _snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
 

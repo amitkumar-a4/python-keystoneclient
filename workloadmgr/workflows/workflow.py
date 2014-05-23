@@ -58,7 +58,6 @@ class Workflow(object):
     """
 
     def __init__(self, name):
-        import pdb;pdb.set_trace()
         self._name = str(name)
         self._flow = None
         self._presnapshot = None
@@ -82,10 +81,10 @@ class Workflow(object):
         if snapshotmetadata is None:
            # create a network snapshot
            self._snapshotmetadata = lf.Flow(self.name + "#SnapshotMetadata")
-           self._snapshotmetadata.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
+           self._snapshotmetadata.add(vmtasks.SnapshotVMNetworks(self.name + "#SnapshotVMNetworks"))
         
            #snapshot flavors of VMs
-           self._snapshotmetadata.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))
+           self._snapshotmetadata.add(vmtasks.SnapshotVMFlavors(self.name + "#SnapshotVMFlavors"))
         else:
            self._snapshotmetadata = snapshotmetadata
 
@@ -127,7 +126,7 @@ class Workflow(object):
     @property
     def snapshotvms(self):
         """Returns references to snapshotvms workflow."""
-        return self._presnapshot
+        return self._snapshotvms
 
     @property
     def postsnapshot(self):

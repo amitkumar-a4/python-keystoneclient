@@ -454,58 +454,42 @@ class MongoDBWorkflow(workflow.Workflow):
         for index, item in enumerate(hosts_to_backup):
             self._store['secondary_'+str(index)] = item
         
-        self._flow = lf.Flow('mongodbwf')
+        snapshotvms = lf.Flow('mongodbwf')
         
-        # Check if any pre snapshot conditions 
-        self._flow.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))                
-        
-        #create a network snapshot
-        self._flow.add(vmtasks.SnapshotVMNetworks("SnapshotVMNetworks"))
-        
-        #snapshot flavors of VMs
-        self._flow.add(vmtasks.SnapshotVMFlavors("SnapshotVMFlavors"))   
-    
         # Add disable profile task. Stopping balancer fails if profile process
         # is running
-        self._flow.add(DisableProfiling('DisableProfiling', provides='proflevel'))
+        snapshotvms.add(DisableProfiling('DisableProfiling', provides='proflevel'))
     
         # This will be a flow that needs to be added to mongo db flow.
         # This is a flow that pauses all related VMs in unordered pattern
-        self._flow.add(PauseDBInstances(hosts_to_backup))
+        snapshotvms.add(PauseDBInstances(hosts_to_backup))
     
-        self._flow.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
+        snapshotvms.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
     
         # This is an unordered pausing of VMs. This flow is created in
         # common tasks library. This routine takes instance ids from 
         # openstack. Workload manager should provide the list of 
         # instance ids
-        self._flow.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
+        snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
     
         # This is again unorder snapshot of VMs. This flow is implemented in
         # common tasks library
-        self._flow.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
+        snapshotvms.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
     
         # This is an unordered pausing of VMs.
-        self._flow.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+        snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
     
         # Restart the config servers so metadata changes can happen
-        self._flow.add(ResumeConfigServer('ResumeConfigServer'))
+        snapshotvms.add(ResumeConfigServer('ResumeConfigServer'))
     
         # unlock all locekd replicas so it starts receiving all updates from primary and
         # will eventually get into sync with primary
-        self._flow.add(ResumeDBInstances(hosts_to_backup))
+        snapshotvms.add(ResumeDBInstances(hosts_to_backup))
     
         # enable profiling to the level before the flow started
-        self._flow.add(EnableProfiling('EnableProfiling'))
+        snapshotvms.add(EnableProfiling('EnableProfiling'))
 
-        #calculate the size of the snapshot
-        self._flow.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
-
-        # Now lazily copy the snapshots of VMs to tvault appliance
-        self._flow.add(vmtasks.UnorderedUploadSnapshot(self._store['instances']))
-    
-        # block commit any changes back to the snapshot
-        self._flow.add(vmtasks.UnorderedPostSnapshot(self._store['instances']))
+        super(MongoDBWorkflow, self).initflow(snapshotvms)
 
     def topology(self):
         # Discover the shards

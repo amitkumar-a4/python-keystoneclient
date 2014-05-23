@@ -27,7 +27,6 @@ from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 from workloadmgr.workloads import manager as workloadmgr
-from workloadmgr.workloads.manager import WorkloadMgrManager as wlmgr
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
 
@@ -46,7 +45,6 @@ class CompositeWorkflow(workflow.Workflow):
     def initflow(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
 
-        import pdb;pdb.set_trace()
         self._flow = lf.Flow('CompositeFlow')
 
         # all we have to do is call into individual workflow init routine
@@ -56,12 +54,32 @@ class CompositeWorkflow(workflow.Workflow):
         # snapshot in any order
         # Dig into each workflow
             
+        # Aggregate all instances here
+        self._store['instances'] = []
+
         workflows = []
         for workload_id in self._store['Workloads'].split(","):
-            workflow_class = wlmgr._get_workflow_class(context, workload.workload_type_id)
-            workflow = workflow_class("workload_workflow_details", store)
+            db = vmtasks.WorkloadMgrDB().db
+            context_dict = dict([('%s' % key, value)
+                              for (key, value) in cntx.to_dict().iteritems()])            
+            context_dict['conf'] =  None # RpcContext object looks for this during init
+            store = {
+                'context': context_dict,                # context dictionary
+                'workload_id': workload_id,             # workload_id
+            }
+
+            workload = db.workload_get(cntx, workload_id)
+            for kvpair in workload.metadata:
+                store[kvpair['key']] = kvpair['value']
+
+            workflow_class = workloadmgr.get_workflow_class(cntx, workload.workload_type_id)
+            workflow = workflow_class("composite_workflow_initflow_" + workload_id, store)
             workflow.initflow()
-            workflows.add(workflow)
+            workflows.append(workflow)
+            self._store['instances'].extend(workflow._store['instances'])
+
+        for index,item in enumerate(self._store['instances']):
+            self._store['instance_'+item['vm_id']] = item
 
         # Aggregate presnapshot workflows from all workloads
         presnapshot = uf.Flow(self.name + "#Presnapshot")
@@ -72,6 +90,9 @@ class CompositeWorkflow(workflow.Workflow):
         snapshotmetadata = uf.Flow(self.name + "#SnapshotMetadata")
         for workflow in workflows:
             snapshotmetadata.add(workflow.snapshotmetadata)
+            # Snapshot Metadata operates on list of snapshots, so we only need to have one
+            # snapshot vmnetworks and snapshot flavor
+            break
 
         # Aggregate snapshotvms workflows from all workloads
         # REVISIT: lf is hardcoded, but should be fed from the workload definition itself
@@ -83,8 +104,6 @@ class CompositeWorkflow(workflow.Workflow):
         postsnapshot = uf.Flow(self.name + "#PostSnapshot")
         for workflow in workflows:
             postsnapshot.add(workflow.postsnapshot)
-
-            self._flow.add(workflow._flow)
 
         super(CompositeWorkflow, self).initflow(snapshotvms=snapshotvms, presnapshot=presnapshot, 
                                                 snapshotmetadata=snapshotmetadata, postsnapshot=postsnapshot)
@@ -98,29 +117,27 @@ class CompositeWorkflow(workflow.Workflow):
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = []
-        import pdb;pdb.set_trace()
         for workload_id in self._store['Workloads'].split(","):
-            """
-            Return workload topology
-            """        
+            db = vmtasks.WorkloadMgrDB().db
             context_dict = dict([('%s' % key, value)
-                              for (key, value) in context.to_dict().iteritems()])            
+                              for (key, value) in cntx.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
             store = {
-                    'context': context_dict,                # context dictionary
-                    'workload_id': workload_id,             # workload_id
+                'context': context_dict,                # context dictionary
+                'workload_id': workload_id,             # workload_id
             }
-            workload = self.db.workload_get(context, workload_id)
+
+            workload = db.workload_get(cntx, workload_id)
             for kvpair in workload.metadata:
                 store[kvpair['key']] = kvpair['value']
-            
-            workflow_class = self._get_workflow_class(context, workload.workload_type_id)
-            workflow = workflow_class("workload_workflow_details", store)
-            instances.append(workflow.discover())
+
+            workflow_class = workloadmgr.get_workflow_class(cntx, workload.workload_type_id)
+            workflow = workflow_class("composite_workflow_discover_" + workload_id, store)
+            workflow.initflow()
+            instances.extend(workflow.discover()['instances'])
 
         return dict(instances=instances)
 
     def execute(self):
-        import pdb;pdb.set_trace()
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
