@@ -25,7 +25,7 @@ cinder_opts = [
                help='Info to match when looking for cinder in the service '
                     'catalog. Format is : separated values of the form: '
                     '<service_type>:<service_name>:<endpoint_type>'),
-    cfg.StrOpt('cinder_endpoint_template',
+    cfg.StrOpt('cinder_production_endpoint_template',
                default='http://localhost:8776/v1/%(project_id)s', #None,
                help='Override service catalog lookup with template for cinder '
                     'endpoint e.g. http://localhost:8776/v1/%(project_id)s'),
@@ -62,8 +62,8 @@ def cinderclient(context):
         'access': []
     }
     sc = service_catalog.ServiceCatalog(compat_catalog)
-    if CONF.cinder_endpoint_template:
-        url = CONF.cinder_endpoint_template % context.to_dict()
+    if CONF.cinder_production_endpoint_template:
+        url = CONF.cinder_production_endpoint_template % context.to_dict()
     else:
         info = CONF.cinder_catalog_info
         service_type, service_name, endpoint_type = info.split(':')

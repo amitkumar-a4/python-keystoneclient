@@ -31,15 +31,18 @@ glance_opts = [
     cfg.StrOpt('glance_tvault_host',
                default='$my_ip',
                help='default glance hostname or ip of tvault'),               
-    cfg.IntOpt('glance_port',
+    cfg.IntOpt('glance_production_port',
                default=9292,
-               help='default glance port'),
+               help='default glance port of production'),
+    cfg.IntOpt('glance_tvault_port',
+               default=9292,
+               help='default glance port of tvault'),               
     cfg.ListOpt('glance_production_api_servers',
-                default=['$glance_production_host:$glance_port'],
+                default=['$glance_production_host:$glance_production_port'],
                 help='A list of the glance api servers available to workloadmgr '
                      '([hostname|ip]:port)'),
     cfg.ListOpt('glance_tvault_api_servers',
-                default=['$glance_tvault_host:$glance_port'],
+                default=['$glance_tvault_host:$glance_tvault_port'],
                 help='A list of the glance api servers available to workloadmgr '
                      '([hostname|ip]:port)'),               
     cfg.StrOpt('glance_protocol',
@@ -68,12 +71,14 @@ CONF.register_opts(glance_opts)
 def generate_glance_url(production):
     """Generate the URL to glance."""
     if production == True:
-        glance_host = CONF.glance_production_host
+        return "%s://%s:%d" % (CONF.glance_protocol, 
+                               CONF.glance_production_host,
+                               CONF.glance_production_port)        
     else:
-        glance_host = CONF.glance_tvault_host
-            
-    return "%s://%s:%d" % (CONF.glance_protocol, glance_host,
-                           CONF.glance_port)
+        return "%s://%s:%d" % (CONF.glance_protocol, 
+                               CONF.glance_tvault_host,
+                               CONF.glance_tvault_port)                   
+
 
 
 def generate_image_url(image_ref, production):

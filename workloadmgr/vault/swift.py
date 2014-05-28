@@ -43,29 +43,29 @@ from workloadmgr.virt import qemuimages
 
 LOG = logging.getLogger(__name__)
 
-wlm_swift_opts = [
-    cfg.StrOpt('wlm_swift_url',
+wlm_vault_swift_opts = [
+    cfg.StrOpt('wlm_vault_swift_url',
                default='http://localhost:8080/v1/AUTH_',
                help='The URL of the Swift endpoint'),
-    cfg.StrOpt('wlm_swift_container',
+    cfg.StrOpt('wlm_vault_swift_container',
                default='vast_snapshots',
                help='The default Swift container to use for workload snapshots'),
-    cfg.IntOpt('wlm_swift_object_size',
+    cfg.IntOpt('wlm_vault_swift_object_size',
                default=2 * 1024 * 1024 * 1024,
                help='The size in bytes of Swift snapshot objects'),
-    cfg.IntOpt('wlm_swift_retry_attempts',
+    cfg.IntOpt('wlm_vault_swift_retry_attempts',
                default=3,
                help='The number of retries to make for Swift operations'),
-    cfg.IntOpt('wlm_swift_retry_backoff',
+    cfg.IntOpt('wlm_vault_swift_retry_backoff',
                default=2,
                help='The backoff time in seconds between Swift retries'),
-    cfg.StrOpt('wlm_compression_algorithm',
+    cfg.StrOpt('wlm_vault_compression_algorithm',
                default= 'none', #'zlib',
                help='Compression algorithm (None to disable)'),
 ]
 
 FLAGS = flags.FLAGS
-FLAGS.register_opts(wlm_swift_opts)
+FLAGS.register_opts(wlm_vault_swift_opts)
 
 class ReadWrapper(object):
 
@@ -116,14 +116,14 @@ class SwiftBackupService(base.Base):
 
     def __init__(self, context, db_driver=None):
         self.context = context
-        self.swift_url = '%s%s' % (FLAGS.wlm_swift_url,
+        self.swift_url = '%s%s' % (FLAGS.wlm_vault_swift_url,
                                    self.context.project_id)
         self.az = FLAGS.storage_availability_zone
-        self.data_block_size_bytes = FLAGS.wlm_swift_object_size
-        self.swift_attempts = FLAGS.wlm_swift_retry_attempts
-        self.swift_backoff = FLAGS.wlm_swift_retry_backoff
+        self.data_block_size_bytes = FLAGS.wlm_vault_swift_object_size
+        self.swift_attempts = FLAGS.wlm_vault_swift_retry_attempts
+        self.swift_backoff = FLAGS.wlm_vault_swift_retry_backoff
         self.compressor = \
-            self._get_compressor(FLAGS.wlm_compression_algorithm)
+            self._get_compressor(FLAGS.wlm_vault_compression_algorithm)
         self.conn = swift.Connection(None, None, None,
                                      retries=self.swift_attempts,
                                      preauthurl=self.swift_url,
@@ -149,7 +149,7 @@ class SwiftBackupService(base.Base):
 
     def _create_container(self, context, container):
         if container is None:
-            container = FLAGS.wlm_swift_container
+            container = FLAGS.wlm_vault_swift_container
         if not self._check_container_exists(container):
             self.conn.put_container(container)
         return container
@@ -215,7 +215,7 @@ class SwiftBackupService(base.Base):
         """Backup the given file to swift using the given snapshot metadata."""
            
         try:
-            container = self._create_container(self.context, FLAGS.wlm_swift_container)
+            container = self._create_container(self.context, FLAGS.wlm_vault_swift_container)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
@@ -272,7 +272,7 @@ class SwiftBackupService(base.Base):
         """Restore a v1 swift volume snapshot from swift."""
 
         try:
-            container = self._create_container(self.context, FLAGS.wlm_swift_container)
+            container = self._create_container(self.context, FLAGS.wlm_vault_swift_container)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         

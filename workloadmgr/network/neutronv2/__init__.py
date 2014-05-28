@@ -51,7 +51,7 @@ def _get_client(token=None):
     if not token and CONF.neutron_auth_strategy:
         token = _get_auth_token()
     params = {
-        'endpoint_url': CONF.neutron_url,
+        'endpoint_url': CONF.neutron_production_url,
         'timeout': CONF.neutron_url_timeout,
         'insecure': CONF.neutron_api_insecure,
         'ca_cert': CONF.neutron_ca_certificates_file,

@@ -38,7 +38,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import uuidutils
 
 neutron_opts = [
-    cfg.StrOpt('neutron_url',
+    cfg.StrOpt('neutron_production_url',
                default='http://127.0.0.1:9696',
                deprecated_name='quantum_url',
                help='URL for connecting to neutron'),
