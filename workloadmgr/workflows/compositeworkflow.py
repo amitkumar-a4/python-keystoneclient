@@ -13,6 +13,8 @@ import datetime
 import paramiko
 import uuid
 
+import json
+
 from taskflow import engines
 from taskflow.utils import misc
 from taskflow.listeners import printing
@@ -38,9 +40,35 @@ LOG = logging.getLogger(__name__)
 
 class CompositeWorkflow(workflow.Workflow):
 
+    def _get_workload_ids(self, graph):
+        for flow in graph['children']:
+            if 'type' in flow:
+                self._workloadids.append(flow['data']['id'])
+            else:
+                self._get_workload_ids(flow)
+
+    def _create_composite_snapshotvm_flow(self, graph):
+        fl = None
+        if graph['flow'] == "serial":
+           fl = lf.Flow(self.name + "#SnapshotVMs")
+        elif graph['flow'] == "parallel":
+           fl = uf.Flow(self.name + "#SnapshotVMs")
+        else:
+           raise Exception("Invalid flow type in workloadgraph")
+
+        for flow in graph['children']:
+            if 'type' in flow:
+                fl.add(self._workflows[flow['data']['id']].snapshotvms)
+            else:
+                fl.add(self._create_composite_snapshotvm_flow(flow))
+
+        return fl
+
     def __init__(self, name, store):
         super(CompositeWorkflow, self).__init__(name)
         self._store = store
+        self._workloadids = []
+        self._workflows = {}
         
     def initflow(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
@@ -57,8 +85,10 @@ class CompositeWorkflow(workflow.Workflow):
         # Aggregate all instances here
         self._store['instances'] = []
 
-        workflows = []
-        for workload_id in self._store['Workloads'].split(","):
+        workflows = {}
+        graph = json.loads(self._store['workloadgraph'])
+        self._get_workload_ids(graph)
+        for workload_id in self._workloadids:
             db = vmtasks.WorkloadMgrDB().db
             context_dict = dict([('%s' % key, value)
                               for (key, value) in cntx.to_dict().iteritems()])            
@@ -75,34 +105,33 @@ class CompositeWorkflow(workflow.Workflow):
             workflow_class = workloadmgr.get_workflow_class(cntx, workload.workload_type_id)
             workflow = workflow_class("composite_workflow_initflow_" + workload_id, store)
             workflow.initflow()
-            workflows.append(workflow)
+            workflows[workload_id] = workflow
             self._store['instances'].extend(workflow._store['instances'])
+
+        self._workflows = workflows
 
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+item['vm_id']] = item
 
         # Aggregate presnapshot workflows from all workloads
         presnapshot = uf.Flow(self.name + "#Presnapshot")
-        for workflow in workflows:
+        for workflowid, workflow in workflows.iteritems():
             presnapshot.add(workflow.presnapshot)
 
         # Aggregate snapshotmetadata workflows from all workloads
         snapshotmetadata = uf.Flow(self.name + "#SnapshotMetadata")
-        for workflow in workflows:
+        for workflowid, workflow in workflows.iteritems():
             snapshotmetadata.add(workflow.snapshotmetadata)
             # Snapshot Metadata operates on list of snapshots, so we only need to have one
             # snapshot vmnetworks and snapshot flavor
             break
 
         # Aggregate snapshotvms workflows from all workloads
-        # REVISIT: lf is hardcoded, but should be fed from the workload definition itself
-        snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
-        for workflow in workflows:
-            snapshotvms.add(workflow.snapshotvms)
+        snapshotvms = self._create_composite_snapshotvm_flow(graph)
 
         # Aggregate snapshotmetadata workflows from all workloads
         postsnapshot = uf.Flow(self.name + "#PostSnapshot")
-        for workflow in workflows:
+        for workflowid, workflow in workflows.iteritems():
             postsnapshot.add(workflow.postsnapshot)
 
         super(CompositeWorkflow, self).initflow(snapshotvms=snapshotvms, presnapshot=presnapshot, 
@@ -117,7 +146,7 @@ class CompositeWorkflow(workflow.Workflow):
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = []
-        for workload_id in self._store['Workloads'].split(","):
+        for workload_id in self._workloadids:
             db = vmtasks.WorkloadMgrDB().db
             context_dict = dict([('%s' % key, value)
                               for (key, value) in cntx.to_dict().iteritems()])            

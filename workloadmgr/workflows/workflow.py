@@ -72,7 +72,7 @@ class Workflow(object):
 
         # Check if any pre snapshot conditions
         if presnapshot is None:
-           self._presnapshot = lf.Flow(self.name + "#Presnapshot")
+           self._presnapshot = uf.Flow(self.name + "#Presnapshot")
            self._presnapshot.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))           
         else:
            self._presnapshot = presnapshot
@@ -80,7 +80,7 @@ class Workflow(object):
         # These are snapshot metadata workflows
         if snapshotmetadata is None:
            # create a network snapshot
-           self._snapshotmetadata = lf.Flow(self.name + "#SnapshotMetadata")
+           self._snapshotmetadata = uf.Flow(self.name + "#SnapshotMetadata")
            self._snapshotmetadata.add(vmtasks.SnapshotVMNetworks(self.name + "#SnapshotVMNetworks"))
         
            #snapshot flavors of VMs
@@ -93,7 +93,7 @@ class Workflow(object):
         # This is the post snapshot workflow
         if postsnapshot is None:
            # calculate the size of the snapshot
-           self._postsnapshot = lf.Flow(self.name + "#Postsnapshot")
+           self._postsnapshot = uf.Flow(self.name + "#Postsnapshot")
            self._postsnapshot.add(vmtasks.UnorderedSnapshotDataSize(self._store['instances']))        
     
            # Now lazily copy the snapshots of VMs to tvault appliance
