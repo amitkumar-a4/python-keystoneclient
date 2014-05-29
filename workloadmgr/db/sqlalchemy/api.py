@@ -768,7 +768,7 @@ def snapshot_update(context, snapshot_id, values):
             if not values.get('uploaded_size'):
                 if values.get('uploaded_size_incremental'):
                     values['uploaded_size'] =  snapshot.uploaded_size + values.get('uploaded_size_incremental') 
-                    if not values.get('progress_percent'):
+                    if not values.get('progress_percent') and snapshot.size > 0:
                         values['progress_percent'] = (100 * values.get('uploaded_size'))/snapshot.size
     
     
