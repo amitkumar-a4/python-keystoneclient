@@ -732,6 +732,14 @@ class VMwareVCDriver(VMwareESXDriver):
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
         pass 
     
+    @autolog.log_method(Logger, 'vmwareapi.driver.freeze_vm')
+    def freeze_vm(self, cntx, db, instance, snapshot):
+        pass     
+    
+    @autolog.log_method(Logger, 'vmwareapi.driver.thaw_vm')
+    def thaw_vm(self, cntx, db, instance, snapshot):
+        pass      
+    
     @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_vm')
     def snapshot_vm(self, cntx, db, instance, snapshot): 
         _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])

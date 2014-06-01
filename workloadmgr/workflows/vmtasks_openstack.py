@@ -276,6 +276,26 @@ def pre_snapshot_vm(cntx, db, instance, snapshot):
     else: 
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         return virtdriver.pre_snapshot_vm(cntx, db, instance, snapshot)   
+    
+@autolog.log_method(Logger, 'vmtasks_openstack.freeze_vm')
+def freeze_vm(cntx, db, instance, snapshot):
+    # freeze instance
+    if instance['hypervisor_type'] == 'QEMU': 
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        return virtdriver.freeze_vm(cntx, db, instance, snapshot)    
+    else: 
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        return virtdriver.freeze_vm(cntx, db, instance, snapshot)  
+    
+@autolog.log_method(Logger, 'vmtasks_openstack.thaw_vm')
+def thaw_vm(cntx, db, instance, snapshot):
+    # thaw instance
+    if instance['hypervisor_type'] == 'QEMU': 
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        return virtdriver.thaw_vm(cntx, db, instance, snapshot)    
+    else: 
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        return virtdriver.thaw_vm(cntx, db, instance, snapshot)          
 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm')
 def snapshot_vm(cntx, db, instance, snapshot):

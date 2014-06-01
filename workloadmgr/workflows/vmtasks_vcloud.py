@@ -44,6 +44,14 @@ def resume_vm(cntx, db, instance):
 def pre_snapshot_vm(cntx, db, instance, snapshot):
     return None
 
+@autolog.log_method(Logger, 'vmtasks_vcloud.freeze_vm')
+def freeze_vm(self, cntx, db, instance, snapshot):
+    pass     
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.thaw_vm')
+def thaw_vm(self, cntx, db, instance, snapshot):
+    pass  
+    
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm')
 def snapshot_vm(cntx, db, instance, snapshot):
     return None

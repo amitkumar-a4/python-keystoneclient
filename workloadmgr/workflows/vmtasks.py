@@ -313,6 +313,57 @@ class PreSnapshot(task.Task):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
         db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})  
+        
+class FreezeVM(task.Task):
+
+    def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'FreezeVM.execute')
+    def execute_with_log(self, context, instance, snapshot):
+        # freeze an instance
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        
+        if True:
+            return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
+        else:
+            return vmtasks_vcloud.freeze_vm(cntx, db, instance, snapshot)
+
+    @autolog.log_method(Logger, 'FreezeVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        if True:
+            return vmtasks_openstack.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
+        else:
+            return vmtasks_vcloud.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])           
+
+class ThawVM(task.Task):
+
+    def execute(self, context, instance, snapshot):
+        return self.execute_with_log(context, instance, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'ThawVM.execute')
+    def execute_with_log(self, context, instance, snapshot):
+        # freeze an instance
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        
+        if True:
+            return vmtasks_openstack.thaw_vm(cntx, db, instance, snapshot)
+        else:
+            return vmtasks_vcloud.thaw_vm(cntx, db, instance, snapshot)
+
+    @autolog.log_method(Logger, 'ThawVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
            
 class SnapshotVM(task.Task):
 
@@ -445,6 +496,20 @@ def UnorderedPreSnapshot(instances):
 
     return flow
 
+def UnorderedFreezeVMs(instances):
+    flow = uf.Flow("freezevmsuf")
+    for index,item in enumerate(instances):
+        flow.add(FreezeVM("FreezeVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    return flow
+
+
+def LinearFreezeVMs(instances):
+    flow = lf.Flow("freezevmslf")
+    for index,item in enumerate(instances):
+        flow.add(FreezeVM("FreezeVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    
+    return flow
+
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
     for index,item in enumerate(instances):
@@ -471,6 +536,7 @@ def UnorderedSnapshotVMs(instances):
     
     return flow
 
+
 # Assume there is dependency between instances
 # snapshot each VM in the order that appears in the array.
 def LinearSnapshotVMs(instances):
@@ -495,6 +561,20 @@ def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
     for index,item in enumerate(instances):
         flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    
+    return flow
+
+def UnorderedThawVMs(instances):
+    flow = uf.Flow("thawvmsuf")
+    for index,item in enumerate(instances):
+        flow.add(ThawVM("ThawVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    return flow
+
+
+def LinearThawVMs(instances):
+    flow = lf.Flow("thawvmslf")
+    for index,item in enumerate(instances):
+        flow.add(ThawVM("ThawVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     
     return flow
 
