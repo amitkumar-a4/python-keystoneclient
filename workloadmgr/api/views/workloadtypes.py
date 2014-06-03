@@ -35,6 +35,7 @@ class ViewBuilder(common.ViewBuilder):
         d['links'] = self._get_links(request, workloadtype['id'])
         d['name'] = workloadtype['display_name']
         d['description'] =  workloadtype['display_description']
+        d['is_public'] =  workloadtype['is_public']
         return {'workload_type': d}        
 
 
@@ -49,7 +50,8 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = workloadtype['status']
         d['links'] = self._get_links(request, workloadtype['id'])
         d['name'] = workloadtype['display_name']
-        d['description'] = workloadtype['display_description'] 
+        d['description'] = workloadtype['display_description']
+        d['is_public'] =  workloadtype['is_public'] 
         d['metadata'] = workloadtype['metadata']        
         return {'workload_type': d}        
 

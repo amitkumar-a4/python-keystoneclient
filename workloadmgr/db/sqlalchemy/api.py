@@ -398,7 +398,7 @@ def workload_types_get(context, session=None):
     try:
         query = session.query(models.WorkloadTypes)\
                        .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
-                       .filter_by(project_id=context.project_id)
+                       .filter((models.WorkloadTypes.project_id == context.project_id) | (models.WorkloadTypes.is_public == True))
 
         #TODO(gbasava): filter out deleted workload_types if context disallows it
         workload_types = query.all()

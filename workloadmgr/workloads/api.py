@@ -54,7 +54,7 @@ class API(base.Base):
         workload_types = self.db.workload_types_get(context)
         return workload_types
     
-    def workload_type_create(self, context, name, description, metadata):
+    def workload_type_create(self, context, name, description, is_public, metadata):
         """
         Create a workload_type. No RPC call is made
         """
@@ -62,6 +62,7 @@ class API(base.Base):
                    'project_id': context.project_id,
                    'display_name': name,
                    'display_description': description,
+                   'is_public' : is_public,
                    'status': 'available',
                    'metadata': metadata,}
 

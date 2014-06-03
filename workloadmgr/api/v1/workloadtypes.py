@@ -78,11 +78,11 @@ class WorkloadTypesController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         try:
-            workload_types = self.workload_api.workload_type_show(context, id)
+            workload_type = self.workload_api.workload_type_show(context, id)
         except exception.NotFound:
             raise exc.HTTPNotFound()
 
-        return self._view_builder.detail(req, workload_types)
+        return self._view_builder.detail(req, workload_type)
 
     def delete(self, req, id):
         """Delete a workload_types."""
@@ -143,13 +143,15 @@ class WorkloadTypesController(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=msg)
         name = workload_type.get('name', None)
         description = workload_type.get('description', None)
+        is_public = workload_type.get('is_public', False)
 
         LOG.audit(_("Creating workload_type"), locals(), context=context)
 
         try:
             new_workload_type = self.workload_api.workload_type_create(context, 
                                                                        name, 
-                                                                       description, 
+                                                                       description,
+                                                                       is_public, 
                                                                        metadata)
             new_workload_type_dict = self.workload_api.workload_type_show(context, new_workload_type.id)
         except exception:

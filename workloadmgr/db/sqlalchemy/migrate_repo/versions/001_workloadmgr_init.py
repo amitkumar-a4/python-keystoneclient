@@ -49,7 +49,8 @@ def upgrade(migrate_engine):
         Column('project_id', String(length=255)),
         Column('display_name', String(length=255)),
         Column('display_description', String(length=255)),
-        Column('status', String(length=255)),
+        Column('is_public', Boolean, default=False),
+        Column('status', String(length=255)),        
         mysql_engine='InnoDB'
     )
     
