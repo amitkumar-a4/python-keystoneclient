@@ -93,6 +93,8 @@ class ParallelWorkflow(workflow.Workflow):
       
         _snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
         
+        _snapshotvms.add(vmtasks.UnorderedFreezeVMs(self._store['instances']))        
+        
         # This is an unordered pausing of VMs. 
         _snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
         
@@ -101,6 +103,8 @@ class ParallelWorkflow(workflow.Workflow):
     
         # This is an unordered unpasuing of VMs. 
         _snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+        
+        _snapshotvms.add(vmtasks.UnorderedThawVMs(self._store['instances']))         
         
         super(ParallelWorkflow, self).initflow(_snapshotvms)
     

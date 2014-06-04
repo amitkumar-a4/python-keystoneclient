@@ -95,6 +95,8 @@ class SerialWorkflow(workflow.Workflow):
       
         _snapshotvms = lf.Flow(self.name + "#SnapshotVMs")
 
+        _snapshotvms.add(vmtasks.LinearFreezeVMs(self._store['instances']))
+        
         # This is a linear pausing of VMs. 
         _snapshotvms.add(vmtasks.LinearPauseVMs(self._store['instances']))
         
@@ -103,6 +105,8 @@ class SerialWorkflow(workflow.Workflow):
     
         # Unpause in reverse order
         _snapshotvms.add(vmtasks.LinearUnPauseVMs(reversed(self._store['instances'])))
+        
+        _snapshotvms.add(vmtasks.LinearThawVMs(self._store['instances']))        
 
         super(SerialWorkflow, self).initflow(_snapshotvms)
           

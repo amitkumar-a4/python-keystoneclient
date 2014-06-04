@@ -119,6 +119,7 @@ class WorkloadTypes(BASE, WorkloadsBase):
 
     display_name = Column(String(255))
     display_description = Column(String(255))
+    is_public = Column(Boolean)
     status = Column(String(255))    
     
 class WorkloadTypeMetadata(BASE, WorkloadsBase):

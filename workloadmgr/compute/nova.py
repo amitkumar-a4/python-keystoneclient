@@ -535,7 +535,7 @@ class API(base.Base):
     def vast_prepare(self, context, server, params):
         """
         PREPARE to VAST an instance
-        :param server: The :class:`Server` (or its ID) to query.
+        :param server: The :class:`Server` (or its ID) to prepare.
         """        
         try:
             extensions = _discover_extensions('1.1')
@@ -543,7 +543,33 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
-            raise                      
+            raise         
+        
+    def vast_freeze(self, context, server, params):
+        """
+        FREEZE an instance
+        :param server: The :class:`Server` (or its ID) to freeze.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_freeze(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+                
+        
+    def vast_thaw(self, context, server, params):
+        """
+        Thaw an instance
+        :param server: The :class:`Server` (or its ID) to thaw.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            return novaclient(context, self._production, extensions=extensions).contego.vast_thaw(server=server, params=params) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+                
                           
     def vast_instance(self, context, server, params):
         """

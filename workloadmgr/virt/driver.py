@@ -168,6 +168,12 @@ def compute_driver_matches(match):
 
 def pre_snapshot_vm(self, cntx, db, instance, snapshot):
     raise NotImplementedError()
+
+def freeze_vm(self, cntx, db, instance, snapshot):
+    raise NotImplementedError()
+
+def thaw_vm(self, cntx, db, instance, snapshot):
+    raise NotImplementedError()
  
 def snapshot_vm(self, cntx, db, instance, snapshot): 
     raise NotImplementedError()  

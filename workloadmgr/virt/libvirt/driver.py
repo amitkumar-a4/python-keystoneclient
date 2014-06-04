@@ -434,6 +434,20 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         vast_params = {'test1': 'test1','test2': 'test2'}
         compute_service.vast_prepare(cntx, instance['vm_id'], vast_params) 
+        
+    @autolog.log_method(Logger, 'libvirt.driver.freeze_vm')
+    def freeze_vm(self, cntx, db, instance, snapshot):
+
+        compute_service = nova.API(production=True)
+        vast_params = {'test1': 'test1','test2': 'test2'}
+        compute_service.vast_freeze(cntx, instance['vm_id'], vast_params)    
+        
+    @autolog.log_method(Logger, 'libvirt.driver.thaw_vm')
+    def thaw_vm(self, cntx, db, instance, snapshot):
+
+        compute_service = nova.API(production=True)
+        vast_params = {'test1': 'test1','test2': 'test2'}
+        compute_service.vast_thaw(cntx, instance['vm_id'], vast_params)               
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_vm')
     def snapshot_vm(self, cntx, db, instance, snapshot):
@@ -572,7 +586,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'snapshot_id': snapshot_obj.id,}
                 
                 vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path']})
-                
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
