@@ -8,6 +8,7 @@ import sqlalchemy
 
 from workloadmgr.apscheduler.jobstores.base import JobStore
 from workloadmgr.apscheduler.job import Job
+from workloadmgr.openstack.common import timeutils
 
 try:
     from sqlalchemy import *
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class SQLAlchemyJobStore(JobStore):
-    def __init__(self, url=None, engine=None, tablename='scheduled_jobs',
+    def __init__(self, url=None, engine=None, tablename='apscheduler_jobs',
                  metadata=None, pickle_protocol=pickle.HIGHEST_PROTOCOL):
         self.jobs = []
         self.pickle_protocol = pickle_protocol
@@ -36,14 +37,18 @@ class SQLAlchemyJobStore(JobStore):
             pickle_coltype = PickleType(pickle_protocol)
         self.jobs_t = Table(
             tablename, metadata or MetaData(),
-            Column('created_at', DateTime),
-            Column('updated_at', DateTime),
+
+            Column('created_at', DateTime, default=timeutils.utcnow),
+            Column('updated_at', DateTime, onupdate=timeutils.utcnow),
             Column('deleted_at', DateTime),
-            Column('deleted', Boolean),
-            Column('id', String(255),
+            Column('deleted', Boolean, default=False),
+            Column('id', Integer,
                    Sequence(tablename + '_id_seq', optional=True),
                    primary_key=True),
-            Column('trigger', String(4096), nullable=False),
+            Column('user_id', String(255), nullable=False),
+            Column('project_id', String(255), nullable=False),
+            Column('workload_id', String(255), nullable=False),
+            Column('trigger', pickle_coltype, nullable=False),
             Column('func_ref', String(1024), nullable=False),
             Column('args', pickle_coltype, nullable=False),
             Column('kwargs', pickle_coltype, nullable=False),
@@ -60,6 +65,7 @@ class SQLAlchemyJobStore(JobStore):
     def add_job(self, job):
         job_dict = job.__getstate__()
         result = self.engine.execute(self.jobs_t.insert().values(**job_dict))
+        job.id = result.inserted_primary_key[0]
         self.jobs.append(job)
 
     def remove_job(self, job):
@@ -76,7 +82,8 @@ class SQLAlchemyJobStore(JobStore):
                 job.__setstate__(job_dict)
                 jobs.append(job)
             except Exception:
-                logger.exception('Unable to restore jobs')
+                job_name = job_dict.get('name', '(unknown)')
+                logger.exception('Unable to restore job "%s"', job_name)
         self.jobs = jobs
 
     def update_job(self, job):

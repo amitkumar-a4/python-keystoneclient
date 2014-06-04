@@ -188,10 +188,9 @@ class WorkloadMgrsController(wsgi.Controller):
         name = workload.get('name', None)
         description = workload.get('description', None)
         workload_type_id = workload.get('workload_type_id', None)
-        hours = workload.get('hours', 24)
+        hours = workload.get('jobschedule', {})
         instances = workload.get('instances', {})
-        metadata = workload.get('metadata', {})        
-        
+        metadata = workload.get('metadata', {})       
 
         LOG.audit(_("Creating workload"), locals(), context=context)
 

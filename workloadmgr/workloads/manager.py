@@ -77,12 +77,6 @@ def get_workflow_class(context, workload_type_id):
         workflow_class = getattr(workflow_class, comp)            
     return workflow_class        
     
-def workload_callback(workload_id):
-    """
-    Callback
-    """
-    #TODO(gbasava): Implementation
-
 class WorkloadMgrManager(manager.SchedulerDependentManager):
     """Manages WorkloadMgr """
 
@@ -204,10 +198,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     workload_id, 
                                     {'host': self.host})
 
-            schjob = self.scheduler.add_interval_job(context, workload_callback, hours=24,
-                                     name=workload['display_name'], args=[workload_id], 
-                                     workload_id=workload_id)
-            LOG.info(_('scheduled workload: %s'), schjob.id)
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
@@ -217,8 +207,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.db.workload_update(context, 
                                 workload_id, 
                                 {'status': 'available',
-                                 'availability_zone': self.az,
-                                 'schedule_job_id':schjob.id})
+                                 'availability_zone': self.az})
         
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):

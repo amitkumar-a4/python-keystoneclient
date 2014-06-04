@@ -24,6 +24,7 @@ from novaclient.v1_1 import client as nova_client
 from oslo.config import cfg
 
 from workloadmgr.db import base
+from workloadmgr import context
 from workloadmgr import exception
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
@@ -120,6 +121,28 @@ def _discover_via_entry_points():
         module = ep.load()
 
         yield name, module
+
+def _get_tenant_context(user_id, tenant_id):
+    try:
+        httpclient = client.HTTPClient(
+                user=CONF.nova_admin_username,
+                password=CONF.nova_admin_password,
+                tenant_id=tenant_id,
+                service_name='nova',
+                service_type='compute',
+                endpoint_type='adminURL',
+                region_name=CONF.nova_production_region_name,
+                auth_url=CONF.nova_admin_auth_url,
+                timeout=CONF.nova_url_timeout,
+                auth_system=CONF.nova_auth_system,
+                insecure=CONF.nova_api_insecure)
+        httpclient.authenticate()
+        tenantcontext = context.RequestContext(user_id=user_id, project_id=tenant_id,
+                                               is_admin=True, auth_token=httpclient.auth_token)
+    except Exception:
+        with excutils.save_and_reraise_exception():
+            LOG.exception(_("_get_auth_token() failed"))
+    return tenantcontext
 
 def _get_httpclient(production):
     try:

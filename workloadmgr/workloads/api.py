@@ -11,6 +11,14 @@ import cPickle as pickle
 
 from eventlet import greenthread
 
+from datetime import datetime
+import time
+
+from workloadmgr.apscheduler.scheduler import Scheduler
+from workloadmgr.apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStore
+from sqlalchemy import create_engine
+
+from novaclient import client
 from workloadmgr.workloads import rpcapi as workloads_rpcapi
 from workloadmgr.db import base
 from workloadmgr import exception
@@ -19,18 +27,91 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.image import glance
+from workloadmgr import context
 
 
 FLAGS = flags.FLAGS
 
 LOG = logging.getLogger(__name__)
 
+def _snapshot_create_callback(*args, **kwargs):
+    from workloadmgr.workloads import API
+
+    workloadmgrapi = API()
+ 
+    workload_id = kwargs['workload_id']
+    user_id = kwargs['user_id']
+    project_id = kwargs['project_id']
+    tenantcontext = nova._get_tenant_context(user_id, project_id)
+    
+    workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+
+    #TODO: Make sure workload is in a created state
+    if workload['status'] == 'error':
+        msg = _("Workload is in error state. Cannot schedule snapshot operation")
+        LOG.info(msg, {'workload_id': workload_id})
+        return
+
+    # wait for 5 minutes until the workload changes state to available
+    count = 0
+    while True:
+        if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
+            break
+        time.sleep(30)
+        count += 1
+        workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+
+    # if workload hasn't changed the status to available
+    if workload['status'] != 'available':
+        msg = _("Workload is not in available state. Cannot schedule snapshot operation")
+        LOG.info(msg, {'workload_id': workload_id})
+        return
+
+    try:
+        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, "incremental", "jobscheduler", None)
+
+        # Wait for snapshot to complete
+        while True:
+            snapshot_details = workloadmgrapi.snapshot_get(tenantcontext, snapshot['id'])
+            if snapshot_details['status'].lower() == "available" or snapshot_details['status'].lower() == "error":
+               break
+            time.sleep(30)
+    except Exception as ex:
+        LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
+        pass
+
 class API(base.Base):
     """API for interacting with the Workload Manager."""
 
+    ## This singleton implementation is not thread safe
+    ## REVISIT: should the singleton be threadsafe
+
+    __single = None # the one, true Singleton
+
+    def __new__(classtype, *args, **kwargs):
+        # Check to see if a __single exists already for this class
+        # Compare class types instead of just looking for None so
+        # that subclasses will create their own __single objects
+        if classtype != type(classtype.__single):
+           classtype.__single = object.__new__(classtype, *args, **kwargs)
+        return classtype.__single
+
     def __init__(self, db_driver=None):
-        self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
-        super(API, self).__init__(db_driver)
+        if not hasattr(self, "workloads_rpcapi"):
+           self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
+
+        if not hasattr(self, "_engine"):
+           self._engine = create_engine(FLAGS.sql_connection)
+
+        if not hasattr(self, "_jobstore"):
+           self._jobstore = SQLAlchemyJobStore(engine=self._engine)
+
+        if not hasattr(self, "_scheduler"):
+           self._scheduler = Scheduler()
+           self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
+           self._scheduler.start()
+
+           super(API, self).__init__(db_driver)
         
     def workload_type_get(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
@@ -132,13 +213,14 @@ class API(base.Base):
         return workloads
     
     def workload_create(self, context, name, description, instances,
-                        workload_type_id, metadata,
+                        workload_type_id, metadata, jobschedule,
                         hours=int(24), availability_zone=None):
         """
         Make the RPC call to create a workload.
         """
         compute_service = nova.API(production=True)
         instances_with_name = compute_service.get_servers(context,admin=True)
+
         #TODO(giri): optimize this lookup
         for instance in instances:
             for instance_with_name in instances_with_name:
@@ -161,10 +243,29 @@ class API(base.Base):
                       'vm_id': instance['instance-id'],
                       'vm_name': instance['instance-name']}
             vm = self.db.workload_vms_create(context, values)
-        
+
         self.workloads_rpcapi.workload_create(context,
                                               workload['host'],
                                               workload['id'])
+
+        # Now register the job with job scheduler
+        # HEre is the catch. The workload may not been fully created yet
+        # so the job call back should only start creating snapshots when
+        # the workload is successfully created.
+        # the workload has errored during workload creation, then it should
+        # remove itself from the job queue
+        # if we fail to schedule the job, we should fail the 
+        # workload create request?
+        #_snapshot_create_callback([], kwargs={'workload_id':workload.id,  
+                                              #'user_id': workload.user_id, 
+                                              #'project_id':workload.project_id})
+        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                            jobschedule,
+                                            jobstore='jobscheduler_store', 
+                                            kwargs={'workload_id':workload.id,  
+                                                    'user_id': workload.user_id, 
+                                                    'project_id':workload.project_id})
+        
         
         return workload
     
@@ -182,6 +283,12 @@ class API(base.Base):
             msg = _('This workload contains snapshots')
             raise exception.InvalidWorkloadMgr(reason=msg)
                     
+        # First unschedule the job
+        jobs = self._scheduler.get_jobs()
+        for job in jobs:
+           if job.kwargs['workload_id'] == workload_id:
+              self._scheduler.unschedule_job(job)
+
         self.db.workload_delete(context, workload_id)
         
     def workload_get_workflow(self, context, workload_id):

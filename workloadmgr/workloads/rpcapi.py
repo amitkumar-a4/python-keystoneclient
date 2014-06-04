@@ -68,7 +68,7 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
 
     def workload_snapshot(self, ctxt, host, snapshot_id):
-        LOG.debug("snapshot workload in rpcapi snapshot_id:%s full:%s", snapshot_id)
+        LOG.debug("snapshot workload in rpcapi snapshot_id:%s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
         self.cast(ctxt,

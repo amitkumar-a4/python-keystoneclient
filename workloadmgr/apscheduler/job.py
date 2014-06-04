@@ -2,8 +2,6 @@
 Jobs represent scheduled tasks.
 """
 
-import pickle
-import uuid
 from threading import Lock
 from datetime import timedelta
 
@@ -42,7 +40,7 @@ class Job(object):
     next_run_time = None
 
     def __init__(self, trigger, func, args, kwargs, misfire_grace_time,
-                 coalesce, name=None, max_runs=None, max_instances=1, workload_id=None):
+                 coalesce, name=None, max_runs=None, max_instances=1):
         if not trigger:
             raise ValueError('The trigger must not be None')
         if not hasattr(func, '__call__'):
@@ -61,12 +59,10 @@ class Job(object):
         self._lock = Lock()
 
         self.trigger = trigger
-        self.id = str(uuid.uuid4())
-        self.workload_id = workload_id
         self.func = func
         self.args = args
         self.kwargs = kwargs
-        self.name = name or get_callable_name(func)
+        self.name = to_unicode(name or get_callable_name(func))
         self.misfire_grace_time = misfire_grace_time
         self.coalesce = coalesce
         self.max_runs = max_runs
@@ -120,18 +116,12 @@ class Job(object):
         state.pop('func', None)
         state.pop('_lock', None)
         state['func_ref'] = obj_to_ref(self.func)
-        state['trigger'] = pickle.dumps(state.pop('trigger'))
-        state['args'] = pickle.dumps(state.pop('args'))
-        state['kwargs'] = pickle.dumps(state.pop('kwargs'))
         return state
 
     def __setstate__(self, state):
         state['instances'] = 0
         state['func'] = ref_to_obj(state.pop('func_ref'))
         state['_lock'] = Lock()
-        state['trigger'] = pickle.loads(state['trigger'])
-        state['args'] = pickle.loads(state['args'])
-        state['kwargs'] = pickle.loads(state['kwargs'])
         self.__dict__ = state
 
     def __eq__(self, other):

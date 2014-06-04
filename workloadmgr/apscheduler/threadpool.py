@@ -60,12 +60,13 @@ class ThreadPool(object):
             self._threads_lock.release()
 
     def _add_thread(self, core):
-        t = Thread(target=self._run_jobs, args=(core,))
+        threadname = "Thread-"+str(self.num_threads)
+        t = Thread(target=self._run_jobs, args=(threadname, core,))
         t.setDaemon(True)
         t.start()
-        self._threads.add(t)
+        self._threads.add(threadname)
 
-    def _run_jobs(self, core):
+    def _run_jobs(self, name, core):
         logger.debug('Started worker thread')
         block = True
         timeout = None
@@ -88,10 +89,12 @@ class ThreadPool(object):
                 logger.exception('Error in worker thread')
 
         self._threads_lock.acquire()
-        #self._threads.remove(currentThread())
-        self._threads_lock.release()
-
-        logger.debug('Exiting worker thread')
+        try:
+            print name, self._threads
+            self._threads.remove(name)
+        finally:
+            self._threads_lock.release()
+            logger.debug('Exiting worker thread')
 
     @property
     def num_threads(self):
