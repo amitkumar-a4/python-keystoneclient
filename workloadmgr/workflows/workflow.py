@@ -85,6 +85,9 @@ class Workflow(object):
         
             #snapshot flavors of VMs
             self._snapshotmetadata.add(vmtasks.SnapshotVMFlavors(self.name + "#SnapshotVMFlavors"))
+            
+            #snapshot security groups of VMs
+            self._snapshotmetadata.add(vmtasks.SnapshotVMSecurityGroups(self.name + "#SnapshotVMSecurityGroups"))            
         else:
             self._snapshotmetadata = snapshotmetadata
 

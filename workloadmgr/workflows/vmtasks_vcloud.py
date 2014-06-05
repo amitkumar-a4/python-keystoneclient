@@ -24,6 +24,10 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
 def snapshot_vm_flavors(cntx, db, instances, snapshot):
     return None
 
+@autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm_security_groups')        
+def snapshot_vm_security_groups(cntx, db, instances, snapshot):
+    return None    
+
 @autolog.log_method(Logger, 'vmtasks_vcloud.pause_vm')
 def pause_vm(cntx, db, instance):
     return None    

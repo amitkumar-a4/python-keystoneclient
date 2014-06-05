@@ -270,6 +270,33 @@ def upgrade(migrate_engine):
         mysql_engine='InnoDB'
     ) 
     
+    vm_security_group_rule_snaps = Table(
+        'vm_security_group_rule_snaps', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('vm_security_group_snap_id', String(length=255), ForeignKey('snapshot_vm_resources.id'), primary_key=True),
+        Column('pickle',String(length=4096)),
+        Column('status', String(length=32), nullable=False),
+        mysql_engine='InnoDB'
+    )        
+    
+    vm_security_group_rule_snap_metadata = Table(
+        'vm_security_group_rule_snap_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('vm_security_group_rule_snap_id', String(length=255), ForeignKey('vm_security_group_rule_snaps.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('vm_security_group_rule_snap_id', 'key'),
+        mysql_engine='InnoDB'
+    )     
+    
     restores = Table(
         'restores', meta,
         Column('created_at', DateTime),
@@ -356,6 +383,8 @@ def upgrade(migrate_engine):
               vm_disk_resource_snap_metadata,
               vm_network_resource_snaps,
               vm_network_resource_snap_metadata,
+              vm_security_group_rule_snaps,
+              vm_security_group_rule_snap_metadata,
               restores,
               restored_vms,
               restored_vm_resources,
@@ -386,6 +415,8 @@ def upgrade(migrate_engine):
                   "vm_disk_resource_snap_metadata",
                   "vm_network_resource_snaps",
                   "vm_network_resource_snap_metadata",
+                  "vm_security_group_rule_snaps",
+                  "vm_security_group_rule_snap_metadata",
                   "restores",
                   "restored_vms",
                   "restored_vm_resources",

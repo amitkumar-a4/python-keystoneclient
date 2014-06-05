@@ -180,6 +180,28 @@ class SnapshotVMFlavors(task.Task):
     @autolog.log_method(Logger, 'SnapshotVMFlavors.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
+    
+class SnapshotVMSecurityGroups(task.Task):
+
+    def execute(self, context, instances, snapshot):
+        return self.execute_with_log(context, instances, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs) 
+      
+    @autolog.log_method(Logger, 'SnapshotVMSecurityGroups.execute')
+    def execute_with_log(self, context, instances, snapshot):
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+
+        if True:
+            return vmtasks_openstack.snapshot_vm_security_groups(cntx, db, instances, snapshot)
+        else:
+            return vmtasks_vcloud.snapshot_vm_security_groups(cntx, db, instances, snapshot)
+          
+    @autolog.log_method(Logger, 'SnapshotVMSecurityGroups.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass    
                             
 class PauseVM(task.Task):
 

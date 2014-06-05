@@ -89,8 +89,8 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             for router in routers_data:
                 if router_found : break
                 search_opts = {'device_id': router['id'], 'network_id':network['id']}
-                router_ports_data = network_service.get_ports(cntx,**search_opts)
-                for router_port in router_ports_data['ports']:
+                router_ports = network_service.get_ports(cntx,**search_opts)
+                for router_port in router_ports:
                     if router_found : break
                     router_port_fixed_ips = router_port['fixed_ips']
                     if router_port_fixed_ips:
@@ -107,9 +107,9 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 nic.setdefault('router_name', router_found['name'])
                 if router_found['external_gateway_info'] and router_found['external_gateway_info']['network_id']:
                     search_opts = {'device_id': router_found['id'], 'network_id': router_found['external_gateway_info']['network_id']}
-                    router_ext_ports_data = network_service.get_ports(cntx,**search_opts)
-                    if router_ext_ports_data and router_ext_ports_data['ports'] and router_ext_ports_data['ports'][0]:
-                        ext_port = router_ext_ports_data['ports'][0]
+                    router_ext_ports = network_service.get_ports(cntx,**search_opts)
+                    if router_ext_ports and len(router_ext_ports) and router_ext_ports[0]:
+                        ext_port = router_ext_ports[0]
                         #utils.append_unique(ports, ext_port) TODO(giri): We may not need ports 
                         ext_subnets_data = network_service.get_subnets_from_port(cntx,ext_port)
                         #TODO(giri): we will capture only one subnet for now
@@ -226,7 +226,59 @@ def snapshot_vm_flavors(cntx, db, instances, snapshot):
                                        'resource_name':  flavor.name,
                                        'metadata': metadata,
                                        'status': 'available'}
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)                                     
+        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values) 
+        
+@autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_security_groups')        
+def snapshot_vm_security_groups(cntx, db, instances, snapshot):
+    compute_service = nova.API(production=True)
+    network_service =  neutron.API(production=True)  
+    
+    security_group_ids = []
+    for instance in instances:
+        server_security_group_ids = network_service.server_security_groups(cntx, instance['vm_id'])
+        security_group_ids += server_security_group_ids
+        for security_group_id in server_security_group_ids:
+            security_group = network_service.security_group_get(cntx, security_group_id)
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': instance['vm_id'],
+                                           'snapshot_id': snapshot['id'],       
+                                           'resource_type': 'security_group',
+                                           'resource_name':  security_group['id'],
+                                           'resource_pit_id': security_group['id'],
+                                           'metadata': {'name': security_group['name'],
+                                                        'description' : security_group['description']},
+                                           'status': 'available'}
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)        
+        
+    unique_security_group_ids = list(set(security_group_ids))
+    for security_group_id in unique_security_group_ids:
+        security_group = network_service.security_group_get(cntx, security_group_id)
+        security_group_rules = security_group['security_group_rules']
+        vm_security_group_snap_values = {'id': str(uuid.uuid4()),
+                                       'vm_id': snapshot['id'],
+                                       'snapshot_id': snapshot['id'],       
+                                       'resource_type': 'security_group',
+                                       'resource_name':  security_group['id'],
+                                       'resource_pit_id': security_group['id'],
+                                       'metadata': {'name': security_group['name'],
+                                                    'description' : security_group['description']},
+                                       'status': 'available'}
+        vm_security_group_snap = db.snapshot_vm_resource_create(cntx,  vm_security_group_snap_values)
+        
+        for security_group_rule in security_group_rules:
+            vm_security_group_rule_snap_metadata = {} # Dictionary to hold the metadata
+            vm_security_group_rule_snap_values = {  'id': str(uuid.uuid4()),
+                                                    'vm_security_group_snap_id': vm_security_group_snap.id,
+                                                    'pickle': pickle.dumps(security_group_rule, 0),
+                                                    'metadata': vm_security_group_rule_snap_metadata,       
+                                                    'status': 'available'}     
+                                                         
+            vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)                
+            
+                     
+        
+        
+    
           
 @autolog.log_method(Logger, 'vmtasks_openstack.pause_vm')
 def pause_vm(cntx, db, instance):
@@ -524,9 +576,9 @@ def restore_vm_networks(cntx, db, restore):
         nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
         
         if nic_options:
-            retval = network_service.get_ports(cntx, **{'subnet_id':nic_options['network']['subnet']['id']}) 
-            if retval and 'ports' in retval:
-                if not _is_duplicate_ip(retval['ports'], nic_options['ip_address']):
+            ports = network_service.get_ports(cntx, **{'subnet_id':nic_options['network']['subnet']['id']}) 
+            if ports:
+                if not _is_duplicate_ip(ports, nic_options['ip_address']):
                     new_ip_address = nic_options['ip_address']
                     try:
                         return _create_port(new_ip_address)
@@ -534,7 +586,7 @@ def restore_vm_networks(cntx, db, restore):
                         LOG.exception(ex)
                    
             for ip in IPNetwork(nic_options['network']['subnet']['cidr']):
-                if not _is_duplicate_ip(retval['ports'], str(ip)):
+                if not _is_duplicate_ip(ports, str(ip)):
                     new_ip_address =  str(ip)
                     try:
                         return _create_port(new_ip_address)

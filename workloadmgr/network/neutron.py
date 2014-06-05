@@ -108,10 +108,15 @@ class API(base.Base):
         self._production = production        
 
     def get_ports(self, context, **search_opts):
-        return get_client(context, admin=True, production=self._production).list_ports(**search_opts)
+        return get_client(context, admin=True, production=self._production).list_ports(**search_opts).get('ports')
 
     def get_port(self, context, port_id):
         return get_client(context, admin=True, production=self._production).show_port(port_id)
+    
+    def modify_port(self, context, port_id, **kwargs):
+        LOG.debug("port_modify(): portid=%s, kwargs=%s" % (port_id, kwargs))
+        body = {'port': kwargs}
+        return get_client(context, admin=True, production=self. _production).update_port(port_id, body=body).get('port')
     
     def create_port(self, context, **kwargs):
         """
@@ -292,6 +297,72 @@ class API(base.Base):
         get_client(context, admin=True, production=self._production).add_gateway_router(router_id, body)
     
         
+    def security_group_list(self, context):
+        return get_client(context, admin=False, production=self._production).list_security_groups(tenant_id = context.project_id)
+    
+    
+    def security_group_get(self, context, sg_id):
+        return get_client(context, admin=False, production=self._production).show_security_group(sg_id).get('security_group')
+    
+    
+    def security_group_create(self, context, name, desc):
+        body = {'security_group': {'name': name,
+                                   'description': desc}}
+        return get_client(context, admin=False, production=self._production).create_security_group(body)
+    
+    def security_group_delete(self, context, sg_id):
+        return get_client(context, admin=False, production=self._production).delete_security_group(sg_id)
+    
+    
+    def security_group_update(self, context, sg_id, name, desc):
+        body = {'security_group': {'name': name,
+                                   'description': desc}}
+        return get_client(context, admin=False, production=self._production).update_security_group(sg_id, body)        
+    
+    
+    def security_group_rule_create(self, context, parent_group_id,
+                                   direction, ethertype,
+                                   ip_protocol, from_port, to_port,
+                                   cidr, group_id):
+        if not cidr:
+            cidr = None
+        if from_port < 0:
+            from_port = None
+        if to_port < 0:
+            to_port = None
+        if isinstance(ip_protocol, int) and ip_protocol < 0:
+            ip_protocol = None
+
+        body = {'security_group_rule':
+                    {'security_group_id': parent_group_id,
+                     'direction': direction,
+                     'ethertype': ethertype,
+                     'protocol': ip_protocol,
+                     'port_range_min': from_port,
+                     'port_range_max': to_port,
+                     'remote_ip_prefix': cidr,
+                     'remote_group_id': group_id}}
+        rule = get_client(context, admin=False, production=self._production).create_security_group_rule(body)
+        return rule.get('security_group_rule')        
+        
+    def security_group_rule_delete(self, context, sgr_id):
+        return get_client(context, admin=False, production=self._production).delete_security_group_rule(sgr_id)
+    
+    def server_security_groups(self, context, instance_id):
+        """Gets security groups of an instance."""
+        ports = self.get_ports(context, device_id=instance_id)
+        sg_ids = []
+        for p in ports:
+            sg_ids += p['security_groups']
+        
+        return list(set(sg_ids))  
+    
+    
+    def server_update_security_groups(self, context, instance_id, new_security_group_ids):
+        ports = self.get_ports(context, device_id=instance_id)
+        for p in ports:
+            params = {'security_groups': new_security_group_ids}
+            self.modify_port(context, p.id, **params)
 
        
     
