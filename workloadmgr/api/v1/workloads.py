@@ -188,7 +188,7 @@ class WorkloadMgrsController(wsgi.Controller):
         name = workload.get('name', None)
         description = workload.get('description', None)
         workload_type_id = workload.get('workload_type_id', None)
-        hours = workload.get('jobschedule', {})
+        jobschedule = workload.get('jobschedule', {})
         instances = workload.get('instances', {})
         metadata = workload.get('metadata', {})       
 
@@ -201,7 +201,7 @@ class WorkloadMgrsController(wsgi.Controller):
                                                              instances,
                                                              workload_type_id,
                                                              metadata, 
-                                                             hours)
+                                                             jobschedule)
             new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
         except exception.InvalidVolume as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))

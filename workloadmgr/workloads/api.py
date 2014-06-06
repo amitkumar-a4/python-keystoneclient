@@ -186,6 +186,18 @@ class API(base.Base):
             metadata.setdefault(kvpair['key'], kvpair['value'])
         workload_dict['metadata'] = metadata        
                 
+        # find the job object based on workload_id
+        jobs = self._scheduler.get_jobs()
+        for job in jobs:
+           if job.kwargs['workload_id'] == workload_id:
+              break
+
+        workload_dict['jobschedule'] = {'start_date':str(job.trigger.start_date),
+                                        'end_date':str(job.trigger.end_date),
+                                        'interval':str(job.trigger.interval),
+                                        'start_time':str(job.trigger.start_time),
+                                        'snapshots to retain':str(job.trigger.snapshotstokeep)}
+
         return workload_dict
 
     def workload_show(self, context, workload_id):
@@ -201,6 +213,19 @@ class API(base.Base):
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
         workload_dict['metadata'] = metadata 
+
+        # find the job object based on workload_id
+        jobs = self._scheduler.get_jobs()
+        for job in jobs:
+           if job.kwargs['workload_id'] == workload_id:
+              break
+
+        workload_dict['jobschedule'] = {'Start Date':str(job.trigger.start_date),
+                                        'End Date':str(job.trigger.end_date),
+                                        'Interval (hr)':str(job.trigger.interval),
+                                        'Start Time':str(job.trigger.start_time),
+                                        'Snapshots Retention':str(job.trigger.snapshotstokeep),
+                                        'Next Snapshot Due':str(job.trigger.get_next_fire_time(datetime.now()))}
                 
         return workload_dict
     
@@ -236,6 +261,7 @@ class API(base.Base):
                    'status': 'creating',
                    'workload_type_id': workload_type_id,
                    'metadata' : metadata,
+                   'jobschedule': jobschedule,
                    'host': socket.gethostname(), }
 
         workload = self.db.workload_create(context, options)
@@ -307,6 +333,30 @@ class API(base.Base):
                                                            socket.gethostname(),
                                                            workload_id)                
              
+    def workload_pause(self, context, workload_id):
+        """
+        Pause workload job schedule. No RPC call is made
+        """
+        workload = self.workload_get(context, workload_id)
+        jobs = self._scheduler.get_jobs()
+        for job in jobs:
+           if job.kwargs['workload_id'] == workload_id:
+              self._scheduler.unschedule_job(job)
+
+    def workload_resume(self, context, workload_id):
+        workload = self.workload_get(context, workload_id)
+        jobs = self._scheduler.get_jobs()
+        for job in jobs:
+           if job.kwargs['workload_id'] == workload_id:
+              msg = _('Workload job scheduler is not paused')
+              raise exception.InvalidWorkloadMgr(reason=msg)
+
+        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                            workload['jobschedule'],
+                                            jobstore='jobscheduler_store', 
+                                            kwargs={'workload_id':workload_id,  
+                                                    'user_id': workload['user_id'],
+                                                    'project_id':workload['project_id']})
 
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """

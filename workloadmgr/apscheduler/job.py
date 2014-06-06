@@ -57,7 +57,6 @@ class Job(object):
             raise ValueError('max_instances must be a positive value')
 
         self._lock = Lock()
-
         self.trigger = trigger
         self.func = func
         self.args = args
