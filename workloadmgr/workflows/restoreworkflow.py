@@ -71,7 +71,10 @@ class RestoreWorkflow(object):
         self._flow.add(vmtasks.UnorderedPreRestore(self._store['instances'])) 
         
         #restore networks
-        self._flow.add(vmtasks.RestoreVMNetworks("RestoreVMNetworks", provides='restored_net_resources'))                  
+        self._flow.add(vmtasks.RestoreVMNetworks("RestoreVMNetworks", provides='restored_net_resources'))
+        
+        #restore security_groups
+        self._flow.add(vmtasks.RestoreSecurityGroups("RestoreSecurityGroups", provides='restored_security_groups'))                           
         
         #linear restore VMs
         self._flow.add(vmtasks.LinearRestoreVMs(self._store['instances']))

@@ -617,7 +617,7 @@ class LibvirtDriver(driver.ComputeDriver):
         pass    
     
     @autolog.log_method(Logger, 'libvirt.driver.restore_vm')
-    def restore_vm(self, cntx, db, instance, restore, restored_net_resources,
+    def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_security_groups,
                    restored_compute_flavor, restored_nics, instance_options):    
         """
         Restores the specified instance from a snapshot
@@ -850,10 +850,16 @@ class LibvirtDriver(driver.ComputeDriver):
                     availability_zone = None
                 else:
                     availability_zone = CONF.default_production_availability_zone
+    
+        restored_security_group_ids = []
+        for pit_id, restored_security_group_id in restored_security_groups.iteritems():
+            restored_security_group_ids.append(restored_security_group_id)
                      
         restored_instance = compute_service.create_server(cntx, restored_instance_name, 
                                                           restored_compute_image, restored_compute_flavor, 
-                                                          nics=restored_nics, availability_zone=availability_zone)
+                                                          nics=restored_nics,
+                                                          security_groups=restored_security_group_ids, 
+                                                          availability_zone=availability_zone)
         
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
