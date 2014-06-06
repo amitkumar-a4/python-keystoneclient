@@ -277,6 +277,21 @@ def vm_network_resource_snap_get(context, snapshot_vm_resource_id, session=None)
 
 def vm_network_resource_snaps_delete(context, snapshot_vm_resource_id):
     return IMPL.vm_network_resource_snaps_delete(context, snapshot_vm_resource_id)
+
+def vm_security_group_rule_snap_create(context, values):
+    return IMPL.vm_security_group_rule_snap_create(context, values)
+
+def vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, vaules, purge_metadata=False):
+    return IMPL.vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, vaules, purge_metadata)
+
+def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, session=None):
+    return IMPL.vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, session)
+
+def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session=None):
+    return IMPL.vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session)
+
+def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
+    return IMPL.vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id)
     
 def get_metadata_value(metadata, key, default=None):
     return IMPL.get_metadata_value(metadata, key, default=None)

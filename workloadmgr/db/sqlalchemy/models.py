@@ -321,7 +321,31 @@ class VMNetworkResourceSnapMetadata(BASE, WorkloadsBase):
     vm_network_resource_snap_id = Column(String(36), ForeignKey('vm_network_resource_snaps.vm_network_resource_snap_id'), nullable=False)
     vm_network_resource_snap = relationship(VMNetworkResourceSnaps, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
-    value = Column(Text)    
+    value = Column(Text) 
+    
+class VMSecurityGroupRuleSnaps(BASE, WorkloadsBase):
+    """Represents the  snapshots of a VM Security Group Rules"""
+    __tablename__ = str('vm_security_group_rule_snaps')
+    id = Column(String(255), primary_key=True)
+    vm_security_group_snap_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    pickle = Column(String(4096))
+    status = Column(String(32), nullable=False)    
+    
+class VMSecurityGroupRuleSnapMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the snapshot of a VM Security Group Rule"""
+    __tablename__ = 'vm_security_group_rule_snap_metadata'
+    __table_args__ = (UniqueConstraint('vm_security_group_rule_snap_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    vm_security_group_rule_snap_id = Column(String(36), ForeignKey('vm_security_group_rule_snaps.id'), nullable=False)
+    vm_security_group_rule_snap = relationship(VMSecurityGroupRuleSnaps, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)            
     
 class Restores(BASE, WorkloadsBase):
     """Represents a restore of a workload snapshots."""
@@ -413,6 +437,8 @@ def register_models():
               VMDiskResourceSnapMetadata,
               VMNetworkResourceSnaps,
               VMNetworkResourceSnapMetadata,
+              VMSecurityGroupRuleSnaps,
+              VMSecurityGroupRuleSnapMetadata,
               Restores,
               RestoredVMs,
               RestoredVMResources,

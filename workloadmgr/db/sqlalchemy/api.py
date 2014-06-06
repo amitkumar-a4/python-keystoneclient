@@ -1353,6 +1353,141 @@ def vm_network_resource_snaps_delete(context, snapshot_vm_network_resource_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+
+""" security group rule snapshot functions """
+def _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rule_snap_ref, metadata,
+                              purge_metadata=False, session=None):
+    """
+    Create or update a set of vm_security_group_rule_snap_metadata for a given snapshot
+
+    :param context: Request context
+    :param vm_security_group_rule_snap_ref: An vm_security_group_rule_snap object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in vm_security_group_rule_snap_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'vm_security_group_rule_snap_id': vm_security_group_rule_snap_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _vm_security_group_rule_snap_metadata_update(context, metadata_ref, metadata_values,
+                                   session=session)
+        else:
+            vm_security_group_rule_snap_metadata_create(context, metadata_values, session=session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def vm_security_group_rule_snap_metadata_create(context, values, session=None):
+    """Create an VMSecurityGroupRuleSnapMetadata object"""
+    metadata_ref = models.VMSecurityGroupRuleSnapMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _vm_security_group_rule_snap_metadata_update(context, metadata_ref, values, session=session)
+
+def _vm_security_group_rule_snap_metadata_update(context, metadata_ref, values, session=None):
+    """
+    Used internally by vm_security_group_rule_snap_metadata_create and vm_security_group_rule_snap_metadata_update
+    """
+    if session == None: 
+        session = get_session()
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session=None):
+    """
+    Used internally by vm_security_group_rule_snap_metadata_create and vm_security_group_rule_snap_metadata_update
+    """
+    if session == None: 
+        session = get_session()
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+def _vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata=False):
+    
+    metadata = values.pop('metadata', {})
+    
+    session = get_session()
+    if id and vm_security_group_snap_id:
+        vm_security_group_rule_snap_ref = vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session)
+    else:
+        vm_security_group_rule_snap_ref = models.VMSecurityGroupRuleSnaps()
+    
+    vm_security_group_rule_snap_ref.update(values)
+    vm_security_group_rule_snap_ref.save(session)
+    
+    _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rule_snap_ref, metadata, purge_metadata)  
+      
+    return vm_security_group_rule_snap_ref
+
+@require_context
+def vm_security_group_rule_snap_create(context, values):
+    
+    return _vm_security_group_rule_snap_update(context, None, None, values, False)
+
+@require_context
+def vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata=False):
+   
+    return _vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata)
+
+@require_context
+def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.VMSecurityGroupRuleSnaps)\
+                       .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
+                       .filter_by(vm_security_group_snap_id=vm_security_group_snap_id)
+
+        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        vm_security_group_rule_snaps = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.VMDiskResourceSnapsNotFound(vm_security_group_snap_id = vm_security_group_snap_id)
+    
+    return vm_security_group_rule_snaps
+
+@require_context
+def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session=None):
+    if session == None: 
+        session = get_session()
+    try:
+        query = session.query(models.VMSecurityGroupRuleSnaps)\
+                       .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
+                       .filter_by(id=id)\
+                       .filter_by(vm_security_group_snap_id=vm_security_group_snap_id)
+
+        #TODO(gbasava): filter out deleted resource snapshots if context disallows it
+        vm_security_group_rule_snap = query.one()
+
+    except sa_orm.exc.NoResultFound:
+        raise 
+    
+    return vm_security_group_rule_snap
+
+@require_context
+def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.VMSecurityGroupRuleSnaps).\
+            filter_by(id=id).\
+            filter_by(vm_security_group_snap_id=vm_security_group_snap_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
             
 def get_metadata_value(metadata, key, default=None):
     for kvpair in metadata:

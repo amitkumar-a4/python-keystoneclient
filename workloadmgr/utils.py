@@ -1233,11 +1233,11 @@ def move_file(src, dest):
 def copy_file(src, dest):
     execute('cp', src, dest)    
     
-def append_unique(list, new_item, key="id"):
-    for item in list:
+def append_unique(dict, new_item, key="id"):
+    for item in dict:
         if item[key] == new_item[key]:
             return
-    list.append(new_item)    
+    dict.append(new_item)    
   
 class ChunkedFile(object):
     """

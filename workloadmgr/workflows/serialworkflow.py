@@ -58,11 +58,12 @@ def get_vms(cntx, workload_id):
                 vm_hypervisor = hypervisor
         if vm_hypervisor == None:
             pass #TODO(giri): Throw exception
-                   
+       
         vm = {
               'vm_id' : vm_instance.id,
               'vm_name' : vm_instance.name,
               'vm_flavor_id' : vm_instance.flavor['id'],
+              'key_name': vm_instance.key_name,
               'hypervisor_hostname' : vm_hypervisor.hypervisor_hostname,
               'hypervisor_type' :  vm_hypervisor.hypervisor_type
              }
