@@ -20,6 +20,7 @@ from sqlalchemy import create_engine
 
 from novaclient import client
 from workloadmgr.workloads import rpcapi as workloads_rpcapi
+from workloadmgr.scheduler import rpcapi as scheduler_rpcapi
 from workloadmgr.db import base
 from workloadmgr import exception
 from workloadmgr import flags
@@ -99,6 +100,9 @@ class API(base.Base):
     def __init__(self, db_driver=None):
         if not hasattr(self, "workloads_rpcapi"):
            self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
+
+        if not hasattr(self, "scheduler_rpcapi"):
+           self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
 
         if not hasattr(self, "_engine"):
            self._engine = create_engine(FLAGS.sql_connection)
@@ -216,16 +220,19 @@ class API(base.Base):
 
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
-        for job in jobs:
-           if job.kwargs['workload_id'] == workload_id:
+        job = None
+        for wj in jobs:
+           if wj.kwargs['workload_id'] == workload_id:
+              job = wj
               break
 
-        workload_dict['jobschedule'] = {'Start Date':str(job.trigger.start_date),
-                                        'End Date':str(job.trigger.end_date),
-                                        'Interval (hr)':str(job.trigger.interval),
-                                        'Start Time':str(job.trigger.start_time),
-                                        'Snapshots Retention':str(job.trigger.snapshotstokeep),
-                                        'Next Snapshot Due':str(job.trigger.get_next_fire_time(datetime.now()))}
+        if job:
+           workload_dict['jobschedule'] = {'Start Date':str(job.trigger.start_date),
+                                           'End Date':str(job.trigger.end_date),
+                                           'Interval (hr)':str(job.trigger.interval),
+                                           'Start Time':str(job.trigger.start_time),
+                                           'Snapshots Retention':str(job.trigger.snapshotstokeep),
+                                           'Next Snapshot Due':str(job.trigger.get_next_fire_time(datetime.now()))}
                 
         return workload_dict
     
@@ -375,7 +382,7 @@ class API(base.Base):
                    'display_description': description,                   
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
-        self.workloads_rpcapi.workload_snapshot(context, workload['host'], snapshot['id'])
+        self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
         return snapshot
 
     def snapshot_get(self, context, snapshot_id):

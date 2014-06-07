@@ -45,7 +45,7 @@ FLAGS.register_opt(scheduler_driver_opt)
 
 
 class SchedulerManager(manager.Manager):
-    """Chooses a host to create volumes."""
+    """Chooses a host to create snapshot."""
 
     RPC_API_VERSION = '1.2'
 
@@ -61,14 +61,17 @@ class SchedulerManager(manager.Manager):
 
     def get_host_list(self, context):
         """Get a list of hosts from the HostManager."""
+        import pdb;pdb.set_trace()
         return self.driver.get_host_list()
 
     def get_service_capabilities(self, context):
         """Get the normalized set of capabilities for this zone."""
+        import pdb;pdb.set_trace()
         return self.driver.get_service_capabilities()
 
     def update_service_capabilities(self, context, service_name=None,
                                     host=None, capabilities=None, **kwargs):
+        import pdb;pdb.set_trace()
         """Process a capability update from a service node."""
         if capabilities is None:
             capabilities = {}
@@ -76,58 +79,45 @@ class SchedulerManager(manager.Manager):
                                                 host,
                                                 capabilities)
 
-    def create_volume(self, context, topic, volume_id, snapshot_id=None,
-                      image_id=None, request_spec=None,
-                      filter_properties=None):
+    def workload_snapshot(self, context, topic, snapshot_id,
+                          request_spec=None, filter_properties=None):
         try:
             if request_spec is None:
-                # For RPC version < 1.2 backward compatibility
                 request_spec = {}
-                volume_ref = db.volume_get(context, volume_id)
-                size = volume_ref.get('size')
-                availability_zone = volume_ref.get('availability_zone')
-                volume_type_id = volume_ref.get('volume_type_id')
-                vol_type = db.volume_type_get(context, volume_type_id)
-                volume_properties = {'size': size,
-                                     'availability_zone': availability_zone,
-                                     'volume_type_id': volume_type_id}
-                request_spec.update(
-                    {'volume_id': volume_id,
-                     'snapshot_id': snapshot_id,
-                     'image_id': image_id,
-                     'volume_properties': volume_properties,
-                     'volume_type': dict(vol_type).iteritems()})
+                snapshot_ref = db.snapshot_get(context, snapshot_id)
 
-            self.driver.schedule_create_volume(context, request_spec,
-                                               filter_properties)
+                request_spec.update( {'snapshot_id': snapshot_id, 'snapshot_properties':{}})
+
+            self.driver.schedule_workload_snapshot(context, request_spec,
+                                                   filter_properties)
         except exception.NoValidHost as ex:
-            volume_state = {'volume_state': {'status': 'error'}}
-            self._set_volume_state_and_notify('create_volume',
-                                              volume_state,
+            snapshot_state = {'status': {'status': 'error'}}
+            self._set_snapshot_state_and_notify('workload_snapshot',
+                                              snapshot_state,
                                               context, ex, request_spec)
         except Exception as ex:
             with excutils.save_and_reraise_exception():
-                volume_state = {'volume_state': {'status': 'error'}}
-                self._set_volume_state_and_notify('create_volume',
-                                                  volume_state,
+                snapshot_state = {'status': {'status': 'error'}}
+                self._set_snapshot_state_and_notify('workload_snapshot',
+                                                  snapshot_state,
                                                   context, ex, request_spec)
 
-    def _set_volume_state_and_notify(self, method, updates, context, ex,
+    def _set_snapshot_state_and_notify(self, method, updates, context, ex,
                                      request_spec):
         LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
+  
+        snapshot_status = updates['status']
+        properties = request_spec.get('snapshot_properties', {})
 
-        volume_state = updates['volume_state']
-        properties = request_spec.get('volume_properties', {})
+        snapshot_id = request_spec.get('snapshot_id', None)
 
-        volume_id = request_spec.get('volume_id', None)
-
-        if volume_id:
-            db.volume_update(context, volume_id, volume_state)
+        if snapshot_id:
+            db.snapshot_update(context, snapshot_id, snapshot_status)
 
         payload = dict(request_spec=request_spec,
-                       volume_properties=properties,
-                       volume_id=volume_id,
-                       state=volume_state,
+                       snapshot_properties=properties,
+                       snapshot_id=snapshot_id,
+                       state=snapshot_status,
                        method=method,
                        reason=ex)
 

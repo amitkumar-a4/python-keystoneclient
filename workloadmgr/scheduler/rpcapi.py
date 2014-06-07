@@ -32,9 +32,9 @@ class SchedulerAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
     API version history:
 
         1.0 - Initial version.
-        1.1 - Add create_volume() method
+        1.1 - Add workload_snapshot() method
         1.2 - Add request_spec, filter_properties arguments
-              to create_volume()
+              to workload_snapshot()
     '''
 
     RPC_API_VERSION = '1.0'
@@ -44,19 +44,15 @@ class SchedulerAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
             topic=FLAGS.scheduler_topic,
             default_version=self.RPC_API_VERSION)
 
-    def create_volume(self, ctxt, topic, volume_id, snapshot_id=None,
-                      image_id=None, request_spec=None,
-                      filter_properties=None):
+    def workload_snapshot(self, ctxt, topic, snapshot_id,
+                          request_spec=None, filter_properties=None):
         request_spec_p = jsonutils.to_primitive(request_spec)
         return self.cast(ctxt, self.make_msg(
-            'create_volume',
-            topic=topic,
-            volume_id=volume_id,
-            snapshot_id=snapshot_id,
-            image_id=image_id,
-            request_spec=request_spec_p,
-            filter_properties=filter_properties),
-            version='1.2')
+                                  'workload_snapshot', topic=topic,
+                                  snapshot_id=snapshot_id,
+                                  request_spec=request_spec_p,
+                                  filter_properties=filter_properties),
+                                  version='1.2')
 
     def update_service_capabilities(self, ctxt,
                                     service_name, host,
