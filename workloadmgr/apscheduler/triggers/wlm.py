@@ -9,25 +9,24 @@ from workloadmgr.apscheduler.util import *
 
 class WorkloadMgrTrigger(object):
     def __init__(self, jobschedule):
-        jobschedule = json.loads(jobschedule)
         self.start_date = datetime.now()
         self.end_date = None
         self.interval = timedelta(seconds=3600)
-        self.start_time = convert_to_datetime(parse(jobschedule['starttime']))
-        self.snapshotstokeep = int(jobschedule['snapshotstokeep'])
+        self.start_time = convert_to_datetime(parse(jobschedule['start_time']))
+        self.snapshots_to_keep = int(jobschedule['snapshots_to_keep'])
 
-        if 'startdate' in jobschedule and jobschedule['startdate'].strip(" ").lower() != "now":
-            self.start_date = convert_to_datetime(parse(jobschedule['startdate']))
+        if 'start_date' in jobschedule and jobschedule['start_date'].strip(" ").lower() != "now":
+            self.start_date = convert_to_datetime(parse(jobschedule['start_date']))
 
-        if 'enddate' in jobschedule and jobschedule['enddate'].strip(" ").lower() != "no end":
-            self.end_date = convert_to_datetime(parse(jobschedule['enddate']))
+        if 'end_date' in jobschedule and jobschedule['end_date'].strip(" ").lower() != "no end":
+            self.end_date = convert_to_datetime(parse(jobschedule['end_date']))
 
         if 'interval' in jobschedule:
             if jobschedule['interval'].find("hr"):
-               if int(jobschedule['interval'].strip(" ").split("hr")[0]) >= 1 and int(jobschedule['interval'].strip(" ").split("hr")[0]) <= 12:
-                  self.interval = timedelta(hours= int(jobschedule['interval'].strip(" ").split("hr")[0]))
-               else:
-                  raise Exception("Invalid format in the job scheduler")
+                if int(jobschedule['interval'].strip(" ").split("hr")[0]) >= 1 and int(jobschedule['interval'].strip(" ").split("hr")[0]) <= 12:
+                    self.interval = timedelta(hours= int(jobschedule['interval'].strip(" ").split("hr")[0]))
+                else:
+                    raise Exception("Invalid format in the job scheduler")
 
 
         # We put at least 30 min window between snapshots.
@@ -62,7 +61,7 @@ class WorkloadMgrTrigger(object):
         return self.start_date + self.interval * next_interval_num
 
     def __str__(self):
-        return 'startdate[%s] enddate[%s] interval[%s]' % (str(self.start_date), str(self.end_date), str(self.interval))
+        return 'start_date[%s] end_date[%s] interval[%s]' % (str(self.start_date), str(self.end_date), str(self.interval))
 
     def __repr__(self):
         return "<%s (interval=%s, start_date=%s end_date=%s)>" % (
@@ -72,12 +71,12 @@ class WorkloadMgrTrigger(object):
 """
 #Unit Tests
 import pdb;pdb.set_trace()
-trigger = WorkloadMgrTrigger(u'{"startdate":"Now","enddate":"No End","starttime":"12:00am","interval":"1 hr","snapshotstokeep":"10"}')
+trigger = WorkloadMgrTrigger(u'{"start_date":"Now","end_date":"No End","start_time":"12:00am","interval":"1 hr","snapshots_to_keep":"10"}')
 print trigger
 print trigger.get_next_fire_time(datetime.now())
 print trigger.get_next_fire_time(datetime.now() + timedelta(days=20))
 
-trigger = WorkloadMgrTrigger(u'{"startdate":"06/15/2014","enddate":"No End","starttime":"12:00am","interval":"1 hr","snapshotstokeep":"10"}')
+trigger = WorkloadMgrTrigger(u'{"start_date":"06/15/2014","end_date":"No End","start_time":"12:00am","interval":"1 hr","snapshots_to_keep":"10"}')
 print trigger.get_next_fire_time(datetime.now())
 print trigger.get_next_fire_time(datetime.now() + timedelta(days=20))
 """

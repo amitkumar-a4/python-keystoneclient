@@ -82,6 +82,7 @@ def upgrade(migrate_engine):
         Column('display_name', String(length=255)),
         Column('display_description', String(length=255)),
         Column('workload_type_id', String(length=255), ForeignKey('workload_types.id')),
+        Column('jobschedule', String(length=4096)),
         Column('status', String(length=255)),
         mysql_engine='InnoDB'
     )
