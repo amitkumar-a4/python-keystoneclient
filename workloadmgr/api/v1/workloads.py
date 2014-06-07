@@ -197,11 +197,11 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             new_workload = self.workload_api.workload_create(context, 
                                                              name, 
-                                                             description, 
+                                                             description,
+                                                             workload_type_id, 
                                                              instances,
-                                                             workload_type_id,
-                                                             metadata, 
-                                                             jobschedule)
+                                                             jobschedule,
+                                                             metadata)
             new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
         except exception.InvalidVolume as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
@@ -222,6 +222,26 @@ class WorkloadMgrsController(wsgi.Controller):
             raise exc.HTTPNotFound(explanation=unicode(error))
 
         return workload_workflow
+    
+    def pause(self, req, id):
+        """pause a given workload."""
+        LOG.debug(_('pause called for member %s'), id)
+        context = req.environ['workloadmgr.context']
+
+        try:
+            workload_workflow = self.workload_api.workload_pause(context, workload_id=id)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+
+    def resume(self, req, id):
+        """resume a given workload."""
+        LOG.debug(_('resume called for member %s'), id)
+        context = req.environ['workloadmgr.context']
+
+        try:
+            workload_workflow = self.workload_api.workload_resume(context, workload_id=id)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error)) 
     
     def get_topology(self, req, id):
         """Return topology of a given workload."""

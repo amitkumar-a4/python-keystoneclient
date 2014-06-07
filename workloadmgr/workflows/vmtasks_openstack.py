@@ -273,13 +273,12 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                                                     'metadata': vm_security_group_rule_snap_metadata,       
                                                     'status': 'available'}     
                                                          
-            vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)                
+            vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)
+            if security_group_rule['remote_group_id']:
+                if (security_group_rule['remote_group_id'] in unique_security_group_ids) == False:
+                    unique_security_group_ids.append(vm_security_group_snap['remote_group_id'])
+                           
             
-                     
-        
-        
-    
-          
 @autolog.log_method(Logger, 'vmtasks_openstack.pause_vm')
 def pause_vm(cntx, db, instance):
     compute_service = nova.API(production=True)
@@ -737,8 +736,52 @@ def restore_vm_networks(cntx, db, restore):
                         pass
     return restored_net_resources                     
 
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')        
+def restore_vm_security_groups(cntx, db, restore):
+    network_service =  neutron.API(production=restore['restore_type'] != 'test')
+    restored_security_groups = {}
+    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])        
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type == 'security_group':
+            name = 'snap_of_' + db.get_metadata_value(snapshot_vm_resource.metadata, 'name')
+            description = 'snapshot - ' + db.get_metadata_value(snapshot_vm_resource.metadata, 'description')
+            security_group = network_service.security_group_create(cntx, name, description).get('security_group')
+            restored_security_groups[snapshot_vm_resource.resource_pit_id] = security_group['id']
+            restored_vm_resource_values = {'id': security_group['id'],
+                                           'vm_id': restore['id'],
+                                           'restore_id': restore['id'],       
+                                           'resource_type': 'security_group',
+                                           'resource_name':  security_group['name'],
+                                           'metadata': {},
+                                           'status': 'available'}
+            restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)
+            #delete default rules
+            for security_group_rule in security_group['security_group_rules']:
+                network_service.security_group_rule_delete(cntx, security_group_rule['id'])              
+        
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type == 'security_group':      
+            vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(cntx, snapshot_vm_resource.id)
+            for vm_security_group_rule in vm_security_group_rule_snaps:
+                vm_security_group_rule_values = pickle.loads(str(vm_security_group_rule.pickle))
+                if vm_security_group_rule_values['remote_group_id']:
+                    remote_group_id = restored_security_groups[vm_security_group_rule_values['remote_group_id']]
+                else:
+                    remote_group_id = None
+                
+                network_service.security_group_rule_create( cntx, 
+                                            restored_security_groups[snapshot_vm_resource.resource_pit_id],
+                                            vm_security_group_rule_values['direction'],
+                                            vm_security_group_rule_values['ethertype'],
+                                            vm_security_group_rule_values['protocol'], 
+                                            vm_security_group_rule_values['port_range_min'], 
+                                            vm_security_group_rule_values['port_range_max'],
+                                            vm_security_group_rule_values['remote_ip_prefix'],
+                                            remote_group_id) 
+    return restored_security_groups      
+
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm')                    
-def restore_vm(cntx, db, instance, restore, restored_net_resources):
+def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_security_groups):
 
     restored_compute_flavor = restore_vm_flavor(cntx, db, instance,restore)                      
 
@@ -751,6 +794,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources):
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
     return virtdriver.restore_vm( cntx, db, instance, restore, 
                                   restored_net_resources,
+                                  restored_security_groups,
                                   restored_compute_flavor,
                                   restored_nics,
                                   instance_options)

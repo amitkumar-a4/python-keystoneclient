@@ -57,6 +57,28 @@ class RestoreVMNetworks(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass    
 
+class RestoreSecurityGroups(task.Task):
+    def execute(self, context, restore):
+        return self.execute_with_log(context, restore)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)    
+
+    @autolog.log_method(Logger, 'RestoreSecurityGroups.execute')
+    def execute_with_log(self, context, restore):
+        # Restore the security groups
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+        
+        if True:
+            return vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
+        else:
+            return vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
+
+    @autolog.log_method(Logger, 'RestoreVMNetworks.revert') 
+    def revert_with_log(self, *args, **kwargs):
+        pass   
+
 class PreRestore(task.Task):
 
     def execute(self, context, instance, restore):
@@ -84,22 +106,27 @@ class PreRestore(task.Task):
 
 class RestoreVM(task.Task):
 
-    def execute(self, context, instance, restore, restored_net_resources):
-        return self.execute_with_log(context, instance, restore, restored_net_resources)
+    def execute(self, context, instance, restore, 
+                restored_net_resources, restored_security_groups):
+        return self.execute_with_log(context, instance, restore, 
+                                     restored_net_resources, restored_security_groups)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'RestoreVM.execute')
-    def execute_with_log(self, context, instance, restore, restored_net_resources):
+    def execute_with_log(self, context, instance, restore, 
+                         restored_net_resources, restored_security_groups):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
         if True:
-            ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore, restored_net_resources)
+            ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore, 
+                                                   restored_net_resources, restored_security_groups)
         else:
-            ret_val = vmtasks_vcloud.restore_vm(cntx, db, instance, restore, restored_net_resources)
+            ret_val = vmtasks_vcloud.restore_vm(cntx, db, instance, restore, 
+                                                restored_net_resources, restored_security_groups)
         
         return ret_val
     
@@ -509,11 +536,10 @@ class PostSnapshot(task.Task):
         db = WorkloadMgrDB().db
         db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
 
-
 def UnorderedPreSnapshot(instances):
     flow = uf.Flow("presnapshotuf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'])
         flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
@@ -523,7 +549,6 @@ def UnorderedFreezeVMs(instances):
     for index,item in enumerate(instances):
         flow.add(FreezeVM("FreezeVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     return flow
-
 
 def LinearFreezeVMs(instances):
     flow = lf.Flow("freezevmslf")
@@ -550,6 +575,7 @@ def LinearPauseVMs(instances):
 
 # Assume there is no ordering dependency between instances
 # snapshot each VM in parallel.
+
 def UnorderedSnapshotVMs(instances):
     flow = uf.Flow("snapshotvmuf")
     for index,item in enumerate(instances):
@@ -561,6 +587,7 @@ def UnorderedSnapshotVMs(instances):
 
 # Assume there is dependency between instances
 # snapshot each VM in the order that appears in the array.
+
 def LinearSnapshotVMs(instances):
     flow = lf.Flow("snapshotvmlf")
     for index,item in enumerate(instances):
@@ -572,6 +599,7 @@ def LinearSnapshotVMs(instances):
 # Assume there is no ordering dependency between instances
 # resume each VM in parallel. Usually there should not be any
 # order in which vms should be resumed.
+
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
     for index,item in enumerate(instances):
@@ -591,7 +619,6 @@ def UnorderedThawVMs(instances):
     for index,item in enumerate(instances):
         flow.add(ThawVM("ThawVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     return flow
-
 
 def LinearThawVMs(instances):
     flow = lf.Flow("thawvmslf")
@@ -624,14 +651,6 @@ def UnorderedPostSnapshot(instances):
 
     return flow
 
-def UnorderedPreSnapshot(instances):
-    flow = uf.Flow("presnapshotuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'])
-        flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
-
-    return flow
-
 def CreateVMSnapshotDBEntries(context, instances, snapshot):
     #create an entry for the VM in the workloadmgr database
     cntx = amqp.RpcContext.from_dict(context)
@@ -644,7 +663,6 @@ def CreateVMSnapshotDBEntries(context, instances, snapshot):
                    'status': 'creating',}
         snapshot_vm = db.snapshot_vm_create(cntx, options)
 
-
 def UnorderedPreRestore(instances):
     flow = uf.Flow("prerestoreuf")
     for index,item in enumerate(instances):
@@ -655,6 +673,7 @@ def UnorderedPreRestore(instances):
 
 # Assume there is no ordering dependency between instances
 # restore each VM in parallel.
+
 def UnorderedRestoreVMs(instances):
     flow = uf.Flow("restorevmuf")
     for index,item in enumerate(instances):
@@ -664,12 +683,14 @@ def UnorderedRestoreVMs(instances):
 
 # Assume there is dependency between instances
 # snapshot each VM in the order that appears in the array.
+
 def LinearRestoreVMs(instances):
     flow = lf.Flow("restorevmlf")
     for index,item in enumerate(instances):
         flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
     
     return flow
+
 def UnorderedPostRestore(instances):
     flow = uf.Flow("postrestoreuf")
     for index,item in enumerate(instances):

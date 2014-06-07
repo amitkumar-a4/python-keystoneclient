@@ -75,6 +75,10 @@ def post_snapshot(cntx, db, instance, snapshot):
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
     return None
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_security_groups')        
+def restore_vm_security_groups(cntx, db, restore):
+    return None    
   
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_nics')
 def get_vm_nics(cntx, db, instance, restore, restored_net_resources): 
@@ -97,7 +101,7 @@ def pre_restore_vm(cntx, db, instance, restore):
     return None
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm')                    
-def restore_vm(cntx, db, instance, restore, restored_net_resources):
+def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_security_groups):
     return None
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_restore_vm')

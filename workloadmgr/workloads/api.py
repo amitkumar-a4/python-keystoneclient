@@ -75,7 +75,7 @@ def _snapshot_create_callback(*args, **kwargs):
         while True:
             snapshot_details = workloadmgrapi.snapshot_get(tenantcontext, snapshot['id'])
             if snapshot_details['status'].lower() == "available" or snapshot_details['status'].lower() == "error":
-               break
+                break
             time.sleep(30)
     except Exception as ex:
         LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
@@ -94,28 +94,28 @@ class API(base.Base):
         # Compare class types instead of just looking for None so
         # that subclasses will create their own __single objects
         if classtype != type(classtype.__single):
-           classtype.__single = object.__new__(classtype, *args, **kwargs)
+            classtype.__single = object.__new__(classtype, *args, **kwargs)
         return classtype.__single
 
     def __init__(self, db_driver=None):
         if not hasattr(self, "workloads_rpcapi"):
-           self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
+            self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
 
         if not hasattr(self, "scheduler_rpcapi"):
            self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
 
         if not hasattr(self, "_engine"):
-           self._engine = create_engine(FLAGS.sql_connection)
+            self._engine = create_engine(FLAGS.sql_connection)
 
         if not hasattr(self, "_jobstore"):
-           self._jobstore = SQLAlchemyJobStore(engine=self._engine)
+            self._jobstore = SQLAlchemyJobStore(engine=self._engine)
 
         if not hasattr(self, "_scheduler"):
-           self._scheduler = Scheduler()
-           self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
-           self._scheduler.start()
+            self._scheduler = Scheduler()
+            self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
+            self._scheduler.start()
 
-           super(API, self).__init__(db_driver)
+            super(API, self).__init__(db_driver)
         
     def workload_type_get(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
@@ -189,18 +189,18 @@ class API(base.Base):
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
         workload_dict['metadata'] = metadata        
+        
                 
+        workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
+        workload_dict['jobschedule']['enabled'] = False
+
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
         for job in jobs:
-           if job.kwargs['workload_id'] == workload_id:
-              break
+            if job.kwargs['workload_id'] == workload_id:
+                workload_dict['jobschedule']['enabled'] = True
+                break
 
-        workload_dict['jobschedule'] = {'start_date':str(job.trigger.start_date),
-                                        'end_date':str(job.trigger.end_date),
-                                        'interval':str(job.trigger.interval),
-                                        'start_time':str(job.trigger.start_time),
-                                        'snapshots to retain':str(job.trigger.snapshotstokeep)}
 
         return workload_dict
 
@@ -216,23 +216,18 @@ class API(base.Base):
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
-        workload_dict['metadata'] = metadata 
+        workload_dict['metadata'] = metadata
+        
+        workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
+        workload_dict['jobschedule']['enabled'] = False 
 
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
-        job = None
-        for wj in jobs:
-           if wj.kwargs['workload_id'] == workload_id:
-              job = wj
-              break
+        for job in jobs:
+            if job.kwargs['workload_id'] == workload_id:
+                workload_dict['jobschedule']['enabled'] = True
+                break
 
-        if job:
-           workload_dict['jobschedule'] = {'Start Date':str(job.trigger.start_date),
-                                           'End Date':str(job.trigger.end_date),
-                                           'Interval (hr)':str(job.trigger.interval),
-                                           'Start Time':str(job.trigger.start_time),
-                                           'Snapshots Retention':str(job.trigger.snapshotstokeep),
-                                           'Next Snapshot Due':str(job.trigger.get_next_fire_time(datetime.now()))}
                 
         return workload_dict
     
@@ -245,9 +240,9 @@ class API(base.Base):
 
         return workloads
     
-    def workload_create(self, context, name, description, instances,
-                        workload_type_id, metadata, jobschedule,
-                        hours=int(24), availability_zone=None):
+    def workload_create(self, context, name, description, workload_type_id,
+                        instances, jobschedule, metadata,
+                        availability_zone=None):
         """
         Make the RPC call to create a workload.
         """
@@ -264,11 +259,10 @@ class API(base.Base):
                    'project_id': context.project_id,
                    'display_name': name,
                    'display_description': description,
-                   'hours':hours,
                    'status': 'creating',
                    'workload_type_id': workload_type_id,
                    'metadata' : metadata,
-                   'jobschedule': jobschedule,
+                   'jobschedule': pickle.dumps(jobschedule, 0),
                    'host': socket.gethostname(), }
 
         workload = self.db.workload_create(context, options)
@@ -290,15 +284,23 @@ class API(base.Base):
         # remove itself from the job queue
         # if we fail to schedule the job, we should fail the 
         # workload create request?
-        #_snapshot_create_callback([], kwargs={'workload_id':workload.id,  
-                                              #'user_id': workload.user_id, 
-                                              #'project_id':workload.project_id})
-        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                            jobschedule,
-                                            jobstore='jobscheduler_store', 
-                                            kwargs={'workload_id':workload.id,  
-                                                    'user_id': workload.user_id, 
-                                                    'project_id':workload.project_id})
+        #_snapshot_create_callback([], kwargs={  'workload_id':workload.id,  
+        #                                        'user_id': workload.user_id, 
+        #                                        'project_id':workload.project_id})
+        #
+        #               jobschedule = {'start_date': '06/05/2014',
+        #                              'end_date': '07/05/2015',
+        #                              'interval': '1 hr',
+        #                              'start_time': '2:30 PM',
+        #                              'snapshots_to_keep': '2'}
+        
+        if len(jobschedule):                                        
+            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                                jobschedule,
+                                                jobstore='jobscheduler_store', 
+                                                kwargs={'workload_id':workload.id,  
+                                                        'user_id': workload.user_id, 
+                                                        'project_id':workload.project_id})
         
         
         return workload
@@ -320,8 +322,9 @@ class API(base.Base):
         # First unschedule the job
         jobs = self._scheduler.get_jobs()
         for job in jobs:
-           if job.kwargs['workload_id'] == workload_id:
-              self._scheduler.unschedule_job(job)
+            if job.kwargs['workload_id'] == workload_id:
+                self._scheduler.unschedule_job(job)
+                break
 
         self.db.workload_delete(context, workload_id)
         
@@ -347,23 +350,25 @@ class API(base.Base):
         workload = self.workload_get(context, workload_id)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
-           if job.kwargs['workload_id'] == workload_id:
-              self._scheduler.unschedule_job(job)
+            if job.kwargs['workload_id'] == workload_id:
+                self._scheduler.unschedule_job(job)
+                break
 
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
-           if job.kwargs['workload_id'] == workload_id:
-              msg = _('Workload job scheduler is not paused')
-              raise exception.InvalidWorkloadMgr(reason=msg)
-
-        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                            workload['jobschedule'],
-                                            jobstore='jobscheduler_store', 
-                                            kwargs={'workload_id':workload_id,  
-                                                    'user_id': workload['user_id'],
-                                                    'project_id':workload['project_id']})
+            if job.kwargs['workload_id'] == workload_id:
+                msg = _('Workload job scheduler is not paused')
+                raise exception.InvalidWorkloadMgr(reason=msg)
+        jobschedule = pickle.loads(str(workload.jobschedule))
+        if len(jobschedule):    
+            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                                jobschedule,
+                                                jobstore='jobscheduler_store', 
+                                                kwargs={'workload_id':workload_id,  
+                                                        'user_id': workload['user_id'],
+                                                        'project_id':workload['project_id']})
 
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """
@@ -549,6 +554,7 @@ class API(base.Base):
         subnets_list = []
         routers_list = []
         flavors_list = []
+        security_groups_list = []
         try:
             resources = self.db.restored_vm_resources_get(context, restore_id, restore_id)
             for resource in resources:
@@ -562,6 +568,9 @@ class API(base.Base):
                     routers_list.append({'id':resource.id, 'name':resource.resource_name})   
                 elif resource.resource_type == 'flavor':
                     flavors_list.append({'id':resource.id, 'name':resource.resource_name}) 
+                elif resource.resource_type == 'security_group':
+                    security_groups_list.append({'id':resource.id, 'name':resource.resource_name})
+                    
         except Exception as ex:
             pass        
         restore_details.setdefault('ports', ports_list)
@@ -569,7 +578,7 @@ class API(base.Base):
         restore_details.setdefault('subnets', subnets_list)
         restore_details.setdefault('routers', routers_list) 
         restore_details.setdefault('flavors', flavors_list) 
-                
+        restore_details.setdefault('security_groups', security_groups_list)                
         return restore_details
     
     def restore_get_all(self, context, snapshot_id=None):
@@ -654,6 +663,14 @@ class API(base.Base):
                 msg = _("Error deleting flavor %(flavor_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'flavor_id': flavor['id'], 'exception': exception})
                 LOG.exception(exception)                                     
+
+        for security_group in restore_details['security_groups']:
+            try:
+                network_service.security_group_delete(context,security_group['id'])
+            except Exception as exception:
+                msg = _("Error deleting security_group %(security_group_id)s with failure: %(exception)s")
+                LOG.debug(msg, {'security_group_id': security_group['id'], 'exception': exception})
+                LOG.exception(exception)
 
         self.db.restore_delete(context, restore_id)
         

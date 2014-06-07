@@ -272,11 +272,12 @@ class API(base.Base):
         
         try:
             item = novaclient(context, self._production).servers.create(  name, image, flavor, 
-                                                                          meta, files,
-                                                                          reservation_id, min_count,
-                                                                          max_count, security_groups, userdata,
-                                                                          key_name, availability_zone,
-                                                                          block_device_mapping, nics=nics, scheduler_hints=scheduler_hints,
+                                                                          meta=meta, files=files,
+                                                                          reservation_id=reservation_id, min_count=min_count,
+                                                                          max_count=max_count, security_groups=security_groups, 
+                                                                          userdata=userdata, key_name=key_name,
+                                                                          availability_zone=availability_zone,block_device_mapping=block_device_mapping,
+                                                                          nics=nics, scheduler_hints=scheduler_hints,
                                                                           config_drive=config_drive, **kwargs)
             time.sleep(15)#TODO(gbasava): Creation is asynchronous. Wait and check for the status
             #Perform translation required if any
