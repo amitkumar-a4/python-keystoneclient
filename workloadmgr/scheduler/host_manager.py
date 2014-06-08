@@ -120,9 +120,10 @@ class HostState(object):
             self.updated = capability['timestamp']
 
     def consume_from_snapshot(self, snapshot):
-        """Incrementally update host state from an volume"""
-        pass
+        """Incrementally update host state snapshot request"""
         self.updated = timeutils.utcnow()
+        self.running_snapshots += self.running_snapshots
+        pass
 
     def __repr__(self):
         return ("host '%s': running snapshots: %s" %
