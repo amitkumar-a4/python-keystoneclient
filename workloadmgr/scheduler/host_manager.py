@@ -32,11 +32,17 @@ from workloadmgr import utils
 
 host_manager_opts = [
     cfg.ListOpt('scheduler_default_filters',
-                default=None,
+                default=[
+                    'AvailabilityZoneFilter',
+                    'CapacityFilter',
+                    #'CapabilitiesFilter'
+                ],
                 help='Which filter class names to use for filtering hosts '
                      'when not specified in the request.'),
     cfg.ListOpt('scheduler_default_weighers',
-                default=None,
+                default=[
+                    'CapacityWeigher'
+                ],
                 help='Which weigher class names to use for weighing hosts.')
 ]
 
@@ -122,7 +128,7 @@ class HostState(object):
     def consume_from_snapshot(self, snapshot):
         """Incrementally update host state snapshot request"""
         self.updated = timeutils.utcnow()
-        self.running_snapshots += self.running_snapshots
+        self.running_snapshots += 1
         pass
 
     def __repr__(self):
