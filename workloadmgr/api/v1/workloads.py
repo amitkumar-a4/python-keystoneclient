@@ -229,7 +229,7 @@ class WorkloadMgrsController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         try:
-            workload_workflow = self.workload_api.workload_pause(context, workload_id=id)
+            self.workload_api.workload_pause(context, workload_id=id)
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
 
@@ -239,7 +239,7 @@ class WorkloadMgrsController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         try:
-            workload_workflow = self.workload_api.workload_resume(context, workload_id=id)
+            self.workload_api.workload_resume(context, workload_id=id)
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error)) 
     

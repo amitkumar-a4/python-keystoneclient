@@ -361,14 +361,17 @@ class API(base.Base):
             if job.kwargs['workload_id'] == workload_id:
                 msg = _('Workload job scheduler is not paused')
                 raise exception.InvalidWorkloadMgr(reason=msg)
-        jobschedule = pickle.loads(str(workload.jobschedule))
-        if len(jobschedule):    
-            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                                jobschedule,
-                                                jobstore='jobscheduler_store', 
-                                                kwargs={'workload_id':workload_id,  
-                                                        'user_id': workload['user_id'],
-                                                        'project_id':workload['project_id']})
+        jobschedule = workload['jobschedule']
+        if len(jobschedule) < 5:
+                msg = _('Job scheduler settings are not available')
+                raise exception.InvalidWorkloadMgr(reason=msg)            
+   
+        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                            jobschedule,
+                                            jobstore='jobscheduler_store', 
+                                            kwargs={'workload_id':workload_id,  
+                                                    'user_id': workload['user_id'],
+                                                    'project_id':workload['project_id']})
 
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """
