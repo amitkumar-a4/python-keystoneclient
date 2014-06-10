@@ -15,9 +15,7 @@
 #    under the License.
 
 """
-The FilterScheduler is for creating volumes.
-You can customize this scheduler by specifying your own volume Filters and
-Weighing Functions.
+The FilterScheduler is for scheduling next snapshot operation
 """
 
 import operator
@@ -27,6 +25,7 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.scheduler import driver
+from workloadmgr.workloads import rpcapi as workloads_rpcapi
 from workloadmgr.scheduler import scheduler_options
 
 
@@ -41,6 +40,7 @@ class FilterScheduler(driver.Scheduler):
         self.cost_function_cache = None
         self.options = scheduler_options.SchedulerOptions()
         self.max_attempts = self._max_attempts()
+        self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
 
     def schedule(self, context, topic, method, *args, **kwargs):
         """The schedule() contract requires we return the one
@@ -56,54 +56,47 @@ class FilterScheduler(driver.Scheduler):
         """Stuff things into filter_properties.  Can be overridden in a
         subclass to add more data.
         """
-        vol = request_spec['volume_properties']
-        filter_properties['size'] = vol['size']
-        filter_properties['availability_zone'] = vol.get('availability_zone')
-        filter_properties['user_id'] = vol.get('user_id')
-        filter_properties['metadata'] = vol.get('metadata')
+        pass
 
-    def schedule_create_volume(self, context, request_spec, filter_properties):
-        weighed_host = self._schedule(context, request_spec,
-                                      filter_properties)
+    def schedule_workload_snapshot(self, context, request_spec, filter_properties):
+        weighed_host = self._schedule(context, request_spec, filter_properties)
 
         if not weighed_host:
             raise exception.NoValidHost(reason="")
 
         host = weighed_host.obj.host
-        volume_id = request_spec['volume_id']
         snapshot_id = request_spec['snapshot_id']
-        image_id = request_spec['image_id']
 
-        updated_volume = driver.volume_update_db(context, volume_id, host)
+        updated_snapshot = driver.snapshot_update_db(context, snapshot_id, host)
         self._post_select_populate_filter_properties(filter_properties,
                                                      weighed_host.obj)
 
         # context is not serializable
-        filter_properties.pop('context', None)
+        if filter_properties:
+           filter_properties.pop('context', None)
 
-        self.volume_rpcapi.create_volume(context, updated_volume, host,
-                                         request_spec=request_spec,
-                                         filter_properties=filter_properties,
-                                         allow_reschedule=True,
-                                         snapshot_id=snapshot_id,
-                                         image_id=image_id)
+        self.workloads_rpcapi.workload_snapshot(context, host, snapshot_id)
 
     def _post_select_populate_filter_properties(self, filter_properties,
                                                 host_state):
         """Add additional information to the filter properties after a host has
         been selected by the scheduling process.
         """
-        # Add a retry entry for the selected volume backend:
+        # Add a retry entry for the selected workloadmgr backend:
         self._add_retry_host(filter_properties, host_state.host)
 
     def _add_retry_host(self, filter_properties, host):
-        """Add a retry entry for the selected volume backend. In the event that
+        """Add a retry entry for the selected workloadmgr backend. In the event that
         the request gets re-scheduled, this entry will signal that the given
         backend has already been tried.
         """
+        if not filter_properties:
+            return
+
         retry = filter_properties.get('retry', None)
         if not retry:
             return
+
         hosts = retry['hosts']
         hosts.append(host)
 
@@ -115,11 +108,11 @@ class FilterScheduler(driver.Scheduler):
             raise exception.InvalidParameterValue(err=msg)
         return max_attempts
 
-    def _log_volume_error(self, volume_id, retry):
-        """If the request contained an exception from a previous volume
-        create operation, log it to aid debugging
+    def _log_snapshot_error(self, snapshot_id, retry):
+        """If the request contained an exception from a previous workload_snapshot operation, 
+           log it to aid debugging
         """
-        exc = retry.pop('exc', None)  # string-ified exception from volume
+        exc = retry.pop('exc', None)  # string-ified exception from snapshot
         if not exc:
             return  # no exception info from a previous attempt, skip
 
@@ -128,7 +121,7 @@ class FilterScheduler(driver.Scheduler):
             return  # no previously attempted hosts, skip
 
         last_host = hosts[-1]
-        msg = _("Error scheduling %(volume_id)s from last vol-service: "
+        msg = _("Error scheduling %(snapshot_id)s from last workloadmgr-service: "
                 "%(last_host)s : %(exc)s") % locals()
         LOG.error(msg)
 
@@ -149,16 +142,16 @@ class FilterScheduler(driver.Scheduler):
         else:
             retry = {
                 'num_attempts': 1,
-                'hosts': []  # list of volume service hosts tried
+                'hosts': []  # list of workloadmgr service hosts tried
             }
         filter_properties['retry'] = retry
 
-        volume_id = properties.get('volume_id')
-        self._log_volume_error(volume_id, retry)
+        snapshot_id = properties.get('snapshot_id')
+        self._log_snapshot_error(snapshot_id, retry)
 
         if retry['num_attempts'] > max_attempts:
             msg = _("Exceeded max scheduling attempts %(max_attempts)d for "
-                    "volume %(volume_id)s") % locals()
+                    "snapshot %(snapshot_id)s") % locals()
             raise exception.NoValidHost(reason=msg)
 
     def _schedule(self, context, request_spec, filter_properties=None):
@@ -167,13 +160,8 @@ class FilterScheduler(driver.Scheduler):
         """
         elevated = context.elevated()
 
-        volume_properties = request_spec['volume_properties']
-        # Since Cinder is using mixed filters from Oslo and it's own, which
-        # takes 'resource_XX' and 'volume_XX' as input respectively, copying
-        # 'volume_XX' to 'resource_XX' will make both filters happy.
-        resource_properties = volume_properties.copy()
-        volume_type = request_spec.get("volume_type", None)
-        resource_type = request_spec.get("volume_type", None)
+        snapshot_properties = request_spec['snapshot_properties']
+        resource_properties = snapshot_properties.copy()
         request_spec.update({'resource_properties': resource_properties})
 
         config_options = self._get_configuration_options()
@@ -184,22 +172,13 @@ class FilterScheduler(driver.Scheduler):
 
         filter_properties.update({'context': context,
                                   'request_spec': request_spec,
-                                  'config_options': config_options,
-                                  'volume_type': volume_type,
-                                  'resource_type': resource_type})
+                                  'config_options': config_options})
 
         self.populate_filter_properties(request_spec,
                                         filter_properties)
 
-        # Find our local list of acceptable hosts by filtering and
-        # weighing our options. we virtually consume resources on
-        # it so subsequent selections can adjust accordingly.
-
-        # Note: remember, we are using an iterator here. So only
-        # traverse this list once.
         hosts = self.host_manager.get_all_host_states(elevated)
 
-        # Filter local hosts based on requirements ...
         hosts = self.host_manager.get_filtered_hosts(hosts,
                                                      filter_properties)
         if not hosts:
@@ -212,5 +191,5 @@ class FilterScheduler(driver.Scheduler):
                                                             filter_properties)
         best_host = weighed_hosts[0]
         LOG.debug(_("Choosing %(best_host)s") % locals())
-        best_host.obj.consume_from_volume(volume_properties)
+        best_host.obj.consume_from_snapshot(snapshot_properties)
         return best_host

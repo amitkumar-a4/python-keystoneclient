@@ -26,32 +26,9 @@ LOG = logging.getLogger(__name__)
 
 
 class CapacityFilter(filters.BaseHostFilter):
-    """CapacityFilter filters based on volume host's capacity utilization."""
+    """CapacityFilter filters based on workloadmgr host's snapshots running."""
 
     def host_passes(self, host_state, filter_properties):
-        """Return True if host has sufficient capacity."""
-        volume_size = filter_properties.get('size')
+        """Return True if the workloadmgr node hasn't reached threshold running snaoshots."""
 
-        if host_state.free_capacity_gb is None:
-            # Fail Safe
-            LOG.error(_("Free capacity not set: "
-                        "volume node info collection broken."))
-            return False
-
-        free_space = host_state.free_capacity_gb
-        if free_space == 'infinite' or free_space == 'unknown':
-            # NOTE(zhiteng) for those back-ends cannot report actual
-            # available capacity, we assume it is able to serve the
-            # request.  Even if it was not, the retry mechanism is
-            # able to handle the failure by rescheduling
-            return True
-        reserved = float(host_state.reserved_percentage) / 100
-        free = math.floor(free_space * (1 - reserved))
-        if free < volume_size:
-            LOG.warning(_("Insufficient free space for volume creation "
-                        "(requested / avail): "
-                        "%(requested)s/%(available)s")
-                        % {'requested': volume_size,
-                           'available': free})
-
-        return free >= volume_size
+        return True

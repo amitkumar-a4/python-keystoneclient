@@ -32,17 +32,11 @@ from workloadmgr import utils
 
 host_manager_opts = [
     cfg.ListOpt('scheduler_default_filters',
-                default=[
-                    'AvailabilityZoneFilter',
-                    'CapacityFilter',
-                    'CapabilitiesFilter'
-                ],
+                default=None,
                 help='Which filter class names to use for filtering hosts '
                      'when not specified in the request.'),
     cfg.ListOpt('scheduler_default_weighers',
-                default=[
-                    'CapacityWeigher'
-                ],
+                default=None,
                 help='Which weigher class names to use for weighing hosts.')
 ]
 
@@ -91,16 +85,13 @@ class HostState(object):
         self.host = host
         self.update_capabilities(capabilities, service)
 
-        self.volume_backend_name = None
+        self.workloadmgr_backend_name = None # Swift/LocalFS/tvaultfs
         self.vendor_name = None
         self.driver_version = 0
-        self.storage_protocol = None
-        self.QoS_support = False
+
         # Mutable available resources.
-        # These will change as resources are virtually "consumed".
-        self.total_capacity_gb = 0
-        self.free_capacity_gb = None
-        self.reserved_percentage = 0
+        # These will change as new snapshot jobs are scheduled
+        self.running_snapshots = 0
 
         self.updated = None
 
@@ -114,40 +105,29 @@ class HostState(object):
             service = {}
         self.service = ReadOnlyDict(service)
 
-    def update_from_volume_capability(self, capability):
-        """Update information about a host from its volume_node info."""
+    def update_from_workloadmgr_capability(self, capability):
+        """Update information about a host from its workloadmgr node info."""
         if capability:
             if self.updated and self.updated > capability['timestamp']:
                 return
 
-            self.volume_backend = capability.get('volume_backend_name', None)
+            self.workloadmgr_backend = capability.get('workloadmgr_backend_name', None)
             self.vendor_name = capability.get('vendor_name', None)
             self.driver_version = capability.get('driver_version', None)
-            self.storage_protocol = capability.get('storage_protocol', None)
-            self.QoS_support = capability.get('QoS_support', False)
 
-            self.total_capacity_gb = capability['total_capacity_gb']
-            self.free_capacity_gb = capability['free_capacity_gb']
-            self.reserved_percentage = capability['reserved_percentage']
+            self.running_snapshots = capability['running_snapshots']
 
             self.updated = capability['timestamp']
 
-    def consume_from_volume(self, volume):
-        """Incrementally update host state from an volume"""
-        volume_gb = volume['size']
-        if self.free_capacity_gb == 'infinite':
-            # There's virtually infinite space on back-end
-            pass
-        elif self.free_capacity_gb == 'unknown':
-            # Unable to determine the actual free space on back-end
-            pass
-        else:
-            self.free_capacity_gb -= volume_gb
+    def consume_from_snapshot(self, snapshot):
+        """Incrementally update host state snapshot request"""
         self.updated = timeutils.utcnow()
+        self.running_snapshots += self.running_snapshots
+        pass
 
     def __repr__(self):
-        return ("host '%s': free_capacity_gb: %s" %
-                (self.host, self.free_capacity_gb))
+        return ("host '%s': running snapshots: %s" %
+                (self.host, self.running_snapshots))
 
 
 class HostManager(object):
@@ -173,19 +153,21 @@ class HostManager(object):
         """
         if filter_cls_names is None:
             filter_cls_names = FLAGS.scheduler_default_filters
-        if not isinstance(filter_cls_names, (list, tuple)):
+
+        if filter_cls_names and not isinstance(filter_cls_names, (list, tuple)):
             filter_cls_names = [filter_cls_names]
         good_filters = []
         bad_filters = []
-        for filter_name in filter_cls_names:
-            found_class = False
-            for cls in self.filter_classes:
-                if cls.__name__ == filter_name:
-                    found_class = True
-                    good_filters.append(cls)
-                    break
-            if not found_class:
-                bad_filters.append(filter_name)
+        if filter_cls_names:
+            for filter_name in filter_cls_names:
+                found_class = False
+                for cls in self.filter_classes:
+                    if cls.__name__ == filter_name:
+                        found_class = True
+                        good_filters.append(cls)
+                        break
+                if not found_class:
+                    bad_filters.append(filter_name)
         if bad_filters:
             msg = ", ".join(bad_filters)
             raise exception.SchedulerHostFilterNotFound(filter_name=msg)
@@ -199,23 +181,24 @@ class HostManager(object):
         """
         if weight_cls_names is None:
             weight_cls_names = FLAGS.scheduler_default_weighers
-        if not isinstance(weight_cls_names, (list, tuple)):
+        if weight_cls_names and not isinstance(weight_cls_names, (list, tuple)):
             weight_cls_names = [weight_cls_names]
 
         good_weighers = []
         bad_weighers = []
-        for weigher_name in weight_cls_names:
-            found_class = False
-            for cls in self.weight_classes:
-                if cls.__name__ == weigher_name:
-                    good_weighers.append(cls)
-                    found_class = True
-                    break
-            if not found_class:
-                bad_weighers.append(weigher_name)
-        if bad_weighers:
-            msg = ", ".join(bad_weighers)
-            raise exception.SchedulerHostWeigherNotFound(weigher_name=msg)
+        if weight_cls_names:
+            for weigher_name in weight_cls_names:
+                found_class = False
+                for cls in self.weight_classes:
+                    if cls.__name__ == weigher_name:
+                        good_weighers.append(cls)
+                        found_class = True
+                        break
+                if not found_class:
+                    bad_weighers.append(weigher_name)
+            if bad_weighers:
+                msg = ", ".join(bad_weighers)
+                raise exception.SchedulerHostWeigherNotFound(weigher_name=msg)
         return good_weighers
 
     def get_filtered_hosts(self, hosts, filter_properties,
@@ -259,7 +242,7 @@ class HostManager(object):
         """
 
         # Get resource usage across the available volume nodes:
-        topic = FLAGS.volume_topic
+        topic = FLAGS.workloads_topic
         volume_services = db.service_get_all_by_topic(context, topic)
         for service in volume_services:
             if not utils.service_is_up(service) or service['disabled']:
@@ -279,6 +262,6 @@ class HostManager(object):
                                                  dict(service.iteritems()))
                 self.host_state_map[host] = host_state
             # update host_state
-            host_state.update_from_volume_capability(capabilities)
+            host_state.update_from_workloadmgr_capability(capabilities)
 
         return self.host_state_map.itervalues()
