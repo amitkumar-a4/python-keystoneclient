@@ -114,6 +114,20 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='snapshot',
                        conditions={"method": ['POST']})
         
+        #pause and resume workload
+        mapper.connect("workloads_pause",
+                       "/{project_id}/workloads/{id}/pause",
+                       controller=self.resources['workloads'],
+                       action='pause',
+                       conditions={"method": ['POST']})
+        
+        mapper.connect("workloads_resume",
+                       "/{project_id}/workloads/{id}/resume",
+                       controller=self.resources['workloads'],
+                       action='resume',
+                       conditions={"method": ['POST']})
+                   
+        
         #get the workflow of a workload
         mapper.connect("workloads_workflow",
                        "/{project_id}/workloads/{id}/workflow",
