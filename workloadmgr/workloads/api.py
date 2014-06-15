@@ -347,12 +347,18 @@ class API(base.Base):
         """
         Pause workload job schedule. No RPC call is made
         """
+        paused = False
         workload = self.workload_get(context, workload_id)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 self._scheduler.unschedule_job(job)
+                paused = True
                 break
+
+        if not paused:
+           msg = _('Workload job scheduler is already paused')
+           raise exception.InvalidWorkloadMgr(reason=msg)
 
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)

@@ -61,17 +61,14 @@ class SchedulerManager(manager.Manager):
 
     def get_host_list(self, context):
         """Get a list of hosts from the HostManager."""
-        import pdb;pdb.set_trace()
         return self.driver.get_host_list()
 
     def get_service_capabilities(self, context):
         """Get the normalized set of capabilities for this zone."""
-        import pdb;pdb.set_trace()
         return self.driver.get_service_capabilities()
 
     def update_service_capabilities(self, context, service_name=None,
                                     host=None, capabilities=None, **kwargs):
-        import pdb;pdb.set_trace()
         """Process a capability update from a service node."""
         if capabilities is None:
             capabilities = {}

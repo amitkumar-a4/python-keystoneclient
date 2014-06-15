@@ -27,16 +27,23 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common.scheduler import filters
 from workloadmgr.openstack.common.scheduler import weights
+from workloadmgr.scheduler.weights.capacity import CapacityWeigher
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import utils
 
 host_manager_opts = [
     cfg.ListOpt('scheduler_default_filters',
-                default=None,
+                default=[
+                    'AvailabilityZoneFilter',
+                    'CapacityFilter',
+                    #'CapabilitiesFilter'
+                ],
                 help='Which filter class names to use for filtering hosts '
                      'when not specified in the request.'),
     cfg.ListOpt('scheduler_default_weighers',
-                default=None,
+                default=[
+                    'CapacityWeigher'
+                ],
                 help='Which weigher class names to use for weighing hosts.')
 ]
 
@@ -122,7 +129,7 @@ class HostState(object):
     def consume_from_snapshot(self, snapshot):
         """Incrementally update host state snapshot request"""
         self.updated = timeutils.utcnow()
-        self.running_snapshots += self.running_snapshots
+        self.running_snapshots += 1
         pass
 
     def __repr__(self):
@@ -141,9 +148,13 @@ class HostManager(object):
         self.filter_handler = filters.HostFilterHandler('workloadmgr.scheduler.'
                                                         'filters')
         self.filter_classes = self.filter_handler.get_all_classes()
-        self.weight_handler = weights.HostWeightHandler('workloadmgr.scheduler.'
-                                                        'weights')
+        self.weight_handler = weights.HostWeightHandler('workloadmgr.scheduler.weights')
         self.weight_classes = self.weight_handler.get_all_classes()
+        # Hardcode this for now. For some reason get_all_classes() is not getting
+        # all weight classes. The routine was working in the python interpreter
+        # though.
+        self.weight_classes = [CapacityWeigher]
+
 
     def _choose_host_filters(self, filter_cls_names):
         """Since the caller may specify which filters to use we need
@@ -204,10 +215,11 @@ class HostManager(object):
     def get_filtered_hosts(self, hosts, filter_properties,
                            filter_class_names=None):
         """Filter hosts and return only ones passing all filters"""
-        filter_classes = self._choose_host_filters(filter_class_names)
-        return self.filter_handler.get_filtered_objects(filter_classes,
-                                                        hosts,
-                                                        filter_properties)
+        return hosts
+        #filter_classes = self._choose_host_filters(filter_class_names)
+        #return self.filter_handler.get_filtered_objects(filter_classes,
+                                                        #hosts,
+                                                        #filter_properties)
 
     def get_weighed_hosts(self, hosts, weight_properties,
                           weigher_class_names=None):
