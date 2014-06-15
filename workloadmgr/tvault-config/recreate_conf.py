@@ -15,7 +15,8 @@ def populate_conf_directory():
     cork._store.save_roles()
 
     tstamp = str(datetime.utcnow())
-    username = password = 'admin'
+    username = 'admin'
+    password = 'password'
     cork._store.users[username] = {
         'role': 'admin',
         'hash': cork._hash(username, password),

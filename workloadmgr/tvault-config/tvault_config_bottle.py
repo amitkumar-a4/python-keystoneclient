@@ -39,6 +39,8 @@ bottle.debug(True)
 module_dir = os.path.dirname(__file__)
 if module_dir:
     os.chdir(os.path.dirname(__file__))
+    
+TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -163,8 +165,8 @@ def replace_line(file_path, pattern, substitute):
     new_file = open(abs_path,'w')
     old_file = open(file_path)
     for line in old_file:
-        if substitute in line:
-            new_file.write(substitute)
+        if pattern in line:
+            new_file.write(substitute+'\n')
         else:
             new_file.write(line)
     #close temp file
@@ -227,8 +229,14 @@ def register_service():
                                    tenant_name=config_data['admin_tenant_name'])
         #create user
         try:
-        
-            keystone.users.create( 't-workloadmgr', 'password', 'workloadmgr@trilioData.com',
+            try:
+                keystone.users.delete( 't-workloadmgr')
+            except Exception as err:
+                if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
+                   raise err
+            
+            
+            keystone.users.create( 't-workloadmgr', TVAULT_SERVICE_PASSWORD, 'workloadmgr@trilioData.com',
                                    tenant_id=config_data['service_tenant_id'],
                                    enabled=True)
         
@@ -349,6 +357,7 @@ def configure_service():
         
         config_wlm['DEFAULT']['sql_connection'] = config_data['sql_connection']
         config_wlm['DEFAULT']['rabbit_host'] = config_data['rabbit_host']
+        config_wlm['DEFAULT']['rabbit_password'] = config_data['rabbit_password']
 
         config_wlm.write()
         
@@ -554,18 +563,19 @@ def configure():
         if  config_inputs['nodetype'] == 'controller':
             #this is the first node
             config_data['wlm_controller_node'] = True
-            config_data['sql_connection'] = 'mysql://root:password@' + config_data['tvault_ipaddress'] + '/workloadmgr?charset=utf8'
-            config_data['rabbit_host'] = config_data['tvault_ipaddress']           
+            config_data['sql_connection'] = 'mysql://root:TVAULT_SERVICE_PASSWORD@' + config_data['tvault_ipaddress'] + '/workloadmgr?charset=utf8'
+            config_data['rabbit_host'] = config_data['tvault_ipaddress']
+            config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
         else:
             kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
             wlm_public_url = keystone.service_catalog.url_for(**kwargs)
             parse_result = urlparse(image_public_url)
             
             config_data['wlm_controller_node'] = False
-            config_data['sql_connection'] = 'mysql://root:password@' + parse_result.hostname + '/workloadmgr?charset=utf8'
+            config_data['sql_connection'] = 'mysql://root:TVAULT_SERVICE_PASSWORD@' + parse_result.hostname + '/workloadmgr?charset=utf8'
             config_data['rabbit_host'] = parse_result.hostname
+            config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 
-        
         bottle.redirect("/task_status")
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
