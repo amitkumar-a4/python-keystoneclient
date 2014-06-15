@@ -203,10 +203,8 @@ class WorkloadMgrsController(wsgi.Controller):
                                                              jobschedule,
                                                              metadata)
             new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
-        except exception.InvalidVolume as error:
-            raise exc.HTTPBadRequest(explanation=unicode(error))
-        except exception.VolumeNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
+        except Exception as error:
+            raise exc.HTTPInternalServerError(explanation=unicode(error))
  
         retval = self._view_builder.summary(req, new_workload_dict)
         return retval
