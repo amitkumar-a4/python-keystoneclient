@@ -95,12 +95,14 @@ def send_password_reset_email():
 
 @bottle.route('/change_password/:reset_code')
 @bottle.view('password_change_form')
+@authorize()
 def change_password(reset_code):
     """Show password change form"""
     return dict(reset_code=reset_code)
 
 @bottle.route('/change_password')
 @bottle.view('password_change_form')
+@authorize()
 def change_password():
     """Show password change form"""
     if aaa.current_user.email_addr == 'admin@localhost.local':
@@ -110,6 +112,7 @@ def change_password():
      
 
 @bottle.post('/change_password')
+@authorize()
 def change_password():
     """Change password"""
     aaa.current_user.update(pwd=post_get('newpassword'), email_addr="info@triliodata.com")
@@ -208,15 +211,18 @@ def get_lan_ip():
 
 @bottle.route('/configure')
 @bottle.view('configure_form')
+@authorize()
 def configure_form():
     return {}
 
 @bottle.route('/task_status')
 @bottle.view('task_status')
+@authorize()
 def task_status():
     return {}
 
 @bottle.route('/register_service')
+@authorize()
 def register_service():
     # Python code to here register the service with keystone
     if config_data['wlm_controller_node'] == False:
@@ -260,7 +266,7 @@ def register_service():
                             keystone.services.delete(service.id)
             #create service and endpoint
             wlm_service = keystone.services.create('trilioVaultWLM', 'workloads', 'trilioVault Workload Manager Service')
-            wlm_url = 'http://' + config_data['tvault_ipaddress'] + ':8780' + '/v1/$(tenant_id)s'
+            wlm_url = 'http://' + config_data['floating_ipaddress'] + ':8780' + '/v1/$(tenant_id)s'
             keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
             
         except Exception as err:
@@ -279,6 +285,7 @@ def register_service():
     return {'status':'Success'}
 
 @bottle.route('/configure_api')
+@authorize()
 def configure_api():
     # Python code to configure api service
     try:
@@ -341,6 +348,7 @@ def configure_api():
     return {'status':'Success'}
 
 @bottle.route('/configure_scheduler')
+@authorize()
 def configure_scheduler():
     # Python code here to configure scheduler
     try:
@@ -365,6 +373,7 @@ def configure_scheduler():
     return {'status':'Success'}
 
 @bottle.route('/configure_service')
+@authorize()
 def configure_service():
     # Python code here to configure workloadmgr
     try:
@@ -418,6 +427,7 @@ def configure_service():
     return {'status':'Success'}
 
 @bottle.route('/start_api')
+@authorize()
 def start_api():
     # Python code to configure api service
     try:
@@ -446,6 +456,7 @@ def start_api():
     return {'status':'Success'}
 
 @bottle.route('/start_scheduler')
+@authorize()
 def start_scheduler():
     # Python code here to configure scheduler
     try:
@@ -462,6 +473,7 @@ def start_scheduler():
     return {'status':'Success'}
 
 @bottle.route('/start_service')
+@authorize()
 def start_service():
     # Python code here to configure workloadmgr
     try:
@@ -477,6 +489,7 @@ def start_service():
     return {'status':'Success'}
 
 @bottle.route('/register_workloadtypes')
+@authorize()
 def register_workloadtypes():
     # Python code here to configure workloadmgr
     try:    
@@ -519,6 +532,7 @@ def register_workloadtypes():
     return {'status':'Success'}
 
 @bottle.post('/configure')
+@authorize()
 def configure():
     global config_data
     config_data = {}
@@ -526,6 +540,7 @@ def configure():
    
     config_data['tvault_ipaddress'] = get_lan_ip()
        
+    config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
     config_data['keystone_admin_url'] = config_inputs['keystone-admin-url']
     config_data['keystone_public_url'] = config_inputs['keystone-public-url']
     config_data['admin_username'] = config_inputs['admin-username']

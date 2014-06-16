@@ -34,7 +34,7 @@
 
 <div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
   <!-- Default panel contents -->
-  <div class="panel-heading"><h3 class="panel-title">tVault Virtual Machine Configuration</h3></div>
+  <div class="panel-heading"><h3 class="panel-title">trilioVault Appliance Configuration</h3></div>
   <div style="margin-left:auto; margin-right:auto; padding:20px">
 
 
@@ -42,6 +42,10 @@
     <input name = "nodetype" type="radio"  value="controller" checked>  Controller Node
     <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
     <div class="input-group">
+    <label class="input-group-addon">Floating IP Address	</label>
+    <input name="floating-ipaddress" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
+    </div><br>
+    <div class="input-group">    
     <label class="input-group-addon">Keystone Admin Url</label>
     <input name="keystone-admin-url" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
     </div><br>
