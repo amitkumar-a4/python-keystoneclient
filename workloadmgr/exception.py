@@ -80,48 +80,6 @@ def wrap_db_error(f):
     _wrap.func_name = f.func_name
     return _wrap
 
-def wrap_exception(notifier=None, publisher_id=None, event_type=None,
-                   level=None):
-    """This decorator wraps a method to catch any exceptions that may
-    get thrown. It logs the exception as well as optionally sending
-    it to the notification system.
-    """
-    # TODO(sandy): Find a way to import nova.notifier.api so we don't have
-    # to pass it in as a parameter. Otherwise we get a cyclic import of
-    # nova.notifier.api -> nova.utils -> nova.exception :(
-    def inner(f):
-        def wrapped(self, context, *args, **kw):
-            # Don't store self or context in the payload, it now seems to
-            # contain confidential information.
-            try:
-                return f(self, context, *args, **kw)
-            except Exception, e:
-                with excutils.save_and_reraise_exception():
-                    if notifier:
-                        payload = dict(exception=e)
-                        call_dict = safe_utils.getcallargs(f, *args, **kw)
-                        cleansed = _cleanse_dict(call_dict)
-                        payload.update({'args': cleansed})
-
-                        # Use a temp vars so we don't shadow
-                        # our outer definitions.
-                        temp_level = level
-                        if not temp_level:
-                            temp_level = notifier.ERROR
-
-                        temp_type = event_type
-                        if not temp_type:
-                            # If f has multiple decorators, they must use
-                            # functools.wraps to ensure the name is
-                            # propagated.
-                            temp_type = f.__name__
-
-                        notifier.notify(context, publisher_id, temp_type,
-                                        temp_level, payload)
-
-    return inner
-
-
 class WorkloadMgrException(Exception):
     """Base WorkloadMgr Exception
 
@@ -193,14 +151,6 @@ class InvalidSnapshot(Invalid):
     message = _("Invalid snapshot") + ": %(reason)s"
 
 
-class VolumeAttached(Invalid):
-    message = _("Volume %(volume_id)s is still attached, detach volume first.")
-
-
-class SfJsonEncodeFailure(WorkloadMgrException):
-    message = _("Failed to load data into json format")
-
-
 class InvalidRequest(Invalid):
     message = _("The request is invalid.")
 
@@ -254,17 +204,8 @@ class NotFound(WorkloadMgrException):
     safe = True
 
 
-class PersistentVolumeFileNotFound(NotFound):
-    message = _("Volume %(volume_id)s persistence file could not be found.")
-
-
 class VolumeNotFound(NotFound):
     message = _("Volume %(volume_id)s could not be found.")
-
-
-class SfAccountNotFound(NotFound):
-    message = _("Unable to locate account %(account_name)s on "
-                "Solidfire device")
 
 
 class VolumeNotFoundForInstance(VolumeNotFound):
@@ -314,9 +255,6 @@ class VolumeTypeExtraSpecsNotFound(NotFound):
 class SnapshotNotFound(NotFound):
     message = _("Snapshot %(snapshot_id)s could not be found.")
 
-
-class VolumeIsBusy(WorkloadMgrException):
-    message = _("deleting volume %(volume_name)s that has snapshot")
 
 
 class SnapshotIsBusy(WorkloadMgrException):
