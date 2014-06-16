@@ -127,6 +127,11 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='resume',
                        conditions={"method": ['POST']})
                    
+        mapper.connect("workloads_update",
+                       "/{project_id}/workloads/{id}",
+                       controller=self.resources['workloads'],
+                       action='update',
+                       conditions={"method": ['PUT']})
         
         #get the workflow of a workload
         mapper.connect("workloads_workflow",

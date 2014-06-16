@@ -62,6 +62,12 @@ class CreateDeserializer(wsgi.MetadataXMLDeserializer):
         workload = self._extract_workload(dom)
         return {'body': {'workload': workload}}
 
+class UpdateDeserializer(wsgi.MetadataXMLDeserializer):
+    def default(self, string):
+        dom = minidom.parseString(string)
+        workload = self._extract_workload(dom)
+        return {'body': {'workload': workload}}
+
     def _extract_workload(self, node):
         workload = {}
         workload_node = self.find_first_child_named(node, 'workload')
@@ -210,6 +216,21 @@ class WorkloadMgrsController(wsgi.Controller):
  
         retval = self._view_builder.summary(req, new_workload_dict)
         return retval
+
+    @wsgi.response(202)
+    @wsgi.serializers(xml=WorkloadTemplate)
+    @wsgi.deserializers(xml=UpdateDeserializer)
+    def update(self, req, id, body):
+        """Update workload."""
+        LOG.debug(_('Updating workload %s'), id)
+        if not self.is_valid_body(body, 'workload'):
+            raise exc.HTTPBadRequest()
+
+        context = req.environ['workloadmgr.context']
+        try:
+            self.workload_api.workload_modify(context, id, body)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
 
     def get_workflow(self, req, id):
         """Return workflow details of a given workload."""
