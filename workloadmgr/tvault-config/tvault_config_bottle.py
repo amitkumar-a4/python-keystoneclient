@@ -368,6 +368,11 @@ def configure_scheduler():
 def configure_service():
     # Python code here to configure workloadmgr
     try:
+        #configure host
+        replace_line('/etc/hosts', ' t-vault', config_data['tvault_ipaddress']+' ' + socket.gethostname())
+        replace_line('/etc/hosts', config_data['tvault_ipaddress']+' ', config_data['tvault_ipaddress']+' ' + socket.gethostname())
+        
+        #configure wlm        
         command = ['sudo', 'rm', "/etc/init/wlm-workloads.override"];
         #shell=FALSE for sudo to work.
         subprocess.call(command, shell=False) 
@@ -403,7 +408,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_protocol = ', 'auth_protocol = ' + config_data['keystone_admin_protocol'])
-
+        
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
            raise err
