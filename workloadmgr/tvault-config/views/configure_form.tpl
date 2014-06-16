@@ -35,39 +35,39 @@
 <div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
   <!-- Default panel contents -->
   <div class="panel-heading"><h3 class="panel-title">tVault Virtual Machine Configuration</h3></div>
-  <div class="panel-body" style="text-align:left">
-    <span>Please provide following input to configure your tVault virtual machine</span>
-  </div>
+  <div style="margin-left:auto; margin-right:auto; padding:20px">
+
 
   <form role="form" class="form-configure" action="/configure" method="post">
     <input name = "nodetype" type="radio"  value="controller" checked>  Controller Node
     <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
     <div class="input-group">
-    <label class="input-group-addon">Keystone Admin Url </label>
+    <label class="input-group-addon">Keystone Admin Url</label>
     <input name="keystone-admin-url" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Keystone Public Url </label>
+    <label class="input-group-addon">Keystone Public Url</label>
     <input name="keystone-public-url" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Administrator</label>
+    <label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
     <input name="admin-username" type="text" required="" placeholder="admin" class="form-control"> <br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Password</label>
+    <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
     <input name="admin-password" type="password" required="" placeholder="password" class="form-control"> <br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Admin Tenant</label>
+    <label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
     <input name="admin-tenant-name" type="text" required="" placeholder="admin" class="form-control">
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Region</label>
+    <label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
     <input name="region-name" type="text" required="" placeholder="RegionOne" class="form-control">
     </div><br>    
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
   </form>
+  </div>
 </div>
 </body>
 </html>
