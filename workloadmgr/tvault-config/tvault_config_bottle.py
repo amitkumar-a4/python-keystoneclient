@@ -285,15 +285,53 @@ def configure_api():
         if config_data['wlm_controller_node'] == True:
             command = ['sudo', 'rm', "/etc/init/wlm-api.override"];
             #shell=FALSE for sudo to work.
+            subprocess.call(command, shell=False) 
+            
+            #configure tvault-gui
+            command = ['sudo', 'rm', "/etc/init/tvault-gui.override"];
+            subprocess.call(command, shell=False) 
+            command = ['sudo', 'rm', "/etc/init/tvault-gui-worker.override"];
+            subprocess.call(command, shell=False)         
+            command = ['sudo', 'rm', "/etc/init/tvault-gui-worker-1.override"];
             subprocess.call(command, shell=False)        
+            command = ['sudo', 'rm', "/etc/init/tvault-gui-web.override"];
+            subprocess.call(command, shell=False)         
+            command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
+            subprocess.call(command, shell=False)
+                                    
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', 'ip: ', 'ip: ' + config_data['keystone_host'])
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', 'port: ', 'port: ' + str(config_data['keystone_public_port']))
+                   
         else:
             command = ['sudo', 'service', 'wlm-api', 'stop'];
-            #shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
             
             command = ['sudo', 'sh', '-c', "echo manual > /etc/init/wlm-api.override"]
-            #shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
+            
+            #configure tvault-gui
+            command = ['sudo', 'service', 'tvault-gui', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-worker', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-worker-1', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-web', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-web-1', 'stop'];
+            subprocess.call(command, shell=False)                                                
+            
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui.override"];
+            subprocess.call(command, shell=False) 
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-worker.override"];
+            subprocess.call(command, shell=False)         
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-worker-1.override"];
+            subprocess.call(command, shell=False)        
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web.override"];
+            subprocess.call(command, shell=False)         
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
+            subprocess.call(command, shell=False)
+            
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
            raise err
@@ -378,9 +416,22 @@ def configure_service():
 def start_api():
     # Python code to configure api service
     try:
-        command = ['sudo', 'service', 'wlm-api', 'restart'];
-        #shell=FALSE for sudo to work.
-        subprocess.call(command, shell=False)
+        if config_data['wlm_controller_node'] == True:
+            command = ['sudo', 'service', 'wlm-api', 'restart'];
+            subprocess.call(command, shell=False)
+            
+            #configure tvault-gui
+            command = ['sudo', 'service', 'tvault-gui', 'restart'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-worker', 'restart'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-worker-1', 'restart'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-web', 'restart'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'tvault-gui-web-1', 'restart'];
+            subprocess.call(command, shell=False)                                                
+        
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
            raise err
@@ -393,9 +444,10 @@ def start_api():
 def start_scheduler():
     # Python code here to configure scheduler
     try:
-        command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
-        #shell=FALSE for sudo to work.
-        subprocess.call(command, shell=False)
+        if config_data['wlm_controller_node'] == True:        
+            command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
+            #shell=FALSE for sudo to work.
+            subprocess.call(command, shell=False)
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
            raise err
