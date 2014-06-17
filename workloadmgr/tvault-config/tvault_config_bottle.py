@@ -306,8 +306,8 @@ def configure_api():
             command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
             subprocess.call(command, shell=False)
                                     
-            replace_line('/opt/tvault-gui/config/tvault-gui.yml', 'ip: ', 'ip: ' + config_data['keystone_host'])
-            replace_line('/opt/tvault-gui/config/tvault-gui.yml', 'port: ', 'port: ' + str(config_data['keystone_public_port']))
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
                    
         else:
             command = ['sudo', 'service', 'wlm-api', 'stop'];
