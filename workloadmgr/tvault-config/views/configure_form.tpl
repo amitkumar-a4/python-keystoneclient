@@ -43,7 +43,7 @@
     <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
     <div class="input-group">
     <label class="input-group-addon">Floating IP Address	</label>
-    <input name="floating-ipaddress" type="text" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
+    <input name="floating-ipaddress" type="text" required="" placeholder="192.168.2.200" class="form-control"><br>
     </div><br>
     <div class="input-group">    
     <label class="input-group-addon">Keystone Admin Url</label>

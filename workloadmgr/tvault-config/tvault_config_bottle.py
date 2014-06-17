@@ -378,9 +378,20 @@ def configure_service():
     # Python code here to configure workloadmgr
     try:
         #configure host
-        replace_line('/etc/hosts', ' t-vault', config_data['tvault_ipaddress']+' ' + socket.gethostname())
-        replace_line('/etc/hosts', config_data['tvault_ipaddress']+' ', config_data['tvault_ipaddress']+' ' + socket.gethostname())
-        
+        fh, abs_path = mkstemp()
+        new_file = open(abs_path,'w')
+        new_file.write('127.0.0.1 localhost\n')
+        new_file.write(config_data['tvault_ipaddress']+' '+socket.gethostname()+'\n')
+        #close temp file
+        new_file.close()
+        close(fh)
+        #Move new file
+        command = ['sudo', 'mv', abs_path, "/etc/hosts"];
+        subprocess.call(command, shell=False)
+        os.chmod('/etc/hosts', 0644)
+        command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+        subprocess.call(command, shell=False)        
+       
         #configure wlm        
         command = ['sudo', 'rm', "/etc/init/wlm-workloads.override"];
         #shell=FALSE for sudo to work.
