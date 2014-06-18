@@ -452,7 +452,6 @@ def _set_metadata_for_workload(context, workload_ref, metadata,
     for metadata_ref in workload_ref.metadata:
         orig_metadata[metadata_ref.key] = metadata_ref
 
-    import pdb;pdb.set_trace()
     for key, value in metadata.iteritems():
         metadata_values = {'workload_id': workload_ref.id,
                            'key': key,

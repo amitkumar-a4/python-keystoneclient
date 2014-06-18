@@ -65,7 +65,7 @@ def connect_server(host, port, user, password, verbose=False):
             connection = MongoClient(auth)
         else:
             auth=''
-            connection = MongoClient(host,port)
+            connection = MongoClient(host,int(port))
 
         if verbose:
             LOG.debug(_('Connected to ' + host +  ' on port ' + port +  '...'))
@@ -87,8 +87,8 @@ def getShards(conn):
 
 class DisableProfiling(task.Task):
 
-    def execute(self, host, port, username, password):
-        self.client = connect_server(host, port, username, password)
+    def execute(self, DBHost, DBPort, DBUser, DBPassword):
+        self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         # Make sure profile is disabled, but also save current
         # profiling state in the flow record? so revert as well
         # as ResumeDB task sets the right profiling level
@@ -98,7 +98,7 @@ class DisableProfiling(task.Task):
         
         cfghost = cfgsrvs[0].split(':')[0]
         cfgport = cfgsrvs[0].split(':')[1]
-        self.cfgclient = connect_server(cfghost, int(cfgport), username, password)
+        self.cfgclient = connect_server(cfghost, int(cfgport), DBUser, DBPassword)
         
         proflevel = self.cfgclient.admin.profiling_level()
         
@@ -113,16 +113,16 @@ class DisableProfiling(task.Task):
 
 class EnableProfiling(task.Task):
 
-    def execute(self, host, port, username, password, proflevel):
+    def execute(self, DBHost, DBPort, DBUser, DBPassword, proflevel):
         LOG.debug(_('EnableProfiling'))
-        self.client = connect_server(host, port, username, password)
+        self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
     
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
     
         cfghost = cfgsrvs[0].split(':')[0]
         cfgport = cfgsrvs[0].split(':')[1]
-        self.cfgclient = connect_server(cfghost, int(cfgport), username, password)
+        self.cfgclient = connect_server(cfghost, int(cfgport), DBUser, DBPassword)
     
         # Read profile level from the flow record?
         self.cfgclient.admin.set_profiling_level(proflevel)
@@ -130,7 +130,7 @@ class EnableProfiling(task.Task):
 
 class PauseDBInstance(task.Task):
 
-    def execute(self, h, username, password):
+    def execute(self, h, DBUser, DBPassword):
         LOG.debug(_('PauseDBInstance'))
         # Flush the database and hold the write # lock the instance.
         host_info = h['secondaryReplica'].split(':')
@@ -147,7 +147,7 @@ class PauseDBInstance(task.Task):
 
 class ResumeDBInstance(task.Task):
 
-    def execute(self, h, username, password):
+    def execute(self, h, DBUser, DBPassword):
         LOG.debug(_('ResumeDBInstance'))
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
@@ -156,9 +156,9 @@ class ResumeDBInstance(task.Task):
 
 class PauseBalancer(task.Task):
 
-    def execute(self, host, port, username, password):
+    def execute(self, DBHost, DBPort, DBUser, DBPassword):
         LOG.debug(_('PauseBalancer'))
-        self.client = connect_server(host, port, username, password)
+        self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         # Pause the DB
         db = self.client.config
     
@@ -175,9 +175,9 @@ class PauseBalancer(task.Task):
 
 class ResumeBalancer(task.Task):
 
-    def execute(self, host, port, username, password):
+    def execute(self, DBHost, DBPort, DBUser, DBPassword):
         LOG.debug(_('ResumeBalancer'))
-        self.client = connect_server(host, port, username, password)
+        self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         # Resume DB
     
         db = self.client.config
@@ -200,30 +200,33 @@ class ShutdownConfigServer(task.Task):
     #'ok' : 1
     #}
     #'''
-    def execute(self, host, port, username, password, hostusername, hostpassword, sshport=22, usesudo=False):
+    def execute(self, DBHost, DBPort, DBUser, DBPassword, HostUsername, HostPassword, HostSSHPort=22, RunAsRoot=False):
         # Get the list of config servers 
         # shutdown one of them
-        self.client = connect_server(host, port, username, password)
+        self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
         
         cfghost = cfgsrvs[0].split(':')[0]
         cfgport = cfgsrvs[0].split(':')[1]
-        self.cfgclient = connect_server(cfghost, int(cfgport), username, password)
+        self.cfgclient = connect_server(cfghost, int(cfgport), DBUser, DBPassword)
         
         cmdlineopts = self.cfgclient.admin.command('getCmdLineOpts')
         
         command = 'mongod --shutdown --port ' + cfgport + ' --configsvr'
-        if usesudo:
+        if RunAsRoot:
             command = 'sudo ' + command
         
         LOG.debug(_('ShutdownConfigServer'))
         try:
             client = paramiko.SSHClient()
             client.load_system_host_keys()
-            client.set_missing_host_key_policy(paramiko.WarningPolicy)
-            client.connect(cfghost, port=sshport, username=hostusername, password=hostpassword)
+            if HostPassword == '':
+               client.set_missing_host_key_policy(paramiko.WarningPolicy)
+            else:
+               client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword)
             
             stdin, stdout, stderr = client.exec_command(command)
             LOG.debug(_(stdout.read()))
@@ -239,7 +242,7 @@ class ShutdownConfigServer(task.Task):
             
             #ssh into the cfg host and start the config server
             if not isinstance(kwargs['result'], misc.Failure):
-                port = kwargs['sshport']
+                port = kwargs['HostSSHPort']
                 
                 command = ''
                 for c in cfgsrvcmdline['argv']:
@@ -248,8 +251,11 @@ class ShutdownConfigServer(task.Task):
                 try:
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
-                    client.set_missing_host_key_policy(paramiko.WarningPolicy)
-                    client.connect(cfghost, port=port, username=kwargs['hostusername'], password=kwargs['hostpassword'])
+                    if HostPassword == '':
+                       client.set_missing_host_key_policy(paramiko.WarningPolicy)
+                    else:
+                       client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    client.connect(cfghost, port=kwargs['HostSSHPort'], username=kwargs['HostUsername'], password=kwargs['HostPassword'])
                 
                     stdin, stdout, stderr = client.exec_command(command)
                     LOG.debug(_(stdout.read()))
@@ -260,7 +266,7 @@ class ShutdownConfigServer(task.Task):
 
 class ResumeConfigServer(task.Task):
 
-    def execute(self, cfgsrv, cfgsrvcmdline, hostusername, hostpassword, sshport=22, usesudo=False):
+    def execute(self, cfgsrv, cfgsrvcmdline, HostUsername, HostPassword, HostSSHPort=22, RunAsRoot=False):
         # Make sure all config servers are resumed
         cfghost = cfgsrv.split(':')[0]
         port = 22
@@ -269,14 +275,17 @@ class ResumeConfigServer(task.Task):
         for c in cfgsrvcmdline['argv']:
             command  = command + c + ' '
     
-        if usesudo:
+        if RunAsRoot:
             command = 'sudo ' + command
     
         try:
             client = paramiko.SSHClient()
             client.load_system_host_keys()
-            client.set_missing_host_key_policy(paramiko.WarningPolicy)
-            client.connect(cfghost, port=sshport, username=hostusername, password=hostpassword)
+            if HostPassword == '':
+               client.set_missing_host_key_policy(paramiko.WarningPolicy)
+            else:
+               client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword)
     
             stdin, stdout, stderr = client.exec_command(command)
             LOG.debug(_(stdout.read()))
@@ -293,7 +302,7 @@ def PauseDBInstances(hosts_list):
  
     for index, h in enumerate(hosts_list):
         host_info = h['secondaryReplica'].split(':')
-        flow.add(PauseDBInstance('PauseDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'username', 'password']))
+        flow.add(PauseDBInstance('PauseDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'DBUser', 'DBPassword']))
 
     return flow
 
@@ -302,7 +311,7 @@ def ResumeDBInstances(hosts_list):
  
     for index, h in enumerate(hosts_list):
         host_info = h['secondaryReplica'].split(':')
-        flow.add(ResumeDBInstance('ResumeDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'username', 'password']))
+        flow.add(ResumeDBInstance('ResumeDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'DBUser', 'DBPassword']))
 
     return flow
 
@@ -340,12 +349,12 @@ def secondaryhosts_to_backup(cntx, host, port, username, password):
 
     return hosts_to_backup
 
-def get_vms(cntx, host, port, username, password):
+def get_vms(cntx, dbhost, dbport, mongodbusername, mongodbpassword, sshport, hostusername, hostpassword):
     #
     # Creating connection to mongos server
     #
-    LOG.debug(_('Connecting to mongos server ' + host))
-    connection = connect_server(host, port, username, password)
+    LOG.debug(_('Connecting to mongos server ' + dbhost))
+    connection = connect_server(dbhost, dbport, mongodbusername, mongodbpassword)
 
     #
     # Getting sharding information
@@ -371,8 +380,11 @@ def get_vms(cntx, host, port, username, password):
         try:
             client = paramiko.SSHClient()
             client.load_system_host_keys()
-            client.set_missing_host_key_policy(paramiko.WarningPolicy)
-            client.connect(hostname, port=22, username='ubuntu', password='')
+            if hostpassword == '':
+               client.set_missing_host_key_policy(paramiko.WarningPolicy)
+            else:
+               client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(hostname, port=int(sshport), username=hostusername, password=hostpassword)
             stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr')
             interfaces[stdout.read().split('HWaddr')[1].strip()] = hostname
         finally:
@@ -447,10 +459,11 @@ class MongoDBWorkflow(workflow.Workflow):
     #
     def initflow(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        self._store['instances'] =  get_vms(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
-        hosts_to_backup = secondaryhosts_to_backup(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        self._store['instances'] =  get_vms(cntx, self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'], self._store['HostSSHPort'], self._store['HostUsername'], self._store['HostPassword'])
+        hosts_to_backup = secondaryhosts_to_backup(cntx, self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'])
         for index,item in enumerate(self._store['instances']):
-            self._store['instance_'+str(index)] = item
+            #self._store['instance_'+str(index)] = item
+            self._store['instance_'+item['vm_id']] = item
         for index, item in enumerate(hosts_to_backup):
             self._store['secondary_'+str(index)] = item
         
@@ -503,8 +516,8 @@ class MongoDBWorkflow(workflow.Workflow):
         #
         # Creating connection to mongos server
         #
-        LOG.debug(_( 'Connecting to mongos server ' + self._store['host']))
-        connection = connect_server(self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        LOG.debug(_( 'Connecting to mongos server ' + self._store['DBHost']))
+        connection = connect_server(self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'])
 
         #
         # Getting sharding information
@@ -595,14 +608,14 @@ class MongoDBWorkflow(workflow.Workflow):
 
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        instances = get_vms(cntx, self._store['host'], self._store['port'], self._store['username'], self._store['password'])
+        instances = get_vms(cntx, self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'], self._store['HostSSHPort'], self._store['HostUsername'], self._store['HostPassword'])
         return dict(instances=instances)
 
     def execute(self):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
 
-    #workloadmgr --os-auth-url http://$KEYSTONE_AUTH_HOST:5000/v2.0 --os-tenant-name demo --os-username demo --os-password $ADMIN_PASSWORD workload-type-create --metadata mongodb_username=string --metadata mongodb_password=password --metadata mongodb_host=string --metadata mongodb_port=string --metadata mongodb_hostusername=string --metadata mongodb_hostpassword=password --metadata mongodb_hostsshport=string --metadata mongodb_usesudo=boolean --metadata capabilities='discover:topology' --display-name "MongoDB" --display-description "MongoDB workload description"
+        #workloadmgr --os-auth-url http://$KEYSTONE_AUTH_HOST:5000/v2.0 --os-tenant-name admin --os-username admin --os-password $ADMIN_PASSWORD workload-type-create --metadata HostUsername=string --metadata HostPassword=password --metadata HostSSHPort=string --metadata DBHost=string --metadata DBPort=string --metadata DBUser=string --metadata DBPassword=password --metadata RunAsRoot=boolean --metadata capabilities='discover:topology' --display-name "MongoDB" --display-description "MongoDB workload description" --is-public True
 
 """
 #test code
