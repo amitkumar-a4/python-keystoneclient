@@ -1,14 +1,14 @@
-from systemtest import WorkloadMgrSystemTest
+from systemtests.tests.systemtest import WorkloadMgrSystemTest
 
 
-Description = 'Test1:                                          \n'\
+Description = 'Test3:                                          \n'\
               '      Create MongoDB workload using parameters  \n'\
               '      Delete the workload that is created         '
 
-class test1(WorkloadMgrSystemTest):
+class test3(WorkloadMgrSystemTest):
 
-    def __init__(self, client, description):
-        super(test1, self).__init__(client, description)
+    def __init__(self, workloadmgrclient, novaclient):
+        super(test3, self).__init__(workloadmgrclient, novaclient, Description)
 
     """
     Setup the conditions for test to run
@@ -16,19 +16,21 @@ class test1(WorkloadMgrSystemTest):
     def prepare(self, *args, **kwargs):
         # Make sure vm as specified in the argument vm1 exists 
         # on the production
+        pass
      
     """
     run the test
     """
     def run(self, *args, **kwargs):
         # Create MongoDB workload with the VM
-        self.client(
 
         # Make sure that the workload is created
+        pass
 
     """
     cleanup the test
     """
     def cleanup(self, *args, **kwargs):
         #Delete the workload that is created
+        pass
         

@@ -1,14 +1,14 @@
 
-from systemtest import WorkloadMgrSystemTest
+from systemtests.tests.systemtest import WorkloadMgrSystemTest
 
 Description = 'Test7:                                       \n'\
               '      Create new workload type               \n'\
               '      Delete workload type that is created     '
 
-class test1(WorkloadMgrSystemTest):
+class test7(WorkloadMgrSystemTest):
 
-    def __init__(self, client, description):
-        super(test1, self).__init__(client, description)
+    def __init__(self, workloadmgrclient, novaclient):
+        super(test7, self).__init__(workloadmgrclient, novaclient, Description)
 
     """
     Setup the conditions for test to run

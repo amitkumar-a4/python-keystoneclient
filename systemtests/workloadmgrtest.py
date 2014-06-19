@@ -20,6 +20,7 @@ import sys
 import logging
 
 from workloadmgrclient import client
+from novaclient import client as novaclient
 from workloadmgrclient import exceptions as exc
 import workloadmgrclient.extension
 from workloadmgrclient.openstack.common import strutils
@@ -239,12 +240,12 @@ class OpenStackWorkloadMgrShell(object):
 
         return parser
 
-    def _discover_tests(self, version):
+    def _discover_tests(self):
         tests = []
         for name, module in itertools.chain(
                 self._discover_tests_via_test_path()):
 
-            tests.append(module)
+            tests.append({'module':module, 'name':name})
 
         return tests
 
@@ -285,9 +286,12 @@ class OpenStackWorkloadMgrShell(object):
             yield name, module
 
     def _discover_tests_via_test_path(self):
-        test_path = os.path.abspath("tests/__init__.py")
-        dir_path = os.path.join(os.path.dirname(test_path))
-        for file in glob.glob1(dir_path, "*.py"):
+        module_path = os.path.dirname(os.path.abspath(__file__))
+        ext_path = os.path.join(module_path, 'tests')
+        ext_glob = os.path.join(ext_path, "*.py")
+
+        for ext_path in glob.iglob(ext_glob):
+            name = os.path.basename(ext_path)[:-3]
 
             if name == "__init__":
                 continue
@@ -295,9 +299,7 @@ class OpenStackWorkloadMgrShell(object):
             if name == "systemtest":
                 continue
 
-            name = "tests." + os.path.splitext(os.path.basename(file))[0]
-            # add package prefix to name, if required
-            module = __import__(name)
+            module = imp.load_source(name, ext_path)
             yield name, module
 
     def _add_bash_completion_subparser(self, subparsers):
@@ -345,7 +347,6 @@ class OpenStackWorkloadMgrShell(object):
         logger.addHandler(streamhandler)
 
     def invoke_workloadmgrclient(self, argv):
-        import pdb;pdb.set_trace()
         # Parse args once to find version and debug settings
         parser = self.get_base_parser()
         (options, args) = parser.parse_known_args(argv)
@@ -359,10 +360,6 @@ class OpenStackWorkloadMgrShell(object):
         subcommand_parser = self.get_subcommand_parser(
             options.os_workload_api_version)
         self.parser = subcommand_parser
-
-        if options.help or not argv:
-            subcommand_parser.print_help()
-            return 0
 
         args = subcommand_parser.parse_args(argv)
         self._run_extension_hooks('__post_parse_args__', args)
@@ -455,18 +452,17 @@ class OpenStackWorkloadMgrShell(object):
                                 http_log_debug=args.debug,
                                 cacert=cacert)
 
-        self.novaclient = novaclient.Client(options.os_compute_api_version,
+        os_compute_api_version = '1.1'
+        service_type = 'compute'
+        self.novaclient = novaclient.Client('1.1', # this need to dynamically set 
                                 os_username, os_password, os_tenant_name,
-                                tenant_id=os_tenant_id, user_id=os_user_id,
+                                tenant_id=os_tenant_id,
                                 auth_url=os_auth_url, insecure=insecure,
                                 region_name=os_region_name, endpoint_type=endpoint_type,
                                 extensions=self.extensions, service_type=service_type,
-                                service_name=service_name, auth_system=os_auth_system,
-                                auth_plugin=auth_plugin, auth_token=auth_token,
-                                volume_service_name=volume_service_name,
-                                timings=args.timings, bypass_url=bypass_url,
-                                os_cache=os_cache, http_log_debug=options.debug,
-                                cacert=cacert, timeout=timeout)
+                                service_name=service_name,
+                                http_log_debug=options.debug,
+                                cacert=cacert)
 
         try:
             if not utils.isunauthenticated(args.func):
@@ -476,7 +472,15 @@ class OpenStackWorkloadMgrShell(object):
         except exc.AuthorizationFailure:
             raise exc.CommandError("Unable to authorize user")
 
-        args.func(self.cs, args)
+        for test in self._discover_tests():
+            # Instantiate the test
+            t = getattr(test['module'], test['name'])(self.cs, self.novaclient)
+ 
+            print(t.description)
+            t.prepare()
+            t.run()
+            t.verify()
+            t.cleanup()
 
     def _run_extension_hooks(self, hook_type, *args, **kwargs):
         """Run hooks for all registered extensions."""

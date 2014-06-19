@@ -1,4 +1,4 @@
-from systemtest import WorkloadMgrSystemTest
+from systemtests.tests.systemtest import WorkloadMgrSystemTest
 
 Description = 'Test11:                                       \n'\
               '      Create Parallel workload                \n'\
@@ -9,22 +9,23 @@ Description = 'Test11:                                       \n'\
 
 class test11(WorkloadMgrSystemTest):
 
-    def __init__(self, client, description):
-        super(test11, self).__init__(client, description)
+    def __init__(self, workloadmgrclient, novaclient):
+        super(test11, self).__init__(workloadmgrclient, novaclient, Description)
 
     """
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        pass
      
     """
     run the test
     """
     def run(self, *args, **kwargs):
         # Create new workload type of various metadata components
-        self.client()
 
         # Make sure the workload type has required elements
+        pass
 
     """
     cleanup the test
@@ -32,3 +33,4 @@ class test11(WorkloadMgrSystemTest):
     def cleanup(self, *args, **kwargs):
         # delete the workload
         # delete the workloadtype that is created
+        pass

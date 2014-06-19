@@ -1,4 +1,4 @@
-from systemtest import WorkloadMgrSystemTest
+from systemtests.tests.systemtest import WorkloadMgrSystemTest
 
 Description = 'Test1:                                       \n'\
               '      Create Serial workload using VM1       \n'\
@@ -6,8 +6,8 @@ Description = 'Test1:                                       \n'\
 
 class test1(WorkloadMgrSystemTest):
 
-    def __init__(self, client, description):
-        super(test1, self).__init__(client, description)
+    def __init__(self, workloadmgrclient, novaclient):
+        super(test1, self).__init__(workloadmgrclient, novaclient, Description)
 
     """
     Setup the conditions for test to run
@@ -22,7 +22,6 @@ class test1(WorkloadMgrSystemTest):
     """
     def run(self, *args, **kwargs):
         # Create serial workload with the VM
-        #self.client()
         pass
         # Make sure that the workload is created
 

@@ -1,14 +1,14 @@
-from systemtest import WorkloadMgrSystemTest
+from systemtests.tests.systemtest import WorkloadMgrSystemTest
 
 
 Description = 'Test6:                                       \n'\
               '      Create Composite workload using VM1    \n'\
               '      Delete the workload that is created      '
 
-class test1(WorkloadMgrSystemTest):
+class test6(WorkloadMgrSystemTest):
 
-    def __init__(self, client, description):
-        super(test1, self).__init__(client, description)
+    def __init__(self, workloadmgrclient, novaclient):
+        super(test6, self).__init__(workloadmgrclient, novaclient, Description)
 
     """
     Setup the conditions for test to run

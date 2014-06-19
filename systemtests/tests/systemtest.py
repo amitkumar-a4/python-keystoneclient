@@ -1,5 +1,4 @@
 import sys
-from novaclient import client
 
 class WorkloadMgrSystemTest(object):
     """
@@ -9,19 +8,20 @@ class WorkloadMgrSystemTest(object):
     """
     describe what this test will do
     """
-    description = ""
+    _description = ""
 
     @property
     def description(self):
         """description of the test."""
-        return self.description
+        return self._description
 
     """
     Base class constructor
     """
-    def __init__(self, wmgrclient, novaclient):
-        self.wmgrclient = client
+    def __init__(self, wmgrclient, novaclient, description):
+        self.wmgrclient = wmgrclient
         self.novaclient = novaclient
+        self._description = description
 
     """
     Setup the conditions for test to run
