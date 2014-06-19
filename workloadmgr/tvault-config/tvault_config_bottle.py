@@ -1,12 +1,12 @@
 #!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2013 Federico Ceratto and others, see AUTHORS file.
-# Released under LGPLv3+ license, see LICENSE.txt
-#
-# Cork example web application
+# Copyright (c) 2014 TrilioData, Inc.
+# All Rights Reserved.
 #
 # The following users are already available:
-#  admin/admin, demo/demo
+#  admin/password
+
 import os
 import socket
 import fcntl
@@ -188,7 +188,8 @@ def get_interface_ip(ifname):
                             ifname[:15]))[20:24])
 
 def get_lan_ip():
-    ip = socket.gethostbyname(socket.gethostname())
+    #ip = socket.gethostbyname(socket.gethostname())
+    ip = '127.0.0.1'
     if ip.startswith("127.") and os.name != "nt":
         interfaces = [
             "eth0",
@@ -249,8 +250,10 @@ def register_service():
         except Exception as err:
             if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
                raise err
-            if str(err.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
+            elif str(err.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
                 pass
+            elif str(err.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
+                pass            
             else:
                bottle.redirect("/configure")        
         
@@ -290,9 +293,27 @@ def configure_api():
     # Python code to configure api service
     try:
         if config_data['wlm_controller_node'] == True:
+            #configure mysql server
+            command = ['sudo', 'service', 'mysql', 'start'];
+            subprocess.call(command, shell=False)
+            stmt = 'GRANT ALL PRIVILEGES ON *.* TO ' +  '\'' + 'root' + '\'' + '@' +'\'' + '%' + '\'' + ' identified by ' + '\'' + TVAULT_SERVICE_PASSWORD + '\'' + ';'
+            command = ['sudo', 'mysql', '-uroot', '-ppassword', '-h127.0.0.1', '-e', stmt]
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'mysql', 'restart'];
+            subprocess.call(command, shell=False)
+            
+            #configure rabittmq
+            command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'start']
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
+            subprocess.call(command, shell=False)
+                     
+                
             command = ['sudo', 'rm', "/etc/init/wlm-api.override"];
             #shell=FALSE for sudo to work.
-            subprocess.call(command, shell=False) 
+            subprocess.call(command, shell=False)
             
             #configure tvault-gui
             command = ['sudo', 'rm', "/etc/init/tvault-gui.override"];
@@ -310,6 +331,12 @@ def configure_api():
             replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
                    
         else:
+            command = ['sudo', 'service', 'mysql', 'stop'];
+            subprocess.call(command, shell=False)    
+            
+            command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
+            subprocess.call(command, shell=False)
+            
             command = ['sudo', 'service', 'wlm-api', 'stop'];
             subprocess.call(command, shell=False)
             
@@ -377,52 +404,32 @@ def configure_scheduler():
 def configure_service():
     # Python code here to configure workloadmgr
     try:
-        #configure host
-        fh, abs_path = mkstemp()
-        new_file = open(abs_path,'w')
-        new_file.write('127.0.0.1 localhost\n')
-        new_file.write(config_data['tvault_ipaddress']+' '+socket.gethostname()+'\n')
-        #close temp file
-        new_file.close()
-        close(fh)
-        #Move new file
-        command = ['sudo', 'mv', abs_path, "/etc/hosts"];
-        subprocess.call(command, shell=False)
-        os.chmod('/etc/hosts', 0644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
-        subprocess.call(command, shell=False)        
-       
         #configure wlm        
         command = ['sudo', 'rm', "/etc/init/wlm-workloads.override"];
         #shell=FALSE for sudo to work.
         subprocess.call(command, shell=False) 
-        
-        config_wlm = ConfigObj('/etc/workloadmgr/workloadmgr.cfg')
-        config_wlm['DEFAULT'] = {}
 
-        config_wlm['DEFAULT']['glance_production_host'] = config_data['glance_production_host']
-        config_wlm['DEFAULT']['glance_production_port'] = config_data['glance_production_port']
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_host = ', 'glance_production_host = ' + config_data['glance_production_host'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_port = ', 'glance_production_port = ' + str(config_data['glance_production_port']))
         
-        config_wlm['DEFAULT']['neutron_admin_auth_url'] = config_data['neutron_admin_auth_url'] 
-        config_wlm['DEFAULT']['neutron_admin_auth_url'] = config_data['neutron_admin_auth_url']
-        config_wlm['DEFAULT']['neutron_admin_auth_url'] = config_data['neutron_admin_auth_url']
-        config_wlm['DEFAULT']['neutron_admin_auth_url'] = config_data['neutron_admin_auth_url'] 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_auth_url = ', 'neutron_admin_auth_url = ' + config_data['neutron_admin_auth_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_production_url = ', 'neutron_production_url = ' + config_data['neutron_production_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_username = ', 'neutron_admin_username = ' + config_data['neutron_admin_username'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_password = ', 'neutron_admin_password = ' + config_data['neutron_admin_password'])
         
-        config_wlm['DEFAULT']['nova_admin_auth_url'] = config_data['nova_admin_auth_url']
-        config_wlm['DEFAULT']['nova_admin_username'] = config_data['nova_admin_username']
-        config_wlm['DEFAULT']['nova_admin_username'] = config_data['nova_admin_username']
-        config_wlm['DEFAULT']['nova_production_endpoint_template'] = config_data['nova_production_endpoint_template']
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_auth_url = ', 'nova_admin_auth_url = ' + config_data['nova_admin_auth_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_production_endpoint_template = ', 'nova_production_endpoint_template = ' + config_data['nova_production_endpoint_template'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_username = ', 'nova_admin_username = ' + config_data['nova_admin_username'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_password = ', 'nova_admin_password = ' + config_data['nova_admin_password'])
         
-        config_wlm['DEFAULT']['cinder_production_endpoint_template'] = config_data['cinder_production_endpoint_template']
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_production_endpoint_template = ', 'cinder_production_endpoint_template = ' + config_data['cinder_production_endpoint_template'])
         
-        config_wlm['DEFAULT']['wlm_vault_service'] = config_data['wlm_vault_service']
-        config_wlm['DEFAULT']['wlm_vault_swift_url'] = config_data['wlm_vault_swift_url']
-        
-        config_wlm['DEFAULT']['sql_connection'] = config_data['sql_connection']
-        config_wlm['DEFAULT']['rabbit_host'] = config_data['rabbit_host']
-        config_wlm['DEFAULT']['rabbit_password'] = config_data['rabbit_password']
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_service = ', 'wlm_vault_service = ' + config_data['wlm_vault_service'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['wlm_vault_swift_url'])
 
-        config_wlm.write()
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])
         
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
@@ -512,13 +519,14 @@ def register_workloadtypes():
                                    tenant_id=config_data['admin_tenant_id'])
             workload_types = wlm.workload_types.list()
             if len(workload_types) == 0:
-                metadata = { 'Username':'string', 'Password':'password', 'Namenode':'string', 'NamenodeSSHPort':'string', 'capabilities':'discover:topology'}
+                #Hadoop
+                metadata = { 'Namenode':'string', 'NamenodeSSHPort':'string', 'Username':'string', 'Password':'password', 'capabilities':'discover:topology'}
                 wlm.workload_types.create(metadata=metadata, is_public = True, name= 'Hadoop', description = 'Hadoop workload')
                 
                 #MongoDB
-                metadata = {'username':'string', 'password':'password', 'host':'string', 'port':'string',
-                            'hostusername':'string', 'hostpassword':'password', 'hostsshport':'string',
-                            'usesudo':'boolean', 'capabilities':'discover:topology'}         
+                metadata = {'HostUsername':'string', 'HostPassword':'password', 'HostSSHPort':'string', 'DBHost':'string',
+                            'DBPort':'string', 'DBUser':'string', 'DBPassword':'password',
+                            'RunAsRoot':'boolean', 'capabilities':'discover:topology'}         
                 wlm.workload_types.create(metadata=metadata, is_public = True, name= 'MongoDB', description = 'MongoDB workload')
                 
                 #Cassandra
@@ -550,8 +558,24 @@ def configure():
     config_inputs = bottle.request.POST
    
     config_data['tvault_ipaddress'] = get_lan_ip()
-       
     config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
+    
+    #configure host
+    fh, abs_path = mkstemp()
+    new_file = open(abs_path,'w')
+    new_file.write('127.0.0.1 localhost\n')
+    new_file.write(config_data['floating_ipaddress']+' '+socket.gethostname()+'\n')
+    #close temp file
+    new_file.close()
+    close(fh)
+    #Move new file
+    command = ['sudo', 'mv', abs_path, "/etc/hosts"];
+    subprocess.call(command, shell=False)
+    os.chmod('/etc/hosts', 0644)
+    command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+    subprocess.call(command, shell=False)        
+
+    
     config_data['keystone_admin_url'] = config_inputs['keystone-admin-url']
     config_data['keystone_public_url'] = config_inputs['keystone-public-url']
     config_data['admin_username'] = config_inputs['admin-username']
@@ -646,16 +670,16 @@ def configure():
         if  config_inputs['nodetype'] == 'controller':
             #this is the first node
             config_data['wlm_controller_node'] = True
-            config_data['sql_connection'] = 'mysql://root:TVAULT_SERVICE_PASSWORD@' + config_data['tvault_ipaddress'] + '/workloadmgr?charset=utf8'
-            config_data['rabbit_host'] = config_data['tvault_ipaddress']
+            config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+            config_data['rabbit_host'] = config_data['floating_ipaddress']
             config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
         else:
             kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
             wlm_public_url = keystone.service_catalog.url_for(**kwargs)
-            parse_result = urlparse(image_public_url)
+            parse_result = urlparse(wlm_public_url)
             
             config_data['wlm_controller_node'] = False
-            config_data['sql_connection'] = 'mysql://root:TVAULT_SERVICE_PASSWORD@' + parse_result.hostname + '/workloadmgr?charset=utf8'
+            config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
             config_data['rabbit_host'] = parse_result.hostname
             config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 

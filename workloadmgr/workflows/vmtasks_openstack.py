@@ -740,6 +740,9 @@ def restore_vm_networks(cntx, db, restore):
 def restore_vm_security_groups(cntx, db, restore):
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
+    
+    return restored_security_groups
+    
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])        
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'security_group':

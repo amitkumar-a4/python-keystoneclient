@@ -197,7 +197,7 @@ $( document ).ready(function() {
 
 <div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
   <!-- Default panel contents -->
-  <div class="panel-heading">Configuring tvault virtual machine </div>
+  <div class="panel-heading">Configuring trilioVault Appliance </div>
   <!-- List group -->
   <ul class="list-group">
     <li id="register-service" class="list-group-item"><span class="glyphicon"></span>

@@ -858,7 +858,7 @@ class LibvirtDriver(driver.ComputeDriver):
         restored_instance = compute_service.create_server(cntx, restored_instance_name, 
                                                           restored_compute_image, restored_compute_flavor, 
                                                           nics=restored_nics,
-                                                          security_groups=restored_security_group_ids, 
+                                                          #security_groups=restored_security_group_ids, 
                                                           availability_zone=availability_zone)
         
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
