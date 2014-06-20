@@ -107,11 +107,11 @@ def workload_type_create(context, values):
 def workload_type_update(context, id, values, purge_metadata=False):
     return IMPL.workload_type_update(context, id, values, purge_metadata)
 
-def workload_types_get(context, session=None):
-    return IMPL.workload_types_get(context, session=None)
+def workload_types_get(context):
+    return IMPL.workload_types_get(context)
 
-def workload_type_get(context, id, session=None):
-    return IMPL.workload_type_get(context, id, session=None)
+def workload_type_get(context, id):
+    return IMPL.workload_type_get(context, id)
 
 def workload_type_delete(context, id):
     return IMPL.workload_type_delete(context, id)
@@ -154,24 +154,12 @@ def workload_delete(context, workload_id):
 def workload_vms_create(context, values):
     return IMPL.workload_vms_create(context, values)
 
-def workload_vms_get(context, workload_id, session=None):
-    return IMPL.workload_vms_get(context, workload_id, session)
+def workload_vms_get(context, workload_id):
+    return IMPL.workload_vms_get(context, workload_id)
 
 def workload_vms_delete(context, vm_id, workload_id):
     return IMPL.workload_vms_delete(context, vm_id, workload_id)
     
-def scheduledjob_create(context, scheduledjob):
-    return IMPL.scheduledjob_create(context, scheduledjob)
-
-def scheduledjob_delete(context, scheduledjob):
-    return IMPL.scheduledjob_delete(context, scheduledjob)
-
-def scheduledjob_get(context):
-    return IMPL.scheduledjob_get(context)
-
-def scheduledjob_update(context, scheduledjob):
-    return IMPL.scheduledjob_update(context, scheduledjob)
-
 def snapshot_create(context, values):
     return IMPL.snapshot_create(context, values)
 
@@ -179,8 +167,8 @@ def snapshot_delete(context, snapshot_id):
     """Destroy the snapshot or raise if it does not exist."""
     return IMPL.snapshot_delete(context, snapshot_id)
 
-def snapshot_get(context, snapshot_id, session=None):
-    return IMPL.snapshot_get(context, snapshot_id, session)
+def snapshot_get(context, snapshot_id):
+    return IMPL.snapshot_get(context, snapshot_id)
     
 def snapshot_get_all(context, workload_id=None):
     return IMPL.snapshot_get_all(context, workload_id)    
@@ -203,11 +191,11 @@ def snapshot_update(context, snapshot_id, values):
 def snapshot_vm_create(context, values):
     return IMPL.snapshot_vm_create(context, values)
 
-def snapshot_vms_get(context, snapshot_id, session=None):
-    return IMPL.snapshot_vms_get(context, snapshot_id, session)
+def snapshot_vms_get(context, snapshot_id):
+    return IMPL.snapshot_vms_get(context, snapshot_id)
 
-def snapshot_vm_get(context, vm_id, snapshot_id, session=None):
-    return IMPL.snapshot_vm_get(context, vm_id, snapshot_id, session)
+def snapshot_vm_get(context, vm_id, snapshot_id):
+    return IMPL.snapshot_vm_get(context, vm_id, snapshot_id)
 
 def snapshot_vm_update(context, vm_id, snapshot_id, values):
     return IMPL.snapshot_vm_update(context, vm_id, snapshot_id, values)
@@ -218,8 +206,8 @@ def snapshot_vm_delete(context, vm_id, snapshot_id):
 def vm_recent_snapshot_create(context, values):
     return IMPL.vm_recent_snapshot_create(context, values)
 
-def vm_recent_snapshot_get(context, vm_id, session=None):
-    return IMPL.vm_recent_snapshot_get(context, vm_id, session)
+def vm_recent_snapshot_get(context, vm_id):
+    return IMPL.vm_recent_snapshot_get(context, vm_id)
 
 def vm_recent_snapshot_update(context, vm_id, values):
     return IMPL.vm_recent_snapshot_update(context, vm_id, values)
@@ -233,14 +221,14 @@ def snapshot_vm_resource_create(context, values):
 def snapshot_vm_resource_update(context, id, vaules, purge_metadata=False):
     return IMPL.snapshot_vm_resource_update(context, id, vaules, purge_metadata)
 
-def snapshot_vm_resources_get(context, vm_id, snapshot_id, session=None):
-    return IMPL.snapshot_vm_resources_get(context, vm_id, snapshot_id, session)
+def snapshot_vm_resources_get(context, vm_id, snapshot_id):
+    return IMPL.snapshot_vm_resources_get(context, vm_id, snapshot_id)
 
-def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name, session=None):
-    return IMPL.snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name, session)
+def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name):
+    return IMPL.snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name)
 
-def snapshot_vm_resource_get(context, id, session=None):
-    return IMPL.snapshot_vm_resource_get(context, id, session)
+def snapshot_vm_resource_get(context, id):
+    return IMPL.snapshot_vm_resource_get(context, id)
 
 def snapshot_vm_resource_delete(context, id, vm_id, snapshot_id):
     return IMPL.snapshot_vm_resource_delete(context, id, vm_id, snapshot_id)
@@ -251,14 +239,14 @@ def vm_disk_resource_snap_create(context, values):
 def vm_disk_resource_snap_update(context, id, vaules, purge_metadata=False):
     return IMPL.vm_disk_resource_snap_update(context, id, vaules, purge_metadata)
 
-def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, session=None):
-    return IMPL.vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, session)
+def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id):
+    return IMPL.vm_disk_resource_snaps_get(context, snapshot_vm_resource_id)
 
-def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id, session=None):
-    return IMPL.vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id, session)
+def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
+    return IMPL.vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id)
 
-def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session=None):
-    return IMPL.vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session)
+def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id):
+    return IMPL.vm_disk_resource_snap_get(context, vm_disk_resource_snap_id)
 
 def vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id):
     return IMPL.vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id)
@@ -269,11 +257,11 @@ def vm_network_resource_snap_create(context, values):
 def vm_network_resource_snap_update(context, id, vaules, purge_metadata=False):
     return IMPL.vm_network_resource_snap_update(context, id, vaules, purge_metadata)
 
-def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session=None):
-    return IMPL.vm_network_resource_snaps_get(context, snapshot_vm_resource_id, session)
+def vm_network_resource_snaps_get(context, snapshot_vm_resource_id):
+    return IMPL.vm_network_resource_snaps_get(context, snapshot_vm_resource_id)
 
-def vm_network_resource_snap_get(context, snapshot_vm_resource_id, session=None):
-    return IMPL.vm_network_resource_snap_get(context, snapshot_vm_resource_id, session)
+def vm_network_resource_snap_get(context, snapshot_vm_resource_id):
+    return IMPL.vm_network_resource_snap_get(context, snapshot_vm_resource_id)
 
 def vm_network_resource_snaps_delete(context, snapshot_vm_resource_id):
     return IMPL.vm_network_resource_snaps_delete(context, snapshot_vm_resource_id)
@@ -284,11 +272,11 @@ def vm_security_group_rule_snap_create(context, values):
 def vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, vaules, purge_metadata=False):
     return IMPL.vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, vaules, purge_metadata)
 
-def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, session=None):
-    return IMPL.vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, session)
+def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id):
+    return IMPL.vm_security_group_rule_snaps_get(context, vm_security_group_snap_id)
 
-def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session=None):
-    return IMPL.vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session)
+def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
+    return IMPL.vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id)
 
 def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
     return IMPL.vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id)
@@ -296,8 +284,8 @@ def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
 def get_metadata_value(metadata, key, default=None):
     return IMPL.get_metadata_value(metadata, key, default=None)
 
-def restore_get(context, restore_id, session=None):
-    return IMPL.restore_get(context, restore_id, session)
+def restore_get(context, restore_id):
+    return IMPL.restore_get(context, restore_id)
 
 def restore_get_all(context):
     return IMPL.restore_get_all(context)
@@ -308,8 +296,8 @@ def restore_get_all_by_project(context, project_id):
 def restore_get_all_by_project_snapshot(context, project_id, snapshot_id):
     return IMPL.restore_get_all_by_project_snapshot(context, project_id, snapshot_id)
 
-def restore_show(context, restore_id, session=None):
-    return IMPL.restore_show(context, restore_id, session=None)
+def restore_show(context, restore_id):
+    return IMPL.restore_show(context, restore_id)
 
 def restore_create(context, values):
     return IMPL.restore_create(context, values)
@@ -326,17 +314,17 @@ def restored_vm_create(context, values):
 def restored_vm_update(context, vm_id, restore_id, values):
     return IMPL.restored_vm_update(context, vm_id, restore_id, values)
 
-def restored_vm_get(context, restore_id, session=None):
-    return IMPL.restored_vm_get(context, restore_id, session)
+def restored_vm_get(context, restore_id):
+    return IMPL.restored_vm_get(context, restore_id)
 
 def restored_vm_delete(context, vm_id, restore_id):
     return IMPL.restored_vm_delete(context, vm_id, restore_id)
 
-def restored_vm_resource_metadata_create(context, values, session=None):
-    return IMPL.restored_vm_resource_metadata_create(context, values, session)
+def restored_vm_resource_metadata_create(context, values):
+    return IMPL.restored_vm_resource_metadata_create(context, values)
 
-def restored_vm_resource_metadata_delete(context, metadata_ref, session=None):
-    return IMPL.restored_vm_resource_metadata_delete(context, metadata_ref, session)
+def restored_vm_resource_metadata_delete(context, metadata_ref):
+    return IMPL.restored_vm_resource_metadata_delete(context, metadata_ref)
 
 def restored_vm_resource_create(context, values):
     return IMPL.restored_vm_resource_create(context, values)
@@ -344,14 +332,14 @@ def restored_vm_resource_create(context, values):
 def restored_vm_resource_update(context, restored_vm_resource_id, values, purge_metadata=False):
     return IMPL.restored_vm_resource_update(context, restored_vm_resource_id, values, purge_metadata)
 
-def restored_vm_resources_get(context, vm_id, restore_id, session=None):
-    return IMPL.restored_vm_resources_get(context, vm_id, restore_id, session)
+def restored_vm_resources_get(context, vm_id, restore_id):
+    return IMPL.restored_vm_resources_get(context, vm_id, restore_id)
 
-def restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name, session=None):
-    return IMPL.restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name, session)
+def restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name):
+    return IMPL.restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name)
 
-def restored_vm_resource_get(context, id, session=None):
-    return IMPL.restored_vm_resource_get(context, id, session)
+def restored_vm_resource_get(context, id):
+    return IMPL.restored_vm_resource_get(context, id)
 
 def restored_vm_resource_delete(context, id, vm_id, restore_id):
     return IMPL.restored_vm_resource_delete(context, id, vm_id, restore_id)

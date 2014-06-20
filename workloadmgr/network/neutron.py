@@ -151,7 +151,7 @@ class API(base.Base):
         rv_subnets = self.get_subnet(context, subnet_id)
         search_opts = {'network_id': rv_subnets['subnet']['network_id']}        
         rv_ports = self.get_ports(context, **search_opts)
-        for port in rv_ports['ports']:
+        for port in rv_ports:
             self.delete_port(context, port['id'])
         client.delete_subnet(subnet_id) 
     
