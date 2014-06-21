@@ -1,7 +1,7 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test10:                                       \n'\
+Description = 'Test20:                                       \n'\
               '      Create Serial workload                  \n'\
               '      Take a snapshot                         \n'\
               '      Monitor the snapshot progress           \n'\
@@ -10,10 +10,10 @@ Description = 'Test10:                                       \n'\
 
 vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
 
-class test10(WorkloadMgrSystemTest):
+class test20(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test10, self).__init__(testshell, Description)
+        super(test20, self).__init__(testshell, Description)
 
     """
     Setup the conditions for test to run
@@ -22,14 +22,14 @@ class test10(WorkloadMgrSystemTest):
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
-        self.serialtype = None
+        self.paralleltype = None
         for type in self._testshell.cs.workload_types.list():
-            if type.name == 'Serial':
-               self.serialtype = type
+            if type.name == 'Parallel':
+               self.paralleltype = type
                break
      
-        if self.serialtype == None:
-           raise Exception("Serial workloadtype not found")
+        if self.paralleltype == None:
+           raise Exception("Parallel workloadtype not found")
  
         # We will use VM4
         self._vms = []
@@ -57,7 +57,7 @@ class test10(WorkloadMgrSystemTest):
         if len(instances) != 5:
            raise Exception("There are less than 5 vms")
 
-        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.serialtype.id, instances, {}, {})
+        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.paralleltype.id, instances, {}, {})
         status = self.workload.status
         print "Waiting for workload status to be either available or error"
         while 1:
