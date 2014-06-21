@@ -57,11 +57,11 @@ class WorkloadMgrClientArgumentParser(argparse.ArgumentParser):
                       'subp': progparts[2]})
 
 
-class OpenStackWorkloadMgrShell(object):
+class WorkloadMgrTestShell(object):
 
     def get_base_parser(self):
         parser = WorkloadMgrClientArgumentParser(
-            prog='workloadmgr',
+            prog='workloadmgrtest',
             description=__doc__.strip(),
             epilog='See "workloadmgr help COMMAND" '
                    'for help on a specific command.',
@@ -364,14 +364,6 @@ class OpenStackWorkloadMgrShell(object):
         args = subcommand_parser.parse_args(argv)
         self._run_extension_hooks('__post_parse_args__', args)
 
-        # Short-circuit and deal with help right away.
-        if args.func == self.do_help:
-            self.do_help(args)
-            return 0
-        elif args.func == self.do_bash_completion:
-            self.do_bash_completion(args)
-            return 0
-
         (os_username, os_password, os_tenant_name, os_auth_url,
          os_region_name, os_tenant_id, endpoint_type, insecure,
          service_type, service_name, username, apikey, projectid, 
@@ -474,13 +466,18 @@ class OpenStackWorkloadMgrShell(object):
 
         for test in self._discover_tests():
             # Instantiate the test
-            t = getattr(test['module'], test['name'])(self.cs, self.novaclient)
+            t = getattr(test['module'], test['name'])(self)
  
             print(t.description)
-            t.prepare()
-            t.run()
-            t.verify()
-            t.cleanup()
+            try:
+               t.prepare()
+               t.run()
+               t.verify()
+               print("SUCCESS: %s" % test['name'])
+            except Exception:
+               print("FAILED: %s" % test['name'])
+            finally:
+               t.cleanup()
 
     def _run_extension_hooks(self, hook_type, *args, **kwargs):
         """Run hooks for all registered extensions."""
@@ -520,7 +517,6 @@ class OpenStackWorkloadMgrShell(object):
             self.parser.print_help()
 
 
-# I'm picky about my shell help.
 class OpenStackHelpFormatter(argparse.HelpFormatter):
     def start_section(self, heading):
         # Title-case the headings
@@ -530,7 +526,7 @@ class OpenStackHelpFormatter(argparse.HelpFormatter):
 
 def main():
     try:
-        OpenStackWorkloadMgrShell().invoke_workloadmgrclient(map(strutils.safe_decode, sys.argv[1:]))
+        WorkloadMgrTestShell().invoke_workloadmgrclient(map(strutils.safe_decode, sys.argv[1:]))
     except KeyboardInterrupt:
         print("... terminating workloadmgr client", file=sys.stderr)
         sys.exit(130)

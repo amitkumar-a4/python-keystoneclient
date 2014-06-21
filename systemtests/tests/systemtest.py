@@ -18,9 +18,8 @@ class WorkloadMgrSystemTest(object):
     """
     Base class constructor
     """
-    def __init__(self, wmgrclient, novaclient, description):
-        self.wmgrclient = wmgrclient
-        self.novaclient = novaclient
+    def __init__(self, testshell, description):
+        self._testshell = testshell
         self._description = description
 
     """

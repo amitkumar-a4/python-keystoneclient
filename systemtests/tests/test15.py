@@ -9,8 +9,8 @@ Description = 'Test15:                                       \n'\
 
 class test15(WorkloadMgrSystemTest):
 
-    def __init__(self, workloadmgrclient, novaclient):
-        super(test15, self).__init__(workloadmgrclient, novaclient, Description)
+    def __init__(self, testshell):
+        super(test15, self).__init__(testshell, Description)
 
     """
     Setup the conditions for test to run
