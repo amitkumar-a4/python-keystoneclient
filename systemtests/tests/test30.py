@@ -1,14 +1,18 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test3:                                                                     \n'\
-              '      Create MongoDB workload with mongodb1 as one of the node in cluster  \n'\
-              '      Delete the workload that is created                                    '
 
-class test3(WorkloadMgrSystemTest):
+Description = 'Test30:                                       \n'\
+              '      Create MongoDB workload with mongodb1 as one of the node in cluster  \n'\
+              '      Take a snapshot                         \n'\
+              '      Monitor the snapshot progress           \n'\
+              '      Delete snapshot                         \n'\
+              '      Delete workload that is created           '
+
+class test30(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test3, self).__init__(testshell, Description)
+        super(test30, self).__init__(testshell, Description)
         self.workload = None
         self.metadata = {'DBPort': '27019', 
                          'DBUser': '', 
@@ -25,7 +29,7 @@ class test3(WorkloadMgrSystemTest):
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test3, self).prepare(args, kwargs)
+        super(test30, self).prepare(args, kwargs)
         # Make sure vm as specified in the argument vm1 exists 
         # on the production
         workloads = self._testshell.cs.workloads.list()
@@ -69,6 +73,26 @@ class test3(WorkloadMgrSystemTest):
               break
            time.sleep(5)
 
+        print "Performing snapshot operations"
+        # perform snapshot operation
+        self._testshell.cs.workloads.snapshot(self.workload.id, name="MongoDBSnapshot", description="First snapshot of MongoDB workload")
+
+        snapshots = []
+        for s in self._testshell.cs.snapshots.list():
+            if s.workload_id == self.workload.id:
+                snapshots.append(s)
+
+        if len(snapshots) != 1:
+           raise Exception("Error: More than one snapshot")
+ 
+        print "Waiting for snapshot to become available"
+        while 1:
+           self.snapshot = self._testshell.cs.snapshots.get(snapshots[0].id)
+           status = self.snapshot.status
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
     def verify(self, *args, **kwargs):
         if len(self.workload.instances) != len(self.instances):
            raise Exception("Number of instances in the workload is not 1")
@@ -86,11 +110,15 @@ class test3(WorkloadMgrSystemTest):
         if self.workload.description != "MongoDB Workload":
            raise Exception("workload name is not 'MongoDB Workload'")
 
+        self.snapshot = self._testshell.cs.snapshots.get(self.snapshot.id)
+        # Also make sure right number of objects are created in swift
+
     """
     cleanup the test
     """
     def cleanup(self, *args, **kwargs):
         #Delete the workload that is created
+        self._testshell.cs.snapshots.delete(self.snapshot.id)
         wid = self.workload.id
         self._testshell.cs.workloads.delete(self.workload.id)
 

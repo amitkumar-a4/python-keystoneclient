@@ -19,6 +19,8 @@ class test10(WorkloadMgrSystemTest):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        # Cleanup swift first
+        super(test10, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         

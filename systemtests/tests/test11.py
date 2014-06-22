@@ -22,6 +22,8 @@ class test11(WorkloadMgrSystemTest):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        # Cleanup swift first
+        super(test11, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
@@ -115,8 +117,8 @@ class test11(WorkloadMgrSystemTest):
     verify the test
     """
     def verify(self, *args, **kwargs):
-        self.snapshot = self._testshell.cs.snapshots.get(self.snapshot.id)
-        self.restore = self._testshell.cs.snapshots.get(self.restore.id)
+        self.verify_snapshot(self.snapshot.id)
+        self.verify_restore(self.restore.id)
 
     """
     cleanup the test

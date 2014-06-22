@@ -12,6 +12,8 @@ class test2(WorkloadMgrSystemTest):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        # Cleanup swift first
+        super(test2, self).prepare(args, kwargs)
         # Make sure vm as specified in the argument vm1 exists 
         # on the production
         pass

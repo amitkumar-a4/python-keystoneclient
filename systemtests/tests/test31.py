@@ -1,15 +1,24 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test3:                                                                     \n'\
-              '      Create MongoDB workload with mongodb1 as one of the node in cluster  \n'\
-              '      Delete the workload that is created                                    '
 
-class test3(WorkloadMgrSystemTest):
+Description = 'Test31:                                       \n'\
+              '      Create MongoDB workload with mongodb1 as one of the node in cluster  \n'\
+              '      Take a snapshot                         \n'\
+              '      Monitor the snapshot progress           \n'\
+              '      Restore the snapshot                    \n'\
+              '      Delete snapshot                         \n'\
+              '      Delete workload that is created           '
+
+class test31(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test3, self).__init__(testshell, Description)
+        super(test31, self).__init__(testshell, Description)
+
         self.workload = None
+        self.snapshot = None
+        self.restore = None
+
         self.metadata = {'DBPort': '27019', 
                          'DBUser': '', 
                          'DBHost': 'mongodb1',
@@ -25,7 +34,7 @@ class test3(WorkloadMgrSystemTest):
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test3, self).prepare(args, kwargs)
+        super(test31, self).prepare(args, kwargs)
         # Make sure vm as specified in the argument vm1 exists 
         # on the production
         workloads = self._testshell.cs.workloads.list()
@@ -69,6 +78,47 @@ class test3(WorkloadMgrSystemTest):
               break
            time.sleep(5)
 
+        print "Performing snapshot operations"
+        # perform snapshot operation
+        self._testshell.cs.workloads.snapshot(self.workload.id, name="MongoDBSnapshot", description="First snapshot of MongoDB workload")
+
+        snapshots = []
+        for s in self._testshell.cs.snapshots.list():
+            if s.workload_id == self.workload.id:
+                snapshots.append(s)
+
+        if len(snapshots) != 1:
+           raise Exception("Error: More than one snapshot")
+ 
+        print "Waiting for snapshot to become available"
+        while 1:
+           self.snapshot = self._testshell.cs.snapshots.get(snapshots[0].id)
+           status = self.snapshot.status
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
+        print "Performing restore operations"
+        # perform snapshot operation
+        self._testshell.cs.snapshots.restore(self.snapshot.id, name="Restore", description="First Restore of MongoDB workload")
+
+        restores = []
+        for r in self._testshell.cs.restores.list():
+            if r.snapshot_id == self.snapshot.id:
+                restores.append(r)
+
+        if len(restores) != 1:
+           raise Exception("Error: More than one restore")
+ 
+        self.restore = None
+        print "Waiting for restore to become available"
+        while 1:
+           self.restore = self._testshell.cs.restores.get(restores[0].id)
+           status = self.restore.status
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
     def verify(self, *args, **kwargs):
         if len(self.workload.instances) != len(self.instances):
            raise Exception("Number of instances in the workload is not 1")
@@ -86,11 +136,24 @@ class test3(WorkloadMgrSystemTest):
         if self.workload.description != "MongoDB Workload":
            raise Exception("workload name is not 'MongoDB Workload'")
 
+        # Also make sure right number of objects are created in swift
+        self.verify_snapshot(self.snapshot.id)
+
+        # Make sure that right resources are created on the production
+        # and the workload is running
+        self.verify_restore(self.restore.id)
+
     """
     cleanup the test
     """
     def cleanup(self, *args, **kwargs):
+        if restore:
+            self._testshell.cs.restores.delete(self.restore.id)
+
         #Delete the workload that is created
+        if self.snapshot:
+            self._testshell.cs.snapshots.delete(self.snapshot.id)
+
         wid = self.workload.id
         self._testshell.cs.workloads.delete(self.workload.id)
 

@@ -22,6 +22,8 @@ class test21(WorkloadMgrSystemTest):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        # Cleanup swift first
+        super(test21, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
@@ -104,7 +106,6 @@ class test21(WorkloadMgrSystemTest):
  
         self.restore = None
         print "Waiting for restore to become available"
-        import pdb;pdb.set_trace()
         while 1:
            self.restore = self._testshell.cs.restores.get(restores[0].id)
            status = self.restore.status
@@ -116,8 +117,8 @@ class test21(WorkloadMgrSystemTest):
     verify the test
     """
     def verify(self, *args, **kwargs):
-        self.snapshot = self._testshell.cs.snapshots.get(self.snapshot.id)
-        self.restore = self._testshell.cs.snapshots.get(self.restore.id)
+        self.verify_snapshot(self.snapshot.id)
+        self.verify_restore(self.restore.id)
 
     """
     cleanup the test

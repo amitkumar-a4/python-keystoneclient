@@ -341,6 +341,9 @@ class HadoopWorkflow(workflow.Workflow):
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = get_hadoop_nodes(cntx, self._store['Namenode'], int(self._store['NamenodeSSHPort']), self._store['Username'], self._store['Password'])
+        for instance in instances:
+            del instance['hypervisor_hostname']
+            del instance['hypervisor_type']
         return dict(instances=instances)
     
     def execute(self):

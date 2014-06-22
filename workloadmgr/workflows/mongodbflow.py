@@ -609,6 +609,9 @@ class MongoDBWorkflow(workflow.Workflow):
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = get_vms(cntx, self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'], self._store['HostSSHPort'], self._store['HostUsername'], self._store['HostPassword'])
+        for instance in instances:
+            del instance['hypervisor_hostname']
+            del instance['hypervisor_type']
         return dict(instances=instances)
 
     def execute(self):

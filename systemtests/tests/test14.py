@@ -16,6 +16,8 @@ class test14(WorkloadMgrSystemTest):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        # Cleanup swift first
+        super(test14, self).prepare(args, kwargs)
         pass
      
     """

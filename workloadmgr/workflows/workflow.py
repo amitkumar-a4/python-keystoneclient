@@ -147,6 +147,9 @@ class Workflow(object):
 
     def discover(self):
         instances = []
+        for instance in instances:
+            del instance['hypervisor_hostname']
+            del instance['hypervisor_type']
         return dict(instances=self._store['instances'])
 
     def details(self):
