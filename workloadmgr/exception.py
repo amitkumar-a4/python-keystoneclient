@@ -120,6 +120,8 @@ class WorkloadMgrException(Exception):
 
         super(WorkloadMgrException, self).__init__(message)
 
+class InvalidState(WorkloadMgrException):
+    message = _("Invalid state") + ": %(reason)s"
 
 class GlanceConnectionFailed(WorkloadMgrException):
     message = _("Connection to glance failed") + ": %(reason)s"
@@ -408,4 +410,7 @@ class VMDiskResourceSnapsNotFound(NotFound):
     
 class VMNetworkResourceSnapsNotFound(NotFound):
     message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")  
+    
+class RestoreNotFound(NotFound):
+    message = _("Restore %(restore_id)s could not be found.")       
     
