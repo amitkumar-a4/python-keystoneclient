@@ -163,9 +163,6 @@ class InvalidInput(Invalid):
     message = _("Invalid input received") + ": %(reason)s"
 
 
-class InvalidVolumeType(Invalid):
-    message = _("Invalid volume type") + ": %(reason)s"
-
 
 class InvalidVolume(Invalid):
     message = _("Invalid volume") + ": %(reason)s"
@@ -206,80 +203,6 @@ class NotFound(WorkloadMgrException):
 
 class VolumeNotFound(NotFound):
     message = _("Volume %(volume_id)s could not be found.")
-
-
-class VolumeNotFoundForInstance(VolumeNotFound):
-    message = _("Volume not found for instance %(instance_id)s.")
-
-
-class VolumeMetadataNotFound(NotFound):
-    message = _("Volume %(volume_id)s has no metadata with "
-                "key %(metadata_key)s.")
-
-
-class InvalidVolumeMetadata(Invalid):
-    message = _("Invalid metadata") + ": %(reason)s"
-
-
-class InvalidVolumeMetadataSize(Invalid):
-    message = _("Invalid metadata size") + ": %(reason)s"
-
-
-class SnapshotMetadataNotFound(NotFound):
-    message = _("Snapshot %(snapshot_id)s has no metadata with "
-                "key %(metadata_key)s.")
-
-
-class InvalidSnapshotMetadata(Invalid):
-    message = _("Invalid metadata") + ": %(reason)s"
-
-
-class InvalidSnapshotMetadataSize(Invalid):
-    message = _("Invalid metadata size") + ": %(reason)s"
-
-
-class VolumeTypeNotFound(NotFound):
-    message = _("Volume type %(volume_type_id)s could not be found.")
-
-
-class VolumeTypeNotFoundByName(VolumeTypeNotFound):
-    message = _("Volume type with name %(volume_type_name)s "
-                "could not be found.")
-
-
-class VolumeTypeExtraSpecsNotFound(NotFound):
-    message = _("Volume Type %(volume_type_id)s has no extra specs with "
-                "key %(extra_specs_key)s.")
-
-
-class SnapshotNotFound(NotFound):
-    message = _("Snapshot %(snapshot_id)s could not be found.")
-
-
-
-class SnapshotIsBusy(WorkloadMgrException):
-    message = _("deleting snapshot %(snapshot_name)s that has "
-                "dependent volumes")
-
-
-class ISCSITargetNotFoundForVolume(NotFound):
-    message = _("No target id found for volume %(volume_id)s.")
-
-
-class ISCSITargetCreateFailed(WorkloadMgrException):
-    message = _("Failed to create iscsi target for volume %(volume_id)s.")
-
-
-class ISCSITargetAttachFailed(WorkloadMgrException):
-    message = _("Failed to attach iSCSI target for volume %(volume_id)s.")
-
-
-class ISCSITargetRemoveFailed(WorkloadMgrException):
-    message = _("Failed to remove iscsi target for volume %(volume_id)s.")
-
-
-class DiskNotFound(NotFound):
-    message = _("No disk at %(location)s")
 
 
 class InvalidImageRef(Invalid):
@@ -347,15 +270,6 @@ class OverQuota(WorkloadMgrException):
     message = _("Quota exceeded for resources: %(overs)s")
 
 
-class MigrationNotFound(NotFound):
-    message = _("Migration %(migration_id)s could not be found.")
-
-
-class MigrationNotFoundByStatus(MigrationNotFound):
-    message = _("Migration not found for instance %(instance_id)s "
-                "with status %(status)s.")
-
-
 class FileNotFound(NotFound):
     message = _("File %(file_path)s could not be found.")
 
@@ -368,17 +282,8 @@ class NotAllowed(WorkloadMgrException):
     message = _("Action not allowed.")
 
 
-#TODO(bcwaldon): EOL this exception!
 class Duplicate(WorkloadMgrException):
     pass
-
-
-class KeyPairExists(Duplicate):
-    message = _("Key pair %(key_name)s already exists.")
-
-
-class VolumeTypeExists(Duplicate):
-    message = _("Volume Type %(id)s already exists.")
 
 
 class MigrationError(WorkloadMgrException):
@@ -412,46 +317,8 @@ class QuotaError(WorkloadMgrException):
     safe = True
 
 
-class VolumeSizeExceedsAvailableQuota(QuotaError):
-    message = _("Requested volume or snapshot exceeds "
-                "allowed Gigabytes quota")
-
-
-class VolumeSizeExceedsQuota(QuotaError):
-    message = _("Maximum volume/snapshot size exceeded")
-
-
-class VolumeLimitExceeded(QuotaError):
-    message = _("Maximum number of volumes allowed (%(allowed)d) exceeded")
-
-
 class SnapshotLimitExceeded(QuotaError):
     message = _("Maximum number of snapshots allowed (%(allowed)d) exceeded")
-
-
-class DuplicateSfVolumeNames(Duplicate):
-    message = _("Detected more than one volume with name %(vol_name)s")
-
-
-class Duplicate3PARHost(WorkloadMgrException):
-    message = _("3PAR Host already exists: %(err)s.  %(info)s")
-
-
-class Invalid3PARDomain(WorkloadMgrException):
-    message = _("Invalid 3PAR Domain: %(err)s")
-
-
-class VolumeTypeCreateFailed(WorkloadMgrException):
-    message = _("Cannot create volume_type with "
-                "name %(name)s and specs %(extra_specs)s")
-
-
-class SolidFireAPIException(WorkloadMgrException):
-    message = _("Bad response from SolidFire API")
-
-
-class SolidFireAPIDataException(SolidFireAPIException):
-    message = _("Error in SolidFire API response: data=%(data)s")
 
 
 class UnknownCmd(Invalid):
@@ -470,33 +337,8 @@ class FailedCmdWithDump(WorkloadMgrException):
     message = _("Operation failed with status=%(status)s. Full dump: %(data)s")
 
 
-class ZadaraServerCreateFailure(WorkloadMgrException):
-    message = _("Unable to create server object for initiator %(name)s")
-
-
-class ZadaraServerNotFound(NotFound):
-    message = _("Unable to find server object for initiator %(name)s")
-
-
-class ZadaraVPSANoActiveController(WorkloadMgrException):
-    message = _("Unable to find any active VPSA controller")
-
-
-class ZadaraAttachmentsNotFound(NotFound):
-    message = _("Failed to retrieve attachments for volume %(name)s")
-
-
-class ZadaraInvalidAttachmentInfo(Invalid):
-    message = _("Invalid attachment info for volume %(name)s: %(reason)s")
-
-
 class InstanceNotFound(NotFound):
     message = _("Instance %(instance_id)s could not be found.")
-
-
-class VolumeBackendAPIException(WorkloadMgrException):
-    message = _("Bad or unexpected response from the storage volume "
-                "backend API: %(data)s")
 
 
 class NfsException(WorkloadMgrException):
@@ -523,11 +365,6 @@ class GlusterfsNoSuitableShareFound(NotFound):
     message = _("There is no share which can host %(volume_size)sG")
 
 
-class GlanceMetadataExists(Invalid):
-    message = _("Glance metadata cannot be updated, key %(key)s"
-                " exists for volume id %(volume_id)s")
-
-
 class ImageCopyFailure(Invalid):
     message = _("Failed to copy image to volume")
 
@@ -535,8 +372,9 @@ class ImageCopyFailure(Invalid):
 class WorkloadMgrNotFound(NotFound):
     message = _("WorkloadMgr %(workload_id)s could not be found.")
 
+   
 class SnapshotNotFound(NotFound):
-    message = _("Snapshot %(snapshot_id)s could not be found.")
+    message = _("Snapshot %(snapshot_id)s could not be found.")    
 
 class SwiftObjectNotFound(NotFound):
     message = _("SwiftObject %(object_id)s could not be found.")
