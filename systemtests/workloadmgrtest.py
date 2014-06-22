@@ -466,15 +466,21 @@ class WorkloadMgrTestShell(object):
 
         for test in self._discover_tests():
             # Instantiate the test
+            #if test['name'] != "test31":
+            #continue
             t = getattr(test['module'], test['name'])(self)
  
             print(t.description)
             try:
+               print("\tPreparing: %s" % test['name'])
                t.prepare()
+               print("\tRunning: %s" % test['name'])
                t.run()
+               print("\tVerifying: %s" % test['name'])
                t.verify()
                print("SUCCESS: %s" % test['name'])
-            except Exception:
+            except Exception as e:
+               print("Error running '%s': %s" % (test['name'], str(e)))
                print("FAILED: %s" % test['name'])
             finally:
                t.cleanup()

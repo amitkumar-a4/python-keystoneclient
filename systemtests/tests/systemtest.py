@@ -1,4 +1,9 @@
 import sys
+import time
+from subprocess import call
+import os
+
+
 
 class WorkloadMgrSystemTest(object):
     """
@@ -26,7 +31,13 @@ class WorkloadMgrSystemTest(object):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
-        pass
+        #Clean up all swift objects
+        os.system('bash -c "swift list vast_snapshots > /tmp/swift.out"')
+        with open("/tmp/swift.out") as f:
+            content = f.readlines()
+
+        for l in content:
+            os.system("swift delete vast_snapshots "+ l)
      
     """
     run the test
@@ -34,6 +45,29 @@ class WorkloadMgrSystemTest(object):
     def run(self, *args, **kwargs):
         pass
 
+    """
+    Verify snapshot objects
+    """
+    def verify_snapshot_object(self, snapshot_id):
+        snapshot = self._testshell.cs.snapshots.get(snapshot_id)
+
+
+    """
+    Verify restore
+    """
+    def verify_restore(self, restore_id):
+        restore = self._testshell.cs.restores.get(restore_id)
+        
+        # Verify vms
+        for inst in restore.instances:
+            server = self._testshell.novaclient.servers.get(inst['id'])
+            if server is None:
+                raise Exception("Server with %s is not found" % inst['id'])
+
+        # TODO verify networks
+
+        # TODO: verify subnets
+        
     """
     Verify that the test has run successfully
     """

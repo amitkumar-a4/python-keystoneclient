@@ -363,6 +363,9 @@ class CassandraWorkflow(workflow.Workflow):
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = get_cassandra_nodes(cntx, self._store['CassandraNode'], int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
+        for instance in instances:
+            del instance['hypervisor_hostname']
+            del instance['hypervisor_type']
         return dict(instances=instances)
     
     def execute(self):

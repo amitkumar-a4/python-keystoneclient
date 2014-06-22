@@ -2,7 +2,7 @@ from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
 Description = 'Test20:                                       \n'\
-              '      Create Serial workload                  \n'\
+              '      Create Parallel workload                  \n'\
               '      Take a snapshot                         \n'\
               '      Monitor the snapshot progress           \n'\
               '      Delete snapshot                         \n'\
@@ -19,6 +19,8 @@ class test20(WorkloadMgrSystemTest):
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
+        # Cleanup swift first
+        super(test20, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
