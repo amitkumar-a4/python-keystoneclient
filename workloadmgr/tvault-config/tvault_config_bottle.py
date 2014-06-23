@@ -234,10 +234,10 @@ def configure_storage():
         command = ['sudo', 'mkfs', '-t', 'ext4', '/dev/vdb']
         subprocess.check_call(command, shell=False)  
         
-        command = ['sudo', 'mount', '/dev/vdb', '/tmp']
+        command = ['sudo', 'mount', '/dev/vdb', '/tmp/wlm']
         subprocess.check_call(command, shell=False) 
         
-        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /tmp ext4 defaults 0' >> /etc/fstab"]
+        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /tmp/wlm ext4 defaults 0' >> /etc/fstab"]
         #subprocess.check_call(command, shell=False)        
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
