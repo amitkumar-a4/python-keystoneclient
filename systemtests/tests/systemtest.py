@@ -48,8 +48,11 @@ class WorkloadMgrSystemTest(object):
     """
     Verify snapshot objects
     """
-    def verify_snapshot_object(self, snapshot_id):
+    def verify_snapshot(self, snapshot_id):
         snapshot = self._testshell.cs.snapshots.get(snapshot_id)
+      
+        # Make sure none of the VMs are in paused state. They
+        # all should be active
 
 
     """

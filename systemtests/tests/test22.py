@@ -2,7 +2,7 @@ from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
 Description = 'Test12:                                       \n'\
-              '      Create Serial workload                  \n'\
+              '      Create Parallel workload                  \n'\
               '      Take a snapshot                         \n'\
               '      Take 5 more snapshots                   \n'\
               '      Monitor the snapshot progress           \n'\
@@ -28,14 +28,14 @@ class test12(WorkloadMgrSystemTest):
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
-        self.serialtype = None
+        self.paralleltype = None
         for type in self._testshell.cs.workload_types.list():
-            if type.name == 'Serial':
-               self.serialtype = type
+            if type.name == 'Parallel':
+               self.paralleltype = type
                break
      
-        if self.serialtype == None:
-           raise Exception("Serial workloadtype not found")
+        if self.paralleltype == None:
+           raise Exception("Parallel workloadtype not found")
  
         # We will use VM4
         self._vms = []
@@ -54,7 +54,7 @@ class test12(WorkloadMgrSystemTest):
     """
     def run(self, *args, **kwargs):
         # Make sure the workload type has required elements
-        # Create serial workload with the VM
+        # Create parallel workload with the VM
         # Make sure that the workload is created
         instances = []
         for vm in self._vms:
@@ -63,7 +63,7 @@ class test12(WorkloadMgrSystemTest):
         if len(instances) != 5:
            raise Exception("There are less than 5 vms")
 
-        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.serialtype.id, instances, {}, {})
+        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.paralleltype.id, instances, {}, {})
         status = self.workload.status
         print "Waiting for workload status to be either available or error"
         while 1:
@@ -114,6 +114,10 @@ class test12(WorkloadMgrSystemTest):
            while 1:
               self.snapshot = self._testshell.cs.snapshots.get(snapshots[0].id)
               status = self.snapshot.status
+
+              if status == 'error':
+                 print self.snapshot
+                 raise Exception("Error: Snapshot operation failed")
               if status == 'available' or status == 'error':
                  break
               time.sleep(5)

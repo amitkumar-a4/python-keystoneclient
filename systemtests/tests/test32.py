@@ -1,81 +1,86 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test12:                                       \n'\
-              '      Create Serial workload                  \n'\
+
+Description = 'Test32:                                       \n'\
+              '      Create MongoDB workload with mongodb1 as one of the node in cluster  \n'\
               '      Take a snapshot                         \n'\
-              '      Take 5 more snapshots                   \n'\
               '      Monitor the snapshot progress           \n'\
-              '      Delete snapshots                        \n'\
+              '      Take incremental snapshots              \n'\
+              '      Delete snapshot                         \n'\
               '      Delete workload that is created           '
 
-vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
-
-class test12(WorkloadMgrSystemTest):
+class test32(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test12, self).__init__(testshell, Description)
-        self.restore = None
-        self.snapshot = None
+        super(test32, self).__init__(testshell, Description)
+
         self.workload = None
+        self.snapshot = None
+        self.restore = None
+
+        self.metadata = {'DBPort': '27019', 
+                         'DBUser': '', 
+                         'DBHost': 'mongodb1',
+                         'RunAsRoot': 'True', 
+                         'DBPassword': '', 
+                         'HostPassword': 'project1',
+                         'HostSSHPort': '22', 
+                         'HostUsername': 'ubuntu'} 
+        self.instances = []
 
     """
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test12, self).prepare(args, kwargs)
-        # Make sure that VMs are not part of any workload
+        super(test32, self).prepare(args, kwargs)
+        # Make sure vm as specified in the argument vm1 exists 
+        # on the production
         workloads = self._testshell.cs.workloads.list()
-        
-        self.serialtype = None
+        self.mongodbtype = None
         for type in self._testshell.cs.workload_types.list():
-            if type.name == 'Serial':
-               self.serialtype = type
+            if type.name.lower() == 'MongoDB'.lower():
+               self.mongodbtype = type
                break
      
-        if self.serialtype == None:
-           raise Exception("Serial workloadtype not found")
+        if self.mongodbtype == None:
+           raise Exception("MongoDB workloadtype not found")
  
         # We will use VM4
-        self._vms = []
-        for novavm in self._testshell.novaclient.servers.list():
-           for vm in vms:
-              if str(novavm.name).lower() == vm.lower():
-                 self._vms.append(novavm)
-                 break
+        self.mongodb = None
+        for vm in self._testshell.novaclient.servers.list():
+           if str(vm.name).lower() == "mongodb1":
+              self.mongodb = vm
+              break
 
         # May be I need to create a VM with in the test itself
-        if len(self._vms) != len(vms):
-           raise Exception("Not all VMs are present at production")
+        if self.mongodb == None:
+           raise Exception("mongodb1 is not found in the vm inventory")
  
     """
     run the test
     """
     def run(self, *args, **kwargs):
-        # Make sure the workload type has required elements
-        # Create serial workload with the VM
+        # Create mongodb workload with the monogodb1
         # Make sure that the workload is created
-        instances = []
-        for vm in self._vms:
-           instances.append({'instance-id':vm.id})
+        self.instances = []
+        
+        mongonodes = self._testshell.cs.workload_types.discover_instances(self.mongodbtype.id, metadata=self.metadata)['instances']
+        for inst in mongonodes:
+            self.instances.append({'instance-id':inst['vm_id']})
 
-        if len(instances) != 5:
-           raise Exception("There are less than 5 vms")
-
-        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.serialtype.id, instances, {}, {})
+        self.workload = self._testshell.cs.workloads.create("MongoDB", "MongoDB Workload", self.mongodbtype.id, self.instances, {}, self.metadata)
         status = self.workload.status
-        print "Waiting for workload status to be either available or error"
         while 1:
-           self.workload = self._testshell.cs.workloads.get(self.workload.id)
-           status = self.workload.status
+           status = self._testshell.cs.workloads.get(self.workload.id).status
            if status == 'available' or status == 'error':
               break
            time.sleep(5)
 
         print "Performing snapshot operations"
         # perform snapshot operation
-        self._testshell.cs.workloads.snapshot(self.workload.id, name="Snapshot1", description="First snapshot of the workload")
+        self._testshell.cs.workloads.snapshot(self.workload.id, name="MongoDBSnapshot", description="First snapshot of MongoDB workload")
 
         snapshots = []
         for s in self._testshell.cs.snapshots.list():
@@ -114,17 +119,33 @@ class test12(WorkloadMgrSystemTest):
            while 1:
               self.snapshot = self._testshell.cs.snapshots.get(snapshots[0].id)
               status = self.snapshot.status
+
+              if status == 'error':
+                 print self.snapshot
+                 raise Exception("Error: Snapshot operation failed")
               if status == 'available' or status == 'error':
                  break
               time.sleep(5)
            print "Sleeping 30 seconds before next snapshot operation"
            time.sleep(30)
 
-           
-    """
-    verify the test
-    """
     def verify(self, *args, **kwargs):
+        if len(self.workload.instances) != len(self.instances):
+           raise Exception("Number of instances in the workload is not 1")
+
+        instids = []
+        for i in self.instances:
+           instids.append(i['instance-id'])
+
+        if set(self.workload.instances) != set(instids):
+           raise Exception("Instance ids in the workload does not match with the ids that were provided")
+     
+        if self.workload.name != "MongoDB":
+           raise Exception("workload name is not 'MongoDB'")
+
+        if self.workload.description != "MongoDB Workload":
+           raise Exception("workload name is not 'MongoDB Workload'")
+
         ns = 0
         for s in self._testshell.cs.snapshots.list():
            if s.workload_id == self.workload.id:
@@ -140,9 +161,6 @@ class test12(WorkloadMgrSystemTest):
     cleanup the test
     """
     def cleanup(self, *args, **kwargs):
-        # delete the restore
-        # delete the snapshot
-        # delete the workload
         if self.restore:
            self._testshell.cs.restores.delete(self.restore.id)
 
@@ -156,3 +174,7 @@ class test12(WorkloadMgrSystemTest):
 
         if self.workload:
            self._testshell.cs.workloads.delete(self.workload.id)
+
+        for wload in self._testshell.cs.workloads.list():
+            if wload.id == wid:
+               raise Exception("Workload exists after delete")
