@@ -13,7 +13,7 @@ from cgi import parse_qs, escape
 from workloadmgr.api import common
 from workloadmgr.api import wsgi
 from workloadmgr.api import xmlutil
-from workloadmgr import exception
+from workloadmgr import exception as wlm_exceptions
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import strutils
@@ -80,11 +80,10 @@ class RestoresController(wsgi.Controller):
 
         try:
             restore = self.workload_api.restore_show(context, id)
-        except exception.NotFound:
+        except wlm_exceptions.NotFound:
             raise exc.HTTPNotFound()
 
         return self._view_builder.detail(req, restore)
-        #return {'restore': _translate_restore_detail_view(context, restore)}
 
     def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a restore."""
@@ -94,9 +93,11 @@ class RestoresController(wsgi.Controller):
 
         try:
             self.workload_api.restore_delete(context, id)
-        except exception.NotFound:
+        except wlm_exceptions.NotFound:
             raise exc.HTTPNotFound()
-        return webob.Response(status_int=202)
+        except wlm_exceptions.InvalidState as error:
+            raise exc.HTTPBadRequest(explanation= unicode(error))
+
 
     @wsgi.serializers(xml=RestoresTemplate)
     def index(self, req, workload_id=None, snapshot_id=None):

@@ -22,7 +22,7 @@ from novaclient import client
 from workloadmgr.workloads import rpcapi as workloads_rpcapi
 from workloadmgr.scheduler import rpcapi as scheduler_rpcapi
 from workloadmgr.db import base
-from workloadmgr import exception
+from workloadmgr import exception as wlm_exceptions
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
@@ -161,7 +161,7 @@ class API(base.Base):
         workload_type = self.workload_type_get(context, workload_type_id)
         if workload_type['status'] not in ['available', 'error']:
             msg = _('WorkloadType status must be available or error')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
 
         #TODO(giri): check if this workload_type is referenced by other workloads
                     
@@ -345,12 +345,12 @@ class API(base.Base):
         workload = self.workload_get(context, workload_id)
         if workload['status'] not in ['available', 'error']:
             msg = _('Workload status must be available or error')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
 
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
         if len(snapshots) > 0:
             msg = _('This workload contains snapshots')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
                     
         # First unschedule the job
         jobs = self._scheduler.get_jobs()
@@ -390,8 +390,8 @@ class API(base.Base):
                 break
 
         if not paused:
-           msg = _('Workload job scheduler is already paused')
-           raise exception.InvalidWorkloadMgr(reason=msg)
+            msg = _('Workload job scheduler is already paused')
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
 
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
@@ -399,11 +399,11 @@ class API(base.Base):
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 msg = _('Workload job scheduler is not paused')
-                raise exception.InvalidWorkloadMgr(reason=msg)
+                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
         jobschedule = workload['jobschedule']
         if len(jobschedule) < 5:
                 msg = _('Job scheduler settings are not available')
-                raise exception.InvalidWorkloadMgr(reason=msg)            
+                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)            
    
         self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                             jobschedule,
@@ -419,7 +419,7 @@ class API(base.Base):
         workload = self.workload_get(context, workload_id)
         if workload['status'] in ['running']:
             msg = _('Workload snapshot job is already executing, ignoring this execution')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
 
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
@@ -523,13 +523,13 @@ class API(base.Base):
         """
         if snapshot['status'] not in ['available', 'error']:
             msg = _('Snapshot status must be available or error')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
         """
         restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
         for restore in restores:
             if restore.restore_type == 'test':
                 msg = _('This workload snapshot contains testbubbles')
-                raise exception.InvalidWorkloadMgr(reason=msg)      
+                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)      
 
         self.db.snapshot_delete(context, snapshot_id)
         
@@ -541,7 +541,7 @@ class API(base.Base):
         workload = self.workload_get(context, snapshot['workload_id'])
         if snapshot['status'] != 'available':
             msg = _('Snapshot status must be available')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
         
         restore_type = "restore"
         if test:
@@ -643,8 +643,8 @@ class API(base.Base):
         restore_details = self.restore_show(context, restore_id)
         
         if restore_details['status'] not in ['available', 'error']:
-            msg = _('Restore or Testbubble status must be completed or error')
-            raise exception.InvalidWorkloadMgr(reason=msg)
+            msg = _("Status of the requested resource status must be 'available' or 'error'")
+            raise wlm_exceptions.InvalidState(reason=msg)
 
         if restore_details['restore_type'] == 'test':
             network_service =  neutron.API(production=False)
