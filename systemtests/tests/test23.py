@@ -1,20 +1,21 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test12:                                       \n'\
-              '      Create Serial workload                  \n'\
+Description = 'Test13:                                       \n'\
+              '      Create Parallel workload                  \n'\
               '      Take a snapshot                         \n'\
               '      Take 5 more snapshots                   \n'\
+              '      Restore the lastest snapshot            \n'\
               '      Monitor the snapshot progress           \n'\
               '      Delete snapshots                        \n'\
               '      Delete workload that is created           '
 
 vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
 
-class test12(WorkloadMgrSystemTest):
+class test13(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test12, self).__init__(testshell, Description)
+        super(test13, self).__init__(testshell, Description)
         self.restore = None
         self.snapshot = None
         self.workload = None
@@ -24,18 +25,18 @@ class test12(WorkloadMgrSystemTest):
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test12, self).prepare(args, kwargs)
+        super(test13, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
-        self.serialtype = None
+        self.paralleltype = None
         for type in self._testshell.cs.workload_types.list():
-            if type.name == 'Serial':
-               self.serialtype = type
+            if type.name == 'Parallel':
+               self.paralleltype = type
                break
      
-        if self.serialtype == None:
-           raise Exception("Serial workloadtype not found")
+        if self.paralleltype == None:
+           raise Exception("Parallel workloadtype not found")
  
         # We will use VM4
         self._vms = []
@@ -54,7 +55,7 @@ class test12(WorkloadMgrSystemTest):
     """
     def run(self, *args, **kwargs):
         # Make sure the workload type has required elements
-        # Create serial workload with the VM
+        # Create parallel workload with the VM
         # Make sure that the workload is created
         instances = []
         for vm in self._vms:
@@ -63,7 +64,7 @@ class test12(WorkloadMgrSystemTest):
         if len(instances) != 5:
            raise Exception("There are less than 5 vms")
 
-        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.serialtype.id, instances, {}, {})
+        self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.paralleltype.id, instances, {}, {})
         status = self.workload.status
         print "Waiting for workload status to be either available or error"
         while 1:
@@ -110,17 +111,103 @@ class test12(WorkloadMgrSystemTest):
            if len(snapshots) != 1:
                raise Exception("Error: More snapshots than expected")
  
-           print("Waiting for snapshot %s to become available" % "Snapshot-"+str(i))
+           snapshotname = "Snapshot-"+str(i)
+           print("Waiting for snapshot %s to become available" % snapshotname)
            while 1:
               self.snapshot = self._testshell.cs.snapshots.get(snapshots[0].id)
               status = self.snapshot.status
+
+              if status == 'error':
+                 print self.snapshot
+                 raise Exception("Error: Snapshot operation failed")
               if status == 'available' or status == 'error':
                  break
               time.sleep(5)
            print "Sleeping 30 seconds before next snapshot operation"
            time.sleep(30)
 
-           
+        # Restore latest
+        latest_snapshot = None
+        for s in self._testshell.cs.snapshots.list():
+            if s.workload_id == self.workload.id and s.name == "Snapshot-4":
+                latest_snapshot = s
+
+        if latest_snapshot == None:
+           raise Exception("Cannot find latest snapshot")
+
+        print "Performing restore operations"
+        # perform restore operation
+        self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
+
+        restores = []
+        for r in self._testshell.cs.restores.list():
+            if r.snapshot_id == latest_snapshot.id:
+                restores.append(r)
+
+        if len(restores) != 1:
+           raise Exception("Error: More than one restore")
+ 
+        self.restore = None
+        print "Waiting for restore to become available"
+        while 1:
+           self.restore = self._testshell.cs.restores.get(restores[0].id)
+           status = self.restore.status
+
+           if status == 'error':
+              print self.snapshot
+              raise Exception("Error: Snapshot operation failed")
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
+        if self.restore.status != 'available':
+            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
+
+        self.restore = self._testshell.cs.restores.delete(restores[0].id)
+        if len(self._testshell.cs.restores.list()):
+           raise Exception("Cannot delete latest restore successfully")
+
+        # Restore latest
+        latest_snapshot = None
+        for s in self._testshell.cs.snapshots.list():
+            if s.workload_id == self.workload.id and s.name == "Snapshot-3":
+                latest_snapshot = s
+
+        if latest_snapshot == None:
+           raise Exception("Cannot find latest snapshot")
+
+        print "Performing restore operations"
+        # perform restore operation
+        self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
+
+        restores = []
+        for r in self._testshell.cs.restores.list():
+            if r.snapshot_id == latest_snapshot.id:
+                restores.append(r)
+
+        if len(restores) != 1:
+           raise Exception("Error: More than one restore")
+ 
+        self.restore = None
+        print "Waiting for restore to become available"
+        while 1:
+           self.restore = self._testshell.cs.restores.get(restores[0].id)
+           status = self.restore.status
+
+           if status == 'error':
+              print self.snapshot
+              raise Exception("Error: Snapshot operation failed")
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
+        if self.restore.status != 'available':
+            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
+
+        self.restore = self._testshell.cs.restores.delete(restores[0].id)
+        if len(self._testshell.cs.restores.list()):
+           raise Exception("Cannot delete latest restore successfully")
+
     """
     verify the test
     """
@@ -152,6 +239,7 @@ class test12(WorkloadMgrSystemTest):
 
         if len(self._testshell.cs.snapshots.list()):
            if s.workload_id == self.workload.id:
+               import pdb;pdb.set_trace()
                raise Exception("Not al snapshot are cleaned up successfully")
 
         if self.workload:

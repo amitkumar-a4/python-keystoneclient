@@ -94,6 +94,10 @@ class test31(WorkloadMgrSystemTest):
         while 1:
            self.snapshot = self._testshell.cs.snapshots.get(snapshots[0].id)
            status = self.snapshot.status
+
+           if status == 'error':
+              print self.snapshot
+              raise Exception("Error: Snapshot operation failed")
            if status == 'available' or status == 'error':
               break
            time.sleep(5)
@@ -115,6 +119,10 @@ class test31(WorkloadMgrSystemTest):
         while 1:
            self.restore = self._testshell.cs.restores.get(restores[0].id)
            status = self.restore.status
+
+           if status == 'error':
+              print self.restore
+              raise Exception("Error: Restore operation failed")
            if status == 'available' or status == 'error':
               break
            time.sleep(5)
@@ -147,7 +155,7 @@ class test31(WorkloadMgrSystemTest):
     cleanup the test
     """
     def cleanup(self, *args, **kwargs):
-        if restore:
+        if self.restore:
             self._testshell.cs.restores.delete(self.restore.id)
 
         #Delete the workload that is created
