@@ -222,6 +222,31 @@ def configure_form():
 def task_status():
     return {}
 
+
+@bottle.route('/configure_storage')
+@authorize()
+def configure_storage():
+    # Python code to configure storage
+    try:
+        command = ['sudo', 'umount', '/dev/vdb']
+        subprocess.call(command, shell=False)
+        
+        command = ['sudo', 'mkfs', '-t', 'ext4', '/dev/vdb']
+        subprocess.check_call(command, shell=False)  
+        
+        command = ['sudo', 'mount', '/dev/vdb', '/tmp']
+        subprocess.check_call(command, shell=False) 
+        
+        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /tmp ext4 defaults 0' >> /etc/fstab"]
+        #subprocess.check_call(command, shell=False)        
+    except Exception as err:
+        if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise err
+        else:
+           raise err        
+    time.sleep(1)
+    return {'status':'Success'}
+
 @bottle.route('/register_service')
 @authorize()
 def register_service():
