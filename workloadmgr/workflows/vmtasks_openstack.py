@@ -218,7 +218,8 @@ def snapshot_vm_flavors(cntx, db, instances, snapshot):
     for instance in instances:
         # Create  a flavor resource
         flavor = compute_service.get_flavor_by_id(cntx, instance['vm_flavor_id'])
-        metadata = {'name':flavor.name, 'vcpus':flavor.vcpus, 'ram':flavor.ram, 'disk':flavor.disk, 'ephemeral':flavor.ephemeral}
+        metadata = {'name':flavor.name, 'vcpus':flavor.vcpus, 'ram':flavor.ram, 
+                    'disk':flavor.disk, 'ephemeral':flavor.ephemeral, 'swap': flavor.swap}
         snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                        'vm_id': instance['vm_id'],
                                        'snapshot_id': snapshot['id'],       
