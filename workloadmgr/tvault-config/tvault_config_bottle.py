@@ -232,12 +232,15 @@ def configure_storage():
         subprocess.call(command, shell=False)
         
         command = ['sudo', 'mkfs', '-t', 'ext4', '/dev/vdb']
-        subprocess.check_call(command, shell=False)  
-        
-        command = ['sudo', 'mount', '/dev/vdb', '/tmp/wlm']
         subprocess.check_call(command, shell=False) 
         
-        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /tmp/wlm ext4 defaults 0' >> /etc/fstab"]
+        command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
+        subprocess.call(command, shell=False)
+        
+        command = ['sudo', 'mount', '/dev/vdb', '/opt/stack/data/wlm']
+        subprocess.check_call(command, shell=False) 
+        
+        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /opt/stack/data/wlm ext4 defaults 0' >> /etc/fstab"]
         #subprocess.check_call(command, shell=False)        
     except Exception as err:
         if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -322,7 +325,7 @@ def configure_api():
             command = ['sudo', 'service', 'mysql', 'start'];
             subprocess.call(command, shell=False)
             stmt = 'GRANT ALL PRIVILEGES ON *.* TO ' +  '\'' + 'root' + '\'' + '@' +'\'' + '%' + '\'' + ' identified by ' + '\'' + TVAULT_SERVICE_PASSWORD + '\'' + ';'
-            command = ['sudo', 'mysql', '-uroot', '-ppassword', '-h127.0.0.1', '-e', stmt]
+            command = ['sudo', 'mysql', '-uroot', '-p'+TVAULT_SERVICE_PASSWORD, '-h127.0.0.1', '-e', stmt]
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'mysql', 'restart'];
             subprocess.call(command, shell=False)
@@ -584,6 +587,7 @@ def configure():
    
     config_data['tvault_ipaddress'] = get_lan_ip()
     config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
+    
     
     #configure host
     fh, abs_path = mkstemp()

@@ -644,7 +644,7 @@ class LibvirtDriver(driver.ComputeDriver):
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
-            temp_directory = os.path.join("/tmp/wlm", restore['id'], snapshot_vm_resource.id)
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
             try:
                 shutil.rmtree( temp_directory )
             except OSError as exc:
@@ -928,7 +928,7 @@ class LibvirtDriver(driver.ComputeDriver):
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
-            temp_directory = os.path.join("/tmp/wlm", restore['id'], snapshot_vm_resource.id)
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
             try:
                 shutil.rmtree(temp_directory)
             except OSError as exc:
