@@ -264,16 +264,32 @@ def register_service():
                                    tenant_name=config_data['admin_tenant_name'])
         #create user
         try:
+            wlm_user = None
+            users = keystone.users.list()
+            for user in users:
+                if user.name == 't-workloadmgr' and user.tenantId == config_data['service_tenant_id']:
+                    wlm_user = user
+                    break
+                
+            admin_role = None
+            roles = keystone.roles.list()
+            for role in roles:
+                if role.name == 'admin':
+                    admin_role = role
+                    break                
+                      
             try:
-                keystone.users.delete( 't-workloadmgr')
+                keystone.users.delete(wlm_user.id)
             except Exception as err:
                 if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
                    raise err
             
             
-            keystone.users.create( 't-workloadmgr', TVAULT_SERVICE_PASSWORD, 'workloadmgr@trilioData.com',
-                                   tenant_id=config_data['service_tenant_id'],
-                                   enabled=True)
+            wlm_user = keystone.users.create('t-workloadmgr', TVAULT_SERVICE_PASSWORD, 'workloadmgr@trilioData.com',
+                                             tenant_id=config_data['service_tenant_id'],
+                                             enabled=True)
+            
+            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
         
         except Exception as err:
             if str(err.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -540,7 +556,7 @@ def register_workloadtypes():
     # Python code here to configure workloadmgr
     try:    
         if config_data['wlm_controller_node'] == True:
-            time.sleep(4)
+            time.sleep(10)
             wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 

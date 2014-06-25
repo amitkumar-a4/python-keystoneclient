@@ -28,6 +28,7 @@ import socket
 import StringIO
 import time
 import types
+import threading
 
 import eventlet
 from oslo.config import cfg
@@ -42,6 +43,8 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.virt import qemuimages
 
 LOG = logging.getLogger(__name__)
+
+lock = threading.Lock()
 
 wlm_vault_swift_opts = [
     cfg.StrOpt('wlm_vault_swift_url',
@@ -148,11 +151,15 @@ class SwiftBackupService(base.Base):
             return True
 
     def _create_container(self, context, container):
-        if container is None:
-            container = FLAGS.wlm_vault_swift_container
-        if not self._check_container_exists(container):
-            self.conn.put_container(container)
-        return container
+        try:
+            lock.acquire()        
+            if container is None:
+                container = FLAGS.wlm_vault_swift_container
+            if not self._check_container_exists(container):
+                self.conn.put_container(container)
+            return container
+        finally:
+            lock.release()        
 
     def _generate_swift_object_name_prefix(self, snapshot_metadata):
         jobrun = 'snapshot_%s' % (snapshot_metadata['snapshot_id'])
