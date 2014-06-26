@@ -466,7 +466,7 @@ class WorkloadMgrTestShell(object):
 
         for test in self._discover_tests():
             # Instantiate the test
-            if test['name'] != "test33":
+            if test['name'] != "test18":
                continue
             t = getattr(test['module'], test['name'])(self)
  

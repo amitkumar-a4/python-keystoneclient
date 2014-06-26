@@ -1,7 +1,7 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test13:                                       \n'\
+Description = 'Test14:                                       \n'\
               '      Create Serial workload                  \n'\
               '      Take a snapshot                         \n'\
               '      Take 5 more snapshots                   \n'\
@@ -12,10 +12,10 @@ Description = 'Test13:                                       \n'\
 
 vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
 
-class test13(WorkloadMgrSystemTest):
+class test14(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test13, self).__init__(testshell, Description)
+        super(test14, self).__init__(testshell, Description)
         self.restore = None
         self.snapshot = None
         self.workload = None
@@ -25,7 +25,7 @@ class test13(WorkloadMgrSystemTest):
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test13, self).prepare(args, kwargs)
+        super(test14, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
@@ -135,11 +135,11 @@ class test13(WorkloadMgrSystemTest):
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-
+        import pdb;pdb.set_trace()
         changedvms = []
-        for inst in latest_snapshot.instances:
+        for inst in self._testshell.cs.snapshots.get(latest_snapshot.id).instances:
             changedvm = {}
-            vm = self._testshell.novaclient.servers.get(inst)
+            vm = self._testshell.novaclient.servers.get(inst['id'])
             changedvm['id'] = vm.id
             changedvm['name'] = vm.name+"restored"
             changedvms.append(changedvm)

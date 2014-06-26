@@ -93,11 +93,11 @@ class CompositeWorkflow(workflow.Workflow):
             context_dict = dict([('%s' % key, value)
                               for (key, value) in cntx.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
+
             store = {
                 'context': context_dict,                # context dictionary
                 'workload_id': workload_id,             # workload_id
             }
-
             workload = db.workload_get(cntx, workload_id)
             for kvpair in workload.metadata:
                 store[kvpair['key']] = kvpair['value']
@@ -106,7 +106,13 @@ class CompositeWorkflow(workflow.Workflow):
             workflow = workflow_class("composite_workflow_initflow_" + workload_id, store)
             workflow.initflow()
             workflows[workload_id] = workflow
-            self._store['instances'].extend(workflow._store['instances'])
+        
+            # Populate the keys the the child workload produced
+            for k, v in workflow._store.iteritems():
+                if k == "instances":
+                    self._store['instances'].extend(workflow._store['instances'])
+                else:
+                    self._store[k] = v
 
         self._workflows = workflows
 
