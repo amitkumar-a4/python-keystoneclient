@@ -348,7 +348,7 @@ class API(base.Base):
             msg = _('Workload status must be available or error')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
         
-        workloads = self.db.workload_get_all()
+        workloads = self.db.workload_get_all(context)
         for workload in workloads:
             workload_type = self.db.workload_type_get(context, workload.workload_type_id)
             if (workload_type.display_name == 'Composite'):
@@ -435,7 +435,7 @@ class API(base.Base):
             msg = _('Workload snapshot job is already executing, ignoring this execution')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
         
-        workloads = self.db.workload_get_all()
+        workloads = self.db.workload_get_all(context)
         for workload in workloads:
             workload_type = self.db.workload_type_get(context, workload.workload_type_id)
             if (workload_type.display_name == 'Composite'):
