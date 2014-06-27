@@ -8,6 +8,7 @@ Handles all requests relating to the  workloadmgr service.
 """
 import socket
 import cPickle as pickle
+import json
 
 from eventlet import greenthread
 
@@ -102,7 +103,7 @@ class API(base.Base):
             self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
 
         if not hasattr(self, "scheduler_rpcapi"):
-           self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
+            self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
 
         if not hasattr(self, "_engine"):
             self._engine = create_engine(FLAGS.sql_connection)
@@ -346,6 +347,19 @@ class API(base.Base):
         if workload['status'] not in ['available', 'error']:
             msg = _('Workload status must be available or error')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+        
+        workloads = self.db.workload_get_all()
+        for workload in workloads:
+            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+            if (workload_type.display_name == 'Composite'):
+                for kvpair in workload.metadata:
+                    if kvpair['key'] == 'workloadgraph':
+                        graph = json.loads(kvpair['value'])
+                        for flow in graph['children']:
+                            if 'type' in flow:
+                                if flow['data']['id'] == workload_id:
+                                    msg = _('Operation not allowed since this workload is a member of a composite workflow')
+                                    raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                    
 
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
         if len(snapshots) > 0:
@@ -420,6 +434,20 @@ class API(base.Base):
         if workload['status'] in ['running']:
             msg = _('Workload snapshot job is already executing, ignoring this execution')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+        
+        workloads = self.db.workload_get_all()
+        for workload in workloads:
+            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+            if (workload_type.display_name == 'Composite'):
+                for kvpair in workload.metadata:
+                    if kvpair['key'] == 'workloadgraph':
+                        graph = json.loads(kvpair['value'])
+                        for flow in graph['children']:
+                            if 'type' in flow:
+                                if flow['data']['id'] == workload_id:
+                                    msg = _('Operation not allowed since this workload is a member of a composite workflow')
+                                    raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                                    
+        
 
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
