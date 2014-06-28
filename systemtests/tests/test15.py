@@ -10,13 +10,14 @@ class WorkloadTest(Thread):
     def on_thread_finished(self, thread, data):
         pass
 
-    def __init__(self, name, description, vms, workloadtype, parent=None):
-        self._parent = parent
-        self._testshell = parent._testshell
+    def __init__(self, name, description, vms, workloadtype, _parent=None):
+        self._parent = _parent
+        self._testshell = _parent._testshell
         self._vms = vms
         self._workloadtype = workloadtype
         self._name = name
-        self._descrition = description
+        self._description = description
+        super(WorkloadTest, self).__init__()
 
     def run(self):
         # Create serial workload with the VM
@@ -107,7 +108,7 @@ class WorkloadTest(Thread):
             changedvm['name'] = vm.name+"restored"
             changedvms.append(changedvm)
             
-        print "Performing restore operations"
+        print("Restoring '%s' snapshot" % latest_snapshot.name)
         # perform restore operation
         self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
 
@@ -129,13 +130,12 @@ class WorkloadTest(Thread):
            time.sleep(5)
 
         if self.restore.status != 'available':
-            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
+           raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
 
         self.restore = self._testshell.cs.restores.delete(restores[0].id)
         if len(self._testshell.cs.restores.list()):
            raise Exception("Cannot delete latest restore successfully")
 
-        # Restore VMs to a different network
         latest_snapshot = None
         for s in self._testshell.cs.snapshots.list():
             if s.workload_id == self.workload.id and s.name == "Snapshot-3":
@@ -144,7 +144,7 @@ class WorkloadTest(Thread):
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-        print "Performing restore operations"
+        print("Restoring '%s' snapshot" % latest_snapshot.name)
         # perform restore operation
         self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
 
@@ -172,43 +172,7 @@ class WorkloadTest(Thread):
         if len(self._testshell.cs.restores.list()):
            raise Exception("Cannot delete latest restore successfully")
 
-        # Restore VMs to different flavors
-        latest_snapshot = None
-        for s in self._testshell.cs.snapshots.list():
-            if s.workload_id == self.workload.id and s.name == "Snapshot-3":
-                latest_snapshot = s
-
-        if latest_snapshot == None:
-           raise Exception("Cannot find latest snapshot")
-
-        print "Performing restore operations"
-        # perform restore operation
-        self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
-
-        restores = []
-        for r in self._testshell.cs.restores.list():
-            if r.snapshot_id == latest_snapshot.id:
-                restores.append(r)
-
-        if len(restores) != 1:
-           raise Exception("Error: More than one restore")
- 
         self.restore = None
-        print "Waiting for restore to become available"
-        while 1:
-           self.restore = self._testshell.cs.restores.get(restores[0].id)
-           status = self.restore.status
-           if status == 'available' or status == 'error':
-              break
-           time.sleep(5)
-
-        if self.restore.status != 'available':
-            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
-
-        self.restore = self._testshell.cs.restores.delete(restores[0].id)
-        if len(self._testshell.cs.restores.list()):
-           raise Exception("Cannot delete latest restore successfully")
- 
         self.verify()
         self.cleanup()
 
@@ -223,9 +187,9 @@ class WorkloadTest(Thread):
         if ns != 6:
            raise Exception("Error: number of snapshots is not 6")
 
-        for s in self._testshell.cs.snapshots.list():
-           if s.workload_id == self.workload.id:
-              self.verify_snapshot(s.id)
+        #for s in self._testshell.cs.snapshots.list():
+           #if s.workload_id == self.workload.id:
+              #self.verify_snapshot(s.id)
 
     """
     cleanup the test
@@ -243,13 +207,12 @@ class WorkloadTest(Thread):
 
         if len(self._testshell.cs.snapshots.list()):
            if s.workload_id == self.workload.id:
-               import pdb;pdb.set_trace()
                raise Exception("Not al snapshot are cleaned up successfully")
 
         if self.workload:
            self._testshell.cs.workloads.delete(self.workload.id)
 
-Description = 'Test14:                                       \n'\
+Description = 'Test15:                                       \n'\
               '      Create four workloads                   \n'\
               '          Two serial and two parallel         \n'\
               '          Serial1: VM1, VM2                   \n'\
@@ -265,21 +228,19 @@ Description = 'Test14:                                       \n'\
               '      Delete workload that is created           '
 
 vms = ["vm1", "vm2", "vm3", "vm4", "vm5", "vm6", "vm7", "vm8"]
+#vms = ["vm1", "vm2"]
 
-class test14(WorkloadMgrSystemTest):
+class test15(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test14, self).__init__(testshell, Description)
-        self.restore = None
-        self.snapshot = None
-        self.workload = None
+        super(test15, self).__init__(testshell, Description)
 
     """
     Setup the conditions for test to run
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test14, self).prepare(args, kwargs)
+        super(test15, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
@@ -314,9 +275,16 @@ class test14(WorkloadMgrSystemTest):
     run the test
     """
     def run(self, *args, **kwargs):
-        for i in range(0..5):
-            thread = WorkloadTest(self, "WorkloadTest-"+str(i), "Workload test", vms[i*2:i*2+1], self.serialtype, parent=self):
-            thread.start()
+        threads = []
+        for i in range(0,2):
+            thread = WorkloadTest("WorkloadTest-"+str(i), "Workload test", self._vms[i*2:i*2+2], self.serialtype, _parent=self)
+            threads.append(thread)
+
+        # Start all threads
+        [x.start() for x in threads]
+
+        # Wait for all of them to finish
+        [x.join() for x in threads]
 
     """
     verify the test

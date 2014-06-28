@@ -1,56 +1,22 @@
 from systemtests.tests.systemtest import WorkloadMgrSystemTest
 import time
 
-Description = 'Test14:                                       \n'\
+Description = 'Test131:                                       \n'\
               '      Create Serial workload                  \n'\
               '      Take a snapshot                         \n'\
               '      Take 5 more snapshots                   \n'\
-              '      Try various restore options             \n'\
+              '      Delete last but one snapshot            \n'\
+              '      Restore the lastest snapshot            \n'\
               '      Monitor the snapshot progress           \n'\
               '      Delete snapshots                        \n'\
               '      Delete workload that is created           '
 
-#vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
-vms = ["vm1", "vm2"]
+vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
 
-"""
-   recoveryoptions data structure:
-
-   options {
-       openstack:
-          zone:
-          instances: [
-                 vm : {
-                     id:
-                     name:
-                     zone:
-                     flavor: {
-                          disk:
-                          vcpus:
-                          ram:
-                          swap:
-                     }
-                     nics: [
-                        {
-                            mac_address:nic.mac_address, 
-                            ip_address:freeip, network:netchange 
-                            network: {
-                                name:
-                                id:
-                                subnet:
-                            }
-                        }
-                     ]
-          ]
-                     
-       vmware:
-   }
-"""
-
-class test14(WorkloadMgrSystemTest):
+class test131(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
-        super(test14, self).__init__(testshell, Description)
+        super(test131, self).__init__(testshell, Description)
         self.restore = None
         self.snapshot = None
         self.workload = None
@@ -60,7 +26,7 @@ class test14(WorkloadMgrSystemTest):
     """
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
-        super(test14, self).prepare(args, kwargs)
+        super(test131, self).prepare(args, kwargs)
         # Make sure that VMs are not part of any workload
         workloads = self._testshell.cs.workloads.list()
         
@@ -161,7 +127,24 @@ class test14(WorkloadMgrSystemTest):
            print "Sleeping 30 seconds before next snapshot operation"
            time.sleep(30)
 
-        # Restore VMs with different names
+        # Delete last but one snapshot
+        latest_snapshot = None
+        for s in self._testshell.cs.snapshots.list():
+            if s.workload_id == self.workload.id and s.name == "Snapshot-3":
+                snapshot_to_delete = s
+
+        if snapshot_to_delete == None:
+           raise Exception("Cannot find snapshot_to_delete")
+
+        print("Deleting snapshot '%s'" % snapshot_to_delete.name)
+        self._testshell.cs.snapshots.delete(snapshot_to_delete.id)
+        try :
+            if self._testshell.cs.snapshots.get(snapshot_to_delete.id):
+              raise Exception("snapshot_to_delete is not deleted successfully")
+        except:
+           pass
+     
+        # Restore latest
         latest_snapshot = None
         for s in self._testshell.cs.snapshots.list():
             if s.workload_id == self.workload.id and s.name == "Snapshot-4":
@@ -170,58 +153,7 @@ class test14(WorkloadMgrSystemTest):
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-        import pdb;pdb.set_trace()
-        restoreoptions = {'type':'openstack', 'openstack': { 'zone': "", 'instances':[]}, 'vmware':{}}
-        restoreoptions['openstack']
-        changedvms = []
-        for inst in self._testshell.cs.snapshots.get(latest_snapshot.id).instances:
-            changedvm = {}
-            vm = self._testshell.novaclient.servers.get(inst['id'])
-            changedvm['id'] = vm.id
-            changedvm['name'] = vm.name+"restored"
-            changedvms.append(changedvm)
-            
-        restoreoptions['openstack']['instances'] = changedvms
-        #restoreoptions['openstack']['name']
-        #restoreoptions['openstack']['description']
-        print "Performing restore operations"
-        # perform restore operation
-        self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot", options=restoreoptions)
-
-        restores = []
-        for r in self._testshell.cs.restores.list():
-            if r.snapshot_id == latest_snapshot.id:
-                restores.append(r)
-
-        if len(restores) != 1:
-           raise Exception("Error: More than one restore")
- 
-        self.restore = None
-        print "Waiting for restore to become available"
-        while 1:
-           self.restore = self._testshell.cs.restores.get(restores[0].id)
-           status = self.restore.status
-           if status == 'available' or status == 'error':
-              break
-           time.sleep(5)
-
-        if self.restore.status != 'available':
-            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
-
-        self.restore = self._testshell.cs.restores.delete(restores[0].id)
-        if len(self._testshell.cs.restores.list()):
-           raise Exception("Cannot delete latest restore successfully")
-
-        # Restore VMs to a different network
-        latest_snapshot = None
-        for s in self._testshell.cs.snapshots.list():
-            if s.workload_id == self.workload.id and s.name == "Snapshot-3":
-                latest_snapshot = s
-
-        if latest_snapshot == None:
-           raise Exception("Cannot find latest snapshot")
-
-        print "Performing restore operations"
+        print("Restoring snapshot '%s'" % latest_snapshot.name)
         # perform restore operation
         self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
 
@@ -249,16 +181,16 @@ class test14(WorkloadMgrSystemTest):
         if len(self._testshell.cs.restores.list()):
            raise Exception("Cannot delete latest restore successfully")
 
-        # Restore VMs to different flavors
+        # Restore latest
         latest_snapshot = None
         for s in self._testshell.cs.snapshots.list():
-            if s.workload_id == self.workload.id and s.name == "Snapshot-3":
+            if s.workload_id == self.workload.id and s.name == "Snapshot-2":
                 latest_snapshot = s
 
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-        print "Performing restore operations"
+        print("Restoring snapshot '%s'" % latest_snapshot.name)
         # perform restore operation
         self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
 
@@ -285,8 +217,6 @@ class test14(WorkloadMgrSystemTest):
         self.restore = self._testshell.cs.restores.delete(restores[0].id)
         if len(self._testshell.cs.restores.list()):
            raise Exception("Cannot delete latest restore successfully")
-
-        # TODO: Restore VMs to different availability zones
 
     """
     verify the test
@@ -296,8 +226,8 @@ class test14(WorkloadMgrSystemTest):
         for s in self._testshell.cs.snapshots.list():
            if s.workload_id == self.workload.id:
                ns += 1
-        if ns != 6:
-           raise Exception("Error: number of snapshots is not 6")
+        if ns != 5:
+           raise Exception("Error: number of snapshots is not 5")
 
         for s in self._testshell.cs.snapshots.list():
            if s.workload_id == self.workload.id:
@@ -319,8 +249,7 @@ class test14(WorkloadMgrSystemTest):
 
         if len(self._testshell.cs.snapshots.list()):
            if s.workload_id == self.workload.id:
-               import pdb;pdb.set_trace()
-               raise Exception("Not al snapshot are cleaned up successfully")
+               raise Exception("Not all snapshot are deleted successfully")
 
         if self.workload:
            self._testshell.cs.workloads.delete(self.workload.id)
