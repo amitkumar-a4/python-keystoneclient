@@ -133,8 +133,11 @@ class WorkloadTest(Thread):
            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
 
         self.restore = self._testshell.cs.restores.delete(restores[0].id)
-        if len(self._testshell.cs.restores.list()):
-           raise Exception("Cannot delete latest restore successfully")
+        try :
+           if self._testshell.cs.restores.get(restores[0].id):
+              raise Exception("Cannot delete latest restore successfully")
+        except:
+           pass
 
         latest_snapshot = None
         for s in self._testshell.cs.snapshots.list():
@@ -169,8 +172,11 @@ class WorkloadTest(Thread):
             raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
 
         self.restore = self._testshell.cs.restores.delete(restores[0].id)
-        if len(self._testshell.cs.restores.list()):
-           raise Exception("Cannot delete latest restore successfully")
+        try :
+           if self._testshell.cs.restores.get(restores[0].id):
+              raise Exception("Cannot delete second restore successfully")
+        except:
+           pass
 
         self.restore = None
         self.verify()
@@ -204,10 +210,6 @@ class WorkloadTest(Thread):
         for s in self._testshell.cs.snapshots.list():
            if s.workload_id == self.workload.id:
                self._testshell.cs.snapshots.delete(s.id)
-
-        if len(self._testshell.cs.snapshots.list()):
-           if s.workload_id == self.workload.id:
-               raise Exception("Not al snapshot are cleaned up successfully")
 
         if self.workload:
            self._testshell.cs.workloads.delete(self.workload.id)
@@ -276,7 +278,7 @@ class test15(WorkloadMgrSystemTest):
     """
     def run(self, *args, **kwargs):
         threads = []
-        for i in range(0,2):
+        for i in range(0,4):
             thread = WorkloadTest("WorkloadTest-"+str(i), "Workload test", self._vms[i*2:i*2+2], self.serialtype, _parent=self)
             threads.append(thread)
 
