@@ -6,9 +6,10 @@ Description = 'Test13:                                       \n'\
               '      Take a snapshot                         \n'\
               '      Take 5 more snapshots                   \n'\
               '      Restore the lastest snapshot            \n'\
+              '      Restore two times from same snapshot    \n'\
               '      Monitor the snapshot progress           \n'\
               '      Delete snapshots                        \n'\
-              '      Delete workload that is created           '
+              '      Delete workload that is created         \n'
 
 vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
 
@@ -135,7 +136,7 @@ class test13(WorkloadMgrSystemTest):
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-        print "Performing restore operations"
+        print("Restoring snapshot '%s'" % latest_snapshot.name)
         # perform restore operation
         self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
 
@@ -163,7 +164,9 @@ class test13(WorkloadMgrSystemTest):
         if len(self._testshell.cs.restores.list()):
            raise Exception("Cannot delete latest restore successfully")
 
-        # Restore latest
+        self.restore = None
+
+        # Restore last but one snapshot
         latest_snapshot = None
         for s in self._testshell.cs.snapshots.list():
             if s.workload_id == self.workload.id and s.name == "Snapshot-3":
@@ -172,7 +175,7 @@ class test13(WorkloadMgrSystemTest):
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-        print "Performing restore operations"
+        print("Restoring snapshot '%s'" % latest_snapshot.name)
         # perform restore operation
         self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
 
@@ -199,6 +202,47 @@ class test13(WorkloadMgrSystemTest):
         self.restore = self._testshell.cs.restores.delete(restores[0].id)
         if len(self._testshell.cs.restores.list()):
            raise Exception("Cannot delete latest restore successfully")
+
+        print("Restoring two times from snapshot '%s'" % latest_snapshot.name)
+        # perform restore operation
+        self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Restore from latest snapshot")
+        self._testshell.cs.snapshots.restore(latest_snapshot.id, name="Restore", description="Another from latest snapshot")
+
+        restores = []
+        for r in self._testshell.cs.restores.list():
+            if r.snapshot_id == latest_snapshot.id:
+                restores.append(r)
+
+        if len(restores) != 2:
+           raise Exception("Error: More than one restore")
+ 
+        self.restore = None
+        print "Waiting for restores to become available"
+        while 1:
+           self.restore = self._testshell.cs.restores.get(restores[0].id)
+           status = self.restore.status
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
+        if self.restore.status != 'available':
+            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
+
+        while 1:
+           self.restore = self._testshell.cs.restores.get(restores[1].id)
+           status = self.restore.status
+           if status == 'available' or status == 'error':
+              break
+           time.sleep(5)
+
+        if self.restore.status != 'available':
+            raise Exception("Restore from latest snapshot failed. Status %s" % self.restore.status)
+
+        self.restore = self._testshell.cs.restores.delete(restores[0].id)
+        self.restore = self._testshell.cs.restores.delete(restores[1].id)
+        if len(self._testshell.cs.restores.list()):
+           raise Exception("Cannot delete latest restore successfully")
+
 
     """
     verify the test

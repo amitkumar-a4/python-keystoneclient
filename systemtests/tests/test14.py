@@ -96,8 +96,8 @@ class test14(WorkloadMgrSystemTest):
         for vm in self._vms:
            instances.append({'instance-id':vm.id})
 
-        if len(instances) != 5:
-           raise Exception("There are less than 5 vms")
+        if len(instances) != len(vms):
+           raise Exception("There are less vms on the production than expected")
 
         self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.serialtype.id, instances, {}, {})
         status = self.workload.status
@@ -170,7 +170,6 @@ class test14(WorkloadMgrSystemTest):
         if latest_snapshot == None:
            raise Exception("Cannot find latest snapshot")
 
-        import pdb;pdb.set_trace()
         restoreoptions = {'type':'openstack', 'openstack': { 'zone': "", 'instances':[]}, 'vmware':{}}
         restoreoptions['openstack']
         changedvms = []
