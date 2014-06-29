@@ -308,36 +308,47 @@ class API(base.Base):
 
     def workload_modify(self, context, workload_id, workload):
         """
-        Make the RPC call to create a workload.
+        Make the RPC call to modify a workload.
         """
-        compute_service = nova.API(production=True)
-        instances_with_name = compute_service.get_servers(context,admin=True)
+        workload_paused = self._is_workload_paused(context, workload_id)
+        if workload_paused == False:
+            self.workload_pause(context, workload_id)
+        
+     
 
-        try:
-           self.workload_pause(context, workload_id)
-        except:
-           pass
+        purge_metadata = False
+        options = {}
+        if 'name' in workload:
+            options['display_name'] = workload['name']
+        if 'description' in workload:
+            options['display_description'] = workload['description']  
+        #if 'workload_type_id' in workload:
+        #    options['workload_type_id'] = workload['workload_type_id']                
+        if 'metadata' in workload:
+            purge_metadata = True
+            options['metadata'] = workload['metadata']     
+        if 'jobschedule' in workload:
+            options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
+        if  'instances' in workload:
+            for vm in self.db.workload_vms_get(context, workload_id):
+                self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
+            #TODO(giri): optimize this lookup
+            compute_service = nova.API(production=True)
+            instances_with_name = compute_service.get_servers(context,admin=True)               
+            instances = workload['instances']
+            for instance in instances:
+                for instance_with_name in instances_with_name:
+                    if instance['instance-id'] == instance_with_name.id:
+                        instance['instance-name'] = instance_with_name.name  
+            for instance in instances:
+                values = {'workload_id': workload_id,
+                          'vm_id': instance['instance-id'],
+                          'vm_name': instance['instance-name']}
+                vm = self.db.workload_vms_create(context, values)                                       
 
-        #TODO(giri): optimize this lookup
-                   
-        options = {'display_name': workload['workload']['name'],
-                   'display_description': workload['workload']['description'],
-                   'metadata' : workload['workload']['metadata'],
-                   'jobschedule': pickle.dumps(workload['workload']['jobschedule'], 0),}
-
-        self.db.workload_update(context, workload_id, options)
-        # TODO: Update only when there is change is instances
-        #for instance in workload['workload']['instances']:
-            #for instance_with_name in instances_with_name:
-                #if instance['instance-id'] == instance_with_name.id:
-                    #instance['instance-name'] = instance_with_name.name 
-        #for instance in workload.instances:
-            #values = {'workload_id': workload['workload']['id'],
-                      #'vm_id': instance['instance-id'],
-                      #'vm_name': instance['instance-name']}
-            #vm = self.db.workload_vms_create(context, values)
-
-        self.workload_resume(context, workload_id)
+        self.db.workload_update(context, workload_id, options, purge_metadata)
+        if workload_paused == False:
+            self.workload_resume(context, workload_id)
     
     def workload_delete(self, context, workload_id):
         """
@@ -388,24 +399,26 @@ class API(base.Base):
         """
         return self.workloads_rpcapi.workload_get_topology(context,
                                                            socket.gethostname(),
-                                                           workload_id)                
-             
+                                                           workload_id)   
+                     
+    def _is_workload_paused(self, context, workload_id): 
+        workload = self.workload_get(context, workload_id)
+        jobs = self._scheduler.get_jobs()
+        for job in jobs:
+            if job.kwargs['workload_id'] == workload_id:
+                return False
+        return True
+               
     def workload_pause(self, context, workload_id):
         """
         Pause workload job schedule. No RPC call is made
         """
-        paused = False
         workload = self.workload_get(context, workload_id)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 self._scheduler.unschedule_job(job)
-                paused = True
                 break
-
-        if not paused:
-            msg = _('Workload job scheduler is already paused')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
 
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
