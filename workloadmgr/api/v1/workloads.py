@@ -226,7 +226,7 @@ class WorkloadMgrsController(wsgi.Controller):
 
         context = req.environ['workloadmgr.context']
         try:
-            self.workload_api.workload_modify(context, id, body)
+            self.workload_api.workload_modify(context, id, body['workload'])
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
 

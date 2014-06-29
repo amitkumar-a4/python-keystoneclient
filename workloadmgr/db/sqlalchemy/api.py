@@ -602,7 +602,7 @@ def _workload_get(context, id, session):
         workloads = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsWithIdNotFound(id = id)
+        raise exception.WorkloadNotFound(workload_id=id)
 
     return workloads
 

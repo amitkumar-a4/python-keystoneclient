@@ -414,3 +414,8 @@ class VMNetworkResourceSnapsNotFound(NotFound):
 class RestoreNotFound(NotFound):
     message = _("Restore %(restore_id)s could not be found.")       
     
+class WorkloadNotFound(NotFound):
+    message = _("Workload %(workload_id)s could not be found.") 
+    
+class WorkloadsNotFound(NotFound):
+    message = _("Workloads could not be found.")    
