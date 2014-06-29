@@ -140,7 +140,7 @@ def workload_get_all_by_project(context, project_id):
     """Get all workloads belonging to a project."""
     return IMPL.workload_get_all_by_project(context, project_id)
 
-def workload_update(context, workload_id, values, purge_metadata):
+def workload_update(context, workload_id, values, purge_metadata=False):
     """
     Set the given properties on a workload  and update it.
     Raises NotFound if workload  does not exist.
