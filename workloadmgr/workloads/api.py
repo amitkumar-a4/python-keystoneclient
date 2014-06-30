@@ -361,16 +361,19 @@ class API(base.Base):
         
         workloads = self.db.workload_get_all(context)
         for workload in workloads:
+            if workload.deleted:
+                continue
             workload_type = self.db.workload_type_get(context, workload.workload_type_id)
             if (workload_type.display_name == 'Composite'):
                 for kvpair in workload.metadata:
                     if kvpair['key'] == 'workloadgraph':
                         graph = json.loads(kvpair['value'])
                         for flow in graph['children']:
-                            if 'type' in flow:
-                                if flow['data']['id'] == workload_id:
-                                    msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                    raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                    
+                            for member in flow['children']:
+                                if 'type' in member:
+                                    if member['data']['id'] == workload_id:
+                                        msg = _('Operation not allowed since this workload is a member of a composite workflow')
+                                        raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                    
 
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
         if len(snapshots) > 0:
@@ -450,16 +453,19 @@ class API(base.Base):
         
         workloads = self.db.workload_get_all(context)
         for workload in workloads:
+            if workload.deleted:
+                continue
             workload_type = self.db.workload_type_get(context, workload.workload_type_id)
             if (workload_type.display_name == 'Composite'):
                 for kvpair in workload.metadata:
                     if kvpair['key'] == 'workloadgraph':
                         graph = json.loads(kvpair['value'])
                         for flow in graph['children']:
-                            if 'type' in flow:
-                                if flow['data']['id'] == workload_id:
-                                    msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                    raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                                    
+                            for member in flow['children']:
+                                if 'type' in member:
+                                    if member['data']['id'] == workload_id:
+                                        msg = _('Operation not allowed since this workload is a member of a composite workflow')
+                                        raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                                    
         
 
         options = {'user_id': context.user_id,
