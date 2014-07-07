@@ -7,6 +7,8 @@ Description = 'Test33:                                       \n'\
               '      Take a snapshot                         \n'\
               '      Monitor the snapshot progress           \n'\
               '      Take incremental snapshots              \n'\
+              '      Restore latest snapshot                 \n'\
+              '      Restore last but one snapshot           \n'\
               '      Delete snapshot                         \n'\
               '      Delete workload that is created           '
 

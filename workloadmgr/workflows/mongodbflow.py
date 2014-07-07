@@ -142,7 +142,8 @@ class PauseDBInstance(task.Task):
     
     def revert(self, *args, **kwargs):
         # Resume DB
-        self.client.unlock()
+        if self.client.is_locked:
+           self.client.unlock()
 
 
 class ResumeDBInstance(task.Task):

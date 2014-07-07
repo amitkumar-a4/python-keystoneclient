@@ -11,7 +11,8 @@ Description = 'Test13:                                       \n'\
               '      Delete snapshots                        \n'\
               '      Delete workload that is created         \n'
 
-vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
+#vms = ["vm1", "vm2", "vm3", "vm4", "vm5"]
+vms = ["vm1", "vm2"]
 
 class test13(WorkloadMgrSystemTest):
 
@@ -62,7 +63,7 @@ class test13(WorkloadMgrSystemTest):
         for vm in self._vms:
            instances.append({'instance-id':vm.id})
 
-        if len(instances) != 5:
+        if len(instances) != len(vms):
            raise Exception("There are less than 5 vms")
 
         self.workload = self._testshell.cs.workloads.create("VMsWorkload", "Workload with 5 VMs", self.serialtype.id, instances, {}, {})
