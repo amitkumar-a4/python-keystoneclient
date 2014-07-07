@@ -35,40 +35,70 @@
 <div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
   <!-- Default panel contents -->
   <div class="panel-heading"><h3 class="panel-title">trilioVault Appliance Configuration</h3></div>
+  % if len(error_message) > 0:
+	  	<div class="alert alert-danger alert-dismissible" role="alert">
+		  <button type="button" class="close" data-dismiss="alert">
+		  <span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+		  <strong>{{error_message}}</strong>
+ 		</div>
+  % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
-
-
   <form role="form" class="form-configure" action="/configure" method="post">
     <input name = "nodetype" type="radio"  value="controller" checked>  Controller Node
     <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
+   
     <div class="input-group">
-    <label class="input-group-addon">Floating IP Address	</label>
-    <input name="floating-ipaddress" type="text" required="" placeholder="192.168.2.200" class="form-control"><br>
+    	<label class="input-group-addon">Floating IP Address	</label>
+    	<input name="floating-ipaddress" type="text" required="" placeholder="192.168.2.200" class="form-control"><br>
     </div><br>
     <div class="input-group">    
-    <label class="input-group-addon">Keystone Admin Url</label>
-    <input name="keystone-admin-url" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
+    	<label class="input-group-addon">Keystone Admin Url</label>
+    	<input name="keystone-admin-url" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Keystone Public Url</label>
-    <input name="keystone-public-url" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+    	<label class="input-group-addon">Keystone Public Url</label>
+    	<input name="keystone-public-url" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    <input name="admin-username" type="text" required="" placeholder="admin" class="form-control"> <br>
+    	<label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<input name="admin-username" type="text" required="" placeholder="admin" class="form-control"> <br>
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    <input name="admin-password" type="password" required="" placeholder="password" class="form-control"> <br>
+    	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<input name="admin-password" type="password" required="" placeholder="password" class="form-control"> <br>
+    </div><br>
+    	<div class="input-group">
+    	<label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<input name="admin-tenant-name" type="text" required="" placeholder="admin" class="form-control">
     </div><br>
     <div class="input-group">
-    <label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    <input name="admin-tenant-name" type="text" required="" placeholder="admin" class="form-control">
-    </div><br>
-    <div class="input-group">
-    <label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    <input name="region-name" type="text" required="" placeholder="RegionOne" class="form-control">
+    	<label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<input name="region-name" type="text" required="" placeholder="RegionOne" class="form-control">
     </div><br>    
+    
+	<div class="panel-group" id="accordion">
+	  <div class="panel panel-default" id="panel1">
+	    <div class="panel-heading">
+	      <h4 class="panel-title">
+	        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">
+	          Optional
+	        </a>
+	      </h4>
+	    </div>
+	    <div id="collapseOne" class="panel-collapse collapse">
+	      <div class="panel-body">
+    		<div class="input-group" >
+		    	<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+		    	<input name="name-server" type="text" placeholder="192.168.2.1" class="form-control">
+		    	
+		    	<label class="input-group-addon">Domain Search Order</label>
+		    	<input name="domain-search-order" type="text" placeholder="example.com example.net" class="form-control">
+    		</div><br>   	      
+	      </div>
+	    </div>
+	  </div>
+	</div>
+    
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
   </form>
   </div>
