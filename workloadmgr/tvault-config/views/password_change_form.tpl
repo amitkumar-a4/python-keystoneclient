@@ -36,6 +36,7 @@ function validatepasswords()
         pass2.style.backgroundColor = badColor;
         message.style.color = badColor;
         message.innerHTML = "Passwords Do Not Match!"
+        return false;
     }
 }
 </script>
@@ -62,13 +63,13 @@ function validatepasswords()
 <div class="panel-body">
 <div class="container" style="width:370px">
  <img width="200" height="100" src="triliovault.png" alt="trilio-splash" id="tdmini">
- <form role="form" class="form-signin" action="/change_password" method="post">
+ <form role="form" class="form-signin" action="/change_password" onsubmit="return validatepasswords()" method="post">
   <h2 class="form-signin-heading">Change Password</h2><br><br>
       <div>
         <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="New Password" class="form-control"><br>
         <input id="confirmpassword" name="confirmpassword" type="password" required="" placeholder="Confirm Password" class="form-control" onkeyup="validatepasswords(); return false;"><br>
         <span id="confirmMessage" class="confirmMessage"></span>
-        <button type="submit" class="btn btn-lg btn-primary btn-block" onclick="validatepasswords(); return false;">Submit</button>
+        <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
       </div>
  </form>
 </div>
