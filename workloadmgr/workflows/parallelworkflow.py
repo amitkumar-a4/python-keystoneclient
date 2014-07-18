@@ -62,6 +62,7 @@ def get_vms(cntx, workload_id):
         vm = {'vm_id' : vm_instance.id,
               'vm_name' : vm_instance.name,
               'vm_flavor_id' : vm_instance.flavor['id'],
+              'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
               'hypervisor_hostname' : vm_hypervisor.hypervisor_hostname,
               'hypervisor_type' :  vm_hypervisor.hypervisor_type}
         vms.append(vm)

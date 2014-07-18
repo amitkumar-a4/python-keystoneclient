@@ -68,7 +68,7 @@ function validatepasswords()
         <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="New Password" class="form-control"><br>
         <input id="confirmpassword" name="confirmpassword" type="password" required="" placeholder="Confirm Password" class="form-control" onkeyup="validatepasswords(); return false;"><br>
         <span id="confirmMessage" class="confirmMessage"></span>
-        <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
+        <button type="submit" class="btn btn-lg btn-primary btn-block" onclick="validatepasswords(); return false;">Submit</button>
       </div>
  </form>
 </div>

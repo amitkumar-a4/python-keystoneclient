@@ -869,15 +869,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
         
-        if test == True:
-            # We will not powerdown the VM if we are doing a test restore.
-            #self.shutdown_instance(restored_instance) 
-            #time.sleep(10)
-            pass
-        else:
-            compute_service.stop(cntx, restored_instance.id)
-            LOG.debug('Waiting for the instance ' + restored_instance.id + ' to stop' )
-            time.sleep(10)
+
         #attach volumes 
         for device, restored_volume in device_restored_volumes.iteritems():
             if device == 'Hard disk 2':
@@ -909,8 +901,6 @@ class LibvirtDriver(driver.ComputeDriver):
             time.sleep(10)
             LOG.debug(_("Test Restore Completed"))
         else:
-            LOG.debug('Starting instance ' + restored_instance.id )            
-            compute_service.start(cntx, restored_instance.id)  
             LOG.debug(_("Restore Completed"))
             
         restored_vm_values = {'vm_id': restored_instance.id,

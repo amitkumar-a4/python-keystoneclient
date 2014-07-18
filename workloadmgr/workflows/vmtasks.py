@@ -35,6 +35,19 @@ import vmtasks_vcloud
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
+POWER_STATES = {
+    0: "NO STATE",
+    1: "RUNNING",
+    2: "BLOCKED",
+    3: "PAUSED",
+    4: "SHUTDOWN",
+    5: "SHUTOFF",
+    6: "CRASHED",
+    7: "SUSPENDED",
+    8: "FAILED",
+    9: "BUILDING",
+}
+
 class RestoreVMNetworks(task.Task):
     def execute(self, context, restore):
         return self.execute_with_log(context, restore)
@@ -244,6 +257,8 @@ class PauseVM(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+            return
         if True:
             return vmtasks_openstack.pause_vm(cntx, db, instance)
         else:
@@ -253,6 +268,8 @@ class PauseVM(task.Task):
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
+        if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
+            return        
         if True:
             return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
         else:
@@ -273,6 +290,8 @@ class UnPauseVM(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+            return
         if True:
             return vmtasks_openstack.unpause_vm(cntx, db, instance)
         else:
@@ -298,6 +317,8 @@ class SuspendVM(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+            return
         if True:
             return vmtasks_openstack.suspend_vm(cntx, db, instance)
         else:
@@ -307,6 +328,8 @@ class SuspendVM(task.Task):
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
+        if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
+            return        
         if True:
             return vmtasks_openstack.resume_vm(cntx, db, kwargs['instance'])
         else:
@@ -327,6 +350,8 @@ class ResumeVM(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+            return
         if True:
             return vmtasks_openstack.resume_vm(cntx, db, instance)
         else:
@@ -377,6 +402,8 @@ class FreezeVM(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
+        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+            return        
         if True:
             return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
         else:
@@ -405,6 +432,8 @@ class ThawVM(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
+        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+            return        
         if True:
             return vmtasks_openstack.thaw_vm(cntx, db, instance, snapshot)
         else:
