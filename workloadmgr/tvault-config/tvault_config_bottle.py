@@ -121,9 +121,9 @@ def change_password():
 
 
 @bottle.route('/')
-@authorize()
+@bottle.view('landing_page')
 def index():
-    bottle.redirect("/configure")
+    return {}
 
 # Static pages
 @bottle.route('/login')
@@ -160,6 +160,14 @@ def send_css(filename):
 @bottle.route('/<filename:re:.*\.otf>')
 def send_css(filename):
     return static_file(filename, root='views', mimetype='font/otf')
+
+@bottle.route('/<filename:re:.*\.deb>')
+def send_deb(filename):
+    return static_file(filename, root='views', mimetype='application/vnd.debian.binary-package')
+
+@bottle.route('/<filename:re:.*\.gz>')
+def send_gz(filename):
+    return static_file(filename, root='views', mimetype='application/x-gzip')
 
 """############################ tvault config API's ########################"""
 
@@ -789,6 +797,7 @@ def configure():
         else:
            bottle.redirect("/configure")
 
+    
 # #  Web application main  # #
 
 def main():
