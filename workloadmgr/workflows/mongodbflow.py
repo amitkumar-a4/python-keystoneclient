@@ -143,7 +143,7 @@ class PauseDBInstance(task.Task):
     def revert(self, *args, **kwargs):
         # Resume DB
         if self.client.is_locked:
-           self.client.unlock()
+            self.client.unlock()
 
 
 class ResumeDBInstance(task.Task):
@@ -224,9 +224,9 @@ class ShutdownConfigServer(task.Task):
             client = paramiko.SSHClient()
             client.load_system_host_keys()
             if HostPassword == '':
-               client.set_missing_host_key_policy(paramiko.WarningPolicy)
+                client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
-               client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword)
             
             stdin, stdout, stderr = client.exec_command(command)
@@ -253,9 +253,9 @@ class ShutdownConfigServer(task.Task):
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
                     if HostPassword == '':
-                       client.set_missing_host_key_policy(paramiko.WarningPolicy)
+                        client.set_missing_host_key_policy(paramiko.WarningPolicy())
                     else:
-                       client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                     client.connect(cfghost, port=kwargs['HostSSHPort'], username=kwargs['HostUsername'], password=kwargs['HostPassword'])
                 
                     stdin, stdout, stderr = client.exec_command(command)
@@ -283,9 +283,9 @@ class ResumeConfigServer(task.Task):
             client = paramiko.SSHClient()
             client.load_system_host_keys()
             if HostPassword == '':
-               client.set_missing_host_key_policy(paramiko.WarningPolicy)
+                client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
-               client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword)
     
             stdin, stdout, stderr = client.exec_command(command)
@@ -382,9 +382,9 @@ def get_vms(cntx, dbhost, dbport, mongodbusername, mongodbpassword, sshport, hos
             client = paramiko.SSHClient()
             client.load_system_host_keys()
             if hostpassword == '':
-               client.set_missing_host_key_policy(paramiko.WarningPolicy)
+                client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
-               client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(hostname, port=int(sshport), username=hostusername, password=hostpassword)
             stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr')
             interfaces[stdout.read().split('HWaddr')[1].strip()] = hostname
@@ -590,8 +590,8 @@ class MongoDBWorkflow(workflow.Workflow):
                 if len(item._name.split('_')) == 2:
                     nodename = item._name.split("_")[1]
                     for n in nodes['instances']:
-                       if n['vm_id'] == nodename:
-                          nodename = n['vm_name']
+                        if n['vm_id'] == nodename:
+                            nodename = n['vm_name']
                     taskdetails['input'] = [['vm', nodename]]
                 return taskdetails
 

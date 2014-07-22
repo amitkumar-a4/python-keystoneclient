@@ -255,6 +255,16 @@ class API(base.Base):
             for instance_with_name in instances_with_name:
                 if instance['instance-id'] == instance_with_name.id:
                     instance['instance-name'] = instance_with_name.name 
+        
+        workload_type_id_valid = False
+        workload_types = self.workload_type_get_all(context)            
+        for workload_type in workload_types:
+            if workload_type_id == workload_type.id:
+                workload_type_id_valid = True
+                break 
+        if workload_type_id_valid == False:
+            msg = _('Invalid workload type')
+            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                
                    
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
