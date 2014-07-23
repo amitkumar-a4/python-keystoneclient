@@ -169,6 +169,10 @@ def send_deb(filename):
 def send_gz(filename):
     return static_file(filename, root='views', mimetype='application/x-gzip')
 
+@bottle.route('/<filename:re:.*\.sh>')
+def send_sh(filename):
+    return static_file(filename, root='views', mimetype='application/x-sh')
+
 """############################ tvault config API's ########################"""
 
 def replace_line(file_path, pattern, substitute):
