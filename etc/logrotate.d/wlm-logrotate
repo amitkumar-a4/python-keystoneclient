@@ -1,0 +1,7 @@
+/var/log/workloadmgr/wlm-api.log /var/log/workloadmgr/wlm-scheduler.log /var/log/workloadmgr/wlm-workloads.log {
+    daily
+    missingok
+    compress
+    delaycompress
+    notifempty
+}
