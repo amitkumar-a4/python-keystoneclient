@@ -196,7 +196,7 @@ def upgrade(migrate_engine):
         Column('resource_pit_id', String(length=255)),
         Column('size', BigInteger, nullable=False),                
         Column('status', String(length=32), nullable=False),
-        UniqueConstraint('vm_id', 'snapshot_id', 'resource_name'),
+        UniqueConstraint('vm_id', 'snapshot_id', 'resource_name', 'resource_pit_id'),
         mysql_engine='InnoDB'
     )
     

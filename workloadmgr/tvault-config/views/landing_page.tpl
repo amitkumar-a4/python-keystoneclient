@@ -40,14 +40,14 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/configure">http://&lt;floating-ipaddress-of-tvault-vm&gt;/configure</a>
+                            <a href="/configure" target="_blank">http://&lt;floating-ipaddress-of-tvault-vm&gt;/configure</a>
                         </div>
                     </li>
 
                     <li>Configure OS Controller</li>
                     <br>
                     <div class="well">
-                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list</code>
+                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
                         <br>
                         <code># sudo apt-get update</code>
                         <br>
@@ -58,7 +58,7 @@
                     <li>Configure Compute Nodes</li>
                     <br>
                     <div class="well">
-                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list</code>
+                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
                         <br>
                         <code># sudo apt-get update</code>
                         <br>
@@ -79,7 +79,7 @@
                     <li>Horizon Dashboard Plugin</li>
                     <br>
                     <div class="well">
-                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list</code>
+                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
                         <br>
                         <code># sudo apt-get update</code>
                         <br>
