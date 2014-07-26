@@ -247,6 +247,7 @@ class API(base.Base):
         """
         Make the RPC call to create a workload.
         """
+        
         compute_service = nova.API(production=True)
         instances_with_name = compute_service.get_servers(context,admin=True)
 
@@ -325,21 +326,20 @@ class API(base.Base):
             self.workload_pause(context, workload_id)
         
      
-
         purge_metadata = False
         options = {}
-        if 'name' in workload:
+        if 'name' in workload and workload['name']:
             options['display_name'] = workload['name']
-        if 'description' in workload:
+        if 'description' in workload and workload['description']:
             options['display_description'] = workload['description']  
         #if 'workload_type_id' in workload:
         #    options['workload_type_id'] = workload['workload_type_id']                
-        if 'metadata' in workload:
+        if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']     
-        if 'jobschedule' in workload:
+        if 'jobschedule' in workload and workload['jobschedule']:
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
-        if  'instances' in workload:
+        if  'instances' in workload and workload['instances']:
             for vm in self.db.workload_vms_get(context, workload_id):
                 self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
             #TODO(giri): optimize this lookup
