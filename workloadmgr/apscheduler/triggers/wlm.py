@@ -23,7 +23,7 @@ class WorkloadMgrTrigger(object):
 
         if 'interval' in jobschedule:
             if jobschedule['interval'].find("hr"):
-                if int(jobschedule['interval'].strip(" ").split("hr")[0]) >= 1 and int(jobschedule['interval'].strip(" ").split("hr")[0]) <= 12:
+                if int(jobschedule['interval'].strip(" ").split("hr")[0]) >= 1:
                     self.interval = timedelta(hours= int(jobschedule['interval'].strip(" ").split("hr")[0]))
                 else:
                     raise Exception("Invalid format in the job scheduler")
