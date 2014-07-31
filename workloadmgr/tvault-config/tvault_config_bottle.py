@@ -173,6 +173,21 @@ def send_gz(filename):
 def send_sh(filename):
     return static_file(filename, root='views', mimetype='application/x-sh')
 
+@bottle.route('workloadmgr/<filename:re:.log>')
+@authorize()
+def send_wlm_logs(filename):
+    return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain')
+
+@bottle.route('tvault-gui/<filename:re:.log>')
+@authorize()
+def send_tvault_gui_logs(filename):
+    return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain')
+
+@bottle.route('tvault-gui/<filename:re:.log.1>')
+@authorize()
+def send_tvault_gui_logs1(filename):
+    return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain')
+
 """############################ tvault config API's ########################"""
 
 def replace_line(file_path, pattern, substitute):
@@ -518,10 +533,10 @@ def configure_api():
             #configure tvault-gui
             command = ['sudo', 'rm', "/etc/init/tvault-gui.override"];
             subprocess.call(command, shell=False) 
-            command = ['sudo', 'rm', "/etc/init/tvault-gui-worker.override"];
-            subprocess.call(command, shell=False)         
-            command = ['sudo', 'rm', "/etc/init/tvault-gui-worker-1.override"];
-            subprocess.call(command, shell=False)        
+            #command = ['sudo', 'rm', "/etc/init/tvault-gui-worker.override"];
+            #subprocess.call(command, shell=False)         
+            #command = ['sudo', 'rm', "/etc/init/tvault-gui-worker-1.override"];
+            #subprocess.call(command, shell=False)        
             command = ['sudo', 'rm', "/etc/init/tvault-gui-web.override"];
             subprocess.call(command, shell=False)         
             command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
@@ -650,10 +665,10 @@ def start_api():
             #configure tvault-gui
             command = ['sudo', 'service', 'tvault-gui', 'restart'];
             subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-worker', 'restart'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-worker-1', 'restart'];
-            subprocess.call(command, shell=False)
+            #command = ['sudo', 'service', 'tvault-gui-worker', 'restart'];
+            #subprocess.call(command, shell=False)
+            #command = ['sudo', 'service', 'tvault-gui-worker-1', 'restart'];
+            #subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'tvault-gui-web', 'restart'];
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'tvault-gui-web-1', 'restart'];

@@ -282,7 +282,8 @@ class API(base.Base):
             time.sleep(15)#TODO(gbasava): Creation is asynchronous. Wait and check for the status
             #Perform translation required if any
             return item 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return       
         
@@ -308,7 +309,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production, admin).servers.find(name=name) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return 
         
@@ -322,7 +324,8 @@ class API(base.Base):
             for server in servers:
                 if server.id == id:
                     return server 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return       
          
@@ -334,7 +337,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.stop(server=server) 
-        except Exception:
+        except Exception  as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return         
         
@@ -346,7 +350,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.start(server=server) 
-        except Exception:
+        except Exception  as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return                 
         
@@ -358,7 +363,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.suspend(server=server) 
-        except Exception:
+        except Exception  as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
         
@@ -370,7 +376,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.resume(server=server) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return            
         
@@ -382,7 +389,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.pause(server=server) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return                   
 
@@ -394,7 +402,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.unpause(server=server) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
         
@@ -406,7 +415,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.delete(server=server) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
         
@@ -418,7 +428,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).servers.force_delete(server=server) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return 
                     
@@ -434,7 +445,8 @@ class API(base.Base):
   
         try:
             return novaclient(context, self._production).volumes.create_server_volume(server_id, volume_id, device) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return 
                     
@@ -448,7 +460,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).images.find(id=id) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return 
         
@@ -461,7 +474,8 @@ class API(base.Base):
         """   
         try:
             return novaclient(context, self._production).flavors.list(is_public=is_public) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return         
                       
@@ -475,7 +489,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).flavors.find(name=name) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return 
          
@@ -489,7 +504,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production).flavors.get(id) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return 
 
@@ -506,7 +522,8 @@ class API(base.Base):
             return novaclient(context, self._production, True).flavors.create(name, 
                                                 memory, vcpus, root_gb, flavorid="auto", 
                                                 ephemeral = ephemeral_gb)
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return         
 
@@ -517,7 +534,8 @@ class API(base.Base):
     
         try:
             return novaclient(context, self._production, True).flavors.delete(id) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
                
@@ -529,7 +547,8 @@ class API(base.Base):
         """        
         try:
             return novaclient(context, self._production).servers.interface_list(server=server) 
-        except Exception:
+        except Exception as ex:
+            LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return              
 

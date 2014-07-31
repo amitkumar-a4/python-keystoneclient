@@ -14,6 +14,7 @@ import uuid
 import time
 import cPickle as pickle
 from netaddr import IPNetwork
+import threading
 
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
@@ -27,6 +28,8 @@ from workloadmgr import utils
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
+
+lock = threading.Lock()
 
 def _get_pit_resource_id(metadata, key):
     for metadata_item in metadata:
@@ -49,167 +52,170 @@ def _get_instance_restore_options(restore_options, instance_id):
                 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
-
-    compute_service = nova.API(production=True)
-    network_service =  neutron.API(production=True)  
-    subnets = []
-    networks = []
-    routers = []
-    for instance in instances: 
-        interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
-        nics = []
-        for interface in interfaces:
-            nic = {} #nic is dictionary to hold the following data
-            #ip_address, mac_address, subnet_id, network_id, router_id, ext_subnet_id, ext_network_id
-            
-            nic.setdefault('ip_address', interface.fixed_ips[0]['ip_address'])
-            nic.setdefault('mac_address', interface.mac_addr)
-    
-            port_data = network_service.get_port(cntx, interface.port_id)
-            #TODO(giri): We may not need ports
-            #utils.append_unique(ports, port_data['port']) 
-            #nic.setdefault('port_id', interface.port_id)
-            
-            subnets_data = network_service.get_subnets_from_port(cntx,port_data['port'])
-            #TODO(giri): we will support only one fixedip per interface for now
-            if subnets_data['subnets'][0]:
-                utils.append_unique(subnets, subnets_data['subnets'][0])
-                nic.setdefault('subnet_id', subnets_data['subnets'][0]['id'])
-                nic.setdefault('subnet_name', subnets_data['subnets'][0]['name'])
-    
-            network = network_service.get_network(cntx,port_data['port']['network_id'])
-            if network : 
-                utils.append_unique(networks, network)
-                nic.setdefault('network_id', network['id'])
-                nic.setdefault('network_name', network['name'])
-            
-            #Let's find our router
-            routers_data = network_service.get_routers(cntx)
-            router_found = None
-            for router in routers_data:
-                if router_found : break
-                search_opts = {'device_id': router['id'], 'network_id':network['id']}
-                router_ports = network_service.get_ports(cntx,**search_opts)
-                for router_port in router_ports:
+    try:
+        lock.acquire()
+        compute_service = nova.API(production=True)
+        network_service =  neutron.API(production=True)  
+        subnets = []
+        networks = []
+        routers = []
+        for instance in instances: 
+            interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
+            nics = []
+            for interface in interfaces:
+                nic = {} #nic is dictionary to hold the following data
+                #ip_address, mac_address, subnet_id, network_id, router_id, ext_subnet_id, ext_network_id
+                
+                nic.setdefault('ip_address', interface.fixed_ips[0]['ip_address'])
+                nic.setdefault('mac_address', interface.mac_addr)
+        
+                port_data = network_service.get_port(cntx, interface.port_id)
+                #TODO(giri): We may not need ports
+                #utils.append_unique(ports, port_data['port']) 
+                #nic.setdefault('port_id', interface.port_id)
+                
+                subnets_data = network_service.get_subnets_from_port(cntx,port_data['port'])
+                #TODO(giri): we will support only one fixedip per interface for now
+                if subnets_data['subnets'][0]:
+                    utils.append_unique(subnets, subnets_data['subnets'][0])
+                    nic.setdefault('subnet_id', subnets_data['subnets'][0]['id'])
+                    nic.setdefault('subnet_name', subnets_data['subnets'][0]['name'])
+        
+                network = network_service.get_network(cntx,port_data['port']['network_id'])
+                if network : 
+                    utils.append_unique(networks, network)
+                    nic.setdefault('network_id', network['id'])
+                    nic.setdefault('network_name', network['name'])
+                
+                #Let's find our router
+                routers_data = network_service.get_routers(cntx)
+                router_found = None
+                for router in routers_data:
                     if router_found : break
-                    router_port_fixed_ips = router_port['fixed_ips']
-                    if router_port_fixed_ips:
-                        for router_port_ip in router_port_fixed_ips:
-                            if router_found : break
-                            for subnet in subnets_data['subnets']:
-                                if router_port_ip['subnet_id'] == subnet['id']:
-                                    router_found = router
-                                    break;
-                            
-            if router_found:
-                utils.append_unique(routers, router_found)
-                nic.setdefault('router_id', router_found['id'])
-                nic.setdefault('router_name', router_found['name'])
-                if router_found['external_gateway_info'] and router_found['external_gateway_info']['network_id']:
-                    search_opts = {'device_id': router_found['id'], 'network_id': router_found['external_gateway_info']['network_id']}
-                    router_ext_ports = network_service.get_ports(cntx,**search_opts)
-                    if router_ext_ports and len(router_ext_ports) and router_ext_ports[0]:
-                        ext_port = router_ext_ports[0]
-                        #utils.append_unique(ports, ext_port) TODO(giri): We may not need ports 
-                        ext_subnets_data = network_service.get_subnets_from_port(cntx,ext_port)
-                        #TODO(giri): we will capture only one subnet for now
-                        if ext_subnets_data['subnets'][0]:
-                            utils.append_unique(subnets, ext_subnets_data['subnets'][0])
-                            nic.setdefault('ext_subnet_id', ext_subnets_data['subnets'][0]['id'])
-                            nic.setdefault('ext_subnet_name', ext_subnets_data['subnets'][0]['name'])
-                        ext_network = network_service.get_network(cntx,ext_port['network_id'])
-                        if ext_network:
-                            utils.append_unique(networks, ext_network)
-                            nic.setdefault('ext_network_id', ext_network['id'])
-                            nic.setdefault('ext_network_name', ext_network['name'])
-            nics.append(nic)
-        #Store the nics in the DB
-        for nic in nics:
-            snapshot_vm_resource_values = { 'id': str(uuid.uuid4()),
-                                            'vm_id': instance['vm_id'],
-                                            'snapshot_id': snapshot['id'],       
-                                            'resource_type': 'nic',
-                                            'resource_name':  nic['mac_address'],
-                                            'resource_pit_id': '',
-                                            'metadata': {},
-                                            'status': 'available'}
+                    search_opts = {'device_id': router['id'], 'network_id':network['id']}
+                    router_ports = network_service.get_ports(cntx,**search_opts)
+                    for router_port in router_ports:
+                        if router_found : break
+                        router_port_fixed_ips = router_port['fixed_ips']
+                        if router_port_fixed_ips:
+                            for router_port_ip in router_port_fixed_ips:
+                                if router_found : break
+                                for subnet in subnets_data['subnets']:
+                                    if router_port_ip['subnet_id'] == subnet['id']:
+                                        router_found = router
+                                        break;
+                                
+                if router_found:
+                    utils.append_unique(routers, router_found)
+                    nic.setdefault('router_id', router_found['id'])
+                    nic.setdefault('router_name', router_found['name'])
+                    if router_found['external_gateway_info'] and router_found['external_gateway_info']['network_id']:
+                        search_opts = {'device_id': router_found['id'], 'network_id': router_found['external_gateway_info']['network_id']}
+                        router_ext_ports = network_service.get_ports(cntx,**search_opts)
+                        if router_ext_ports and len(router_ext_ports) and router_ext_ports[0]:
+                            ext_port = router_ext_ports[0]
+                            #utils.append_unique(ports, ext_port) TODO(giri): We may not need ports 
+                            ext_subnets_data = network_service.get_subnets_from_port(cntx,ext_port)
+                            #TODO(giri): we will capture only one subnet for now
+                            if ext_subnets_data['subnets'][0]:
+                                utils.append_unique(subnets, ext_subnets_data['subnets'][0])
+                                nic.setdefault('ext_subnet_id', ext_subnets_data['subnets'][0]['id'])
+                                nic.setdefault('ext_subnet_name', ext_subnets_data['subnets'][0]['name'])
+                            ext_network = network_service.get_network(cntx,ext_port['network_id'])
+                            if ext_network:
+                                utils.append_unique(networks, ext_network)
+                                nic.setdefault('ext_network_id', ext_network['id'])
+                                nic.setdefault('ext_network_name', ext_network['name'])
+                nics.append(nic)
+            #Store the nics in the DB
+            for nic in nics:
+                snapshot_vm_resource_values = { 'id': str(uuid.uuid4()),
+                                                'vm_id': instance['vm_id'],
+                                                'snapshot_id': snapshot['id'],       
+                                                'resource_type': 'nic',
+                                                'resource_name':  nic['mac_address'],
+                                                'resource_pit_id': '',
+                                                'metadata': {},
+                                                'status': 'available'}
+                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
+                                                    snapshot_vm_resource_values)                                                
+                # create an entry in the vm_network_resource_snaps table
+                vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
+                #ip_address, mac_address, subnet_id, network_id, router_id, ext_subnet_id, ext_network_id
+                vm_network_resource_snap_metadata = nic
+                vm_network_resource_snap_values = {'vm_network_resource_snap_id': snapshot_vm_resource.id,
+                                                     'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                     'pickle': pickle.dumps(nic, 0),
+                                                     'metadata': vm_network_resource_snap_metadata,       
+                                                     'status': 'available'}     
+                                                             
+                vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
+                                
+        #store the subnets, networks and routers in the DB
+        for subnet in subnets:
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': snapshot['id'], 
+                                           'snapshot_id': snapshot['id'],       
+                                           'resource_type': 'subnet',
+                                           'resource_name':  subnet['name'],
+                                           'resource_pit_id': subnet['id'],
+                                           'metadata': {},
+                                           'status': 'available'}
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
                                                 snapshot_vm_resource_values)                                                
             # create an entry in the vm_network_resource_snaps table
             vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-            #ip_address, mac_address, subnet_id, network_id, router_id, ext_subnet_id, ext_network_id
-            vm_network_resource_snap_metadata = nic
-            vm_network_resource_snap_values = {'vm_network_resource_snap_id': snapshot_vm_resource.id,
+            vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                 'pickle': pickle.dumps(nic, 0),
+                                                 'pickle': pickle.dumps(subnet, 0),
                                                  'metadata': vm_network_resource_snap_metadata,       
                                                  'status': 'available'}     
                                                          
             vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
-                            
-    #store the subnets, networks and routers in the DB
-    for subnet in subnets:
-        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                       'vm_id': snapshot['id'], 
-                                       'snapshot_id': snapshot['id'],       
-                                       'resource_type': 'subnet',
-                                       'resource_name':  subnet['name'],
-                                       'resource_pit_id': subnet['id'],
-                                       'metadata': {},
-                                       'status': 'available'}
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                            snapshot_vm_resource_values)                                                
-        # create an entry in the vm_network_resource_snaps table
-        vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-        vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
-                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                             'pickle': pickle.dumps(subnet, 0),
-                                             'metadata': vm_network_resource_snap_metadata,       
-                                             'status': 'available'}     
-                                                     
-        vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
+            
+        for network in networks:
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': snapshot['id'],
+                                           'snapshot_id': snapshot['id'],       
+                                           'resource_type': 'network',
+                                           'resource_name':  network['name'],
+                                           'resource_pit_id': network['id'],
+                                           'metadata': {},
+                                           'status': 'available'}
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
+                                                snapshot_vm_resource_values)                                                
+            # create an entry in the vm_network_resource_snaps table
+            vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
+            vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
+                                                 'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                 'pickle': pickle.dumps(network, 0),
+                                                 'metadata': vm_network_resource_snap_metadata,       
+                                                 'status': 'available'}     
+                                                         
+            vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
         
-    for network in networks:
-        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                       'vm_id': snapshot['id'],
-                                       'snapshot_id': snapshot['id'],       
-                                       'resource_type': 'network',
-                                       'resource_name':  network['name'],
-                                       'resource_pit_id': network['id'],
-                                       'metadata': {},
-                                       'status': 'available'}
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                            snapshot_vm_resource_values)                                                
-        # create an entry in the vm_network_resource_snaps table
-        vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-        vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
-                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                             'pickle': pickle.dumps(network, 0),
-                                             'metadata': vm_network_resource_snap_metadata,       
-                                             'status': 'available'}     
-                                                     
-        vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
-    
-    for router in routers:
-        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                       'vm_id': snapshot['id'],
-                                       'snapshot_id': snapshot['id'],       
-                                       'resource_type': 'router',
-                                       'resource_name':  router['name'],
-                                       'resource_pit_id': router['id'],
-                                       'metadata': {},
-                                       'status': 'available'}
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                            snapshot_vm_resource_values)                                                
-        # create an entry in the vm_network_resource_snaps table
-        vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
-        vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
-                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                             'pickle': pickle.dumps(router, 0),
-                                             'metadata': vm_network_resource_snap_metadata,       
-                                             'status': 'available'}     
-                                                     
-        vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
+        for router in routers:
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': snapshot['id'],
+                                           'snapshot_id': snapshot['id'],       
+                                           'resource_type': 'router',
+                                           'resource_name':  router['name'],
+                                           'resource_pit_id': router['id'],
+                                           'metadata': {},
+                                           'status': 'available'}
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
+                                                snapshot_vm_resource_values)                                                
+            # create an entry in the vm_network_resource_snaps table
+            vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
+            vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
+                                                 'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                 'pickle': pickle.dumps(router, 0),
+                                                 'metadata': vm_network_resource_snap_metadata,       
+                                                 'status': 'available'}     
+                                                         
+            vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)
+    finally:
+        lock.release()
 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_flavors')
 def snapshot_vm_flavors(cntx, db, instances, snapshot):
