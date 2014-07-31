@@ -173,20 +173,20 @@ def send_gz(filename):
 def send_sh(filename):
     return static_file(filename, root='views', mimetype='application/x-sh')
 
-@bottle.route('workloadmgr/<filename:re:.log>')
+@bottle.route('/workloadmgr/<filename:re:.*\.log>')
 @authorize()
 def send_wlm_logs(filename):
-    return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain')
+    return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain', download=True)
 
-@bottle.route('tvault-gui/<filename:re:.log>')
+@bottle.route('/tvault-gui/<filename:re:.*\.log>')
 @authorize()
 def send_tvault_gui_logs(filename):
-    return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain')
+    return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain', download=True)
 
-@bottle.route('tvault-gui/<filename:re:.log.1>')
+@bottle.route('/tvault-gui/<filename:re:.*\.log.1>')
 @authorize()
 def send_tvault_gui_logs1(filename):
-    return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain')
+    return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain', download=True)
 
 """############################ tvault config API's ########################"""
 
