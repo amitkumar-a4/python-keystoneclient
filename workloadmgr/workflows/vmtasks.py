@@ -61,7 +61,8 @@ class RestoreVMNetworks(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         
-        if True:
+        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
+        if target_platform == "openstack":
             return vmtasks_openstack.restore_vm_networks(cntx, db, restore)
         else:
             return vmtasks_vcloud.restore_vm_networks(cntx, db, restore)
@@ -83,7 +84,8 @@ class RestoreSecurityGroups(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         
-        if True:
+        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
+        if target_platform == "openstack":
             return vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
         else:
             return vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
@@ -106,7 +108,8 @@ class PreRestore(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        if True:
+        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
+        if target_platform == "openstack":
             return vmtasks_openstack.pre_restore_vm(cntx, db, instance, restore)
         else:
             return vmtasks_vcloud.pre_restore_vm(cntx, db, instance, restore)
@@ -134,7 +137,8 @@ class RestoreVM(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        if True:
+        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
+        if target_platform == "openstack":
             ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore, 
                                                    restored_net_resources, restored_security_groups)
         else:
@@ -163,7 +167,8 @@ class PostRestore(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
-        if True:
+        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
+        if target_platform == "openstack":
             ret_val = vmtasks_openstack.post_restore_vm(cntx, db, instance, restore)
         else:
             ret_val = vmtasks_vcloud.post_restore_vm(cntx, db, instance, restore)        
@@ -178,19 +183,19 @@ class PostRestore(task.Task):
               
 class SnapshotVMNetworks(task.Task):
         
-    def execute(self, context, instances, snapshot):
-        return self.execute_with_log(context, instances, snapshot)
+    def execute(self, context, source_platform, instances, snapshot):
+        return self.execute_with_log(context, source_platform, instances, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)    
 
     @autolog.log_method(Logger, 'SnapshotVMNetworks.execute')
-    def execute_with_log(self, context, instances, snapshot):
+    def execute_with_log(self, context, source_platform, instances, snapshot):
         # Snapshot the networking configuration of VMs
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.snapshot_vm_networks(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_networks(cntx, db, instances, snapshot)
@@ -201,18 +206,18 @@ class SnapshotVMNetworks(task.Task):
         
 class SnapshotVMFlavors(task.Task):
 
-    def execute(self, context, instances, snapshot):
-        return self.execute_with_log(context, instances, snapshot)
+    def execute(self, context, source_platform, instances, snapshot):
+        return self.execute_with_log(context, source_platform, instances, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs) 
       
     @autolog.log_method(Logger, 'SnapshotVMFlavors.execute')
-    def execute_with_log(self, context, instances, snapshot):
+    def execute_with_log(self, context, source_platform, instances, snapshot):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.snapshot_vm_flavors(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_flavors(cntx, db, instances, snapshot)
@@ -223,18 +228,18 @@ class SnapshotVMFlavors(task.Task):
     
 class SnapshotVMSecurityGroups(task.Task):
 
-    def execute(self, context, instances, snapshot):
-        return self.execute_with_log(context, instances, snapshot)
+    def execute(self, context, source_platform, instances, snapshot):
+        return self.execute_with_log(context, source_platform, instances, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs) 
       
     @autolog.log_method(Logger, 'SnapshotVMSecurityGroups.execute')
-    def execute_with_log(self, context, instances, snapshot):
+    def execute_with_log(self, context, source_platform, instances, snapshot):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.snapshot_vm_security_groups(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_security_groups(cntx, db, instances, snapshot)
@@ -245,21 +250,21 @@ class SnapshotVMSecurityGroups(task.Task):
                             
 class PauseVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs) 
     
     @autolog.log_method(Logger, 'PauseVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # Pause the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.pause_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.pause_vm(cntx, db, instance)
@@ -270,7 +275,7 @@ class PauseVM(task.Task):
         db = WorkloadMgrDB().db
         if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
             return        
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
         else:
             return vmtasks_vcloud.unpause_vm(cntx, db, kwargs['instance'])  
@@ -278,21 +283,21 @@ class PauseVM(task.Task):
         
 class UnPauseVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'UnPauseVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # UnPause the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.unpause_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.unpause_vm(cntx, db, instance)
@@ -305,21 +310,21 @@ class UnPauseVM(task.Task):
         
 class SuspendVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'SuspendVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # Resume the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.suspend_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.suspend_vm(cntx, db, instance)
@@ -330,7 +335,7 @@ class SuspendVM(task.Task):
         db = WorkloadMgrDB().db
         if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
             return        
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.resume_vm(cntx, db, kwargs['instance'])
         else:
             return vmtasks_vcloud.resume_vm(cntx, db, kwargs['instance'])
@@ -338,21 +343,21 @@ class SuspendVM(task.Task):
 
 class ResumeVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'ResumeVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # Resume the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.resume_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.resume_vm(cntx, db, instance)
@@ -365,19 +370,19 @@ class ResumeVM(task.Task):
     
 class PreSnapshot(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'PreSnapshot.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # pre processing of snapshot
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.pre_snapshot_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.pre_snapshot_vm(cntx, db, instance, snapshot)
@@ -390,21 +395,22 @@ class PreSnapshot(task.Task):
         
 class FreezeVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'FreezeVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
-        if True:
+
+        if source_platform is "openstack":
             return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.freeze_vm(cntx, db, instance, snapshot)
@@ -420,21 +426,21 @@ class FreezeVM(task.Task):
 
 class ThawVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'ThawVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
-        if True:
+        if source_platform is "openstack":
             return vmtasks_openstack.thaw_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.thaw_vm(cntx, db, instance, snapshot)
@@ -445,19 +451,19 @@ class ThawVM(task.Task):
            
 class SnapshotVM(task.Task):
 
-    def execute(self, context, instance, snapshot):
-        return self.execute_with_log(context, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'SnapshotVM.execute')
-    def execute_with_log(self, context, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        if True:
+        if source_platform is "openstack":
             ret_val = vmtasks_openstack.snapshot_vm(cntx, db, instance, snapshot)
         else:
             ret_val = vmtasks_vcloud.snapshot_vm(cntx, db, instance, snapshot)
@@ -473,20 +479,20 @@ class SnapshotVM(task.Task):
   
 class SnapshotDataSize(task.Task):
 
-    def execute(self, context, instance, snapshot, snapshot_data):
-        return self.execute_with_log(context, instance, snapshot, snapshot_data)
+    def execute(self, context, source_platform, instance, snapshot, snapshot_data):
+        return self.execute_with_log(context, source_platform, instance, snapshot, snapshot_data)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)    
     
     @autolog.log_method(Logger, 'GetSnapshotDataSize.execute')    
-    def execute_with_log(self, context, instance, snapshot, snapshot_data):
+    def execute_with_log(self, context, source_platform, instance, snapshot, snapshot_data):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
-        if True:
+        if source_platform is "openstack":
             vm_data_size = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         else:
             vm_data_size = vmtasks_vcloud.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
@@ -502,14 +508,14 @@ class SnapshotDataSize(task.Task):
             
 class UploadSnapshot(task.Task):
 
-    def execute(self, context, instance, snapshot, snapshot_data):
-        return self.execute_with_log(context, instance, snapshot, snapshot_data)
+    def execute(self, context, source_platform, instance, snapshot, snapshot_data):
+        return self.execute_with_log(context, source_platform, instance, snapshot, snapshot_data)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'UploadSnapshot.execute')    
-    def execute_with_log(self, context, instance, snapshot, snapshot_data):
+    def execute_with_log(self, context, source_platform, instance, snapshot, snapshot_data):
         # Upload snapshot data to swift endpoint
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
@@ -521,7 +527,7 @@ class UploadSnapshot(task.Task):
         LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
         db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
         
-        if True:
+        if source_platform is "openstack":
             ret_val = vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
             ret_val = vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
@@ -538,19 +544,19 @@ class UploadSnapshot(task.Task):
       
 class PostSnapshot(task.Task):
 
-    def execute(self, context, instance, snapshot, snapshot_data):
-        return self.execute_with_log(context, instance, snapshot, snapshot_data)
+    def execute(self, context, source_platform, instance, snapshot, snapshot_data):
+        return self.execute_with_log(context, source_platform, instance, snapshot, snapshot_data)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'PostSnapshot.execute')    
-    def execute_with_log(self, context, instance, snapshot, snapshot_data):
+    def execute_with_log(self, context, source_platform, instance, snapshot, snapshot_data):
         # post processing of snapshot for ex. block commit
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
-        if True:
+        if source_platform is "openstack":
             ret_val = vmtasks_openstack.post_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
             ret_val = vmtasks_vcloud.post_snapshot(cntx, db, instance, snapshot, snapshot_data)        

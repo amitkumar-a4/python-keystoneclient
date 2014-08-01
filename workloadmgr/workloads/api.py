@@ -242,7 +242,7 @@ class API(base.Base):
         return workloads
     
     def workload_create(self, context, name, description, workload_type_id,
-                        instances, jobschedule, metadata,
+                        source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
         """
         Make the RPC call to create a workload.
@@ -272,6 +272,7 @@ class API(base.Base):
                    'display_name': name,
                    'display_description': description,
                    'status': 'creating',
+                   'source_platform': source_platform,
                    'workload_type_id': workload_type_id,
                    'metadata' : metadata,
                    'jobschedule': pickle.dumps(jobschedule, 0),

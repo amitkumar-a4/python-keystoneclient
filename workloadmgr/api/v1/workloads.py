@@ -194,6 +194,7 @@ class WorkloadMgrsController(wsgi.Controller):
         name = workload.get('name', None)
         description = workload.get('description', None)
         workload_type_id = workload.get('workload_type_id', None)
+        source_platform = workload.get('source_platform', "openstack")
         jobschedule = workload.get('jobschedule', {})
         if not jobschedule:
             jobschedule = {}
@@ -211,6 +212,7 @@ class WorkloadMgrsController(wsgi.Controller):
                                                              name, 
                                                              description,
                                                              workload_type_id, 
+                                                             source_platform,
                                                              instances,
                                                              jobschedule,
                                                              metadata)
