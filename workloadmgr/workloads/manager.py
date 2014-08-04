@@ -132,6 +132,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         context_dict['conf'] =  None # RpcContext object looks for this during init
         store = {
             'context': context_dict,                # context dictionary
+            'source_platform': 'openstack'
         }
 
         for key in metadata:
@@ -150,11 +151,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         context_dict = dict([('%s' % key, value)
                           for (key, value) in context.to_dict().iteritems()])            
         context_dict['conf'] =  None # RpcContext object looks for this during init
+        workload = self.db.workload_get(context, workload_id)
         store = {
                 'context': context_dict,                # context dictionary
                 'workload_id': workload_id,             # workload_id
+                'source_platform': workload.source_platform,
         }
-        workload = self.db.workload_get(context, workload_id)
         for kvpair in workload.metadata:
             store[kvpair['key']] = kvpair['value']
             
@@ -171,11 +173,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         context_dict = dict([('%s' % key, value)
                           for (key, value) in context.to_dict().iteritems()])            
         context_dict['conf'] =  None # RpcContext object looks for this during init
+        workload = self.db.workload_get(context, workload_id)
         store = {
                 'context': context_dict,                # context dictionary
                 'workload_id': workload_id,             # workload_id
+                'source_platform': workload.source_platform
         }
-        workload = self.db.workload_get(context, workload_id)
         for kvpair in workload.metadata:
             store[kvpair['key']] = kvpair['value']
             
@@ -241,13 +244,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
+            workload = self.db.workload_get(context, snapshot.workload_id)
             store = {
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
                 'snapshot': dict(snapshot.iteritems()), # snapshot dictionary
                 'workload_id': snapshot.workload_id,    # workload_id                
+                'source_platform': workload.source_platform,
             }
-            workload = self.db.workload_get(context, snapshot.workload_id)
             for kvpair in workload.metadata:
                 store[kvpair['key']] = kvpair['value']
                 

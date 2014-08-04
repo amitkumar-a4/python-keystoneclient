@@ -151,6 +151,7 @@ class Workloads(BASE, WorkloadsBase):
     display_description = Column(String(255))
     environment = String(36)
     workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
+    source_platform = Column(String(255))
     jobschedule = Column(String(4096))
     status = Column(String(255)) 
   
