@@ -49,7 +49,7 @@ def connect_server(host, port, user, password):
     try:
         client = paramiko.SSHClient()
         client.load_system_host_keys()
-        client.set_missing_host_key_policy(paramiko.WarningPolicy)
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
         client.connect(host, port, user, password)
         LOG.debug(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
 
