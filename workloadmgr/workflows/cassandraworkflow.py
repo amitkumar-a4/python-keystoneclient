@@ -266,7 +266,7 @@ class CassandraWorkflow(workflow.Workflow):
         self._store['instances'] =  get_cassandra_nodes(cntx, self._store['CassandraNode'], 
                  int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
         for index,item in enumerate(self._store['instances']):
-            self._store['instance_'+str(index)] = item
+            self._store['instance_'+item['vm_id']] = item
         
         snapshotvms = lf.Flow('cassandrawf')
         
