@@ -145,7 +145,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workloads/{id}/topology",
                        controller=self.resources['workloads'],
                        action='get_topology',
-                       conditions={"method": ['GET']}) 
+                       conditions={"method": ['GET']})
+        
+        #unlock workload
+        mapper.connect("workloads_unlock",
+                       "/{project_id}/workloads/{id}/unlock",
+                       controller=self.resources['workloads'],
+                       action='unlock',
+                       conditions={"method": ['POST']})         
         
         ###################################################################################################        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)

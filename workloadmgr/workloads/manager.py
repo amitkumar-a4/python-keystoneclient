@@ -38,6 +38,7 @@ from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 from workloadmgr.workflows import vmtasks_openstack
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+from workloadmgr import exception as wlm_exceptions
 
 from workloadmgr import autolog
 
@@ -271,8 +272,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'status': 'available'
                                     })             
-            return 
-         
         except Exception as ex:
             msg = _("Error creating workload snapshot %(snapshot_id)s with failure: %(exception)s") %{
                     'snapshot_id': snapshot_id, 'exception': ex,}
@@ -284,8 +283,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'progress_msg': '',
                                      'error_msg': msg,
                                      'status': 'error'
-                                    })             
-            return;          
+                                    })
+        
+        snapshot = self.db.snapshot_get(context, snapshot_id)
+        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+        
             
     @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):

@@ -11,6 +11,9 @@ specific flows
 
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
+from workloadmgr.virt import driver
+from workloadmgr.vault import vault
+
 
 
 LOG = logging.getLogger(__name__)
@@ -30,19 +33,21 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.pause_vm')
 def pause_vm(cntx, db, instance):
-    return None    
+    return suspend_vm(cntx, db, instance)
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.unpause_vm')
 def unpause_vm(cntx, db, instance):
-    return None    
+    return resume_vm(cntx, db, instance)    
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.suspend_vm')
 def suspend_vm(cntx, db, instance):
-    return None
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    return virtdriver.suspend(cntx, instance)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.resume_vm')
 def resume_vm(cntx, db, instance):
-    return None
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    return virtdriver.resume(cntx, instance, network_info=None)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.pre_snapshot_vm')
 def pre_snapshot_vm(cntx, db, instance, snapshot):
@@ -58,20 +63,28 @@ def thaw_vm(self, cntx, db, instance, snapshot):
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm')
 def snapshot_vm(cntx, db, instance, snapshot):
-    return None
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    return virtdriver.snapshot_vm(cntx, db, instance, snapshot)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_snapshot_data_size')
-def get_snapshot_data_size(cntx, db, instance, snapshot):
-    return None
+def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):
+    LOG.debug(_("instance: %(instance_id)s") %{'instance_id': instance['vm_id'],})
+    vm_data_size = 0;
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    vm_data_size = virtdriver.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+    LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
+    return vm_data_size
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.upload_snapshot')
-def upload_snapshot(cntx, db, instance, snapshot):
-    return None
+def upload_snapshot(cntx, db, instance, snapshot, snapshot_data):
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_snapshot')
-def post_snapshot(cntx, db, instance, snapshot):
-    return None
-
+def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
+      
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
     return None

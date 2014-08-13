@@ -14,6 +14,8 @@ import pkgutil
 import os
 import imp
 import pkg_resources
+from threading import Lock
+
 
 from workloadmgr.openstack.common.gettextutils import _
 from novaclient import exceptions as nova_exception
@@ -75,6 +77,19 @@ CONF.register_opts(nova_opts)
 
 LOG = logging.getLogger(__name__)
 
+novalock = Lock()
+def synchronized(lock):
+    '''Synchronization decorator.'''
+    def wrap(f):
+        def new_function(*args, **kw):
+            lock.acquire()
+            try:
+                return f(*args, **kw)
+            finally:
+                lock.release()
+        return new_function
+    return wrap
+  
 def _discover_extensions(version):
     extensions = []
     for name, module in itertools.chain(
@@ -223,11 +238,13 @@ class API(base.Base):
     
     def __init__(self, production = True):
         self._production = production   
-        
+    
+    @synchronized(novalock)    
     def get_hypervisors(self,context):
         hypervisors = novaclient(context, self._production, True).hypervisors.list()
         return hypervisors         
-
+    
+    @synchronized(novalock)
     def create_server(self, context, name, image, flavor,
                meta=None, files=None,
                reservation_id=None, min_count=None,
@@ -286,8 +303,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return       
-        
-    def get_servers(self, context, search_opts=None, admin=False):
+    
+    def _get_servers(self, context, search_opts=None, admin=False):
         """
         Get all the servers for a particular tenant or all tenants 
         :rtype: :class:`Server`
@@ -300,7 +317,13 @@ class API(base.Base):
             search_opts['project_id'] = context.project_id
         servers = novaclient(context, self._production, admin=admin).servers.list(True, search_opts)
         return servers
-
+        
+    @synchronized(novalock)    
+    def get_servers(self, context, search_opts=None, admin=False):
+        return self._get_servers(context, search_opts, admin)
+    
+    
+    @synchronized(novalock)
     def get_server(self, context, name, admin=False):
         """
         Get the server given the name
@@ -313,14 +336,15 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return 
-        
+    
+    @synchronized(novalock)    
     def get_server_by_id(self, context, id, admin=False):
         """
         :param id to query.
         :rtype: :class:`Server`
         """   
         try:
-            servers = self.get_servers(context, search_opts=None, admin=admin)
+            servers = self._get_servers(context, search_opts=None, admin=admin)
             for server in servers:
                 if server.id == id:
                     return server 
@@ -328,7 +352,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return       
-         
+    
+    @synchronized(novalock)     
     def stop(self, context, server):
         """
         Stop the server given the id
@@ -341,7 +366,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return         
-        
+    
+    @synchronized(novalock)    
     def start(self, context, server):
         """
         Start the server given the id
@@ -354,7 +380,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return                 
-        
+    
+    @synchronized(novalock)    
     def suspend(self, context, server):
         """
         Suspend the server given the id
@@ -367,7 +394,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
-        
+    
+    @synchronized(novalock)    
     def resume(self, context, server):
         """
         Resume the server given the id
@@ -380,7 +408,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return            
-        
+    
+    @synchronized(novalock)    
     def pause(self, context, server):
         """
         Pause the server given the id
@@ -393,7 +422,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return                   
-
+    
+    @synchronized(novalock)
     def unpause(self, context, server):
         """
         UnPause the server given the id
@@ -406,7 +436,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
-        
+    
+    @synchronized(novalock)    
     def delete(self, context, server):
         """
         Delete the server given the id
@@ -419,7 +450,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
-        
+    
+    @synchronized(novalock)    
     def force_delete(self, context, server):
         """
         Force Delete the server given the id
@@ -432,7 +464,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return 
-                    
+    
+    @synchronized(novalock)                
     def attach_volume(self, context, server_id, volume_id, device):
         """
         Attach a volume identified by the volume ID to the given server ID
@@ -449,7 +482,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return 
-                    
+    
+    @synchronized(novalock)                
     def get_image(self, context, id):
         """
         Get the image given the name
@@ -464,7 +498,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return 
-        
+    
+    @synchronized(novalock)    
     def get_flavors(self, context, is_public=True):
         """
         Get the list of flavors 
@@ -478,7 +513,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return         
-                      
+    
+    @synchronized(novalock)                  
     def get_flavor_by_name(self, context, name):
         """
         Get the flavors given the name
@@ -493,7 +529,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return 
-         
+    
+    @synchronized(novalock)     
     def get_flavor_by_id(self, context, id):
         """
         Get the flavor given the id
@@ -508,7 +545,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return 
-
+    
+    @synchronized(novalock)
     def create_flavor(self, context, name, memory, vcpus, 
                       root_gb, ephemeral_gb):
         
@@ -527,6 +565,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             return         
 
+    @synchronized(novalock)
     def delete_flavor(self, context, id):
         """
         Delete the falvor given the flavor name
@@ -538,7 +577,8 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
             return
-               
+    
+    @synchronized(novalock)           
     def get_interfaces(self, context, server):   
         """
         List attached network interfaces
@@ -552,6 +592,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             return              
 
+    @synchronized(novalock)
     def vast_prepare(self, context, server, params):
         """
         PREPARE to VAST an instance
@@ -565,6 +606,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             raise         
         
+    @synchronized(novalock)
     def vast_freeze(self, context, server, params):
         """
         FREEZE an instance
@@ -578,6 +620,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
                 
         
+    @synchronized(novalock)
     def vast_thaw(self, context, server, params):
         """
         Thaw an instance
@@ -591,6 +634,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
                 
                           
+    @synchronized(novalock)
     def vast_instance(self, context, server, params):
         """
         VAST an instance
@@ -604,6 +648,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             raise  
         
+    @synchronized(novalock)
     def vast_get_info(self, context, server, params):
         """
         Get components of a VASTed instance
@@ -617,6 +662,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             raise          
         
+    @synchronized(novalock)
     def vast_data(self, context, server, params):
         """
         Read a component of a VASTed instance
@@ -630,6 +676,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             raise   
 
+    @synchronized(novalock)
     def vast_finalize(self, context, server, params):
         """
         Finalize the VAST
@@ -643,6 +690,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             raise  
                             
+    @synchronized(novalock)
     def testbubble_attach_volume(self, context, server, params):
         """
         Attach a volume to testbubble instance
@@ -656,6 +704,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception   
             raise                      
 
+    @synchronized(novalock)
     def testbubble_reboot_instance(self, context, server, params):
         """
         Simple reboot of a testbubble instance

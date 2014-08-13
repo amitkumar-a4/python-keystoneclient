@@ -1765,6 +1765,7 @@ class API(base.Base):
 
         check_policy(context, "get_all", target)
         check_policy(context, "get_all_tenants", target)
+        search_opts['deep_discover'] = True
         if 'deep_discover' in search_opts and search_opts['deep_discover']:
 
             search_opts.pop('deep_discover', None)
@@ -1839,11 +1840,12 @@ class API(base.Base):
                
             for inst in existing_instances:
                 if not inst['found'] and 'metadata' in inst:
-                    for md in inst['metadata']:
-                        if md['key'] == 'imported_from_vcenter' and md['value'] == 'True':
+                    for key,value in inst['metadata'].iteritems():
+                        if key == 'imported_from_vcenter' and value == 'True':
                             instance = self.get(context, inst['uuid'], want_objects=True)
                             self.delete(context, instance)
                             break
+
    
         return self.get_all_bak(context, search_opts=search_opts, sort_key=sort_key,
                         sort_dir=sort_dir, limit=limit, marker=marker, want_objects=want_objects)

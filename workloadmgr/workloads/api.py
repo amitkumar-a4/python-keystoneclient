@@ -14,6 +14,7 @@ from eventlet import greenthread
 
 from datetime import datetime
 import time
+import threading
 
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStore
@@ -31,6 +32,7 @@ from workloadmgr.network import neutron
 from workloadmgr.image import glance
 from workloadmgr import context
 
+workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
 
@@ -453,15 +455,15 @@ class API(base.Base):
                                                     'user_id': workload['user_id'],
                                                     'project_id':workload['project_id']})
 
+    def workload_unlock(self, context, workload_id):
+        workload = self.workload_get(context, workload_id)
+        if not workload['deleted']:
+            self.db.workload_update(context, workload_id, {'status': 'available'})         
+
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """
         Make the RPC call to snapshot a workload.
         """
-        workload = self.workload_get(context, workload_id)
-        if workload['status'] in ['running']:
-            msg = _('Workload snapshot job is already executing, ignoring this execution')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
-        
         workloads = self.db.workload_get_all(context)
         for workload in workloads:
             if workload.deleted:
@@ -477,7 +479,16 @@ class API(base.Base):
                                     if member['data']['id'] == workload_id:
                                         msg = _('Operation not allowed since this workload is a member of a composite workflow')
                                         raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                                    
-        
+
+        try:
+            workload_lock.acquire()
+            workload = self.workload_get(context, workload_id)
+            if workload['status'] != 'available':
+                msg = _("Workload must be in the 'available' state to take a snapshot")
+                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+            self.db.workload_update(context, workload_id, {'status': 'locked'})
+        finally:
+            workload_lock.release()                    
 
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,

@@ -116,7 +116,21 @@ class WorkloadMgrsController(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=unicode(error))
 
         return webob.Response(status_int=202)
+    
+    def unlock(self, req, id):
+        LOG.debug(_('workload unlock called for workload %s'), id)
+        context = req.environ['workloadmgr.context']
 
+        LOG.audit(_('Unlock workload with id: %s'), id, context=context)
+        try:
+            self.workload_api.workload_unlock(context, id)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidWorkloadMgr as error:
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+
+        return webob.Response(status_int=202)
+    
     def snapshot(self, req, id, body=None):
         """snapshot a workload."""
         LOG.debug(_('snapshot called for workload %s'), id)

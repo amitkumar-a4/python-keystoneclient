@@ -60,9 +60,12 @@ class RestoreVMNetworks(task.Task):
         # Restore the networking configuration of VMs
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
-        
-        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
-        if target_platform == "openstack":
+        target_platform = 'openstack' 
+        if 'pickle' in restore:
+            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+            if options and 'type' in options:
+                target_platform = options['type'] 
+        if target_platform == 'openstack':
             return vmtasks_openstack.restore_vm_networks(cntx, db, restore)
         else:
             return vmtasks_vcloud.restore_vm_networks(cntx, db, restore)
@@ -83,9 +86,12 @@ class RestoreSecurityGroups(task.Task):
         # Restore the security groups
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
-        
-        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
-        if target_platform == "openstack":
+        target_platform = 'openstack' 
+        if 'pickle' in restore:
+            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+            if options and 'type' in options:
+                target_platform = options['type'] 
+        if target_platform == 'openstack':
             return vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
         else:
             return vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
@@ -107,9 +113,12 @@ class PreRestore(task.Task):
         # pre processing of restore
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-        
-        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
-        if target_platform == "openstack":
+        target_platform = 'openstack' 
+        if 'pickle' in restore:
+            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+            if options and 'type' in options:
+                target_platform = options['type'] 
+        if target_platform == 'openstack':
             return vmtasks_openstack.pre_restore_vm(cntx, db, instance, restore)
         else:
             return vmtasks_vcloud.pre_restore_vm(cntx, db, instance, restore)
@@ -136,9 +145,12 @@ class RestoreVM(task.Task):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-        
-        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
-        if target_platform == "openstack":
+        target_platform = 'openstack' 
+        if 'pickle' in restore:
+            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+            if options and 'type' in options:
+                target_platform = options['type'] 
+        if target_platform == 'openstack':
             ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore, 
                                                    restored_net_resources, restored_security_groups)
         else:
@@ -166,9 +178,12 @@ class PostRestore(task.Task):
         # post processing of restore
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-
-        target_platform = pickle.loads(restore['pickle'].encode('ascii','ignore'))['type'] 
-        if target_platform == "openstack":
+        target_platform = 'openstack' 
+        if 'pickle' in restore:
+            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+            if options and 'type' in options:
+                target_platform = options['type'] 
+        if target_platform == 'openstack':
             ret_val = vmtasks_openstack.post_restore_vm(cntx, db, instance, restore)
         else:
             ret_val = vmtasks_vcloud.post_restore_vm(cntx, db, instance, restore)        
@@ -195,7 +210,7 @@ class SnapshotVMNetworks(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_networks(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_networks(cntx, db, instances, snapshot)
@@ -217,7 +232,7 @@ class SnapshotVMFlavors(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_flavors(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_flavors(cntx, db, instances, snapshot)
@@ -239,7 +254,7 @@ class SnapshotVMSecurityGroups(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_security_groups(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_security_groups(cntx, db, instances, snapshot)
@@ -264,7 +279,7 @@ class PauseVM(task.Task):
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.pause_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.pause_vm(cntx, db, instance)
@@ -275,7 +290,7 @@ class PauseVM(task.Task):
         db = WorkloadMgrDB().db
         if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
             return        
-        if source_platform is "openstack":
+        if kwargs['source_platform'] == 'openstack':
             return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
         else:
             return vmtasks_vcloud.unpause_vm(cntx, db, kwargs['instance'])  
@@ -297,7 +312,7 @@ class UnPauseVM(task.Task):
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.unpause_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.unpause_vm(cntx, db, instance)
@@ -324,7 +339,7 @@ class SuspendVM(task.Task):
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.suspend_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.suspend_vm(cntx, db, instance)
@@ -335,7 +350,7 @@ class SuspendVM(task.Task):
         db = WorkloadMgrDB().db
         if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
             return        
-        if source_platform is "openstack":
+        if kwargs['source_platform'] == 'openstack':
             return vmtasks_openstack.resume_vm(cntx, db, kwargs['instance'])
         else:
             return vmtasks_vcloud.resume_vm(cntx, db, kwargs['instance'])
@@ -357,7 +372,7 @@ class ResumeVM(task.Task):
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.resume_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.resume_vm(cntx, db, instance)
@@ -382,7 +397,7 @@ class PreSnapshot(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.pre_snapshot_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.pre_snapshot_vm(cntx, db, instance, snapshot)
@@ -410,7 +425,7 @@ class FreezeVM(task.Task):
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
 
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.freeze_vm(cntx, db, instance, snapshot)
@@ -419,7 +434,7 @@ class FreezeVM(task.Task):
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
-        if True:
+        if kwargs['source_platform'] == 'openstack':
             return vmtasks_openstack.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
         else:
             return vmtasks_vcloud.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])           
@@ -440,7 +455,7 @@ class ThawVM(task.Task):
         
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             return vmtasks_openstack.thaw_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.thaw_vm(cntx, db, instance, snapshot)
@@ -463,7 +478,7 @@ class SnapshotVM(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             ret_val = vmtasks_openstack.snapshot_vm(cntx, db, instance, snapshot)
         else:
             ret_val = vmtasks_vcloud.snapshot_vm(cntx, db, instance, snapshot)
@@ -492,7 +507,7 @@ class SnapshotDataSize(task.Task):
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             vm_data_size = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         else:
             vm_data_size = vmtasks_vcloud.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
@@ -527,7 +542,7 @@ class UploadSnapshot(task.Task):
         LOG.debug(_("snapshot_data_size: %(snapshot_data_size)s") %{'snapshot_data_size': snapshot_data_size,})
         db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
         
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             ret_val = vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
             ret_val = vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
@@ -556,7 +571,7 @@ class PostSnapshot(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
-        if source_platform is "openstack":
+        if source_platform == 'openstack':
             ret_val = vmtasks_openstack.post_snapshot(cntx, db, instance, snapshot, snapshot_data)
         else:
             ret_val = vmtasks_vcloud.post_snapshot(cntx, db, instance, snapshot, snapshot_data)        

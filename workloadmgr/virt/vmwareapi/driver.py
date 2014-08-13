@@ -744,18 +744,18 @@ class VMwareVCDriver(VMwareESXDriver):
     def snapshot_vm(self, cntx, db, instance, snapshot): 
         _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
         return _vmops.snapshot_vm(cntx, db, instance, snapshot)
+    
+    @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_data_size')
+    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):     
+        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
+        vm_data_size = _vmops.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+        return vm_data_size     
            
     @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_disk_info')
     def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
         _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
         disks_info = _vmops.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)['info']
         return disks_info 
-    
-    @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_data_size')
-    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):     
-        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
-        vm_data_size = _vmops.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
-        return vm_data_size 
     
     @autolog.log_method(Logger, 'vmwareapi.driver..upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):

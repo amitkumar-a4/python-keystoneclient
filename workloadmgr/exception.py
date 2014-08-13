@@ -418,4 +418,7 @@ class WorkloadNotFound(NotFound):
     message = _("Workload %(workload_id)s could not be found.") 
     
 class WorkloadsNotFound(NotFound):
-    message = _("Workloads could not be found.")    
+    message = _("Workloads could not be found.")
+    
+class InvalidWorkloadState(WorkloadMgrException):
+    message = _("Invalid workload state: %(state)s")         
