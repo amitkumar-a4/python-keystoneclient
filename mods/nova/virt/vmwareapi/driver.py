@@ -143,7 +143,6 @@ class VMwareESXDriver(driver.ComputeDriver):
 
     def __init__(self, virtapi, read_only=False, scheme="https"):
         super(VMwareESXDriver, self).__init__(virtapi)
-
         self._host_ip = CONF.vmware.host_ip
         if not (self._host_ip or CONF.vmware.host_username is None or
                         CONF.vmware.host_password is None):
@@ -179,6 +178,30 @@ class VMwareESXDriver(driver.ComputeDriver):
     def list_instances(self):
         """List VM instances."""
         return self._vmops.list_instances()
+
+    def list_datacenters(self):
+        """List datacenters."""
+        return self._vmops.list_datacenters()
+
+    def list_clusters(self):
+        """List clusters."""
+        return self._vmops.list_clusters()
+
+    def list_vmfolders(self, vmfolderref):
+        """List vmfolders."""
+        return self._vmops.list_vmfolders(vmfolderref)
+
+    def list_resourcepools(self, resourcepoolref):
+        """List resourcepools."""
+        return self._vmops.list_resourcepools(resourcepoolref)
+
+    def list_datastores(self, datastoreref):
+        """List datastores."""
+        return self._vmops.list_datastores(datastoreref)
+
+    def list_vmnetworks(self, vmnetworkref):
+        """List VM networks."""
+        return self._vmops.list_vmnetworks(vmnetworkref)
 
     def spawn(self, context, instance, image_meta, injected_files,
               admin_password, network_info=None, block_device_info=None):

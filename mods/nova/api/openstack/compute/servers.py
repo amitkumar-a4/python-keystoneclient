@@ -30,6 +30,10 @@ from nova.api.openstack import xmlutil
 from nova import block_device
 from nova import compute
 from nova.compute import flavors
+from nova.virt.vmwareapi import vim
+from nova.virt.vmwareapi import vim_util
+from nova.virt.vmwareapi import vm_util
+from nova.virt import driver
 from nova import exception
 from nova.openstack.common.gettextutils import _
 from nova.openstack.common import log as logging
@@ -483,7 +487,8 @@ class Controller(wsgi.Controller):
 
     def __init__(self, ext_mgr=None, **kwargs):
         super(Controller, self).__init__(**kwargs)
-        self.compute_api = compute.API()
+        self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        self.compute_api = compute.API(vmware_driver=self.cm)
         self.ext_mgr = ext_mgr
 
     @wsgi.serializers(xml=MinimalServersTemplate)

@@ -848,6 +848,26 @@ def get_vm_uuid_from_vmref(session, vm_ref):
                 vm_ref, "VirtualMachine", "config.uuid")
     return uuid
 
+def get_datastore_from_vmref(session, vm_ref):
+    datastore = session._call_method(vim_util, "get_dynamic_property",
+                vm_ref, "VirtualMachine", "datastore")
+    return datastore[0][0]
+
+def get_datastore_folder_from_datastore(session, datastore):
+    datastorefolder = session._call_method(vim_util, "get_dynamic_property",
+                         datastore, "Datastore", "parent")
+    return datastorefolder
+
+def get_datacenter_from_datacenterfolder(session, datastorefolder):
+    datacenter = session._call_method(vim_util, "get_dynamic_property",
+                datastorefolder, "Folder", "parent")
+    return datacenter
+
+def get_name_from_datacenter(session, datacenter):
+    name = session._call_method(vim_util, "get_dynamic_property",
+                datacenter, "Datacenter", "name")
+    return name
+
 def get_vm_memmbs_from_vmref(session, vm_ref):
     vm_memmbs = session._call_method(vim_util, "get_dynamic_property",
                 vm_ref, "VirtualMachine", "summary.config.memorySizeMB")

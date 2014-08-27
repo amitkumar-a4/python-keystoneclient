@@ -72,6 +72,7 @@ from nova.scheduler import rpcapi as scheduler_rpcapi
 from nova import servicegroup
 from nova import utils
 from nova import volume
+from nova.virt import driver
 
 
 LOG = logging.getLogger(__name__)
@@ -222,7 +223,7 @@ class API(base.Base):
     """API for interacting with the compute manager."""
 
     def __init__(self, image_service=None, network_api=None, volume_api=None,
-                 security_group_api=None, **kwargs):
+                 security_group_api=None, vmware_driver=None, **kwargs):
         self.image_service = (image_service or
                               glance.get_default_image_service())
 
@@ -236,6 +237,7 @@ class API(base.Base):
         self._compute_task_api = None
         self.servicegroup_api = servicegroup.API()
         self.notifier = notifier.get_notifier('compute', CONF.host)
+        self.cm = vmware_driver
 
         super(API, self).__init__(**kwargs)
 
@@ -1686,14 +1688,10 @@ class API(base.Base):
 
     #WLM_MOD:BEGIN function to discover vmware vms    
     def _discover_vmware_vms(self, context):
-        # check if we can overload list_instnaces of VMware driver and call
-        # the driver routine here
-        from nova.virt import driver
-        from nova.virt.vmwareapi import vm_util
-        
+
         instance_list = []
         try:
-            cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+            cm = self.cm
             instances = cm.list_instances()
             
             for i in instances:
@@ -1708,6 +1706,12 @@ class API(base.Base):
                 host = vm_util.get_host_id_from_vm_ref(cm._session, vmref)
                 net_id = vm_util.get_network_id_from_vm_ref(cm._session, vmref)
                 host_ref = vm_util.get_host_ref_from_id(cm._session, host, None)
+ 
+                datastore = vm_util.get_datastore_from_vmref(cm._session, vmref)
+                datastorefolder = vm_util.get_datastore_folder_from_datastore(cm._session, datastore)
+                datacenter = vm_util.get_datacenter_from_datacenterfolder(cm._session, datastorefolder)
+                datacenter_name = vm_util.get_name_from_datacenter(cm._session, datacenter)
+
                 networks = []
                 for n in net_id:
                     networks.append({'netid':n, 'name':vm_util.get_network_ref_from_id(cm._session, n).propSet[0].val})
@@ -3154,9 +3158,10 @@ class API(base.Base):
 class HostAPI(base.Base):
     """Sub-set of the Compute Manager API for managing host operations."""
 
-    def __init__(self, rpcapi=None):
+    def __init__(self, rpcapi=None, vmware_driver=None):
         self.rpcapi = rpcapi or compute_rpcapi.ComputeAPI()
         self.servicegroup_api = servicegroup.API()
+        self.cm = vmware_driver
         super(HostAPI, self).__init__()
 
     def _assert_host_exists(self, context, host_name, must_be_up=False):
@@ -3262,6 +3267,36 @@ class HostAPI(base.Base):
 
     def compute_node_statistics(self, context):
         return self.db.compute_node_statistics(context)
+
+    def datacenters(self, context):
+        if not self.cm:
+            self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        return self.cm.list_datacenters()
+
+    def clusters(self, context):
+        if not self.cm:
+            self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        return self.cm.list_clusters()
+
+    def vmfolder(self, context, vmfolderref):
+        if not self.cm:
+            self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        return self.cm.list_vmfolders(vmfolderref)
+
+    def resourcepool(self, context, resourcepoolref):
+        if not self.cm:
+            self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        return self.cm.list_resourcepools(resourcepoolref)
+
+    def datastore(self, context, datastoreref):
+        if not self.cm:
+            self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        return self.cm.list_datastores(datastoreref)
+
+    def vmnetwork(self, context, vmnetworkref):
+        if not self.cm:
+            self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
+        return self.cm.list_vmnetworks(vmnetworkref)
 
 
 class InstanceActionAPI(base.Base):
