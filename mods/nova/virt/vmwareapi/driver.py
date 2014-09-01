@@ -33,6 +33,7 @@ from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
 from nova.openstack.common import loopingcall
 from nova.openstack.common import uuidutils
+from nova.openstack.common import periodic_task
 from nova.virt import driver
 from nova.virt.vmwareapi import error_util
 from nova.virt.vmwareapi import host
@@ -82,6 +83,9 @@ vmwareapi_opts = [
                        'Used only if compute_driver is '
                        'vmwareapi.VMwareESXDriver or '
                        'vmwareapi.VMwareVCDriver.'),
+    cfg.IntOpt('session_poll_interval',
+               default=300,
+               help='Interval in seconds for keeping the session active'),
     cfg.IntOpt('api_retry_count',
                default=10,
                deprecated_name='vmwareapi_api_retry_count',
@@ -865,16 +869,20 @@ class VMwareAPISession(object):
         """Check if the module is a VIM Object instance."""
         return isinstance(module, vim.Vim)
 
+    @periodic_task.periodic_task
     def _session_is_active(self):
         active = False
-        try:
-            active = self.vim.SessionIsActive(
+        for x in range(0, 2):
+            try:
+                active = self.vim.SessionIsActive(
                     self.vim.get_service_content().sessionManager,
                     sessionID=self._session.key,
                     userName=self._session.userName)
-        except Exception as e:
-            LOG.warning(_("Unable to validate session %s!"),
+            except Exception as e:
+                LOG.warning(_("Unable to validate session %s!"),
                         self._session.key)
+                import pdb;pdb.set_trace()
+                self._create_session()
         return active
 
     def _call_method(self, module, method, *args, **kwargs):

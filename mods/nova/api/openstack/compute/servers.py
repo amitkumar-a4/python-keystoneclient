@@ -733,8 +733,11 @@ class Controller(wsgi.Controller):
     def show(self, req, id):
         """Returns server details by server id."""
         try:
+            search_opts = {}
+            search_opts.update(req.GET)
             context = req.environ['nova.context']
             instance = self.compute_api.get(context, id,
+                                            search_opts=search_opts,
                                             want_objects=True)
             req.cache_db_instance(instance)
             return self._view_builder.show(req, instance)

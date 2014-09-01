@@ -1663,7 +1663,7 @@ class API(base.Base):
         """Get an instance type by instance type id."""
         return flavors.get_flavor(instance_type_id, ctxt=context)
 
-    def get(self, context, instance_id, want_objects=False):
+    def get_bak(self, context, instance_id, want_objects=False):
         """Get a single instance with the given instance_id."""
         # NOTE(ameade): we still need to support integer ids for ec2
         expected_attrs = ['metadata', 'system_metadata',
@@ -1686,8 +1686,101 @@ class API(base.Base):
             instance = obj_base.obj_to_primitive(instance)
         return instance
 
+    def get(self, context, instance_id, search_opts=None,
+            want_objects=False):
+                                            
+        """Refresh the instance db record with new data from vcenter"""
+
+        instance_uuid = instance_id
+        if search_opts['vmuuid'] == '1':
+            vmware_vms = self._discover_vmware_vms(context, vmuuid=instance_id)
+ 
+            for vm in vmware_vms:
+                # Create flavors by vmware guid only if the flavor does not exists
+                # otherwise update flavors
+                try:
+                    instance_type = flavors.get_flavor_by_name(vm['uuid'])
+                    instance_type['memory_mb'] =  vm['flavor']['memoryMBs']
+                    instance_type['vcpus'] = vm['flavor']['vcpus']
+                    instance_type['root_gb'] = vm['flavor']['rootgb']
+                    instance_type['name'] = vm['flavor']['name']
+                    flavors.save_flavor_info(dict(), instance_type)
+                except:
+                    flavors.create(vm['flavor']['name'], vm['flavor']['memoryMBs'],
+                                   vm['flavor']['vcpus'], vm['flavor']['rootgb'])
+            
+            # Read existing networks
+            networks = self.network_api.get_all(context)
+                
+            vcnets = {}
+            for vm in vmware_vms:
+                for vcnet in vm['networks']:
+                    vcnets[vcnet['name']] = vcnet['netid']
+            
+            # Create networks that don't exists
+            for key, value in vcnets.iteritems():
+                found = 0
+                for net in networks:
+                    if net['name'] == key:
+                        found = 1  
+                        break
+                if not found:
+                    req = {'network': {'name': "{0}".format(key), 'admin_state_up': True}}
+                    self.network_api.create_network(context, req)
+                
+                      
+            # first read existing entries from the database
+            existing_instances = self.get_all_bak(context, search_opts={'deleted':False})
+            for inst in existing_instances: 
+                inst['found'] = False
+                
+            images = self.image_service.detail(context)
+            if images is None or len(images) == 0:
+                return []
+                
+            # refresh networks list
+            networks = self.network_api.get_all(context)
+            
+            # Now create db instance for every vm discovered on the vcenter
+            instance_uuid = None
+            for vm in vmware_vms:
+                vmware_vm_found = False
+                for inst in existing_instances: 
+                    if 'metadata' in inst and 'vmware_uuid' in inst['metadata']:
+                        if inst['metadata']['vmware_uuid'] == vm['uuid']:
+                            vmware_vm_found = True
+                            inst['found'] = True
+                            instance_uuid = inst['uuid']
+                            break
+                    if vmware_vm_found:
+                        # update the vmware record
+                        inst['display_name'] = vm['name']
+                        inst['display_description'] = vm['name']
+                        self.update(inst)
+                        continue
+                    requested_networks = []
+                    #for vcnet in vm['networks']:
+                    for net in networks:
+                        #if not net['router:external'] and net['name'] == vcnet['name']:
+                        if not net['router:external'] and net['name'] == 'private':
+                            requested_networks.append((net['id'], None, None))
+                            break
+                
+                    instance_type = flavors.get_flavor_by_name(vm['uuid'])
+                    instance_uuid = self.create(context, instance_type,
+                                                images[0]['id'],
+                                                requested_networks=requested_networks,
+                                                metadata = {'imported_from_vcenter':'True', 'vmware_uuid' : vm['uuid']},
+                                                display_name=vm['name'], display_description=vm['name'])[0][0]['uuid']
+                   
+        return self.get_bak(context, instance_uuid, want_objects)
+
     #WLM_MOD:BEGIN function to discover vmware vms    
-    def _discover_vmware_vms(self, context):
+    def _discover_vmware_vms(self, context, vmuuid=None):
+
+        from nova.virt.vmwareapi import vim
+        from nova.virt.vmwareapi import vim_util
+        from nova.virt.vmwareapi import vm_util
 
         instance_list = []
         try:
@@ -1697,6 +1790,8 @@ class API(base.Base):
             for i in instances:
                 vmref = vm_util.get_vm_ref_from_name(cm._session, i)
                 uuid = vm_util.get_vm_uuid_from_vmref(cm._session, vmref)
+                if vmuuid and vmuuid != uuid:
+                    continue
                 memmbs = vm_util.get_vm_memmbs_from_vmref(cm._session, vmref)
                 vcpus = vm_util.get_vm_vcpus_from_vmref(cm._session, vmref)
                 vdisks = vm_util.get_vm_vdisks_from_vmref(cm._session, vmref)
@@ -1846,11 +1941,16 @@ class API(base.Base):
                 if not inst['found'] and 'metadata' in inst:
                     for key,value in inst['metadata'].iteritems():
                         if key == 'imported_from_vcenter' and value == 'True':
-                            instance = self.get(context, inst['uuid'], want_objects=True)
+                            instance = self.get_bak(context, inst['uuid'], want_objects=True)
                             self.delete(context, instance)
+                            # delete corresponding flavor too
+                            fname = inst['metadata']['vmware_uuid']
+                            try: 
+                                flavors.get_flavor_by_name(fname, ctxt=context)
+                            except:
+                                flavors.destroy(fname)
                             break
 
-   
         return self.get_all_bak(context, search_opts=search_opts, sort_key=sort_key,
                         sort_dir=sort_dir, limit=limit, marker=marker, want_objects=want_objects)
 

@@ -107,7 +107,7 @@ class VMwareVMOps(object):
         LOG.debug(_("Getting list of instances"))
         vms = self._session._call_method(vim_util, "get_objects",
                      "VirtualMachine",
-                     ["name", "runtime.connectionState"])
+                     ["name", "runtime.connectionState", "config.template"])
         lst_vm_names = []
 
         while vms:
@@ -115,13 +115,16 @@ class VMwareVMOps(object):
             for vm in vms.objects:
                 vm_name = None
                 conn_state = None
+                template = False
                 for prop in vm.propSet:
                     if prop.name == "name":
                         vm_name = prop.val
                     elif prop.name == "runtime.connectionState":
                         conn_state = prop.val
+                    elif prop.name == "config.template":
+                        template = prop.val
                 # Ignoring the orphaned or inaccessible VMs
-                if conn_state not in ["orphaned", "inaccessible"]:
+                if conn_state not in ["orphaned", "inaccessible"] and not template:
                     lst_vm_names.append(vm_name)
             if token:
                 vms = self._session._call_method(vim_util,
