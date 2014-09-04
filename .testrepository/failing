@@ -1,0 +1,145 @@
+time: 2014-09-04 15:36:21.658358Z
+tags: worker-0
+test: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation
+time: 2014-09-04 15:36:21.663576Z
+failure: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+594
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1193, in patched
+    arg = patching.__enter__()
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1268, in __enter__
+    original, local = self.get_original()
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1242, in get_original
+    "%s does not have the attribute %r" % (target, name)
+AttributeError: <module 'workloadmgr.openstack.common.gettextutils' from 'workloadmgr/openstack/common/gettextutils.py'> does not have the attribute 'get_localized_message'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1193, in patched
+    arg = patching.__enter__()
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1268, in __enter__
+    original, local = self.get_original()
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1242, in get_original
+    "%s does not have the attribute %r" % (target, name)
+AttributeError: <module 'workloadmgr.openstack.common.gettextutils' from 'workloadmgr/openstack/common/gettextutils.py'> does not have the attribute 'get_localized_message'
+
+0
+]
+tags: -worker-0
+time: 2014-09-04 15:36:21.697537Z
+tags: worker-0
+test: workloadmgr.tests.test_wsgi.TestWSGIServer.test_app_using_ipv6_and_ssl
+time: 2014-09-04 15:36:21.921903Z
+failure: workloadmgr.tests.test_wsgi.TestWSGIServer.test_app_using_ipv6_and_ssl [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+55E
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_wsgi.py", line 181, in test_app_using_ipv6_and_ssl
+    server.start()
+  File "workloadmgr/wsgi.py", line 191, in start
+    backlog=backlog)
+  File "workloadmgr/wsgi.py", line 141, in _get_socket
+    family=family)
+  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
+    sock.bind(addr)
+  File "/usr/lib/python2.7/socket.py", line 224, in meth
+    return getattr(self._sock,name)(*args)
+gaierror: [Errno -9] Address family for hostname not supported
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_wsgi.py", line 181, in test_app_using_ipv6_and_ssl
+    server.start()
+  File "workloadmgr/wsgi.py", line 191, in start
+    backlog=backlog)
+  File "workloadmgr/wsgi.py", line 141, in _get_socket
+    family=family)
+  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
+    sock.bind(addr)
+  File "/usr/lib/python2.7/socket.py", line 224, in meth
+    return getattr(self._sock,name)(*args)
+gaierror: [Errno -9] Address family for hostname not supported
+
+0
+]
+tags: -worker-0
+time: 2014-09-04 15:36:21.962277Z
+tags: worker-0
+test: workloadmgr.tests.test_wsgi.TestWSGIServer.test_start_random_port_with_ipv6
+time: 2014-09-04 15:36:22.178399Z
+failure: workloadmgr.tests.test_wsgi.TestWSGIServer.test_start_random_port_with_ipv6 [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+568
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_wsgi.py", line 118, in test_start_random_port_with_ipv6
+    server.start()
+  File "workloadmgr/wsgi.py", line 191, in start
+    backlog=backlog)
+  File "workloadmgr/wsgi.py", line 141, in _get_socket
+    family=family)
+  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
+    sock.bind(addr)
+  File "/usr/lib/python2.7/socket.py", line 224, in meth
+    return getattr(self._sock,name)(*args)
+gaierror: [Errno -9] Address family for hostname not supported
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_wsgi.py", line 118, in test_start_random_port_with_ipv6
+    server.start()
+  File "workloadmgr/wsgi.py", line 191, in start
+    backlog=backlog)
+  File "workloadmgr/wsgi.py", line 141, in _get_socket
+    family=family)
+  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
+    sock.bind(addr)
+  File "/usr/lib/python2.7/socket.py", line 224, in meth
+    return getattr(self._sock,name)(*args)
+gaierror: [Errno -9] Address family for hostname not supported
+
+0
+]
+tags: -worker-0

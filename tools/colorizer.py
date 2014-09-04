@@ -137,7 +137,7 @@ def get_elapsed_time_color(elapsed_time):
 
 class WorkloadMgrTestResult(testtools.TestResult):
     def __init__(self, stream, descriptions, verbosity):
-        super(NovaTestResult, self).__init__()
+        super(WorkloadMgrTestResult, self).__init__()
         self.stream = stream
         self.showAll = verbosity > 1
         self.num_slow_tests = 10
@@ -191,26 +191,26 @@ class WorkloadMgrTestResult(testtools.TestResult):
             self.colorizer.write(short_result, color)
 
     def addSuccess(self, test):
-        super(NovaTestResult, self).addSuccess(test)
+        super(WorkloadMgrTestResult, self).addSuccess(test)
         self._addResult(test, 'OK', 'green', '.', True)
 
     def addFailure(self, test, err):
         if test.id() == 'process-returncode':
             return
-        super(NovaTestResult, self).addFailure(test, err)
+        super(WorkloadMgrTestResult, self).addFailure(test, err)
         self._addResult(test, 'FAIL', 'red', 'F', False)
 
     def addError(self, test, err):
-        super(NovaTestResult, self).addFailure(test, err)
+        super(WorkloadMgrTestResult, self).addFailure(test, err)
         self._addResult(test, 'ERROR', 'red', 'E', False)
 
     def addSkip(self, test, reason=None, details=None):
-        super(NovaTestResult, self).addSkip(test, reason, details)
+        super(WorkloadMgrTestResult, self).addSkip(test, reason, details)
         self._addResult(test, 'SKIP', 'blue', 'S', True)
 
     def startTest(self, test):
         self.start_time = self._now()
-        super(NovaTestResult, self).startTest(test)
+        super(WorkloadMgrTestResult, self).startTest(test)
 
     def writeTestCase(self, cls):
         if not self.results.get(cls):
@@ -289,7 +289,7 @@ test = subunit.ProtocolTestCase(sys.stdin, passthrough=None)
 if sys.version_info[0:2] <= (2, 6):
     runner = unittest.TextTestRunner(verbosity=2)
 else:
-    runner = unittest.TextTestRunner(verbosity=2, resultclass=NovaTestResult)
+    runner = unittest.TextTestRunner(verbosity=2, resultclass=WorkloadMgrTestResult)
 
 if runner.run(test).wasSuccessful():
     exit_code = 0
