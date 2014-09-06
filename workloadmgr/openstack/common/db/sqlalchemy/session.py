@@ -26,8 +26,8 @@ Initializing:
   Example:
 
     session.set_defaults(
-        sql_connection="sqlite:///var/lib/cinder/sqlite.db",
-        sqlite_db="/var/lib/cinder/sqlite.db")
+        sql_connection="sqlite:///var/lib/workloadmgr/sqlite.db",
+        sqlite_db="/var/lib/workloadmgr/sqlite.db")
 
 Recommended ways to use sessions within this framework:
 
@@ -255,16 +255,16 @@ import sqlalchemy.orm
 from sqlalchemy.pool import NullPool, StaticPool
 from sqlalchemy.sql.expression import literal_column
 
-from cinder.openstack.common.db import exception
-from cinder.openstack.common import log as logging
-from cinder.openstack.common.gettextutils import _
-from cinder.openstack.common import timeutils
+from workloadmgr.openstack.common.db import exception
+from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr.openstack.common import timeutils
 
 DEFAULT = 'DEFAULT'
 
 sqlite_db_opts = [
     cfg.StrOpt('sqlite_db',
-               default='cinder.sqlite',
+               default='workloadmgr.sqlite',
                help='the filename to use with sqlite'),
     cfg.BoolOpt('sqlite_synchronous',
                 default=True,
@@ -679,8 +679,8 @@ def _patch_mysqldb_with_stacktrace_comments():
             # db/api is just a wrapper around db/sqlalchemy/api
             if file.endswith('db/api.py'):
                 continue
-            # only trace inside cinder
-            index = file.rfind('cinder')
+            # only trace inside workloadmgr
+            index = file.rfind('workloadmgr')
             if index == -1:
                 continue
             stack += "File:%s:%s Method:%s() Line:%s | " \

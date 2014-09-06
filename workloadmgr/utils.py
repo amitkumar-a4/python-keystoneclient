@@ -21,6 +21,7 @@ import signal
 import sys
 import tempfile
 import time
+import paramiko
 from xml.dom import minidom
 from xml.parsers import expat
 from xml import sax
@@ -47,6 +48,17 @@ PERFECT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 FLAGS = flags.FLAGS
 _IS_NEUTRON_ATTEMPTED = False
 _IS_NEUTRON = False
+
+# Default symbols to use for passwords. Avoids visually confusing characters.
+# ~6 bits per symbol
+DEFAULT_PASSWORD_SYMBOLS = ('23456789',  # Removed: 0,1
+                            'ABCDEFGHJKLMNPQRSTUVWXYZ',   # Removed: I, O
+                            'abcdefghijkmnopqrstuvwxyz')  # Removed: l
+
+
+# ~5 bits per symbol
+EASIER_PASSWORD_SYMBOLS = ('23456789',  # Removed: 0, 1
+                           'ABCDEFGHJKLMNPQRSTUVWXYZ')  # Removed: I, O
 
 synchronized = lockutils.synchronized_with_prefix('workloadmgr-')
 
@@ -1238,7 +1250,52 @@ def append_unique(dict, new_item, key="id"):
         if item[key] == new_item[key]:
             return
     dict.append(new_item)    
-  
+
+def get_file_mode(path):
+    """This primarily exists to make unit testing easier."""
+    return stat.S_IMODE(os.stat(path).st_mode)
+
+def get_file_gid(path):
+    """This primarily exists to make unit testing easier."""
+    return os.stat(path).st_gid
+
+def generate_password(length=20, symbolgroups=DEFAULT_PASSWORD_SYMBOLS):
+    """Generate a random password from the supplied symbol groups.
+
+    At least one symbol from each group will be included. Unpredictable
+    results if length is less than the number of symbol groups.
+
+    Believed to be reasonably secure (with a reasonable password length!)
+
+    """
+    r = random.SystemRandom()
+
+    # NOTE(jerdfelt): Some password policies require at least one character
+    # from each group of symbols, so start off with one random character
+    # from each symbol group
+    password = [r.choice(s) for s in symbolgroups]
+    # If length < len(symbolgroups), the leading characters will only
+    # be from the first length groups. Try our best to not be predictable
+    # by shuffling and then truncating.
+    r.shuffle(password)
+    password = password[:length]
+    length -= len(password)
+
+    # then fill with random characters from all symbol groups
+    symbols = ''.join(symbolgroups)
+    password.extend([r.choice(symbols) for _i in xrange(length)])
+
+    # finally shuffle to ensure first x characters aren't from a
+    # predictable group
+    r.shuffle(password)
+
+    return ''.join(password)
+
+
+def generate_username(length=20, symbolgroups=DEFAULT_PASSWORD_SYMBOLS):
+    # Use the same implementation as the password generation.
+    return generate_password(length, symbolgroups)
+
 class ChunkedFile(object):
     """
     something that can iterate over a large file

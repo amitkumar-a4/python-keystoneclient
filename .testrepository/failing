@@ -1,11 +1,11 @@
-time: 2014-09-04 15:36:21.658358Z
+time: 2014-09-05 13:07:23.301864Z
 tags: worker-0
-test: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation
-time: 2014-09-04 15:36:21.663576Z
-failure: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation [ multipart
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_day
+time: 2014-09-05 13:07:23.377233Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_day [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
-594
+2EA
 Traceback (most recent call last):
 _StringException: Empty attachments:
   pythonlogging:''
@@ -14,13 +14,9 @@ _StringException: Empty attachments:
   stdout
 
 Traceback (most recent call last):
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1193, in patched
-    arg = patching.__enter__()
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1268, in __enter__
-    original, local = self.get_original()
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1242, in get_original
-    "%s does not have the attribute %r" % (target, name)
-AttributeError: <module 'workloadmgr.openstack.common.gettextutils' from 'workloadmgr/openstack/common/gettextutils.py'> does not have the attribute 'get_localized_message'
+  File "workloadmgr/tests/test_utils.py", line 668, in test_day
+    begin, end = utils.last_completed_audit_period(unit='day')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
 
 Traceback (most recent call last):
 _StringException: Empty attachments:
@@ -30,21 +26,1046 @@ _StringException: Empty attachments:
   stdout
 
 Traceback (most recent call last):
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1193, in patched
-    arg = patching.__enter__()
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1268, in __enter__
-    original, local = self.get_original()
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1242, in get_original
-    "%s does not have the attribute %r" % (target, name)
-AttributeError: <module 'workloadmgr.openstack.common.gettextutils' from 'workloadmgr/openstack/common/gettextutils.py'> does not have the attribute 'get_localized_message'
+  File "workloadmgr/tests/test_utils.py", line 668, in test_day
+    begin, end = utils.last_completed_audit_period(unit='day')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
 
 0
 ]
 tags: -worker-0
-time: 2014-09-04 15:36:21.697537Z
+time: 2014-09-05 13:07:23.377538Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_after_current
+time: 2014-09-05 13:07:23.382657Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_after_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+324
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 688, in test_day_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='day@10')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 688, in test_day_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='day@10')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.382949Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_before_current
+time: 2014-09-05 13:07:23.387759Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_before_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+324
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 677, in test_day_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='day@6')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 677, in test_day_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='day@6')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.388041Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour
+time: 2014-09-05 13:07:23.392397Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+2EE
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 630, in test_hour
+    begin, end = utils.last_completed_audit_period(unit='hour')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 630, in test_hour
+    begin, end = utils.last_completed_audit_period(unit='hour')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.392664Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_after_current
+time: 2014-09-05 13:07:23.397250Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_after_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+328
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 655, in test_hour_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='hour@30')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 655, in test_hour_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='hour@30')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.397516Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_before_current
+time: 2014-09-05 13:07:23.401770Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_before_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+32A
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 642, in test_hour_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='hour@10')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 642, in test_hour_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='hour@10')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.402042Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_month
+time: 2014-09-05 13:07:23.408557Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_month [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+2F2
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 699, in test_month
+    begin, end = utils.last_completed_audit_period(unit='month')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 699, in test_month
+    begin, end = utils.last_completed_audit_period(unit='month')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.408852Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_after_current
+time: 2014-09-05 13:07:23.413204Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_after_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+32C
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 717, in test_month_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='month@15')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 717, in test_month_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='month@15')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.413470Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_before_current
+time: 2014-09-05 13:07:23.417973Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_before_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+32C
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 708, in test_month_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='month@2')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 708, in test_month_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='month@2')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.418246Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_year
+time: 2014-09-05 13:07:23.422469Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_year [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+2EE
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 726, in test_year
+    begin, end = utils.last_completed_audit_period(unit='year')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 726, in test_year
+    begin, end = utils.last_completed_audit_period(unit='year')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.422732Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_after_current
+time: 2014-09-05 13:07:23.427183Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_after_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+326
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 744, in test_year_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='year@6')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 744, in test_year_with_offset_after_current
+    begin, end = utils.last_completed_audit_period(unit='year@6')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.427451Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_before_current
+time: 2014-09-05 13:07:23.431689Z
+failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_before_current [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+328
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 735, in test_year_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='year@2')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 735, in test_year_with_offset_before_current
+    begin, end = utils.last_completed_audit_period(unit='year@2')
+AttributeError: 'module' object has no attribute 'last_completed_audit_period'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.431978Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.ExecuteTestCase.test_check_exit_code_boolean
+time: 2014-09-05 13:07:23.457502Z
+failure: workloadmgr.tests.test_utils.ExecuteTestCase.test_check_exit_code_boolean [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+CC2
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 97, in test_check_exit_code_boolean
+    '/usr/bin/env', 'false', check_exit_code=True)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 187, in execute
+    cmd=' '.join(cmd))
+ProcessExecutionError: Unexpected error while running command.
+Command: /usr/bin/env false
+Exit code: 1
+Stdout: ''
+Stderr: ''
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 97, in test_check_exit_code_boolean
+    '/usr/bin/env', 'false', check_exit_code=True)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 187, in execute
+    cmd=' '.join(cmd))
+ProcessExecutionError: Unexpected error while running command.
+Command: /usr/bin/env false
+Exit code: 1
+Stdout: ''
+Stderr: ''
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.477598Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.ExecuteTestCase.test_retry_on_failure
+time: 2014-09-05 13:07:23.661481Z
+failure: workloadmgr.tests.test_utils.ExecuteTestCase.test_retry_on_failure [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+CC0
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 74, in test_retry_on_failure
+    delay_on_retry=False)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 187, in execute
+    cmd=' '.join(cmd))
+ProcessExecutionError: Unexpected error while running command.
+Command: /tmp/tmp7O7zCM/tmp6POiWM /tmp/tmp7O7zCM/tmpD8GHHa
+Exit code: 1
+Stdout: ''
+Stderr: ''
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 74, in test_retry_on_failure
+    delay_on_retry=False)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 187, in execute
+    cmd=' '.join(cmd))
+ProcessExecutionError: Unexpected error while running command.
+Command: /tmp/tmp7O7zCM/tmp6POiWM /tmp/tmp7O7zCM/tmpD8GHHa
+Exit code: 1
+Stdout: ''
+Stderr: ''
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.661853Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.ExecuteTestCase.test_unknown_kwargs_raises_error
+time: 2014-09-05 13:07:23.667899Z
+failure: workloadmgr.tests.test_utils.ExecuteTestCase.test_unknown_kwargs_raises_error [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+C7A
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 91, in test_unknown_kwargs_raises_error
+    this_is_not_a_valid_kwarg=True)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 142, in execute
+    'to utils.execute: %r') % kwargs)
+Error: Got unknown keyword args to utils.execute: {'this_is_not_a_valid_kwarg': True}
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 91, in test_unknown_kwargs_raises_error
+    this_is_not_a_valid_kwarg=True)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 142, in execute
+    'to utils.execute: %r') % kwargs)
+Error: Got unknown keyword args to utils.execute: {'this_is_not_a_valid_kwarg': True}
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.668642Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection
+time: 2014-09-05 13:07:23.673999Z
+failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+2F2
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 456, in test_check_ssh_injection
+    self.assertIsNone(utils.check_ssh_injection(cmd_list))
+AttributeError: 'module' object has no attribute 'check_ssh_injection'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 456, in test_check_ssh_injection
+    self.assertIsNone(utils.check_ssh_injection(cmd_list))
+AttributeError: 'module' object has no attribute 'check_ssh_injection'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.674666Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection_on_error
+time: 2014-09-05 13:07:23.679323Z
+failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection_on_error [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+2F4
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 464, in test_check_ssh_injection_on_error
+    self.assertRaises(exception.SSHInjectionThreat,
+AttributeError: 'module' object has no attribute 'SSHInjectionThreat'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 464, in test_check_ssh_injection_on_error
+    self.assertRaises(exception.SSHInjectionThreat,
+AttributeError: 'module' object has no attribute 'SSHInjectionThreat'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.684980Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_generate_glance_url
+time: 2014-09-05 13:07:23.689362Z
+failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_generate_glance_url [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+2DC
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 304, in test_generate_glance_url
+    generated_url = utils.generate_glance_url()
+AttributeError: 'module' object has no attribute 'generate_glance_url'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 304, in test_generate_glance_url
+    generated_url = utils.generate_glance_url()
+AttributeError: 'module' object has no attribute 'generate_glance_url'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.699134Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_get_file_mode
+time: 2014-09-05 13:07:23.703803Z
+failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_get_file_mode [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+364
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 543, in test_get_file_mode
+    mode = utils.get_file_mode(test_file)
+  File "workloadmgr/utils.py", line 1256, in get_file_mode
+    return stat.S_IMODE(os.stat(path).st_mode)
+NameError: global name 'stat' is not defined
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 543, in test_get_file_mode
+    mode = utils.get_file_mode(test_file)
+  File "workloadmgr/utils.py", line 1256, in get_file_mode
+    return stat.S_IMODE(os.stat(path).st_mode)
+NameError: global name 'stat' is not defined
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.734338Z
+tags: worker-0
+test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_read_file_as_root
+time: 2014-09-05 13:07:23.741086Z
+failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_read_file_as_root [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+DBA
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 366, in test_read_file_as_root
+    utils.read_file_as_root, 'bad')
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 921, in read_file_as_root
+    out, _err = execute('cat', file_path, run_as_root=True)
+  File "workloadmgr/tests/test_utils.py", line 359, in fake_execute
+    raise putils.ProcessExecutionError
+ProcessExecutionError: Unexpected error while running command.
+Command: None
+Exit code: -
+Stdout: None
+Stderr: None
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_utils.py", line 366, in test_read_file_as_root
+    utils.read_file_as_root, 'bad')
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 431, in assertThat
+    mismatch_error = self._matchHelper(matchee, matcher, message, verbose)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 481, in _matchHelper
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 108, in match
+    mismatch = self.exception_matcher.match(exc_info)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_higherorder.py", line 62, in match
+    mismatch = matcher.match(matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 412, in match
+    reraise(*matchee)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/matchers/_exception.py", line 101, in match
+    result = matchee()
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 955, in __call__
+    return self._callable_object(*self._args, **self._kwargs)
+  File "workloadmgr/utils.py", line 921, in read_file_as_root
+    out, _err = execute('cat', file_path, run_as_root=True)
+  File "workloadmgr/tests/test_utils.py", line 359, in fake_execute
+    raise putils.ProcessExecutionError
+ProcessExecutionError: Unexpected error while running command.
+Command: None
+Exit code: -
+Stdout: None
+Stderr: None
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.807249Z
+tags: worker-0
+test: workloadmgr.tests.test_workloads.BaseWorkloadTestCase.test_create_delete_workload
+time: 2014-09-05 13:07:23.929764Z
+failure: workloadmgr.tests.test_workloads.BaseWorkloadTestCase.test_create_delete_workload [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+308
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workloads.py", line 46, in test_create_delete_workload
+    self.workload.create_workload(self.context, workload_id)
+AttributeError: 'BaseWorkloadTestCase' object has no attribute 'workload'
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''
+  pythonlogging:''-1
+  stderr
+  stdout
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workloads.py", line 46, in test_create_delete_workload
+    self.workload.create_workload(self.context, workload_id)
+AttributeError: 'BaseWorkloadTestCase' object has no attribute 'workload'
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:23.963456Z
+tags: worker-0
+test: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation
+time: 2014-09-05 13:07:23.987565Z
+failure: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation [ multipart
+Content-Type: text/plain;charset=""utf8""
+pythonlogging:''
+4A7
+Caught error: 
+Traceback (most recent call last):
+  File "workloadmgr/api/middleware/fault.py", line 60, in __call__
+    return req.get_response(self.application)
+  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1296, in send
+    application, catch_exc_info=False)
+  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1260, in call_application
+    app_iter = application(self.environ, start_response)
+  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 130, in __call__
+    resp = self.call_func(req, *args, **self.kwargs)
+  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 195, in call_func
+    return self.func(req, *args, **kwargs)
+  File "workloadmgr/tests/test_wsgi.py", line 283, in fail
+    raise MyWorkloadNotFound()
+  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
+    self.msg = message
+  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
+    self.msg = message
+  File "/usr/lib/python2.7/bdb.py", line 49, in trace_dispatch
+    return self.dispatch_line(frame)
+  File "/usr/lib/python2.7/bdb.py", line 68, in dispatch_line
+    if self.quitting: raise BdbQuit
+BdbQuit
+http://localhost/ returned with HTTP 500
+0
+Content-Type: text/plain;charset=""utf8""
+stdout
+63
+> /opt/stack/workloadmgr/workloadmgr/tests/test_wsgi.py(281)__init__()
+-> self.msg = message
+(Pdb) 0
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+1247
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
+    return func(*args, **keywargs)
+  File "workloadmgr/tests/test_wsgi.py", line 292, in test_workloadmgr_exception_with_localized_explanation
+    resp = webob.Request.blank('/').get_response(api)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: 404 != 500
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+
+pythonlogging:'': {{{
+Caught error: 
+Traceback (most recent call last):
+  File "workloadmgr/api/middleware/fault.py", line 60, in __call__
+    return req.get_response(self.application)
+  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1296, in send
+    application, catch_exc_info=False)
+  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1260, in call_application
+    app_iter = application(self.environ, start_response)
+  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 130, in __call__
+    resp = self.call_func(req, *args, **self.kwargs)
+  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 195, in call_func
+    return self.func(req, *args, **kwargs)
+  File "workloadmgr/tests/test_wsgi.py", line 283, in fail
+    raise MyWorkloadNotFound()
+  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
+    self.msg = message
+  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
+    self.msg = message
+  File "/usr/lib/python2.7/bdb.py", line 49, in trace_dispatch
+    return self.dispatch_line(frame)
+  File "/usr/lib/python2.7/bdb.py", line 68, in dispatch_line
+    if self.quitting: raise BdbQuit
+BdbQuit
+http://localhost/ returned with HTTP 500
+}}}
+
+stdout: {{{
+> /opt/stack/workloadmgr/workloadmgr/tests/test_wsgi.py(281)__init__()
+-> self.msg = message
+(Pdb)
+}}}
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
+    return func(*args, **keywargs)
+  File "workloadmgr/tests/test_wsgi.py", line 292, in test_workloadmgr_exception_with_localized_explanation
+    resp = webob.Request.blank('/').get_response(api)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: 404 != 500
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+
+pythonlogging:'': {{{
+Caught error: 
+Traceback (most recent call last):
+  File "workloadmgr/api/middleware/fault.py", line 60, in __call__
+    return req.get_response(self.application)
+  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1296, in send
+    application, catch_exc_info=False)
+  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1260, in call_application
+    app_iter = application(self.environ, start_response)
+  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 130, in __call__
+    resp = self.call_func(req, *args, **self.kwargs)
+  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 195, in call_func
+    return self.func(req, *args, **kwargs)
+  File "workloadmgr/tests/test_wsgi.py", line 283, in fail
+    raise MyWorkloadNotFound()
+  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
+    self.msg = message
+  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
+    self.msg = message
+  File "/usr/lib/python2.7/bdb.py", line 49, in trace_dispatch
+    return self.dispatch_line(frame)
+  File "/usr/lib/python2.7/bdb.py", line 68, in dispatch_line
+    if self.quitting: raise BdbQuit
+BdbQuit
+http://localhost/ returned with HTTP 500
+}}}
+
+stdout: {{{
+> /opt/stack/workloadmgr/workloadmgr/tests/test_wsgi.py(281)__init__()
+-> self.msg = message
+(Pdb)
+}}}
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
+    return func(*args, **keywargs)
+  File "workloadmgr/tests/test_wsgi.py", line 292, in test_workloadmgr_exception_with_localized_explanation
+    resp = webob.Request.blank('/').get_response(api)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: 404 != 500
+
+0
+]
+tags: -worker-0
+time: 2014-09-05 13:07:24.024905Z
 tags: worker-0
 test: workloadmgr.tests.test_wsgi.TestWSGIServer.test_app_using_ipv6_and_ssl
-time: 2014-09-04 15:36:21.921903Z
+time: 2014-09-05 13:07:24.427270Z
 failure: workloadmgr.tests.test_wsgi.TestWSGIServer.test_app_using_ipv6_and_ssl [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -92,10 +1113,10 @@ gaierror: [Errno -9] Address family for hostname not supported
 0
 ]
 tags: -worker-0
-time: 2014-09-04 15:36:21.962277Z
+time: 2014-09-05 13:07:24.468366Z
 tags: worker-0
 test: workloadmgr.tests.test_wsgi.TestWSGIServer.test_start_random_port_with_ipv6
-time: 2014-09-04 15:36:22.178399Z
+time: 2014-09-05 13:07:24.713797Z
 failure: workloadmgr.tests.test_wsgi.TestWSGIServer.test_start_random_port_with_ipv6 [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
