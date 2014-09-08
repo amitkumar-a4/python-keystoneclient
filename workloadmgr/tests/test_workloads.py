@@ -21,6 +21,7 @@ from workloadmgr import exception
 from workloadmgr import test
 from workloadmgr.tests import utils as tests_utils
 from workloadmgr.openstack.common import importutils
+from workloadmgr.workloads.api import API
 
 CONF = cfg.CONF
 
@@ -30,6 +31,7 @@ class BaseWorkloadTestCase(test.TestCase):
         super(BaseWorkloadTestCase, self).setUp()
         self.context = context.get_admin_context()
         self.workload = importutils.import_object(CONF.workloads_manager)
+        self.workloadAPI = API()
         self.db = self.workload.db
         self.context.user_id = 'fake'
         self.context.project_id = 'fake'
@@ -70,3 +72,12 @@ class BaseWorkloadTestCase(test.TestCase):
                           db.workload_get,
                           self.context,
                           workload_id)
+
+    def test_create_workload_with_invalid_workload_type(self):
+        """Test workload can be created and deleted."""
+
+        self.assertRaises(exception.InvalidWorkloadMgr,
+                          self.workloadAPI.workload_create,
+                          self.context, 'test_workload',
+                          'this is a test_workload', "invalid_type",
+                          'openstack', [], {}, {})
