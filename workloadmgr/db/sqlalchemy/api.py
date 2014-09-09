@@ -962,14 +962,17 @@ def snapshot_vm_update(context, vm_id, snapshot_id, values, purge_metadata=False
 @require_context
 def snapshot_vms_get(context, snapshot_id):
     session = get_session()
-    result = model_query(context, models.SnapshotVMs,session=session).\
-        filter_by(snapshot_id=snapshot_id).\
-        all()
+    try:
+        query = session.query(models.SnapshotVMs)\
+                       .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
+                       .filter_by(snapshot_id=snapshot_id)\
 
-    if not result:
+        snapshot_vms = query.all()
+
+    except sa_orm.exc.NoResultFound:
         raise exception.VMsOfSnapshotNotFound(snapshot_id=snapshot_id)
-
-    return result    
+    
+    return snapshot_vms    
    
 @require_context
 def _snapshot_vm_get(context, vm_id, snapshot_id, session):

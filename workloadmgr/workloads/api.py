@@ -598,6 +598,7 @@ class API(base.Base):
                 snapshot_vms.append(snapshot_vm)              
 
         except Exception as ex:
+            LOG.exception(ex)
             pass
         snapshot_details['instances'] = snapshot_vms    
         return snapshot_details
