@@ -24,6 +24,7 @@ inline callbacks.
 """
 
 
+import contextlib
 import functools
 import os
 import shutil
@@ -35,6 +36,9 @@ import mox
 from oslo.config import cfg
 import stubout
 import testtools
+import sqlalchemy as sa
+
+from taskflow.persistence.backends import impl_sqlalchemy
 
 #from workloadmgr.common import config  # Need to register global_opts
 from workloadmgr.db import migration
@@ -84,6 +88,15 @@ class Database(fixtures.Fixture):
             if os.path.exists(testdb):
                 return
         db_migrate.db_sync()
+
+        # setup schema for taskflow
+        conf = {
+            'connection': CONF.sql_connection
+        }
+        connection = impl_sqlalchemy.SQLAlchemyBackend(conf).get_connection()
+        with contextlib.closing(connection) as conn:
+            conn.upgrade()
+
 #        self.post_migrations()
         if sql_connection == "sqlite://":
             conn = self.engine.connect()
