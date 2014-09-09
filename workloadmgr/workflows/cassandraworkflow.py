@@ -69,10 +69,9 @@ def getnodeinfo(host, port, user, password):
     nodehash = {}
    
     for c in cassout:
-       if len(c.split(":")) == 0:
-          continue;
-
-       nodehash[c.split(":")[0].strip()] = c.split(":")[1].strip()
+        if len(c.split(":")) == 0:
+            continue;
+        nodehash[c.split(":")[0].strip()] = c.split(":")[1].strip()
 
     nodeinput = []
     nodeinput.append(['Gossip', str(nodehash['Gossip active'])])
@@ -104,10 +103,10 @@ def getcassandranodes(connection):
     for n in cassout[5:]:
         desc = n.split()
         if len(desc) == 0:
-           continue
+            continue
         node = {}
         for idx, k in enumerate(casskeys):
-           node[k] = desc[idx]
+            node[k] = desc[idx]
 
         # Sample output
         # =============
@@ -130,9 +129,9 @@ def getcassandranodes(connection):
         output = stdout.read()
         output = output.split("\n")
         for l in output:
-          fields = l.split(":")
-          if len(fields) > 1:
-             node[fields[0].strip()] = fields[1]
+            fields = l.split(":")
+            if len(fields) > 1:
+                node[fields[0].strip()] = fields[1]
 
         cassnodes.append(node)
 
@@ -162,12 +161,12 @@ def get_cassandra_nodes(cntx, host, port, username, password):
     for name in nodenames:
         # if the name is host name, resolve it to IP address
         try :
-           IP(name['Address'])
-           ips[name['Address']] = 1
+            IP(name['Address'])
+            ips[name['Address']] = 1
         except Exception, e:
-           # we got hostnames
-           import socket
-           ips[socket.gethostbyname(name['Address'])] = 1
+            # we got hostnames
+            import socket
+            ips[socket.gethostbyname(name['Address'])] = 1
 
     # call nova list
     compute_service = nova.API(production=True)
@@ -195,6 +194,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                    
                     utils.append_unique(vms, {'vm_id' : instance.id,
                                               'vm_name' : instance.name,
+                                              'vm_metadata' : instance.metadata,                                                
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                               'hypervisor_hostname' : hypervisor_hostname,
@@ -299,37 +299,37 @@ class CassandraWorkflow(workflow.Workflow):
         cassnodes = getcassandranodes(connection)
         dcs = {'name': "Cassandra Cluster", "datacenters":{}, "input":[]}
         for n in cassnodes:
-           # We discovered this datacenter for the first time, add it
-           if not n['Data Center'] in dcs["datacenters"]:
-              dcs['datacenters'][n['Data Center']] = {'name': n['Data Center'], "racks":{}, "input":[]}
+            # We discovered this datacenter for the first time, add it
+            if not n['Data Center'] in dcs["datacenters"]:
+                dcs['datacenters'][n['Data Center']] = {'name': n['Data Center'], "racks":{}, "input":[]}
 
-           # We discovered this rack for the first time, add it
-           if not n['Rack'] in dcs["datacenters"][n['Data Center']]["racks"]:
-              dcs["datacenters"][n['Data Center']]["racks"][n['Rack']] = {'name': n['Rack'], "nodes":{}, "input":[]}
+            # We discovered this rack for the first time, add it
+            if not n['Rack'] in dcs["datacenters"][n['Data Center']]["racks"]:
+                dcs["datacenters"][n['Data Center']]["racks"][n['Rack']] = {'name': n['Rack'], "nodes":{}, "input":[]}
 
-           #if not n['Address'] in dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"]:
-           n['name'] = n['Address']
-           n['status'] = n.pop('Status', None)
-           n["input"] = []
-           n['input'].append(["Load", n['Load']])
-           #n['input'].append(["State", n['State']])
-           dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"][n['Address']] = {'name': n['Address'], "node": n}
+            #if not n['Address'] in dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"]:
+            n['name'] = n['Address']
+            n['status'] = n.pop('Status', None)
+            n["input"] = []
+            n['input'].append(["Load", n['Load']])
+            #n['input'].append(["State", n['State']])
+            dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"][n['Address']] = {'name': n['Address'], "node": n}
 
 
         dcs["children"] = []
         for d, dv in dcs["datacenters"].iteritems():
-           dcs["children"].append(dv)
-           dv["children"] = []
-           for r, rv in dv["racks"].iteritems():
-              dv["children"].append(rv)
-              rv["children"] = []
-              for n, nv in rv["nodes"].iteritems():
-                 rv["children"].append(nv['node'])
+            dcs["children"].append(dv)
+            dv["children"] = []
+            for r, rv in dv["racks"].iteritems():
+                dv["children"].append(rv)
+                rv["children"] = []
+                for n, nv in rv["nodes"].iteritems():
+                    rv["children"].append(nv['node'])
 
         for d, dv in dcs["datacenters"].iteritems():
-           for r, rv in dv["racks"].iteritems():
-              rv.pop("nodes", None)
-           dv.pop("racks", None)
+            for r, rv in dv["racks"].iteritems():
+                rv.pop("nodes", None)
+                dv.pop("racks", None)
         dcs.pop("datacenters", None)
         return dict(topology=dcs)
 
@@ -343,8 +343,8 @@ class CassandraWorkflow(workflow.Workflow):
                 if len(item._name.split('_')) == 2:
                     nodename = item._name.split("_")[1]
                     for n in nodes['instances']:
-                       if n['vm_id'] == nodename:
-                          nodename = n['vm_name']
+                        if n['vm_id'] == nodename:
+                            nodename = n['vm_name']
                     taskdetails['input'] = [['vm', nodename]]
                 return taskdetails
 

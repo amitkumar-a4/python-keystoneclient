@@ -8,7 +8,7 @@ This file includes library of tasks that can be used to implement VMWare Cloud
 specific flows
 """
 
-
+import cPickle as pickle
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
 from workloadmgr.virt import driver
@@ -18,6 +18,14 @@ from workloadmgr.vault import vault
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
+
+def _get_instance_restore_options(restore_options, instance_id):
+    if restore_options and 'vmware' in restore_options:
+        if 'instances' in restore_options['vmware']:
+            for instance in restore_options['vmware']['instances']:
+                if instance['id'] == instance_id:
+                    return instance
+    return None
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
@@ -42,23 +50,23 @@ def unpause_vm(cntx, db, instance):
 @autolog.log_method(Logger, 'vmtasks_vcloud.suspend_vm')
 def suspend_vm(cntx, db, instance):
     virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    return virtdriver.suspend(cntx, instance)  
+    return virtdriver.suspend(cntx, db, instance)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.resume_vm')
 def resume_vm(cntx, db, instance):
     virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    return virtdriver.resume(cntx, instance, network_info=None)  
+    return virtdriver.resume(cntx, db, instance)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.pre_snapshot_vm')
 def pre_snapshot_vm(cntx, db, instance, snapshot):
     return None
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.freeze_vm')
-def freeze_vm(self, cntx, db, instance, snapshot):
+def freeze_vm(cntx, db, instance, snapshot):
     pass     
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.thaw_vm')
-def thaw_vm(self, cntx, db, instance, snapshot):
+def thaw_vm(cntx, db, instance, snapshot):
     pass  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm')
@@ -115,6 +123,21 @@ def pre_restore_vm(cntx, db, instance, restore):
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm')                    
 def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_security_groups):
+    
+    restored_compute_flavor = None #restore_vm_flavor(cntx, db, instance,restore)                      
+    restored_nics = None #get_vm_nics( cntx, db, instance, restore, restored_net_resources)
+    
+    restore_obj = db.restore_get(cntx, restore['id']) 
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = _get_instance_restore_options(restore_options, instance['vm_id'])
+    
+    virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    return virtdriver.restore_vm( cntx, db, instance, restore, 
+                                  restored_net_resources,
+                                  restored_security_groups,
+                                  restored_compute_flavor,
+                                  restored_nics,
+                                  instance_options)    
     return None
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_restore_vm')

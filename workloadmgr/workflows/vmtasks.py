@@ -145,7 +145,7 @@ class RestoreVM(task.Task):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-        target_platform = 'openstack' 
+        target_platform = 'vmware' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
             if options and 'type' in options:
@@ -210,10 +210,13 @@ class SnapshotVMNetworks(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         
+        return vmtasks_openstack.snapshot_vm_networks(cntx, db, instances, snapshot)
+        """
         if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_networks(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_networks(cntx, db, instances, snapshot)
+        """
 
     @autolog.log_method(Logger, 'SnapshotVMNetworks.revert') 
     def revert_with_log(self, *args, **kwargs):
@@ -232,10 +235,13 @@ class SnapshotVMFlavors(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        return vmtasks_openstack.snapshot_vm_flavors(cntx, db, instances, snapshot)
+        """
         if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_flavors(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.snapshot_vm_flavors(cntx, db, instances, snapshot)
+        """
           
     @autolog.log_method(Logger, 'SnapshotVMFlavors.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -732,6 +738,7 @@ def CreateVMSnapshotDBEntries(context, instances, snapshot):
     for instance in instances:
         options = {'vm_id': instance['vm_id'],
                    'vm_name': instance['vm_name'],
+                   'metadata': instance['vm_metadata'],
                    'snapshot_id': snapshot['id'],
                    'snapshot_type': snapshot['snapshot_type'],
                    'status': 'creating',}

@@ -178,6 +178,17 @@ class WorkloadVMs(BASE, WorkloadsBase):
     vm_id = Column(String(255))
     vm_name = Column(String(255))
     workload_id = Column(String(255), ForeignKey('workloads.id'))
+    
+class WorkloadVMMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the workload vm"""
+    __tablename__ = 'workload_vm_metadata'
+    __table_args__ = (UniqueConstraint('workload_vm_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    workload_vm_id = Column(String(36), ForeignKey('workload_vms.id'), nullable=False)
+    workload_vm = relationship(WorkloadVMs, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)            
 
 class ScheduledJobs(BASE, WorkloadsBase):
     """Represents a scheduled job"""
@@ -235,6 +246,17 @@ class SnapshotVMs(BASE, WorkloadsBase):
     size = Column(BigInteger)
     status =  Column(String(32), nullable=False)
     
+class SnapshotVMMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the snapshot vm"""
+    __tablename__ = 'snapshot_vm_metadata'
+    __table_args__ = (UniqueConstraint('snapshot_vm_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    snapshot_vm_id = Column(String(36), ForeignKey('snapshot_vms.id'), nullable=False)
+    snapshot_vm = relationship(SnapshotVMs, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)            
+        
 class VMRecentSnapshot(BASE, WorkloadsBase):
     """Represents most recent successful snapshot of a VM"""
     __tablename__ = str('vm_recent_snapshot')
@@ -430,9 +452,11 @@ def register_models():
               Workloads,
               WorkloadMetadata,
               WorkloadVMs,
+              WorkloadVMMetadata,
               ScheduledJobs,
               Snapshots,
               SnapshotVMs,
+              SnapshotVMMetadata,
               SnapshotVMResources,
               SnapshotVMResourceMetadata,
               VMDiskResourceSnaps,

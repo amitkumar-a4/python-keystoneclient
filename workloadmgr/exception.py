@@ -420,5 +420,44 @@ class WorkloadNotFound(NotFound):
 class WorkloadsNotFound(NotFound):
     message = _("Workloads could not be found.")
     
+class WorkloadVMNotFound(NotFound):
+    message = _("WorkloadVM %(workload_vm_id)s could not be found.") 
+    
+class WorkloadVMsNotFound(NotFound):
+    message = _("WorkloadVMs could not be found.")        
+    
+class SnapshotVMNotFound(NotFound):
+    message = _("SnapshotVM %(snapshot_id)s could not be found.") 
+    
+class SnapshotVMsNotFound(NotFound):
+    message = _("SnapshotVMs could not be found.")    
+    
 class InvalidWorkloadState(WorkloadMgrException):
-    message = _("Invalid workload state: %(state)s")         
+    message = _("Invalid workload state: %(state)s") 
+    
+class DatastoreNotFound(NotFound):
+    message = _("Could not find the datastore.")
+    
+class ResourcePoolNotFound(NotFound):
+    message = _("Could not find the resourcepool.")
+
+class VMFolderNotFound(NotFound):
+    message = _("Could not find the vmfolder.")
+    
+class VMNotFound(NotFound):
+    message = _("Could not find the VM.")  
+    
+class NetworkNotFound(NotFound):
+    message = _("Could not find the Network.")
+
+class InstanceSuspendFailure(Invalid):
+    msg_fmt = _("Failed to suspend instance") + ": %(reason)s"     
+
+class InstanceResumeFailure(Invalid):
+    msg_fmt = _("Failed to resume instance: %(reason)s.")   
+    
+class InstancePowerOffFailure(Invalid):
+    msg_fmt = _("Failed to power off instance: %(reason)s.")  
+    
+class DatacenterNotFound(NotFound):
+    message = _("Could not find the Datacenter.")                            
