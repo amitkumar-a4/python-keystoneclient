@@ -15,6 +15,7 @@ import paramiko
 import eventlet
 import mock
 import mox
+from mox import IsA
 import StringIO
 
 from oslo.config import cfg
@@ -23,9 +24,11 @@ from workloadmgr import context
 from workloadmgr import db
 from workloadmgr import exception
 from workloadmgr import test
+from workloadmgr.openstack.common import importutils
+from workloadmgr.openstack.common.rpc import amqp
+
 from workloadmgr.compute import nova
 from workloadmgr.tests import utils as tests_utils
-from workloadmgr.openstack.common import importutils
 
 from workloadmgr.workloads.api import API
 from workloadmgr.workflows import cassandraworkflow
@@ -54,20 +57,140 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
                          "Password": "password",
                          "capabilities": "discover:topology",}}
 
+        self.store = { 'connection': CONF.sql_connection,
+                       'CassandraNode': 'localhost',   # cassandra node
+                       'SSHPort': '22', # ssh port of namenode
+                       'Username': 'fake_user', # namenode user
+                       'Password': 'fake_password', # namenode password if ssh
+                                                    # key is not set
+                       'source_platform': "openstack",
+                     }
+        self.store["context"] = self.context.__dict__
+        self.store["context"]["conf"] = None
+        self.store["snapshot"] = {'status': u'starting',
+                                  'project_id': u'fake_project',
+                                  'user_id': u'fake_user',
+                                  'deleted': False, 'uploaded_size': 0L,
+                                  'created_at': datetime.datetime(2014, 9, 9, 13, 2, 38),
+                                  'progress_percent': 0L,
+                                  'updated_at': datetime.datetime(2014, 9, 9, 13, 2, 38),
+                                  'display_description': u'User Initiated Snapshot operation',
+                                  'error_msg': None,
+                                  'progress_msg': u'Snapshot of workload is starting',
+                                  'snapshot_type': 'incremental',
+                                  'workload_id': u'd296c248-d206-4837-b719-0abed920281d',
+                                  'display_name': u'User-Initiated',
+                                  'deleted_at': None,
+                                  'id': u'9ed247f2-c117-4353-88b2-44b61548116b',
+                                  'size': 0L}
+
+        info1str = '\
+                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
+                ID               : 7d62d900-f99d-4b88-8012-f06cb639fc02\n\
+                Gossip active    : true\n\
+                Thrift active    : true\n\
+                Native Transport active: true\n\
+                Load             : 130.46 KB\n\
+                Generation No    : 1410136571\n\
+                Uptime (seconds) : 181\n\
+                Heap Memory (MB) : 86.78 / 992.00\n\
+                Data Center      : 17\n\
+                Rack             : 17\n\
+                Exceptions       : 0\n\
+                Key Cache        : size 1328 (bytes), capacity 51380224 (bytes), 61 hits, 77 requests, 0.792 recent hit rate, 14400 save period in seconds\n\
+                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
+                                  '
+        self.info1 = StringIO.StringIO(info1str)
+        self.info11 = StringIO.StringIO(info1str)
+
+        info2str = '\
+                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
+                ID               : 75917649-6caa-4c66-b003-71c0eb8c09e8\n\
+                Gossip active    : true\n\
+                Thrift active    : true\n\
+                Native Transport active: true\n\
+                Load             : 121.07 KB\n\
+                Generation No    : 1410136525\n\
+                Uptime (seconds) : 274\n\
+                Heap Memory (MB) : 29.66 / 992.00\n\
+                Data Center      : 17\n\
+                Rack             : 17\n\
+                Exceptions       : 0\n\
+                Key Cache        : size 1200 (bytes), capacity 51380224 (bytes), 78 hits, 92 requests, 0.848 recent hit rate, 14400 save period in seconds\n\
+                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
+                                  '
+        self.info2 = StringIO.StringIO(info2str)
+        self.info21 = StringIO.StringIO(info2str)
+
+        info3str = '\
+                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
+                ID               : a03a1287-7d32-42ed-9018-8206fc295dd9\n\
+                Gossip active    : true\n\
+                Thrift active    : true\n\
+                Native Transport active: true\n\
+                Load             : 111.62 KB\n\
+                Generation No    : 1410136541\n\
+                Uptime (seconds) : 327\n\
+                Heap Memory (MB) : 35.32 / 992.00\n\
+                Data Center      : 17\n\
+                Rack             : 17\n\
+                Exceptions       : 0\n\
+                Key Cache        : size 1344 (bytes), capacity 51380224 (bytes), 69 hits, 84 requests, 0.821 recent hit rate, 14400 save period in seconds\n\
+                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
+                                  '
+
+        self.info3 = StringIO.StringIO(info3str)
+        self.info31 = StringIO.StringIO(info3str)
+
+        info4str = '\
+                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
+                ID               : f64ced33-2c01-40a3-9979-cf0a0b60d7af\n\
+                Gossip active    : true\n\
+                Thrift active    : true\n\
+                Native Transport active: true\n\
+                Load             : 80.18 KB\n\
+                Generation No    : 1410136556\n\
+                Uptime (seconds) : 372\n\
+                Heap Memory (MB) : 54.36 / 992.00\n\
+                Data Center      : 17\n\
+                Rack             : 17\n\
+                Exceptions       : 0\n\
+                Key Cache        : size 1952 (bytes), capacity 51380224 (bytes), 85 hits, 97 requests, 0.876 recent hit rate, 14400 save period in seconds\n\
+                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
+                                  '
+        self.info4 = StringIO.StringIO(info4str)
+        self.info41 = StringIO.StringIO(info4str)
+
+        statusiostr = '\
+                Datacenter: 17\n\
+                ==============\n\
+                Status=Up/Down\n\
+                |/ State=Normal/Leaving/Joining/Moving\n\
+                --  Address       Load       Owns (effective)  Host ID                               Token                                    Rack\n\
+                UN  172.17.17.19  130.46 KB  0.2%              7d62d900-f99d-4b88-8012-f06cb639fc02  -4300314010327621                        17\n\
+                UN  172.17.17.21  111.62 KB  65.4%             a03a1287-7d32-42ed-9018-8206fc295dd9  -9218601096928798970                     17\n\
+                UN  172.17.17.20  121.07 KB  67.3%             75917649-6caa-4c66-b003-71c0eb8c09e8  -9210152678340971410                     17\n\
+                UN  172.17.17.22  80.18 KB   67.1%             f64ced33-2c01-40a3-9979-cf0a0b60d7af  -9187087995446879807                     17\n'
+
+        self.statusio = StringIO.StringIO(statusiostr)
+        self.statusio1 = StringIO.StringIO(statusiostr)
+
+        self.snapshotio = StringIO.StringIO('success')
+
     def tearDown(self):
         super(BaseWorkloadTypeCassandraTestCase, self).tearDown()
 
     def test_create_delete_workload_type(self):
         """Test workload can be created and deleted."""
 
-        workload_type = self.workloadAPI.workload_type_create(self.context, 
+        workload_type = self.workloadAPI.workload_type_create(self.context,
 			    self.workload_params['display_name'],
                             self.workload_params['display_description'],
                             self.workload_params['is_public'],
                             self.workload_params['metadata'],)
 
         workload_type_id = workload_type['id']
-        self.assertEqual(workload_type_id, 
+        self.assertEqual(workload_type_id,
                          self.db.workload_type_get(self.context,
                                                    workload_type_id).id)
 
@@ -89,7 +212,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
     def test_create_workload_type_invalid_metadata(self):
         """Test workloadtype with invalid metadata"""
 
-        workload_type = self.workloadAPI.workload_type_create(self.context, 
+        workload_type = self.workloadAPI.workload_type_create(self.context,
                             'test_workload',
                             'this is a test workload_type',
                             False, None)
@@ -105,7 +228,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
             'is_public': True,
             'metadata': {},
         }
-        self.assertEqual(workload_type_id, 
+        self.assertEqual(workload_type_id,
                          self.db.workload_type_get(self.context,
                                                    workload_type_id).id)
 
@@ -121,90 +244,16 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
     def test_cassandra_getcassandranodes(self):
         client = paramiko.SSHClient()
         self.mox.StubOutWithMock(client, 'exec_command')
-   
-        statusio = StringIO.StringIO('\
-                Datacenter: 17\n\
-                ==============\n\
-                Status=Up/Down\n\
-                |/ State=Normal/Leaving/Joining/Moving\n\
-                --  Address       Load       Owns (effective)  Host ID                               Token                                    Rack\n\
-                UN  172.17.17.19  130.46 KB  0.2%              7d62d900-f99d-4b88-8012-f06cb639fc02  -4300314010327621                        17\n\
-                UN  172.17.17.21  111.62 KB  65.4%             a03a1287-7d32-42ed-9018-8206fc295dd9  -9218601096928798970                     17\n\
-                UN  172.17.17.20  121.07 KB  67.3%             75917649-6caa-4c66-b003-71c0eb8c09e8  -9210152678340971410                     17\n\
-                UN  172.17.17.22  80.18 KB   67.1%             f64ced33-2c01-40a3-9979-cf0a0b60d7af  -9187087995446879807                     17\n')
+  
 
         client.exec_command("nodetool status").\
-            AndReturn((sys.stdin, statusio, sys.stderr))
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
 
-        info1 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : 7d62d900-f99d-4b88-8012-f06cb639fc02\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 130.46 KB\n\
-                Generation No    : 1410136571\n\
-                Uptime (seconds) : 181\n\
-                Heap Memory (MB) : 86.78 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1328 (bytes), capacity 51380224 (bytes), 61 hits, 77 requests, 0.792 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-        info2 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : 75917649-6caa-4c66-b003-71c0eb8c09e8\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 121.07 KB\n\
-                Generation No    : 1410136525\n\
-                Uptime (seconds) : 274\n\
-                Heap Memory (MB) : 29.66 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1200 (bytes), capacity 51380224 (bytes), 78 hits, 92 requests, 0.848 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-        info3 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : a03a1287-7d32-42ed-9018-8206fc295dd9\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 111.62 KB\n\
-                Generation No    : 1410136541\n\
-                Uptime (seconds) : 327\n\
-                Heap Memory (MB) : 35.32 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1344 (bytes), capacity 51380224 (bytes), 69 hits, 84 requests, 0.821 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-        info4 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : f64ced33-2c01-40a3-9979-cf0a0b60d7af\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 80.18 KB\n\
-                Generation No    : 1410136556\n\
-                Uptime (seconds) : 372\n\
-                Heap Memory (MB) : 54.36 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1952 (bytes), capacity 51380224 (bytes), 85 hits, 97 requests, 0.876 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
 
-        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, info1, sys.stderr))
-        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, info3, sys.stderr))
-        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, info2, sys.stderr))
-        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, info4, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
 
         self.mox.ReplayAll()
         cassnodes = cassandraworkflow.getcassandranodes(client)
@@ -221,110 +270,485 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
 
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
-        #self.mox.StubOutWithMock(compute_service, "get_servers")
-        #self.mox.StubOutWithMock(compute_service, "get_hypervisors")
-
-   
-        statusio = StringIO.StringIO('\
-                Datacenter: 17\n\
-                ==============\n\
-                Status=Up/Down\n\
-                |/ State=Normal/Leaving/Joining/Moving\n\
-                --  Address       Load       Owns (effective)  Host ID                               Token                                    Rack\n\
-                UN  172.17.17.19  130.46 KB  0.2%              7d62d900-f99d-4b88-8012-f06cb639fc02  -4300314010327621                        17\n\
-                UN  172.17.17.21  111.62 KB  65.4%             a03a1287-7d32-42ed-9018-8206fc295dd9  -9218601096928798970                     17\n\
-                UN  172.17.17.20  121.07 KB  67.3%             75917649-6caa-4c66-b003-71c0eb8c09e8  -9210152678340971410                     17\n\
-                UN  172.17.17.22  80.18 KB   67.1%             f64ced33-2c01-40a3-9979-cf0a0b60d7af  -9187087995446879807                     17\n')
-
-        cassandraworkflow.connect_server("localhost", "22", "fake_user", "fake_password").\
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         self.store['SSHPort'],
+                                         self.store['Username'],
+                                         self.store['Password']).\
             AndReturn(client)
         client.exec_command("nodetool status").\
-            AndReturn((sys.stdin, statusio, sys.stderr))
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
 
-        info1 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : 7d62d900-f99d-4b88-8012-f06cb639fc02\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 130.46 KB\n\
-                Generation No    : 1410136571\n\
-                Uptime (seconds) : 181\n\
-                Heap Memory (MB) : 86.78 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1328 (bytes), capacity 51380224 (bytes), 61 hits, 77 requests, 0.792 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-        info2 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : 75917649-6caa-4c66-b003-71c0eb8c09e8\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 121.07 KB\n\
-                Generation No    : 1410136525\n\
-                Uptime (seconds) : 274\n\
-                Heap Memory (MB) : 29.66 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1200 (bytes), capacity 51380224 (bytes), 78 hits, 92 requests, 0.848 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-        info3 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : a03a1287-7d32-42ed-9018-8206fc295dd9\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 111.62 KB\n\
-                Generation No    : 1410136541\n\
-                Uptime (seconds) : 327\n\
-                Heap Memory (MB) : 35.32 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1344 (bytes), capacity 51380224 (bytes), 69 hits, 84 requests, 0.821 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-        info4 = StringIO.StringIO('\
-                Token            : (invoke with -T/--tokens to see all 256 tokens)\n\
-                ID               : f64ced33-2c01-40a3-9979-cf0a0b60d7af\n\
-                Gossip active    : true\n\
-                Thrift active    : true\n\
-                Native Transport active: true\n\
-                Load             : 80.18 KB\n\
-                Generation No    : 1410136556\n\
-                Uptime (seconds) : 372\n\
-                Heap Memory (MB) : 54.36 / 992.00\n\
-                Data Center      : 17\n\
-                Rack             : 17\n\
-                Exceptions       : 0\n\
-                Key Cache        : size 1952 (bytes), capacity 51380224 (bytes), 85 hits, 97 requests, 0.876 recent hit rate, 14400 save period in seconds\n\
-                Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds\n\
-                                  ')
-
-        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, info1, sys.stderr))
-        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, info3, sys.stderr))
-        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, info2, sys.stderr))
-        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, info4, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
 
         compute_service.get_servers(self.context, admin=True).AndReturn(tests_utils.build_instances())
         compute_service.get_hypervisors(self.context).AndReturn(tests_utils.build_hypervisors())
 
         self.mox.ReplayAll()
 
-        cassnodes = cassandraworkflow.get_cassandra_nodes(self.context, "localhost", "22", "fake_user", "fake_password")
+        cassnodes = cassandraworkflow.get_cassandra_nodes(self.context,
+                                                          self.store['CassandraNode'],
+                                                          self.store['SSHPort'],
+                                                          self.store['Username'],
+                                                          self.store['Password'])
 
         self.assertEqual(len(cassnodes), 4)
+        self.assertEqual(cassnodes[0]['vm_name'], 'd8848b37-1f6a-4a60-9aa5-d7763f710f2a')
+        self.assertEqual(cassnodes[1]['vm_name'], 'testVM')
+        self.assertEqual(cassnodes[2]['vm_name'], 'vm1')
+        self.assertEqual(cassnodes[3]['vm_name'], 'vmware1')
 
-    def test_cassandra_details(self):
-        pass
+    def test_cassandra_discover(self):
+        cflow = cassandraworkflow.CassandraWorkflow("Cassandra", self.store)
+        client = paramiko.SSHClient()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+
+        self.mox.StubOutClassWithMocks(nova, 'API')
+        compute_service = nova.API(production=True)
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+        client.exec_command("nodetool status").\
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
+
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
+
+        compute_service.get_servers(IsA(amqp.RpcContext), admin=True).AndReturn(tests_utils.build_instances())
+        compute_service.get_hypervisors(IsA(amqp.RpcContext)).AndReturn(tests_utils.build_hypervisors())
+
+        self.mox.ReplayAll()
+
+        instances = cflow.discover()
+        self.assertEqual(len(instances['instances']), 4)
+        self.assertEqual(instances['instances'][0]['vm_name'], 'd8848b37-1f6a-4a60-9aa5-d7763f710f2a')
+        self.assertEqual(instances['instances'][1]['vm_name'], 'testVM')
+        self.assertEqual(instances['instances'][2]['vm_name'], 'vm1')
+        self.assertEqual(instances['instances'][3]['vm_name'], 'vmware1')
 
     def test_cassandra_initflow(self):
-        pass
+        cflow = cassandraworkflow.CassandraWorkflow("Cassandra", self.store)
+        client = paramiko.SSHClient()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+
+        self.mox.StubOutClassWithMocks(nova, 'API')
+        compute_service = nova.API(production=True)
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+        client.exec_command("nodetool status").\
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
+
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
+
+        compute_service.get_servers(IsA(amqp.RpcContext), admin=True).AndReturn(tests_utils.build_instances())
+        compute_service.get_hypervisors(IsA(amqp.RpcContext)).AndReturn(tests_utils.build_hypervisors())
+
+        self.mox.ReplayAll()
+
+        cflow.initflow()
+
+        self.assertEqual(cflow._store['instance_b66be913-9f3e-4adf-9274-4a36e980ff25']['vm_name'], 'testVM')
+        self.assertEqual(cflow._store['instance_f6792af5-ffaa-407b-8401-f8246323dedf']['vm_name'], 'vm1')
+        self.assertEqual(cflow._store['instance_144775cc-764b-4af4-99b3-ac6df0cabf98']['vm_name'], 'vmware1')
+        self.assertEqual(cflow._store['instance_e44e5170-255d-42fb-a603-89fa171104e1']['vm_name'], 'd8848b37-1f6a-4a60-9aa5-d7763f710f2a')
+
+    def test_cassandra_details(self):
+        cflow = cassandraworkflow.CassandraWorkflow("Cassandra", self.store)
+        client = paramiko.SSHClient()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+
+        self.mox.StubOutClassWithMocks(nova, 'API')
+        compute_service = nova.API(production=True)
+        compute_service1 = nova.API(production=True)
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+
+
+        client.exec_command("nodetool status").\
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
+
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
+
+        compute_service.get_servers(IsA(amqp.RpcContext), admin=True).AndReturn(tests_utils.build_instances())
+        compute_service.get_hypervisors(IsA(amqp.RpcContext)).AndReturn(tests_utils.build_hypervisors())
+
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+
+        client.exec_command("nodetool status").\
+            AndReturn((sys.stdin, self.statusio1, sys.stderr))
+
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info11, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info31, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info21, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info41, sys.stderr))
+
+        compute_service1.get_servers(IsA(amqp.RpcContext), admin=True).AndReturn(tests_utils.build_instances())
+        compute_service1.get_hypervisors(IsA(amqp.RpcContext)).AndReturn(tests_utils.build_hypervisors())
+
+        self.mox.ReplayAll()
+
+        cflow.initflow()
+        workflow = cflow.details()
+
+        # TODO: Verify that workflow is valid
 
     def test_cassandra_topology(self):
-        pass
+        cflow = cassandraworkflow.CassandraWorkflow("Cassandra", self.store)
+        client = paramiko.SSHClient()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+
+
+        client.exec_command("nodetool status").\
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
+
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
+
+        self.mox.ReplayAll()
+
+        topology = cflow.topology()
+
+        # Verify the topology
+
+    def test_cassandra_execute(self):
+        cflow = cassandraworkflow.CassandraWorkflow("Cassandra", self.store)
+        client = paramiko.SSHClient()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+
+        self.mox.StubOutClassWithMocks(nova, 'API')
+        compute_service = nova.API(production=True)
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+        client.exec_command("nodetool status").\
+            AndReturn((sys.stdin, self.statusio, sys.stderr))
+
+        client.exec_command("nodetool -h 172.17.17.19 info").AndReturn((sys.stdin, self.info1, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.21 info").AndReturn((sys.stdin, self.info3, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.20 info").AndReturn((sys.stdin, self.info2, sys.stderr))
+        client.exec_command("nodetool -h 172.17.17.22 info").AndReturn((sys.stdin, self.info4, sys.stderr))
+
+        compute_service.get_servers(IsA(amqp.RpcContext), admin=True).AndReturn(tests_utils.build_instances())
+        compute_service.get_hypervisors(IsA(amqp.RpcContext)).AndReturn(tests_utils.build_hypervisors())
+
+        self.mox.ReplayAll()
+
+        cflow.initflow()
+"""
+{'workflow':
+    {'type': 'linear_flow', 'name': 'taskflow.patterns.linear_flow.Flow: Cassandra; 4',
+     'children': [
+        {'type': 'unordered_flow',
+         'name': 'taskflow.patterns.unordered_flow.Flow: Cassandra#Presnapshot; 1',
+         'children': [
+            {'type': 'unordered_flow',
+             'name': 'taskflow.patterns.unordered_flow.Flow: presnapshotuf; 4',
+             'children': [
+                {'input': [['vm', u'testVM']],
+                 'type': 'Task',
+                 'name': u'PreSnapshot'
+                },
+                {'input': [['vm', u'vmware1']],
+                 'type': 'Task',
+                 'name': u'PreSnapshot'
+                },
+                {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+                 'type': 'Task',
+                 'name': u'PreSnapshot'
+                },
+                {'input': [['vm', u'vm1']],
+                 'type': 'Task',
+                 'name': u'PreSnapshot'
+                }
+              ]
+            }
+         ]
+     },
+     {'type': 'linear_flow',
+      'name': 'taskflow.patterns.linear_flow.Flow: Cassandra#SnapshotMetadata; 3',
+      'children': [
+         {'input': [],
+          'type': 'Task',
+          'name': 'Cassandra#SnapshotVMNetworks'
+         },
+         {'input': [],
+          'type': 'Task',
+          'name': 'Cassandra#SnapshotVMFlavors'
+         },
+         {'input': [],
+          'type': 'Task',
+          'name': 'Cassandra#SnapshotVMSecurityGroups'
+         }
+      ]
+     },
+     {'type': 'linear_flow',
+      'name': 'taskflow.patterns.linear_flow.Flow: cassandrawf; 5',
+      'children': [
+         {'type': 'unordered_flow',
+          'name': 'taskflow.patterns.unordered_flow.Flow: snapshotnodeuf; 4',
+          'children': [
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'SnapshotNode'
+             },
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'SnapshotNode'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'SnapshotNode'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task', 'name': u'SnapshotNode'
+             }
+          ]
+         },
+         {'type': 'unordered_flow',
+          'name': 'taskflow.patterns.unordered_flow.Flow: pausevmsuf; 4',
+          'children': [
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'PauseVM'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'PauseVM'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'PauseVM'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'PauseVM'
+             }
+          ]
+         },
+         {'type': 'unordered_flow',
+          'name': 'taskflow.patterns.unordered_flow.Flow: snapshotvmuf; 4',
+          'children': [
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'SnapshotVM'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'SnapshotVM'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'SnapshotVM'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'SnapshotVM'
+             }
+          ]
+         },
+         {'type': 'unordered_flow',
+          'name': 'taskflow.patterns.unordered_flow.Flow: unpausevmsuf; 4',
+          'children': [
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'UnpauseVM'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'UnpauseVM'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'UnpauseVM'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'UnpauseVM'
+             }
+          ]
+         },
+         {'type': 'unordered_flow',
+          'name': 'taskflow.patterns.unordered_flow.Flow: clearsnapshotuf; 4',
+          'children': [
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'ClearSnapshot'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'ClearSnapshot'
+             },
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'ClearSnapshot'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'ClearSnapshot'
+             }
+           ]
+          }
+      ]
+     },
+     {'type': 'linear_flow',
+      'name': 'taskflow.patterns.linear_flow.Flow: Cassandra#Postsnapshot; 3',
+      'children': [
+         {'type': 'linear_flow',
+          'name': 'taskflow.patterns.linear_flow.Flow: snapshotdatasizelf; 4',
+          'children': [
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'SnapshotDataSize'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'SnapshotDataSize'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'SnapshotDataSize'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'SnapshotDataSize'
+             }
+          ]
+         },
+         {'type': 'linear_flow',
+          'name': 'taskflow.patterns.linear_flow.Flow: uploadsnapshotlf; 4',
+          'children': [
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'UploadSnapshot'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'UploadSnapshot'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'UploadSnapshot'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'UploadSnapshot'
+             }
+          ]
+         },
+         {'type': 'linear_flow',
+          'name': 'taskflow.patterns.linear_flow.Flow: postsnapshotlf; 4',
+          'children': [
+             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
+              'type': 'Task',
+              'name': u'PostSnapshot'
+             },
+             {'input': [['vm', u'testVM']],
+              'type': 'Task',
+              'name': u'PostSnapshot'
+             },
+             {'input': [['vm', u'vm1']],
+              'type': 'Task',
+              'name': u'PostSnapshot'
+             },
+             {'input': [['vm', u'vmware1']],
+              'type': 'Task',
+              'name': u'PostSnapshot'
+             }
+          ]
+         }
+      ]
+     }
+   ]
+  }
+}
+"""
+        import pdb;pdb.set_trace()
+        cflow.execute()
+
+    def test_cassandra_snapshot_node_execute(self):
+        snaptask = cassandraworkflow.SnapshotNode()
+        client = paramiko.SSHClient()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+
+        client.exec_command("nodetool snapshot").\
+            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+
+        self.mox.ReplayAll()
+        cassnodes = snaptask.execute(self.store['CassandraNode'],
+                                     self.store['SSHPort'],
+                                     self.store['Username'],
+                                     self.store['Password'])
+
+    def test_cassandra_snapshot_node_revert(self):
+        snaptask = cassandraworkflow.SnapshotNode()
+        client = paramiko.SSHClient()
+        snaptask.client = client
+        self.mox.StubOutWithMock(client, 'exec_command')
+  
+        client.exec_command("nodetool clearsnapshot").\
+            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+
+        self.mox.ReplayAll()
+        snaptask.revert([], result=-1)
+
+    def test_cassandra_clear_snapshot_execute(self):
+        client = paramiko.SSHClient()
+        snaptask = cassandraworkflow.ClearSnapshot()
+        self.mox.StubOutWithMock(client, 'exec_command')
+        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+  
+        cassandraworkflow.connect_server(self.store['CassandraNode'],
+                                         int(self.store['SSHPort']),
+                                         self.store['Username'],
+                                         self.store['Password']).AndReturn(client)
+
+        client.exec_command("nodetool clearsnapshot").\
+            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+
+        self.mox.ReplayAll()
+        cassnodes = snaptask.execute(self.store['CassandraNode'],
+                                     self.store['SSHPort'],
+                                     self.store['Username'],
+                                     self.store['Password'])
