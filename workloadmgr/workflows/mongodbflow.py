@@ -417,6 +417,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername, mongodbpassword, sshport, hos
                    
                     utils.append_unique(vms, {'vm_id' : instance.id,
                                               'vm_name' : instance.name,
+                                              'vm_metadata' : instance.metadata,                                                
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                               'hypervisor_hostname' : hypervisor_hostname,

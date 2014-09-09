@@ -870,7 +870,7 @@ class VMwareAPISession(object):
         return isinstance(module, vim.Vim)
 
     @periodic_task.periodic_task
-    def _session_is_active(self):
+    def _session_is_active(self, True):
         active = False
         for x in range(0, 2):
             try:
@@ -878,10 +878,10 @@ class VMwareAPISession(object):
                     self.vim.get_service_content().sessionManager,
                     sessionID=self._session.key,
                     userName=self._session.userName)
+                break
             except Exception as e:
                 LOG.warning(_("Unable to validate session %s!"),
                         self._session.key)
-                import pdb;pdb.set_trace()
                 self._create_session()
         return active
 

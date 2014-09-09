@@ -24,7 +24,6 @@ class VMwareAPI(base.Base):
 
     def __init__(self, **kwargs):
         self.cm = driver.load_compute_driver(None, "vmwareapi.VMwareVCDriver")
-        import pdb;pdb.set_trace()
         super(API, self).__init__(**kwargs)
 
     def get_datacenters(self):

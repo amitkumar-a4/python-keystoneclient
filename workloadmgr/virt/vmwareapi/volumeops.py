@@ -98,7 +98,7 @@ class VMwareVolumeOps(object):
                 if option.key == volume_option:
                     return option.value
 
-    def detach_disk_from_vm(self, vm_ref, instance, device):
+    def detach_disk_from_vm(self, vm_ref, instance, device, destroy_disk=False):
         """
         Detach disk from VM by reconfiguration.
         """
@@ -106,7 +106,7 @@ class VMwareVolumeOps(object):
         instance_uuid = instance['uuid']
         client_factory = self._session._get_vim().client.factory
         vmdk_detach_config_spec = vm_util.get_vmdk_detach_config_spec(
-                                    client_factory, device)
+                                    client_factory, device, destroy_disk)
         disk_key = device.key
         LOG.debug(_("Reconfiguring VM instance %(instance_name)s to detach "
                     "disk %(disk_key)s"),

@@ -7,18 +7,26 @@
 A connection to the VMware ESX/vCenter platform.
 """
 
+import os
 import re
 import time
+import uuid
+from Queue import Queue
+import cPickle as pickle
+import shutil
+import math
+
 
 from eventlet import event
 from oslo.config import cfg
 
-from workloadmgr import exception
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import loopingcall
 from workloadmgr.openstack.common import uuidutils
+from workloadmgr.openstack.common import fileutils
+
 from workloadmgr.virt import driver
 from workloadmgr.virt.vmwareapi import error_util
 from workloadmgr.virt.vmwareapi import host
@@ -27,6 +35,12 @@ from workloadmgr.virt.vmwareapi import vim_util
 from workloadmgr.virt.vmwareapi import vm_util
 from workloadmgr.virt.vmwareapi import vmops
 from workloadmgr.virt.vmwareapi import volumeops
+from workloadmgr.virt.vmwareapi import read_write_util
+from workloadmgr.vault import vault
+from workloadmgr.virt import qemuimages
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+from workloadmgr import utils
+from workloadmgr import exception
 from workloadmgr import autolog
 
 
@@ -53,15 +67,6 @@ vmwareapi_opts = [
                     'Used only if compute_driver is '
                     'vmwareapi.VMwareESXDriver or vmwareapi.VMwareVCDriver.',
                secret=True),
-    cfg.MultiStrOpt('cluster_name',
-               deprecated_name='vmwareapi_cluster_name',
-               deprecated_group='DEFAULT',
-               help='Name of a VMware Cluster ComputeResource. Used only if '
-                    'compute_driver is vmwareapi.VMwareVCDriver.'),
-    cfg.StrOpt('datastore_regex',
-               help='Regex to match the name of a datastore. '
-                    'Used only if compute_driver is '
-                    'vmwareapi.VMwareVCDriver.'),
     cfg.FloatOpt('task_poll_interval',
                  default=5.0,
                  deprecated_name='vmwareapi_task_poll_interval',
@@ -78,30 +83,6 @@ vmwareapi_opts = [
                     'socket error, etc. '
                     'Used only if compute_driver is '
                     'vmwareapi.VMwareESXDriver or vmwareapi.VMwareVCDriver.'),
-    cfg.IntOpt('vnc_port',
-               default=5900,
-               deprecated_name='vnc_port',
-               deprecated_group='DEFAULT',
-               help='VNC starting port'),
-    cfg.IntOpt('vnc_port_total',
-               default=10000,
-               deprecated_name='vnc_port_total',
-               deprecated_group='DEFAULT',
-               help='Total number of VNC ports'),
-    # Deprecated, remove in Icehouse
-    cfg.StrOpt('vnc_password',
-               deprecated_name='vnc_password',
-               deprecated_group='DEFAULT',
-               help='DEPRECATED. VNC password. The password-based access to '
-                    'VNC consoles will be removed in the next release. The '
-                    'default value will disable password protection on the '
-                    'VNC console.',
-               secret=True),
-    cfg.BoolOpt('use_linked_clone',
-                default=True,
-                deprecated_name='use_linked_clone',
-                deprecated_group='DEFAULT',
-                help='Whether to use linked clone'),
     ]
 
 
@@ -144,236 +125,110 @@ class VMwareESXDriver(driver.ComputeDriver):
 
         self._session = VMwareAPISession(scheme=scheme)
         self._volumeops = volumeops.VMwareVolumeOps(self._session)
-        self._vmops = vmops.VMwareVMOps(self._session, self.virtapi,
-                                        self._volumeops)
-        self._host = host.Host(self._session)
-        self._host_state = None
 
-        #TODO(hartsocks): back-off into a configuration test module.
-        if CONF.vmware.use_linked_clone is None:
-            raise error_util.UseLinkedCloneConfigurationFault()
-
-    @property
-    def host_state(self):
-        if not self._host_state:
-            self._host_state = host.HostState(self._session,
-                                              self._host_ip)
-        return self._host_state
-
-    def init_host(self, host):
-        """Do the initialization that needs to be done."""
-        # FIXME(sateesh): implement this
-        pass
-
-    def list_instances(self):
-        """List VM instances."""
-        return self._vmops.list_instances()
-
-    def spawn(self, context, instance, image_meta, injected_files,
-              admin_password, network_info=None, block_device_info=None):
-        """Create VM instance."""
-        self._vmops.spawn(context, instance, image_meta, injected_files,
-              admin_password, network_info, block_device_info)
-
-    
-    def native_snapshot(self, context, instance, name, update_task_state):
-        """Create snapshot from a running VM instance."""
-        self._vmops.native_snapshot(context, instance, name, update_task_state)
-    
-    def reboot(self, context, instance, network_info, reboot_type,
-               block_device_info=None, bad_volumes_callback=None):
-        """Reboot VM instance."""
-        self._vmops.reboot(instance, network_info)
-
-    def destroy(self, instance, network_info, block_device_info=None,
-                destroy_disks=True, context=None):
-        """Destroy VM instance."""
-        self._vmops.destroy(instance, network_info, destroy_disks)
-
-    def pause(self, instance):
+    def pause(self, cntx, db, instance):
         """Pause VM instance."""
-        self._vmops.pause(instance)
+        msg = _("pause not supported for vmwareapi")
+        raise NotImplementedError(msg)
 
-    def unpause(self, instance):
+    def unpause(self, cntx, db, instance):
         """Unpause paused VM instance."""
-        self._vmops.unpause(instance)
+        msg = _("unpause not supported for vmwareapi")
+        raise NotImplementedError(msg)
 
-    def suspend(self, instance):
+    def suspend(self, cntx, db, instance):
         """Suspend the specified instance."""
-        self._vmops.suspend(instance)
-
-    def resume(self, instance, network_info, block_device_info=None):
-        """Resume the suspended VM instance."""
-        self._vmops.resume(instance)
-
-    def rescue(self, context, instance, network_info, image_meta,
-               rescue_password):
-        """Rescue the specified instance."""
-        self._vmops.rescue(context, instance, network_info, image_meta)
-
-    def unrescue(self, instance, network_info):
-        """Unrescue the specified instance."""
-        self._vmops.unrescue(instance)
-
-    def power_off(self, instance):
-        """Power off the specified instance."""
-        self._vmops.power_off(instance)
-
-    def power_on(self, context, instance, network_info,
-                 block_device_info=None):
-        """Power on the specified instance."""
-        self._vmops._power_on(instance)
-
-    def resume_state_on_host_boot(self, context, instance, network_info,
-                                  block_device_info=None):
-        """resume guest state when a host is booted."""
-        # Check if the instance is running already and avoid doing
-        # anything if it is.
-        instances = self.list_instances()
-        if instance['uuid'] not in instances:
-            LOG.warn(_('Instance cannot be found in host, or in an unknown'
-                'state.'), instance=instance)
+        instance['uuid'] = instance['vm_id']
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                    'vm_name': instance['vm_name'],
+                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                                    })
+                
+        pwr_state = self._session._call_method(vim_util,
+                    "get_dynamic_property", vm_ref,
+                    "VirtualMachine", "runtime.powerState")
+        # Only PoweredOn VMs can be suspended.
+        if pwr_state == "poweredOn":
+            LOG.debug(_("Suspending the VM"), instance=instance)
+            suspend_task = self._session._call_method(self._session._get_vim(),
+                    "SuspendVM_Task", vm_ref)
+            self._session._wait_for_task(instance['uuid'], suspend_task)
+            LOG.debug(_("Suspended the VM"), instance=instance)
+        # Raise Exception if VM is poweredOff
+        elif pwr_state == "poweredOff":
+            LOG.debug(_("instance is powered off and cannot be suspended. So returning "
+                      "without doing anything"), instance=instance)
         else:
-            state = vm_util.get_vm_state_from_name(self._session,
-                instance['uuid'])
-            ignored_states = ['poweredon', 'suspended']
+            LOG.debug(_("VM was already in suspended state. So returning "
+                      "without doing anything"), instance=instance)
 
-            if state.lower() in ignored_states:
-                return
-        # Instance is not up and could be in an unknown state.
-        # Be as absolute as possible about getting it back into
-        # a known and running state.
-        self.reboot(context, instance, network_info, 'hard',
-            block_device_info)
+    def resume(self, cntx, db, instance):
+        """Resume the specified instance."""
+        instance['uuid'] = instance['vm_id']
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                    'vm_name': instance['vm_name'],
+                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                                    })
+                
+        pwr_state = self._session._call_method(vim_util,
+                                     "get_dynamic_property", vm_ref,
+                                     "VirtualMachine", "runtime.powerState")
+        if pwr_state.lower() == "suspended":
+            LOG.debug(_("Resuming the VM"), instance=instance)
+            suspend_task = self._session._call_method(
+                                        self._session._get_vim(),
+                                       "PowerOnVM_Task", vm_ref)
+            self._session._wait_for_task(instance['uuid'], suspend_task)
+            LOG.debug(_("Resumed the VM"), instance=instance)
+        else:
+            LOG.debug(_("instance is not in suspended state. So returning "
+                      "without doing anything"), instance=instance)
 
-    def poll_rebooting_instances(self, timeout, instances):
-        """Poll for rebooting instances."""
-        self._vmops.poll_rebooting_instances(timeout, instances)
 
-    def get_info(self, instance):
-        """Return info about the VM instance."""
-        return self._vmops.get_info(instance)
+    def power_off(self, vm_ref, instance):
+        """Power off the specified instance."""
+        pwr_state = self._session._call_method(vim_util,
+                    "get_dynamic_property", vm_ref,
+                    "VirtualMachine", "runtime.powerState")
+        # Only PoweredOn VMs can be powered off.
+        if pwr_state == "poweredOn":
+            LOG.debug(_("Powering off the VM"), instance=instance)
+            poweroff_task = self._session._call_method(
+                                        self._session._get_vim(),
+                                        "PowerOffVM_Task", vm_ref)
+            self._session._wait_for_task(instance['uuid'], poweroff_task)
+            LOG.debug(_("Powered off the VM"), instance=instance)
+        # Raise Exception if VM is suspended
+        elif pwr_state == "suspended":
+            reason = _("instance is suspended and cannot be powered off.")
+            raise exception.InstancePowerOffFailure(reason=reason)
+        else:
+            LOG.debug(_("VM was already in powered off state. So returning "
+                        "without doing anything"), instance=instance)
 
-    def get_diagnostics(self, instance):
-        """Return data about VM diagnostics."""
-        return self._vmops.get_info(instance)
+    def power_on(self, vm_ref, instance):
+        """Power on the specified instance."""
+        pwr_state = self._session._call_method(vim_util,
+                                     "get_dynamic_property", vm_ref,
+                                     "VirtualMachine", "runtime.powerState")
+        if pwr_state == "poweredOn":
+            LOG.debug(_("VM was already in powered on state. So returning "
+                      "without doing anything"), instance=instance)
+        # Only PoweredOff and Suspended VMs can be powered on.
+        else:
+            LOG.debug(_("Powering on the VM"), instance=instance)
+            poweron_task = self._session._call_method(
+                                        self._session._get_vim(),
+                                        "PowerOnVM_Task", vm_ref)
+            self._session._wait_for_task(instance['uuid'], poweron_task)
+            LOG.debug(_("Powered on the VM"), instance=instance)
 
-    def get_console_output(self, instance):
-        """Return snapshot of console."""
-        # The method self._vmops.get_console_output(instance) returns
-        # a PNG format. The vCenter and ESX do not provide a way
-        # to get the text based console format.
-        return _("Currently there is no log available for "
-                 "instance %s") % instance['uuid']
-
-    def get_vnc_console(self, instance):
-        """Return link to instance's VNC console."""
-        return self._vmops.get_vnc_console(instance)
-
-    def get_volume_connector(self, instance):
-        """Return volume connector information."""
-        return self._volumeops.get_volume_connector(instance)
 
     def get_host_ip_addr(self):
         """Retrieves the IP address of the ESX host."""
         return self._host_ip
 
-    def attach_volume(self, context, connection_info, instance, mountpoint,
-                      encryption=None):
-        """Attach volume storage to VM instance."""
-        return self._volumeops.attach_volume(connection_info,
-                                             instance,
-                                             mountpoint)
 
-    def detach_volume(self, connection_info, instance, mountpoint,
-                      encryption=None):
-        """Detach volume storage to VM instance."""
-        return self._volumeops.detach_volume(connection_info,
-                                             instance,
-                                             mountpoint)
-
-    def get_console_pool_info(self, console_type):
-        """Get info about the host on which the VM resides."""
-        return {'address': CONF.vmware.host_ip,
-                'username': CONF.vmware.host_username,
-                'password': CONF.vmware.host_password}
-
-    def _get_available_resources(self, host_stats):
-        return {'vcpus': host_stats['vcpus'],
-               'memory_mb': host_stats['host_memory_total'],
-               'local_gb': host_stats['disk_total'],
-               'vcpus_used': 0,
-               'memory_mb_used': host_stats['host_memory_total'] -
-                                 host_stats['host_memory_free'],
-               'local_gb_used': host_stats['disk_used'],
-               'hypervisor_type': host_stats['hypervisor_type'],
-               'hypervisor_version': host_stats['hypervisor_version'],
-               'hypervisor_hostname': host_stats['hypervisor_hostname'],
-               'cpu_info': jsonutils.dumps(host_stats['cpu_info']),
-               'supported_instances': jsonutils.dumps(
-                   host_stats['supported_instances']),
-               }
-
-    def get_available_resource(self, nodename):
-        """Retrieve resource information.
-
-        This method is called when nova-compute launches, and
-        as part of a periodic task that records the results in the DB.
-
-        :returns: dictionary describing resources
-
-        """
-        host_stats = self.get_host_stats(refresh=True)
-
-        # Updating host information
-        return self._get_available_resources(host_stats)
-
-    def update_host_status(self):
-        """Update the status info of the host, and return those values
-           to the calling program.
-        """
-        return self.host_state.update_status()
-
-    def get_host_stats(self, refresh=False):
-        """Return the current state of the host.
-
-           If 'refresh' is True, run the update first.
-        """
-        return self.host_state.get_host_stats(refresh=refresh)
-
-    def host_power_action(self, host, action):
-        """Reboots, shuts down or powers up the host."""
-        return self._host.host_power_action(host, action)
-
-    def host_maintenance_mode(self, host, mode):
-        """Start/Stop host maintenance window. On start, it triggers
-           guest VMs evacuation.
-        """
-        return self._host.host_maintenance_mode(host, mode)
-
-    def set_host_enabled(self, host, enabled):
-        """Sets the specified host's ability to accept new instances."""
-        return self._host.set_host_enabled(host, enabled)
-
-    def get_host_uptime(self, host):
-        return 'Please refer to %s for the uptime' % CONF.vmware.host_ip
-
-    def inject_network_info(self, instance, network_info):
-        """inject network info for specified instance."""
-        self._vmops.inject_network_info(instance, network_info)
-
-    def plug_vifs(self, instance, network_info):
-        """Plug VIFs into networks."""
-        self._vmops.plug_vifs(instance, network_info)
-
-    def unplug_vifs(self, instance, network_info):
-        """Unplug VIFs from networks."""
-        self._vmops.unplug_vifs(instance, network_info)
-
-    def list_instance_uuids(self):
-        """List VM instance UUIDs."""
-        uuids = self._vmops.list_instances()
-        return [uuid for uuid in uuids if uuidutils.is_uuid_like(uuid)]
     
 class VMwareVCDriver(VMwareESXDriver):
     """The ESX host connection object."""
@@ -390,344 +245,212 @@ class VMwareVCDriver(VMwareESXDriver):
         super(VMwareVCDriver, self).__init__(virtapi)
 
         # Get the list of clusters to be used
-        self._cluster_names = CONF.vmware.cluster_name
-        self.dict_mors = vm_util.get_all_cluster_refs_by_name(self._session,
-                                          self._cluster_names)
-        if not self.dict_mors:
-            raise exception.NotFound(_("All clusters specified %s were not"
-                                       " found in the vCenter")
-                                     % self._cluster_names)
-
-        # Check if there are any clusters that were specified in the nova.conf
-        # but are not in the vCenter, for missing clusters log a warning.
-        clusters_found = [v.get('name') for k, v in self.dict_mors.iteritems()]
-        missing_clusters = set(self._cluster_names) - set(clusters_found)
-        if missing_clusters:
-            LOG.warn(_("The following clusters could not be found in the"
-                " vCenter %s") % list(missing_clusters))
-
-        self._datastore_regex = None
-        if CONF.vmware.datastore_regex:
-            try:
-                self._datastore_regex = re.compile(CONF.vmware.datastore_regex)
-            except re.error:
-                raise exception.InvalidInput(reason=
-                _("Invalid Regular Expression %s")
-                % CONF.vmware.datastore_regex)
-        # The _resources is used to maintain the vmops, volumeops and vcstate
-        # objects per cluster
-        self._resources = {}
-        self._resource_keys = set()
         self._virtapi = virtapi
-        self._update_resources()
 
-        # The following initialization is necessary since the base class does
-        # not use VC state.
-        first_cluster = self._resources.keys()[0]
-        self._vmops = self._resources.get(first_cluster).get('vmops')
-        self._volumeops = self._resources.get(first_cluster).get('volumeops')
-        self._vc_state = self._resources.get(first_cluster).get('vcstate')
-
-    def migrate_disk_and_power_off(self, context, instance, dest,
-                                   instance_type, network_info,
-                                   block_device_info=None):
+    def _mkdir(self, ds_path, datacenter_ref):
         """
-        Transfers the disk of a running instance in multiple phases, turning
-        off the instance before the end.
+        Creates a directory at the path specified. If it is just "NAME",
+        then a directory with this name is created at the topmost level of the
+        DataStore.
         """
-        return self._vmops.migrate_disk_and_power_off(context, instance,
-                                                      dest, instance_type)
+        LOG.debug(_("Creating directory with path %s") % ds_path)
+        self._session._call_method(self._session._get_vim(), "MakeDirectory",
+                    self._session._get_vim().get_service_content().fileManager,
+                    name=ds_path, datacenter=datacenter_ref,
+                    createParentDirectories=False)
+        LOG.debug(_("Created directory with path %s") % ds_path)
 
-    def confirm_migration(self, migration, instance, network_info):
-        """Confirms a resize, destroying the source VM."""
-        self._vmops.confirm_migration(migration, instance, network_info)
+    def _get_values_from_object_properties(self, props, query):
+        while props:
+            token = vm_util._get_token(props)
+            for elem in props.objects:
+                for prop in elem.propSet:
+                    for key in query.keys():
+                        if prop.name == key:
+                            query[key] = prop.val
+                            break
+            if token:
+                props = self._session._call_method(vim_util,
+                                                   "continue_to_get_objects",
+                                                   token)
+            else:
+                break
 
-    def finish_revert_migration(self, instance, network_info,
-                                block_device_info=None, power_on=True):
-        """Finish reverting a resize, powering back on the instance."""
-        self._vmops.finish_revert_migration(instance, network_info,
-                                            block_device_info, power_on)
+    def _replace_last(self, source_string, replace_what, replace_with):
+        head, sep, tail = source_string.rpartition(replace_what)
+        return head + replace_with + tail      
 
-    def finish_migration(self, context, migration, instance, disk_info,
-                         network_info, image_meta, resize_instance=False,
-                         block_device_info=None, power_on=True):
-        """Completes a resize, turning on the migrated instance."""
-        self._vmops.finish_migration(context, migration, instance, disk_info,
-                                     network_info, image_meta, resize_instance,
-                                     block_device_info, power_on)
+    def _get_datacenter_ref_and_name(self, datastore_ref):
+        """Get the datacenter name and the reference."""
+        datacenter_ref = None
+        datacenter_name = None
+        
+        datacenters = self._session._call_method(vim_util, "get_objects",
+                                                "Datacenter", ["datastore", "name"])
+        while datacenters:
+            token = vm_util._get_token(datacenters)
+            for obj_content in datacenters.objects:
+                for datastore in obj_content.propSet[0].val[0]:
+                    if datastore.value == datastore_ref.value and \
+                       datastore._type == datastore_ref._type:
+                        datacenter_ref = obj_content.obj
+                        datacenter_name = obj_content.propSet[1].val
+                        break
+            if datacenter_ref:
+                if token:
+                    self._session._call_method(vim_util,
+                                         "cancel_retrieve",
+                                         token)
+                return datacenter_ref, datacenter_name
+            if token:
+                datacenters = self._session._call_method(vim_util,
+                                                           "continue_to_get_objects",
+                                                           token)
+        raise exception.DatacenterNotFound()                
 
-    def live_migration(self, context, instance_ref, dest,
-                       post_method, recover_method, block_migration=False,
-                       migrate_data=None):
-        """Live migration of an instance to another host."""
-        self._vmops.live_migration(context, instance_ref, dest,
-                                   post_method, recover_method,
-                                   block_migration)
-
-    def get_vnc_console(self, instance):
-        """Return link to instance's VNC console using vCenter logic."""
-        # In this situation, ESXi and vCenter require different
-        # API logic to create a valid VNC console connection object.
-        # In specific, vCenter does not actually run the VNC service
-        # itself. You must talk to the VNC host underneath vCenter.
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        return _vmops.get_vnc_console_vcenter(instance)
-
-    def _update_resources(self):
-        """This method creates a dictionary of VMOps, VolumeOps and VCState.
-
-        The VMwareVMOps, VMwareVolumeOps and VCState object is for each
-        cluster/rp. The dictionary is of the form
-        {
-            domain-1000 : {'vmops': vmops_obj,
-                          'volumeops': volumeops_obj,
-                          'vcstate': vcstate_obj,
-                          'name': MyCluster},
-            resgroup-1000 : {'vmops': vmops_obj,
-                              'volumeops': volumeops_obj,
-                              'vcstate': vcstate_obj,
-                              'name': MyRP},
-        }
+    def _get_vm_ref_from_name_folder(self, vmfolder_ref, name):
+        obj_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
+        for obj_ref in obj_refs.ManagedObjectReference:
+            if obj_ref._type != "VirtualMachine":
+                continue
+            vm_name = self._session._call_method(vim_util, "get_dynamic_property", obj_ref, "VirtualMachine", "name")
+            if vm_name == name:
+                return obj_ref
+        raise exception.VMNotFound()
+    
+    def _get_vmfolder_ref(self, datacenter_ref, vmfolder_moid = None):
+        vmfolder_ref = self._session._call_method(vim_util, "get_dynamic_property", datacenter_ref, "Datacenter", "vmFolder")
+        if vmfolder_moid == None:
+            return vmfolder_ref
+        vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
+        for vmfolder_ref in vmfolder_refs.ManagedObjectReference:
+            if vmfolder_ref.value == vmfolder_moid:
+                return vmfolder_ref
+        raise exception.VMFolderNotFound()                
+    
+    def _get_res_pool_ref(self, resourcepool_moid):
+        res_pool_ref = None
+        resourcepools = self._session._call_method(vim_util, "get_objects", "ResourcePool")
+        while resourcepools:
+            token = vm_util._get_token(resourcepools)
+            for obj_content in resourcepools.objects:
+                if obj_content.obj.value == resourcepool_moid:
+                    res_pool_ref =  obj_content.obj
+            if res_pool_ref:
+                if token:
+                    self._session._call_method(vim_util,
+                                         "cancel_retrieve",
+                                         token)
+                return res_pool_ref
+            if token:
+                resourcepools = self._session._call_method(vim_util,
+                                                           "continue_to_get_objects",
+                                                           token)
+        raise exception.ResourcePoolNotFound()                
+    
+    def _get_network_ref(self, network_moid, dc_ref):
+        network_folder_ref = self._session._call_method(vim_util, "get_dynamic_property", dc_ref, "Datacenter", "networkFolder")
+        network_refs = self._session._call_method(vim_util, "get_dynamic_property", network_folder_ref, "Folder", "childEntity")
+        for network_ref in network_refs.ManagedObjectReference:
+            if network_ref._type == "Network" or network_ref._type == "DistributedVirtualPortgroup":
+                if network_ref.value == network_moid:
+                    return network_ref
+        raise exception.NetworkNotFound()     
+    
+    def _detach_disk_from_vm(self, vm_ref, instance, device, destroy_disk=False):
         """
-        added_nodes = set(self.dict_mors.keys()) - set(self._resource_keys)
-        for node in added_nodes:
-            _volumeops = volumeops.VMwareVolumeOps(self._session,
-                                        self.dict_mors[node]['cluster_mor'],
-                                        vc_support=True)
-            _vmops = vmops.VMwareVCVMOps(self._session, self._virtapi,
-                                       _volumeops,
-                                       self.dict_mors[node]['cluster_mor'],
-                                       datastore_regex=self._datastore_regex)
-            name = self.dict_mors.get(node)['name']
-            nodename = self._create_nodename(node, name)
-            _vc_state = host.VCState(self._session, nodename,
-                                     self.dict_mors.get(node)['cluster_mor'])
-            self._resources[nodename] = {'vmops': _vmops,
-                                         'volumeops': _volumeops,
-                                         'vcstate': _vc_state,
-                                         'name': name,
-                                     }
-            self._resource_keys.add(node)
-
-        deleted_nodes = (set(self._resource_keys) -
-                            set(self.dict_mors.keys()))
-        for node in deleted_nodes:
-            name = self.dict_mors.get(node)['name']
-            nodename = self._create_nodename(node, name)
-            del self._resources[nodename]
-            self._resource_keys.discard(node)
-
-    def _create_nodename(self, mo_id, display_name):
-        """Creates the name that is stored in hypervisor_hostname column.
-
-        The name will be of the form similar to
-        domain-1000(MyCluster)
-        resgroup-1000(MyResourcePool)
+        Detach disk from VM by reconfiguration.
         """
-        return mo_id + '(' + display_name + ')'
+        instance_name = instance['name']
+        instance_uuid = instance['uuid']
+        client_factory = self._session._get_vim().client.factory
+        vmdk_detach_config_spec = vm_util.get_vmdk_detach_config_spec(
+                                    client_factory, device, destroy_disk)
+        disk_key = device.key
+        LOG.debug(_("Reconfiguring VM instance %(instance_name)s to detach "
+                    "disk %(disk_key)s"),
+                  {'instance_name': instance_name, 'disk_key': disk_key})
+        reconfig_task = self._session._call_method(
+                                        self._session._get_vim(),
+                                        "ReconfigVM_Task", vm_ref,
+                                        spec=vmdk_detach_config_spec)
+        self._session._wait_for_task(instance_uuid, reconfig_task)
+        LOG.debug(_("Reconfigured VM instance %(instance_name)s to detach "
+                    "disk %(disk_key)s"),
+                  {'instance_name': instance_name, 'disk_key': disk_key})
 
-    def _get_resource_for_node(self, nodename):
-        """Gets the resource information for the specific node."""
-        resource = self._resources.get(nodename)
-        if not resource:
-            msg = _("The resource %s does not exist") % nodename
-            raise exception.NotFound(msg)
-        return resource
-
-    def _get_vmops_for_compute_node(self, nodename):
-        """Retrieve vmops object from mo_id stored in the node name.
-
-        Node name is of the form domain-1000(MyCluster)
+    def _rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
         """
-        resource = self._get_resource_for_node(nodename)
-        return resource['vmops']
-
-    def _get_volumeops_for_compute_node(self, nodename):
-        """Retrieve vmops object from mo_id stored in the node name.
-
-        Node name is of the form domain-1000(MyCluster)
+        rebase the top to base
         """
-        resource = self._get_resource_for_node(nodename)
-        return resource['volumeops']
+        base_path, base_filename = os.path.split(base)
+        orig_base_path, orig_base_filename = os.path.split(orig_base)
+        base_extent_path = base_path
+        base_extent_filename = base_filename + '.extent' 
+        if(os.path.isfile(os.path.join(base_extent_path,base_extent_filename)) == False):
+            os.rename(base, os.path.join(base_extent_path,base_extent_filename)) 
+            base_descriptor = base_descriptor.replace((' "' + orig_base_filename +'"'), (' "' + base_extent_filename +'"'))
+            if top_descriptor is not None:
+                top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
+                base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
+            with open(base, "w") as base_descriptor_file:
+                base_descriptor_file.write("%s"%base_descriptor)
 
-    def _get_vc_state_for_compute_node(self, nodename):
-        """Retrieve VCState object from mo_id stored in the node name.
-
-        Node name is of the form domain-1000(MyCluster)
+        
+        if top_descriptor is not None:
+            top_path, top_filename = os.path.split(top)
+            orig_top_path, orig_top_filename = os.path.split(orig_top)
+            top_extent_path = top_path
+            top_extent_filename = top_filename + '.extent'             
+            if(os.path.isfile(os.path.join(top_extent_path,top_extent_filename))):
+                with open(top, "r") as top_descriptor_file:
+                    top_descriptor =  top_descriptor_file.read() 
+            else:
+                os.rename(top, os.path.join(top_extent_path,top_extent_filename))
+                top_descriptor = top_descriptor.replace((' "' + orig_top_filename +'"'), (' "' + top_extent_filename +'"'))
+ 
+            top_descriptor = re.sub(r'parentFileNameHint="([^"]*)"', "parentFileNameHint=\"%s\""%base, top_descriptor)
+            with open(top, "w") as top_descriptor_file:
+                top_descriptor_file.write("%s"%top_descriptor)                            
+ 
+    def _commit_vmdk(self, file_to_commit, commit_to, test):
+        """rebase the backing_file_top to backing_file_base
+         :param backing_file_top: top file to commit from to its base
         """
-        resource = self._get_resource_for_node(nodename)
-        return resource['vcstate']
-
-    def get_available_resource(self, nodename):
-        """Retrieve resource info.
-
-        This method is called when nova-compute launches, and
-        as part of a periodic task.
-
-        :returns: dictionary describing resources
-
-        """
-        stats_dict = {}
-        vc_state = self._get_vc_state_for_compute_node(nodename)
-        if vc_state:
-            host_stats = vc_state.get_host_stats(refresh=True)
-
-            # Updating host information
-            stats_dict = self._get_available_resources(host_stats)
-
+        #due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
+        #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
+        if test:
+            utils.execute( 'env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64', 
+                           'vmware-vdiskmanager', '-r', file_to_commit, '-t 2',  commit_to, run_as_root=False)
         else:
-            LOG.info(_("Invalid cluster or resource pool"
-                       " name : %s") % nodename)
-
-        return stats_dict
-
-    def get_available_nodes(self, refresh=False):
-        """Returns nodenames of all nodes managed by the compute service.
-
-        This method is for multi compute-nodes support. If a driver supports
-        multi compute-nodes, this method returns a list of nodenames managed
-        by the service. Otherwise, this method should return
-        [hypervisor_hostname].
+            utils.execute( 'env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
+                           'vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
+        
+        utils.chmod(commit_to, '0664')
+        utils.chmod(commit_to.replace(".vmdk", "-flat.vmdk"), '0664')
+        return commit_to.replace(".vmdk", "-flat.vmdk")
         """
-        self.dict_mors = vm_util.get_all_cluster_refs_by_name(
-                                self._session,
-                                CONF.vmware.cluster_name)
-        nodes = self.dict_mors.keys()
-        node_list = []
-        self._update_resources()
-        for node in self.dict_mors.keys():
-            nodename = self._create_nodename(node,
-                                          self.dict_mors.get(node)['name'])
-            node_list.append(nodename)
-        LOG.debug(_("The available nodes are: %s") % node_list)
-        return node_list
+        if test:
+            utils.execute('qemu-img', 'convert', '-f', 'vmdk', '-O', 'raw', commit_to, commit_to.replace(".vmdk", ".img"), run_as_root=False)
+            return commit_to.replace(".vmdk", ".img")
+        else:
+            return commit_to.replace(".vmdk", "-flat.vmdk") 
+        """     
 
-    def get_host_stats(self, refresh=True):
-        """Return currently known host stats."""
-        stats_list = []
-        nodes = self.get_available_nodes()
-        for node in nodes:
-            stats_list.append(self.get_available_resource(node))
-        return stats_list
-
-    def spawn(self, context, instance, image_meta, injected_files,
-              admin_password, network_info=None, block_device_info=None):
-        """Create VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.spawn(context, instance, image_meta, injected_files,
-              admin_password, network_info, block_device_info)
-
-    def attach_volume(self, context, connection_info, instance, mountpoint,
-                      encryption=None):
-        """Attach volume storage to VM instance."""
-        _volumeops = self._get_volumeops_for_compute_node(instance['node'])
-        return _volumeops.attach_volume(connection_info,
-                                             instance,
-                                             mountpoint)
-
-    def detach_volume(self, connection_info, instance, mountpoint,
-                      encryption=None):
-        """Detach volume storage to VM instance."""
-        _volumeops = self._get_volumeops_for_compute_node(instance['node'])
-        return _volumeops.detach_volume(connection_info,
-                                             instance,
-                                             mountpoint)
-
-    def get_volume_connector(self, instance):
-        """Return volume connector information."""
-        _volumeops = self._get_volumeops_for_compute_node(instance['node'])
-        return _volumeops.get_volume_connector(instance)
-
-    def native_snapshot(self, context, instance, name, update_task_state):
-        """Create snapshot from a running VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.snapshot(context, instance, name, update_task_state)
-
-    def reboot(self, context, instance, network_info, reboot_type,
-               block_device_info=None, bad_volumes_callback=None):
-        """Reboot VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.reboot(instance, network_info)
-
-    def destroy(self, instance, network_info, block_device_info=None,
-                destroy_disks=True, context=None):
-        """Destroy VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.destroy(instance, network_info, destroy_disks)
-
-    def pause(self, instance):
-        """Pause VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.pause(instance)
-
-    def unpause(self, instance):
-        """Unpause paused VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.unpause(instance)
-
-    def suspend(self, instance):
-        """Suspend the specified instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.suspend(instance)
-
-    def resume(self, instance, network_info, block_device_info=None):
-        """Resume the suspended VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.resume(instance)
-
-    def rescue(self, context, instance, network_info, image_meta,
-               rescue_password):
-        """Rescue the specified instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.rescue(context, instance, network_info, image_meta)
-
-    def unrescue(self, instance, network_info):
-        """Unrescue the specified instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.unrescue(instance)
-
-    def power_off(self, instance):
-        """Power off the specified instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.power_off(instance)
-
-    def power_on(self, context, instance, network_info,
-                 block_device_info=None):
-        """Power on the specified instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops._power_on(instance)
-
-    def poll_rebooting_instances(self, timeout, instances):
-        """Poll for rebooting instances."""
-        for instance in instances:
-            _vmops = self._get_vmops_for_compute_node(instance['node'])
-            _vmops.poll_rebooting_instances(timeout, [instance])
-
-    def get_info(self, instance):
-        """Return info about the VM instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        return _vmops.get_info(instance)
-
-    def get_diagnostics(self, instance):
-        """Return data about VM diagnostics."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        return _vmops.get_info(instance)
-
-    def inject_network_info(self, instance, network_info):
-        """inject network info for specified instance."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.inject_network_info(instance, network_info)
-
-    def plug_vifs(self, instance, network_info):
-        """Plug VIFs into networks."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.plug_vifs(instance, network_info)
-
-    def unplug_vifs(self, instance, network_info):
-        """Unplug VIFs from networks."""
-        _vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops.unplug_vifs(instance, network_info)
-
+    def _delete_datastore_file(self, instance, datastore_path, dc_ref):
+        LOG.debug(_("Deleting the datastore file %s") % datastore_path,
+                  instance=instance)
+        vim = self._session._get_vim()
+        file_delete_task = self._session._call_method(
+                self._session._get_vim(),
+                "DeleteDatastoreFile_Task",
+                vim.get_service_content().fileManager,
+                name=datastore_path,
+                datacenter=dc_ref)
+        self._session._wait_for_task(instance['uuid'],
+                                     file_delete_task)
+        LOG.debug(_("Deleted the datastore file"), instance=instance)
+        
     @autolog.log_method(Logger, 'vmwareapi.driver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
         pass 
@@ -741,41 +464,621 @@ class VMwareVCDriver(VMwareESXDriver):
         pass      
     
     @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_vm')
-    def snapshot_vm(self, cntx, db, instance, snapshot): 
-        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
-        return _vmops.snapshot_vm(cntx, db, instance, snapshot)
+    def snapshot_vm(self, cntx, db, instance, snapshot):
+            
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                    'vm_name': instance['vm_name'],
+                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                                    })
+        
+        hardware_devices = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
+                                                      "VirtualMachine", "config.hardware.device")
+        disks = vm_util.get_disks(hardware_devices)
+
+        lst_properties = ["config.files.vmPathName", "runtime.powerState"]
+        props = self._session._call_method(vim_util,
+                    "get_object_properties",None, vm_ref, "VirtualMachine", lst_properties)
+        query = {'config.files.vmPathName': None}
+        self._get_values_from_object_properties(props, query)
+        vmx_file_path = query['config.files.vmPathName']
+        if vmx_file_path:
+            datastore_name, vmx_file_name = vm_util.split_datastore_path(vmx_file_path)
+        datastores = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
+                                                    "VirtualMachine", "datastore")
+        for datastore in datastores:
+            name = self._session._call_method(vim_util,"get_dynamic_property", datastore[1][0],
+                                   "Datastore", "name")
+            if name == datastore_name:
+                datastore_ref = datastore[1][0]
+                break
+            
+        vmx_file = {'vmx_file_path': vmx_file_path, 
+                    'datastore_name': datastore_name,
+                    'datastore_ref' : datastore_ref,
+                    'vmx_file_name': vmx_file_name}
+                
+        snapshot_task = self._session._call_method(
+                    self._session._get_vim(),
+                    "CreateSnapshot_Task", vm_ref,
+                    name="snapshot_id:%s" % snapshot['id'],
+                    description="Trilio VAST Snapshot",
+                    memory=False,
+                    quiesce=True)
+        self._session._wait_for_task(instance['vm_id'], snapshot_task)
+        snapshot_data = {'disks' : disks, 'vmx_file' : vmx_file}
+        return snapshot_data
     
     @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_data_size')
-    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):     
-        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
-        vm_data_size = _vmops.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
-        return vm_data_size     
-           
+    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data): 
+            
+        def _get_vmdk_file_size(file_path, datastore_name, datastore_ref):
+            
+            tmp, vmdk_descriptor_file = vm_util.split_datastore_path(file_path)
+            try:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                        datastore_name,
+                                                        cookies,
+                                                        vmdk_data_file)
+            
+            except Exception as ex:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-flat.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                        datastore_name,
+                                                        cookies,
+                                                        vmdk_data_file)                     
+                     
+            vmdk_file_size = int(vmdk_data_file_handle.get_size())
+            return vmdk_file_size            
+       
+        vm_data_size = 0
+        cookies = self._session._get_vim().client.options.transport.cookiejar
+        for disk in  snapshot_data['disks']:         
+            full = True
+            if snapshot['snapshot_type'] != 'full':
+                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+                if vm_recent_snapshot:
+                    #TODO(giri): the disk could have changed between the snapshots
+                    #TODO(giri): handle the snapshots created out side of WLM                    
+                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                            cntx, 
+                                                            instance['vm_id'], 
+                                                            vm_recent_snapshot.snapshot_id, 
+                                                            disk['label'])
+                    if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
+                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                        if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
+                            vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
+                            full = False                           
+                        
+            vm_data_size = vm_data_size +_get_vmdk_file_size(disk['vmdk_file_path'], disk['datastore_name'], disk['datastore_ref'])
+            if full:
+                for backing in disk['backings']:
+                    vm_data_size = vm_data_size +_get_vmdk_file_size(backing['vmdk_file_path'], backing['datastore_name'], backing['datastore_ref'])                    
+          
+                                     
+                    
+        return vm_data_size            
     @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_disk_info')
     def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
-        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
-        disks_info = _vmops.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)['info']
-        return disks_info 
+        
+        return snapshot_data
     
     @autolog.log_method(Logger, 'vmwareapi.driver..upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
-        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
-        return _vmops.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+        
+        def _upload_vmdk_extent(datastore_ref, vmdk_extent_file, vm_disk_resource_snap_backing_id, top):
+            datastore_name, vmdk_descriptor_file = vm_util.split_datastore_path(vmdk_extent_file)
+                            
+            vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                    self._session._host_ip,
+                                                    self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                    datastore_name,
+                                                    cookies,
+                                                    vmdk_descriptor_file)
+            vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
+            #TODO(giri): throw exception if the size is more than 65536    
+            vmdk_descriptor = vmdk_descriptor_file_handle.read(vmdk_descriptor_file_size)
+            vmdk_descriptor_file_handle.close()
+            
+            try:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                        datastore_name,
+                                                        cookies,
+                                                        vmdk_data_file)
+            
+            except Exception as ex:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-flat.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                        datastore_name,
+                                                        cookies,
+                                                        vmdk_data_file)                     
+                     
+            vmdk_extent_size = int(vmdk_data_file_handle.get_size())
+                        
+            # create an entry in the vm_disk_resource_snaps table
+            vm_disk_resource_snap_id = str(uuid.uuid4())
+            vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
+            vm_disk_resource_snap_metadata.setdefault('disk_format','vmdk')
+            vm_disk_resource_snap_metadata.setdefault('vmware_disktype','thin')
+            vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','lsiLogic')
+            vm_disk_resource_snap_metadata.setdefault('vmdk_descriptor',vmdk_descriptor)
+            vm_disk_resource_snap_metadata.setdefault('vmdk_data_file_name',vmdk_data_file)
+            vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
+                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                             'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                             'metadata': vm_disk_resource_snap_metadata,       
+                                             'top':  top,
+                                             'size': vmdk_extent_size,                                             
+                                             'status': 'creating'}     
+                                                 
+            vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values) 
+    
+            vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                              'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                              'resource_name':  disk['label'],
+                              'snapshot_vm_id': instance['vm_id'],
+                              'snapshot_id': snapshot_obj.id}
+
+
+            
+            db.snapshot_update( cntx, snapshot_obj.id, 
+                                {'progress_msg': 'Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                 'status': 'uploading'
+                                })            
+            LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'] + '; backing file:' + vmdk_data_file))
+            vault_service_url = vault_service.store(vault_metadata, vmdk_data_file_handle, int(vmdk_data_file_handle.get_size()));
+            db.snapshot_update( cntx, snapshot_obj.id, 
+                                {'progress_msg': 'Uploaded '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                 'status': 'uploading'
+                                })   
+            vmdk_data_file_handle.close() 
+            # update the entry in the vm_disk_resource_snap table
+            vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
+                                            'vault_service_metadata' : 'None',
+                                            'status': 'available'}
+            db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+            
+            return vmdk_extent_size, vm_disk_resource_snap.id             
+           
+       
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        vault_service = vault.get_vault_service(cntx)
+        cookies = self._session._get_vim().client.options.transport.cookiejar
+                
+                
+        for disk in snapshot_data['disks']: 
+            vm_disk_size = 0
+            snapshot_vm_resource_metadata = {}
+            snapshot_vm_resource_metadata['vmdk_controler_key'] = disk['vmdk_controler_key']
+            snapshot_vm_resource_metadata['adapter_type'] = disk['adapter_type']
+            snapshot_vm_resource_metadata['label'] = disk['label']
+            snapshot_vm_resource_metadata['unit_number'] = disk['unit_number']
+            snapshot_vm_resource_metadata['disk_type'] = disk['disk_type']
+            snapshot_vm_resource_metadata['capacityInKB'] = disk['capacityInKB']
+            
+            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': instance['vm_id'],
+                                           'snapshot_id': snapshot_obj.id,       
+                                           'resource_type': 'disk',
+                                           'resource_name':  disk['label'],
+                                           'metadata': snapshot_vm_resource_metadata,
+                                           'status': 'creating'}
+    
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
+
+            full = True
+            vm_disk_resource_snap_backing_id = None
+            if snapshot['snapshot_type'] != 'full':
+                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+                if vm_recent_snapshot:
+                    #TODO(giri): the disk colud have changed between the snapshots
+                    #TODO(giri): handle the snapshots created out side of WLM
+                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                            cntx, 
+                                                            instance['vm_id'], 
+                                                            vm_recent_snapshot.snapshot_id, 
+                                                            disk['label'])
+                    if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
+                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
+                        if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
+                            vm_disk_resource_snap_backing_id = previous_vm_disk_resource_snap.id
+                            full = False                           
+
+            if full:
+                for backing in disk['backings']:
+                    vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(backing['datastore_ref'], 
+                                                                                             backing['vmdk_file_path'], 
+                                                                                             vm_disk_resource_snap_backing_id, 
+                                                                                             False)
+                    vm_disk_size = vm_disk_size + vmdk_extent_size
+                    
+            vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(disk['datastore_ref'],
+                                                                                     disk['vmdk_file_path'], 
+                                                                                     vm_disk_resource_snap_backing_id, 
+                                                                                     True)                    
+            vm_disk_size = vm_disk_size + vmdk_extent_size
+            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vm_disk_size})
+            
+        #vmx file 
+        vmx_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                self._session._host_ip,
+                                                self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['datastore_ref'])[1],
+                                                snapshot_data['vmx_file']['datastore_name'],
+                                                cookies,
+                                                snapshot_data['vmx_file']['vmx_file_name'])
+        vmx_file_size = int(vmx_file_handle.get_size())
+        #TODO(giri): throw exception if the size is more than 65536    
+        vmx_file_data = vmx_file_handle.read(vmx_file_size)
+        vmx_file_handle.close()        
+        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                       'vm_id': instance['vm_id'],
+                                       'snapshot_id': snapshot_obj.id,       
+                                       'resource_type': 'vmx',
+                                       'resource_name':  snapshot_data['vmx_file']['vmx_file_name'],
+                                       'metadata': {'vmx_file_data':vmx_file_data},
+                                       'status': 'creating'}
+
+        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
+        db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vmx_file_size})
             
     @autolog.log_method(Logger, 'vmwareapi.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
-        _vmops = self._get_vmops_for_compute_node(instance['hypervisor_hostname'])
-        return _vmops.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
+        
+        def _get_snapshot_to_remove(snapshot_list):
+            snapshot_to_remove = None
+            if snapshot_list:    
+                for vmw_snapshot in snapshot_list:
+                    if vmw_snapshot.name == ('snapshot_id:' + vm_recent_snapshot.snapshot_id) :
+                        snapshot_to_remove = vmw_snapshot.snapshot
+                        break
+                    if hasattr(vmw_snapshot, 'childSnapshotList'):
+                        snapshot_to_remove = _get_snapshot_to_remove(vmw_snapshot.childSnapshotList)
+                        if snapshot_to_remove:
+                            break
+            return snapshot_to_remove             
+
+        vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
+        if vm_recent_snapshot:
+            vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                        'vm_name': instance['vm_name'],
+                                                        'vmware_uuid':instance['vm_metadata']['vmware_uuid'],
+                                                        })
+            root_snapshot_array = self._session._call_method(vim_util,"get_dynamic_property", vm_ref, "VirtualMachine", "snapshot.rootSnapshotList")
            
-    def snapshot(self, workload, snapshot, snapshot_vm, hypervisor_hostname, vault_service, db, context, update_task_state = None):
-        #_vmops = self._get_vmops_for_compute_node(instance['node'])
-        _vmops = self._get_vmops_for_compute_node(hypervisor_hostname) #('domain-c26(td-sea-clu01)'    )
-        _vmops.snapshot(workload, snapshot, snapshot_vm, vault_service, db, context, update_task_state)
- 
-    def get_vcenter_info(self):
+            if root_snapshot_array and len(root_snapshot_array) > 0 : 
+                snapshot_to_remove = _get_snapshot_to_remove(root_snapshot_array[0])
+                if snapshot_to_remove :
+                    remove_snapshot_task = self._session._call_method(
+                                            self._session._get_vim(),
+                                            "RemoveSnapshot_Task", snapshot_to_remove,
+                                            removeChildren=False)
+                    self._session._wait_for_task(instance['vm_id'], remove_snapshot_task)
+           
+    @autolog.log_method(Logger, 'vmwareapi.driver.restore_vm')
+    def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_security_groups,
+                   restored_compute_flavor, restored_nics, instance_options):    
         """
-        Discovers the datacenters, hosts, virtual machines, datastores and networks of a vCenter
+        Restores the specified instance from a snapshot
         """
+        if not instance_options:
+            instance_options = {}
+            instance_options['datacenter'] = {'moid': 'datacenter-2', 'name' : 'Seattle' }
+            instance_options['computeresource'] = {'moid': 'domain-c17', 'name' : 'td-sea-clu01' }
+            instance_options['resourcepool'] = {'moid': 'resgroup-18', 'name' : 'Resources' }
+            instance_options['datastore'] = {'moid': 'datastore-10', 'name' : 'datastore1' }
+            instance_options['vmfolder'] = {'moid': 'group-v403', 'name' : 'testFolder' }
+        
+        restore_obj = db.restore_get(cntx, restore['id'])
+        snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
+        instance['uuid']= instance_name = instance['vm_id']
+        instance['name']= instance_uuid = instance['vm_name']
+    
+        msg = 'Creating VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id  
+        db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
+        
+        client_factory = self._session._get_vim().client.factory
+        service_content = self._session._get_vim().get_service_content()
+        cookies = self._session._get_vim().client.options.transport.cookiejar
+        ds = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastore']['moid'])
+        datastore_ref = ds[0]
+        datastore_name = ds[1]
+        dc_info = self._get_datacenter_ref_and_name(datastore_ref)
+        datacenter_ref = dc_info[0]
+        datacenter_name = dc_info[1]
+        
+        vm_folder_name = restore['id'] + '-' + instance['vm_name']
+        vm_folder_path = vm_util.build_datastore_path(datastore_name, vm_folder_name)
+        self._mkdir(vm_folder_path, datacenter_ref)
+    
+        vault_service = vault.get_vault_service(cntx)
+        snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
+    
+        """Restore vmx file"""
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type == 'vmx':
+                vmx_name = "%s/%s" % (vm_folder_name, os.path.basename(snapshot_vm_resource.resource_name))
+                vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
+                                        self._session._host_ip,
+                                        datacenter_name,
+                                        datastore_name,
+                                        cookies,
+                                        vmx_name,
+                                        snapshot_vm_resource.size)
+                vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
+                vmdk_write_file_handle.write(vmx_file_data)
+                vmdk_write_file_handle.close()    
+                
+        """Register VM on ESX host."""
+        LOG.debug(_("Registering VM on the ESX host"))
+        # Create the VM on the ESX host
+        if 'vmfolder' in instance_options:
+            if 'moid' in instance_options['vmfolder']:
+                vm_folder_ref = self._get_vmfolder_ref(datacenter_ref, instance_options['vmfolder']['moid'])
+        if not vm_folder_ref:
+            vm_folder_ref = self._get_vmfolder_ref(datacenter_ref)    
+        
+        resourcepool_ref = self._get_res_pool_ref(instance_options['resourcepool']['moid'])
+        vmx_path = vm_util.build_datastore_path(datastore_name, vmx_name)
+        vm_register_task = self._session._call_method(
+                                self._session._get_vim(),
+                                "RegisterVM_Task", 
+                                vm_folder_ref,
+                                path=vmx_path,
+                                name=instance['vm_name'],
+                                asTemplate=False,
+                                pool=resourcepool_ref,
+                                #host=computeresource_ref,
+                                )
+        self._session._wait_for_task(instance['uuid'], vm_register_task)
+
+        LOG.debug(_("Registered VM on the ESX host"))
+        
+        vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance['vm_name'])
+        hardware_devices = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
+                                                      "VirtualMachine", "config.hardware.device")
+        if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
+            hardware_devices = hardware_devices.VirtualDevice
+        
+        for device in hardware_devices:
+            if device.__class__.__name__ == "VirtualDisk":
+                self._detach_disk_from_vm(vm_ref, instance, device, destroy_disk=False)
+        
+              
+        for device in hardware_devices:
+            if hasattr(device, 'backing') and \
+               device.backing and \
+               device.backing.__class__.__name__ == "VirtualEthernetCardNetworkBackingInfo":
+                for network in instance_options['networks']:
+                    if device.backing.deviceName == network['network_name']:
+                        device.backing.deviceName = network['new_network_name']
+                        device.backing.network = self._get_network_ref(network['new_network_moid'], datacenter_ref) 
+                        virtual_device_config_spec = client_factory.create('ns0:VirtualDeviceConfigSpec')
+                        virtual_device_config_spec.device = device
+                        virtual_device_config_spec.operation = "edit"
+                        vm_config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
+                        vm_config_spec.deviceChange = [virtual_device_config_spec]
+                        LOG.debug(_("Reconfiguring VM instance %(instance_name)s for nic %(nic_label)s"),{'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
+                        reconfig_task = self._session._call_method( self._session._get_vim(),
+                                                                    "ReconfigVM_Task", vm_ref,
+                                                                    spec=vm_config_spec)
+                        self._session._wait_for_task(instance_uuid, reconfig_task)
+                        LOG.debug(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
+                                    {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
+                        
+        #restore, rebase, commit & upload
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type != 'disk':
+                continue
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
+            try:
+                shutil.rmtree( temp_directory )
+            except OSError as exc:
+                pass
+            fileutils.ensure_tree(temp_directory)
+            
+            commit_queue = Queue() # queue to hold the files to be committed                 
+            vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
+            disk_filename_extention = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
+            restored_file_path =temp_directory + '/' + vm_disk_resource_snap.id + \
+                                '_' + snapshot_vm_resource.resource_name + '.' \
+                                + disk_filename_extention
+            restored_file_path = restored_file_path.replace(" ", "")
+            vault_metadata = {'vault_service_url' : vm_disk_resource_snap.vault_service_url,
+                              'vault_service_metadata' : vm_disk_resource_snap.vault_service_metadata,
+                              'vm_disk_resource_snap_id' : vm_disk_resource_snap.id,
+                              'disk_format' : db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format'),                              
+                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                              'resource_name':  snapshot_vm_resource.resource_name,
+                              'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                              'snapshot_id': snapshot_vm_resource.snapshot_id,
+                              'restore_id': restore_obj.id}
+            LOG.debug('Restoring ' + vm_disk_resource_snap.vault_service_url)
+            vault_service.restore(vault_metadata, restored_file_path)
+            LOG.debug('Restored ' + vm_disk_resource_snap.vault_service_url)
+
+            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
+                if vm_disk_resource_snap.vm_disk_resource_snap_backing_id is None:
+                    self._rebase_vmdk(restored_file_path,
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'),
+                                     None,
+                                     None,
+                                     None)
+                    commit_queue.put(restored_file_path)  
+                                 
+            while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                restored_file_path_backing =temp_directory + '/' + vm_disk_resource_snap_backing.id + \
+                                            '_' + snapshot_vm_resource_backing.resource_name + '.' \
+                                            + disk_filename_extention
+                restored_file_path_backing = restored_file_path_backing.replace(" ", "")
+                vault_metadata = {'vault_service_url' : vm_disk_resource_snap_backing.vault_service_url,
+                                  'vault_service_metadata' : vm_disk_resource_snap_backing.vault_service_metadata,
+                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_backing.id,
+                                  'disk_format' : db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'disk_format'),
+                                  'snapshot_vm_resource_id': snapshot_vm_resource_backing.id,
+                                  'resource_name':  snapshot_vm_resource_backing.resource_name,
+                                  'snapshot_vm_id': snapshot_vm_resource_backing.vm_id,
+                                  'snapshot_id': snapshot_vm_resource_backing.snapshot_id,
+                                  'restore_id': restore_obj.id}
+                LOG.debug('Restoring ' + vm_disk_resource_snap_backing.vault_service_url)
+                vault_service.restore(vault_metadata, restored_file_path_backing)
+                LOG.debug('Restored ' + vm_disk_resource_snap_backing.vault_service_url)     
+                #rebase
+                if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
+                    image_info = qemuimages.qemu_img_info(restored_file_path)
+                    image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
+                    #covert the raw image to qcow2
+                    if image_backing_info.file_format == 'raw':
+                        converted = os.path.join(os.path.dirname(restored_file_path_backing), str(uuid.uuid4()))
+                        LOG.debug('Converting ' + restored_file_path_backing + ' to QCOW2')  
+                        qemuimages.convert_image(restored_file_path_backing, converted, 'qcow2')
+                        LOG.debug('Finished Converting ' + restored_file_path_backing + ' to QCOW2')
+                        utils.delete_if_exists(restored_file_path_backing)
+                        shutil.move(converted, restored_file_path_backing)
+                        image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
+                    #increase the size of the base image
+                    if image_backing_info.virtual_size < image_info.virtual_size :
+                        qemuimages.resize_image(restored_file_path_backing, image_info.virtual_size)  
+                    #rebase the image                            
+                    qemuimages.rebase_qcow2(restored_file_path_backing, restored_file_path)
+                elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
+                    self._rebase_vmdk(restored_file_path_backing,
+                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_data_file_name'),
+                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_descriptor'),
+                                     restored_file_path,
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'))               
+                commit_queue.put(restored_file_path)                                 
+                vm_disk_resource_snap = vm_disk_resource_snap_backing
+                restored_file_path = restored_file_path_backing
+
+            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
+                while commit_queue.empty() is not True:
+                    file_to_commit = commit_queue.get_nowait()
+                    try:
+                        LOG.debug('Commiting QCOW2 ' + file_to_commit)
+                        qemuimages.commit_qcow2(file_to_commit)
+                    except Exception, ex:
+                        LOG.exception(ex)                       
+                    if restored_file_path != file_to_commit:
+                        utils.delete_if_exists(file_to_commit)
+            elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
+                    file_to_commit = commit_queue.get_nowait()
+                    commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
+                    commit_to = commit_to.replace(" ", "")
+                    LOG.debug('Commiting VMDK ' + file_to_commit)
+                    restored_file_path = self._commit_vmdk(file_to_commit, commit_to, test=False)
+           
+            #create vmdk
+            file_size = int(os.path.getsize(restored_file_path))
+            vmdk_name = "%s/%s.vmdk" % (vm_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
+            vmdk_path = vm_util.build_datastore_path(instance_options['datastore']['name'], vmdk_name)
+            flat_vmdk_name = "%s/%s-flat.vmdk" % (vm_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
+            flat_vmdk_path = vm_util.build_datastore_path(instance_options['datastore']['name'], flat_vmdk_name)
+            
+            vmdk_create_spec = vm_util.get_vmdk_create_spec(client_factory,
+                                                            file_size/1024,  #vmdk_file_size_in_kb, 
+                                                            'lsiLogic',      #adapter_type,
+                                                            'preallocated'   #disk_type
+                                                            )
+            vmdk_create_task = self._session._call_method(self._session._get_vim(),
+                                                          "CreateVirtualDisk_Task",
+                                                          service_content.virtualDiskManager,
+                                                          name=vmdk_path,
+                                                          datacenter=datacenter_ref,
+                                                          spec=vmdk_create_spec)
+            self._session._wait_for_task(instance['uuid'], vmdk_create_task)
+            self._delete_datastore_file(instance, flat_vmdk_path, datacenter_ref)
+                    
+            LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
+            db.restore_update(cntx,  restore['id'], 
+                              {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
+                               'status': 'uploading' 
+                              })                  
+            
+            vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
+                                        self._session._host_ip,
+                                        datacenter_name,
+                                        datastore_name,
+                                        cookies,
+                                        flat_vmdk_name,
+                                        file_size)
+
+            for chunk in utils.ChunkedFile(restored_file_path, {'function': WorkloadMgrDB().db.restore_update,
+                                                                'context': cntx,
+                                                                'id':restore['id']}):
+                vmdk_write_file_handle.write(chunk)
+            vmdk_write_file_handle.close()
+
+            adapter_type = db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type')
+            capacityInKB = db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB')
+            vmdk_controler_key = db.get_metadata_value(snapshot_vm_resource.metadata,'vmdk_controler_key')
+            unit_number = db.get_metadata_value(snapshot_vm_resource.metadata,'unit_number')
+            disk_type = db.get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
+            device_name = db.get_metadata_value(snapshot_vm_resource.metadata,'label')
+            linked_clone = False
+
+            self._volumeops.attach_disk_to_vm( vm_ref, instance,
+                                               adapter_type, disk_type, vmdk_path,
+                                               capacityInKB, linked_clone,
+                                               vmdk_controler_key, unit_number, device_name)
+            
+            
+            restore_obj = db.restore_get(cntx, restore['id'])
+            progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
+                'message_color': autolog.BROWN,
+                'message': "Restore Progress: ",
+                'progress_percent': str(restore_obj.progress_percent),
+                'normal_color': autolog.NORMAL,
+                }) 
+            LOG.debug( progress)    
+                    
+
+        restored_instance_id = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
+                                                          "VirtualMachine", "config.uuid")
+        restored_instance_name =  instance['vm_name']                                                
+        restored_vm_values = {'vm_id': restored_instance_id,
+                              'vm_name':  restored_instance_name,    
+                              'restore_id': restore_obj.id,
+                              'status': 'available'}
+        restored_vm = db.restored_vm_create(cntx,restored_vm_values)
+        
+        self.power_on(vm_ref, instance)
+        
+        
+        
+        LOG.debug(_("Restore Completed"))
+         
+        #TODO(giri): Execuete the following in a finally block
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type != 'disk':
+                continue
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
+            try:
+                shutil.rmtree(temp_directory)
+            except OSError as exc:
+                pass 
+
+         
+        db.restore_update(cntx,restore_obj.id, 
+                          {'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
+                           'status': 'executing'
+                          })        
+        db.restore_update( cntx, restore_obj.id, {'progress_msg': 'Created VM:' + restored_vm['vm_id'], 'status': 'executing'})
+        return restored_vm          
 
 class VMwareAPISession(object):
     """

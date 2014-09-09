@@ -37,9 +37,10 @@ class ViewBuilder(common.ViewBuilder):
         if 'instances' in snapshot:
             instances = []
             for vm in snapshot['instances']:
-                instance = {'id':vm['vm_id'],
-                            'name':vm['vm_name'],
+                instance = {'id':vm['id'],
+                            'name':vm['name'],
                             'status':vm['status'],
+                            'metadata':vm['metadata'],
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']
@@ -67,9 +68,10 @@ class ViewBuilder(common.ViewBuilder):
         if 'instances' in snapshot:
             instances = []
             for vm in snapshot['instances']:
-                instance = {'id':vm['vm_id'],
-                            'name':vm['vm_name'],
+                instance = {'id':vm['id'],
+                            'name':vm['name'],
                             'status':vm['status'],
+                            'metadata':vm['metadata'],
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']

@@ -114,6 +114,20 @@ def upgrade(migrate_engine):
         Column('workload_id', String(length=255), ForeignKey('workloads.id')),
         mysql_engine='InnoDB'
     )
+    
+    workload_vm_metadata = Table(
+        'workload_vm_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('workload_vm_id', String(length=255), ForeignKey('workload_vms.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('workload_vm_id', 'key'),
+        mysql_engine='InnoDB'
+    )        
 
     scheduled_jobs = Table(
         'scheduled_jobs', meta,
@@ -171,6 +185,20 @@ def upgrade(migrate_engine):
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
+    
+    snapshot_vm_metadata = Table(
+        'snapshot_vm_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('snapshot_vm_id', String(length=255), ForeignKey('snapshot_vms.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('snapshot_vm_id', 'key'),
+        mysql_engine='InnoDB'
+    )            
     
     vm_recent_snapshot  = Table(
         'vm_recent_snapshot', meta,
@@ -375,9 +403,11 @@ def upgrade(migrate_engine):
               workloads,
               workload_metadata,
               workload_vms,
+              workload_vm_metadata,
               scheduled_jobs,
               snapshots,
               snapshot_vms,
+              snapshot_vm_metadata,
               vm_recent_snapshot,
               snapshot_vm_resources,
               snapshot_vm_resource_metadata,
@@ -407,9 +437,11 @@ def upgrade(migrate_engine):
                   "workloads",
                   "workload_metadata",
                   "workload_vms",
+                  "workload_vm_metadata",
                   "scheduled_jobs",
                   "snapshots",
                   "snapshot_vms",
+                  "snapshot_vm_metadata",
                   "vm_recent_snapshot",
                   "snapshot_vm_resources",
                   "snapshot_vm_resource_metadata",

@@ -183,17 +183,21 @@ class API(base.Base):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
         
-        workload_vm_ids = []
-        for workload_vm in self.db.workload_vms_get(context, workload.id):
-            workload_vm_ids.append(workload_vm.vm_id)  
-        workload_dict['vm_ids'] = workload_vm_ids
+        workload_vms = []
+        for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
+            workload_vm = {'id': workload_vm_obj.vm_id, 'name':workload_vm_obj.vm_name}
+            metadata = {}
+            for kvpair in workload_vm_obj.metadata:
+                metadata.setdefault(kvpair['key'], kvpair['value'])
+            workload_vm['metadata'] = metadata
+            workload_vms.append(workload_vm)              
+        workload_dict['instances'] = workload_vms
         
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
         workload_dict['metadata'] = metadata        
         
-                
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False
 
@@ -210,11 +214,17 @@ class API(base.Base):
     def workload_show(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
-        
-        workload_vm_ids = []
-        for workload_vm in self.db.workload_vms_get(context, workload.id):
-            workload_vm_ids.append(workload_vm.vm_id)  
-        workload_dict['vm_ids'] = workload_vm_ids
+
+        workload_vms = []
+        for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
+            workload_vm = {'id': workload_vm_obj.vm_id, 'name':workload_vm_obj.vm_name}
+            metadata = {}
+            for kvpair in workload_vm_obj.metadata:
+                metadata.setdefault(kvpair['key'], kvpair['value'])
+            workload_vm['metadata'] = metadata
+            workload_vms.append(workload_vm)              
+        workload_dict['instances'] = workload_vms
+
         
         metadata = {}
         for kvpair in workload.metadata:
@@ -257,7 +267,15 @@ class API(base.Base):
         for instance in instances:
             for instance_with_name in instances_with_name:
                 if instance['instance-id'] == instance_with_name.id:
-                    instance['instance-name'] = instance_with_name.name 
+                    instance['instance-name'] = instance_with_name.name
+                    if instance_with_name.metadata:
+                        instance['metadata'] = instance_with_name.metadata
+                        if 'imported_from_vcenter' in instance_with_name.metadata and \
+                            instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
+                            source_platform = "vmware"
+                        
+                        
+                        
         
         workload_type_id_valid = False
         workload_types = self.workload_type_get_all(context)            
@@ -284,7 +302,8 @@ class API(base.Base):
         for instance in instances:
             values = {'workload_id': workload.id,
                       'vm_id': instance['instance-id'],
-                      'vm_name': instance['instance-name']}
+                      'vm_name': instance['instance-name'],
+                      'metadata': instance['metadata']}
             vm = self.db.workload_vms_create(context, values)
 
         self.workloads_rpcapi.workload_create(context,
@@ -504,14 +523,20 @@ class API(base.Base):
     def snapshot_get(self, context, snapshot_id):
         rv = self.db.snapshot_get(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
-        instances = []
+        snapshot_vms = []
         try:
-            vms = self.db.snapshot_vms_get(context, snapshot_id)
-            for vm in vms:
-                instances.append(dict(vm.iteritems()))
+            for snapshot_vm_obj in self.db.snapshot_vms_get(context, snapshot_id):
+                snapshot_vm = {'id': snapshot_vm_obj.vm_id, 
+                               'name':snapshot_vm_obj.vm_name,
+                               'status':snapshot_vm_obj.status,}
+                metadata = {}
+                for kvpair in snapshot_vm_obj.metadata:
+                    metadata.setdefault(kvpair['key'], kvpair['value'])
+                snapshot_vm['metadata'] = metadata
+                snapshot_vms.append(snapshot_vm)              
         except Exception as ex:
             pass
-        snapshot_details.setdefault('instances', instances)    
+        snapshot_details.setdefault('instances', snapshot_vms)    
         return snapshot_details
 
     def snapshot_show(self, context, snapshot_id):
@@ -528,22 +553,27 @@ class API(base.Base):
                          
         rv = self.db.snapshot_show(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
-        instances = []
+        snapshot_vms = []
         try:
-            vms = self.db.snapshot_vms_get(context, snapshot_id)
-            for vm in vms:
-                instance = dict(vm.iteritems())
-                instance['nics'] = []
-                snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, vm.vm_id, snapshot_id)
+            for snapshot_vm_obj in self.db.snapshot_vms_get(context, snapshot_id):
+                snapshot_vm = {'id': snapshot_vm_obj.vm_id, 
+                               'name':snapshot_vm_obj.vm_name,
+                               'status':snapshot_vm_obj.status,}
+                metadata = {}
+                for kvpair in snapshot_vm_obj.metadata:
+                    metadata.setdefault(kvpair['key'], kvpair['value'])
+                snapshot_vm['metadata'] = metadata
+                snapshot_vm['nics'] = []
+                snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm_obj.vm_id, snapshot_id)
                 snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot_id, snapshot_id)                
                 for snapshot_vm_resource in snapshot_vm_resources:                
                     """ flavor """
                     if snapshot_vm_resource.resource_type == 'flavor': 
                         vm_flavor = snapshot_vm_resource
-                        instance['flavor'] = {'vcpus' : self.db.get_metadata_value(vm_flavor.metadata, 'vcpus'),
-                                              'ram' : self.db.get_metadata_value(vm_flavor.metadata, 'ram'),
-                                              'disk': self.db.get_metadata_value(vm_flavor.metadata, 'disk'),
-                                              'ephemeral': self.db.get_metadata_value(vm_flavor.metadata, 'ephemeral')
+                        snapshot_vm['flavor'] = {'vcpus' : self.db.get_metadata_value(vm_flavor.metadata, 'vcpus'),
+                                                 'ram' : self.db.get_metadata_value(vm_flavor.metadata, 'ram'),
+                                                 'disk': self.db.get_metadata_value(vm_flavor.metadata, 'disk'),
+                                                 'ephemeral': self.db.get_metadata_value(vm_flavor.metadata, 'ephemeral')
                                               }
                     """ nics """
                     if snapshot_vm_resource.resource_type == 'nic':
@@ -564,11 +594,12 @@ class API(base.Base):
                                                      'ip_version':subnet.get('ip_version', None),
                                                      'gateway_ip':subnet.get('gateway_ip', None),
                                                      }
-                        instance['nics'].append(nic)
-                instances.append(instance)
+                        snapshot_vm['nics'].append(nic)
+                snapshot_vms.append(snapshot_vm)              
+
         except Exception as ex:
             pass
-        snapshot_details['instances'] = instances    
+        snapshot_details['instances'] = snapshot_vms    
         return snapshot_details
     
     def snapshot_get_all(self, context, workload_id=None):
@@ -577,8 +608,6 @@ class API(base.Base):
                                                     context,
                                                     context.project_id,
                                                     workload_id)
-        elif context.is_admin:
-            snapshots = self.db.snapshot_get_all(context)
         else:
             snapshots = self.db.snapshot_get_all_by_project(
                                         context,context.project_id)

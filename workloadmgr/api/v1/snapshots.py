@@ -165,7 +165,6 @@ class SnapshotsController(wsgi.Controller):
                 options = body['restore'].get('options', {})
                 #options = body['recoveryoptions'].get('options', {})
             
-                                              
             restore = self.workload_api.snapshot_restore(context, 
                                                          snapshot_id=id, 
                                                          test=test,

@@ -289,7 +289,10 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
 @autolog.log_method(Logger, 'vmtasks_openstack.pause_vm')
 def pause_vm(cntx, db, instance):
     compute_service = nova.API(production=True)
-    if instance['hypervisor_type'] == 'VMware vCenter Server':
+    if 'imported_from_vcenter' in instance['vm_metadata'] and \
+       instance['vm_metadata']['imported_from_vcenter'] == "True":
+        suspend_vm(cntx, db, instance)
+    elif instance['hypervisor_type'] == 'VMware vCenter Server':
         suspend_vm(cntx, db, instance)
     else:
         compute_service.pause(cntx, instance['vm_id'])
@@ -302,7 +305,10 @@ def pause_vm(cntx, db, instance):
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
 def unpause_vm(cntx, db, instance):
     compute_service = nova.API(production=True)
-    if instance['hypervisor_type'] == 'VMware vCenter Server':
+    if 'imported_from_vcenter' in instance['vm_metadata'] and \
+       instance['vm_metadata']['imported_from_vcenter'] == "True":
+        suspend_vm(cntx, db, instance)
+    elif instance['hypervisor_type'] == 'VMware vCenter Server':
         resume_vm(cntx, db, instance)
     else:
         compute_service.unpause(cntx, instance['vm_id'])

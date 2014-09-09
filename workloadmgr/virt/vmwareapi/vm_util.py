@@ -34,7 +34,6 @@ def split_datastore_path(datastore_path):
         datastore_url, path = spl
     return datastore_url, path.strip()
 
-
 def get_vm_create_spec(client_factory, instance, data_store_name,
                        vif_infos, os_type="otherGuest"):
     """Builds the VM Create spec."""
@@ -240,13 +239,15 @@ def get_cdrom_attach_config_spec(client_factory,
     return config_spec
 
 
-def get_vmdk_detach_config_spec(client_factory, device):
+def get_vmdk_detach_config_spec(client_factory, device,
+                                destroy_disk=False):
     """Builds the vmdk detach config spec."""
     config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
 
     device_config_spec = []
-    virtual_device_config_spec = delete_virtual_disk_spec(client_factory,
-                                                          device)
+    virtual_device_config_spec = detach_virtual_disk_spec(client_factory,
+                                                          device,
+                                                          destroy_disk)
 
     device_config_spec.append(virtual_device_config_spec)
 
@@ -331,6 +332,7 @@ def get_disks(hardware_devices):
             disk['capacityInKB'] = device.capacityInKB
             backings = [] # using list as a stack for the disk backings            
             if device.backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo":
+                disk['datastore_ref'] = device.backing.datastore
                 disk['vmdk_file_path'] = device.backing.fileName
                 disk['datastore_name'] = split_datastore_path(device.backing.fileName)[0]
                 disk['vmdk_controler_key'] = device.controllerKey
@@ -350,6 +352,7 @@ def get_disks(hardware_devices):
                 while (parent != None):
                     if parent.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo":
                         backing = {}
+                        backing['datastore_ref'] = parent.datastore
                         backing['vmdk_file_path'] = parent.fileName
                         backing['datastore_name'] = split_datastore_path(parent.fileName)[0]
                         backings.append(backing)
@@ -505,14 +508,15 @@ def create_virtual_disk_spec(client_factory, controller_key,
     return virtual_device_config
 
 
-def delete_virtual_disk_spec(client_factory, device):
+def detach_virtual_disk_spec(client_factory, device, destroy_disk=False):
     """
-    Builds spec for the deletion of an already existing Virtual Disk from VM.
+    Builds spec for the detach of an already existing Virtual Disk from VM.
     """
     virtual_device_config = client_factory.create(
                             'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "remove"
-    virtual_device_config.fileOperation = "destroy"
+    if destroy_disk:
+        virtual_device_config.fileOperation = "destroy"
     virtual_device_config.device = device
 
     return virtual_device_config
@@ -693,10 +697,41 @@ def get_vm_ref_from_uuid(session, instance_uuid):
     return _get_object_from_results(session, vms, instance_uuid,
                                     _get_object_for_value)
 
+def get_vm_ref_from_vmware_uuid(session, vmware_uuid):
+    """Get reference to the VM with the vmware_uuid specified."""
+    vm_ref = None
+    vms = session._call_method(vim_util, "get_objects",
+                "VirtualMachine", ["name", "config"])
+    while vms:
+        token = _get_token(vms)
+        for obj_content in vms.objects:
+            # the propset attribute "need not be set" by returning API
+            if not hasattr(obj_content, 'propSet'):
+                continue
+            propdict = propset_dict(obj_content.propSet)
+            vm_name = propdict['name']
+            vm_config = propdict['config']
+            if vm_config.instanceUuid == vmware_uuid:
+                vm_ref = obj_content.obj
+                break
+            
+        if vm_ref:
+            if token:
+                session._call_method(vim_util,
+                                     "cancel_retrieve",
+                                     token)
+            return vm_ref
+        if token:
+            vms = session._call_method(vim_util, "continue_to_get_objects", token)
+        else:
+            raise exception.VMNotFound()    
+    return vm_ref
 
 def get_vm_ref(session, instance):
     """Get reference to the VM through uuid or vm name."""
-    vm_ref = get_vm_ref_from_uuid(session, instance['uuid'])
+    vm_ref = get_vm_ref_from_vmware_uuid(session, instance['vmware_uuid'])
+    if not vm_ref:
+        vm_ref = get_vm_ref_from_uuid(session, instance['uuid'])
     if not vm_ref:
         vm_ref = get_vm_ref_from_name(session, instance['vm_name'])
     if vm_ref is None:
@@ -901,7 +936,7 @@ def propset_dict(propset):
     return dict([(prop.name, prop.val) for prop in propset])
 
 
-def _get_datastore_ref_and_name(data_stores, datastore_regex=None):
+def _get_datastore_ref_and_name(data_stores, datastore_regex=None, datastore_moid=None):
     # selects the datastore with the most freespace
     """Find a usable datastore in a given RetrieveResult object.
 
@@ -930,7 +965,8 @@ def _get_datastore_ref_and_name(data_stores, datastore_regex=None):
         ds_name = propdict['summary.name']
         if ((ds_type == 'VMFS' or ds_type == 'NFS') and
                 propdict['summary.accessible']):
-            if datastore_regex is None or datastore_regex.match(ds_name):
+            if (datastore_moid and datastore_moid == obj_content.obj.value ) or \
+               (datastore_moid is None and (datastore_regex is None or datastore_regex.match(ds_name))):
                 new_ds = DSRecord(
                     datastore=obj_content.obj,
                     name=ds_name,
@@ -949,7 +985,7 @@ def _get_datastore_ref_and_name(data_stores, datastore_regex=None):
 
 
 def get_datastore_ref_and_name(session, cluster=None, host=None,
-                               datastore_regex=None):
+                               datastore_regex=None, datastore_moid=None):
     """Get the datastore list and choose the first local storage."""
     if cluster is None and host is None:
         data_stores = session._call_method(vim_util, "get_objects",
@@ -979,7 +1015,7 @@ def get_datastore_ref_and_name(session, cluster=None, host=None,
                                  "summary.accessible"])
     while data_stores:
         token = _get_token(data_stores)
-        results = _get_datastore_ref_and_name(data_stores, datastore_regex)
+        results = _get_datastore_ref_and_name(data_stores, datastore_regex, datastore_moid)
         if results:
             if token:
                 session._call_method(vim_util,

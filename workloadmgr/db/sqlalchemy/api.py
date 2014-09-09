@@ -622,40 +622,148 @@ def workload_delete(context, id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
-######################################################################################################
+#### WorkloadVMs ################################################################
+""" workload_vms functions """
+def _set_metadata_for_workload_vms(context, workload_vm_ref, metadata,
+                                    purge_metadata, session):
+    """
+    Create or update a set of workload_vms_metadata for a given workload_vm
+
+    :param context: Request context
+    :param workload_vm_ref: An workload_vm object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in workload_vm_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'workload_vm_id': workload_vm_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _workload_vms_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _workload_vms_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _workload_vms_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def _workload_vms_metadata_create(context, values, session):
+    """Create an WorkloadMetadata object"""
+    metadata_ref = models.WorkloadVMMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _workload_vms_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def workload_vms_metadata_create(context, values, session):
+    """Create an WorkloadMetadata object"""
+    session = get_session()
+    return _workload_vms_metadata_create(context, values, session)
+
+@require_context
+def _workload_vms_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by workload_vms_metadata_create and workload_vms_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _workload_vms_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by workload_vms_metadata_create and workload_vms_metadata_update
+    """
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+def _workload_vms_update(context, values, id, purge_metadata, session):
+    
+    metadata = values.pop('metadata', {})
+    
+    if id:
+        workload_vm_ref = _workload_vm_get(context, id, session)
+    else:
+        workload_vm_ref = models.WorkloadVMs()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())        
+    
+    workload_vm_ref.update(values)
+    workload_vm_ref.save(session)
+    
+    if metadata:
+        _set_metadata_for_workload_vms(context, workload_vm_ref, metadata, purge_metadata, session=session)  
+      
+    return workload_vm_ref
+
+
 @require_context
 def workload_vms_create(context, values):
-    workload_vm = models.WorkloadVMs()
-    if not values.get('id'):
-        values['id'] = str(uuid.uuid4())
-    workload_vm.update(values)
-    workload_vm.save()
-    return workload_vm
+    session = get_session()
+    return _workload_vms_update(context, values, None, False, session)
+
+@require_context
+def workload_vms_update(context, id, values, purge_metadata=False):
+    session = get_session()
+    return _workload_vms_update(context, values, id, purge_metadata, session)
 
 @require_context
 def workload_vms_get(context, workload_id):
     session = get_session()
-    result = model_query(context, models.WorkloadVMs,
-                         session=session).\
-                         filter_by(workload_id=workload_id).\
-                         all()
+    try:
+        query = session.query(models.WorkloadVMs)\
+                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                       .filter_by(workload_id=workload_id)\
 
-    if not result:
-        return []
+        #TODO(gbasava): filter out deleted workload_vms if context disallows it
+        workload_vms = query.all()
 
-    return result
+    except sa_orm.exc.NoResultFound:
+        raise exception.WorkloadVMsNotFound()
+    
+    return workload_vms
+
+    
+@require_context
+def _workload_vm_get(context, id, session):
+    try:
+        query = session.query(models.WorkloadVMs)\
+                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                       .filter_by(id=id)\
+
+        #TODO(gbasava): filter out deleted workload_vms if context disallows it
+        workload_vm = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.WorkloadVMsNotFound()
+
+    return workload_vm
 
 @require_context
-def workload_vms_delete(context, vm_id, workload_id):
+def workload_vm_get(context, id):
+    session = get_session() 
+    return _workload_vm_get(context, id, session)   
+    
+@require_context
+def workload_vms_delete(context, id):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadVMs).\
-            filter_by(vm_id=vm_id).\
-            filter_by(workload_id=workload_id).\
+            filter_by(id=id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+######################################################################################################
                     
 @require_context
 def snapshot_get(context, snapshot_id):
@@ -754,17 +862,102 @@ def snapshot_delete(context, snapshot_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
+#### SnapshotVMs ################################################################
+""" snapshot_vms functions """
+def _set_metadata_for_snapshot_vms(context, snapshot_vm_ref, metadata,
+                                    purge_metadata, session):
+    """
+    Create or update a set of snapshot_vms_metadata for a given snapshot_vm
+
+    :param context: Request context
+    :param snapshot_vm_ref: An snapshot_vm object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in snapshot_vm_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'snapshot_vm_id': snapshot_vm_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _snapshot_vms_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _snapshot_vms_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _snapshot_vms_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def _snapshot_vms_metadata_create(context, values, session):
+    """Create an SnapshotMetadata object"""
+    metadata_ref = models.SnapshotVMMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _snapshot_vms_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def snapshot_vms_metadata_create(context, values, session):
+    """Create an SnapshotMetadata object"""
+    session = get_session()
+    return _snapshot_vms_metadata_create(context, values, session)
+
+@require_context
+def _snapshot_vms_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by snapshot_vms_metadata_create and snapshot_vms_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _snapshot_vms_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by snapshot_vms_metadata_create and snapshot_vms_metadata_update
+    """
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, session):
+    
+    metadata = values.pop('metadata', {})
+    
+    if vm_id:
+        snapshot_vm_ref = _snapshot_vm_get(context, vm_id, snapshot_id, session)
+    else:
+        snapshot_vm_ref = models.SnapshotVMs()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())
+        if not values.get('size'):
+            values['size'] = 0
+
+    
+    snapshot_vm_ref.update(values)
+    snapshot_vm_ref.save(session)
+    
+    if metadata:
+        _set_metadata_for_snapshot_vms(context, snapshot_vm_ref, metadata, purge_metadata, session=session)  
+      
+    return snapshot_vm_ref
+
+
 @require_context
 def snapshot_vm_create(context, values):
-    snapshot_vm = models.SnapshotVMs()
-    if not values.get('id'):
-        values['id'] = str(uuid.uuid4())
-    if not values.get('size'):
-        values['size'] = 0
-        
-    snapshot_vm.update(values)
-    snapshot_vm.save()
-    return snapshot_vm
+    session = get_session()
+    return _snapshot_vm_update(context, values, None, None, False, session)
+
+@require_context
+def snapshot_vm_update(context, vm_id, snapshot_id, values, purge_metadata=False):
+    session = get_session()
+    return _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, session)
 
 @require_context
 def snapshot_vms_get(context, snapshot_id):
@@ -776,40 +969,29 @@ def snapshot_vms_get(context, snapshot_id):
     if not result:
         raise exception.VMsOfSnapshotNotFound(snapshot_id=snapshot_id)
 
-    return result
-
+    return result    
+   
 @require_context
-def snapshot_vm_get(context, vm_id, snapshot_id):
-    session = get_session()
+def _snapshot_vm_get(context, vm_id, snapshot_id, session):
     try:
         query = session.query(models.SnapshotVMs)\
+                       .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
                        .filter_by(vm_id=vm_id)\
                        .filter_by(snapshot_id=snapshot_id)
 
-        #TODO(gbasava): filter out deleted snapshot vm if context disallows it
+        #TODO(gbasava): filter out deleted snapshot_vm if context disallows it
         snapshot_vm = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMsOfSnapshotNotFound(snapshot_id = snapshot_id)
-    
-    return snapshot_vm            
+        raise exception.SnapshotVMsNotFound(snapshot_id=snapshot_id)
 
-@require_context
-def snapshot_vm_update(context, vm_id, snapshot_id, values):
-    session = get_session()
-    with session.begin():
-        snapshot_vm = model_query(context, models.SnapshotVMs, session=session, read_deleted="yes")\
-                                    .filter_by(vm_id=vm_id)\
-                                    .filter_by(snapshot_id=snapshot_id).first()
-
-        if not snapshot_vm:
-            raise exception.SnapshotNotFound(
-                _("No snapshot VM with id %(vm_id)s") % locals())
-
-        snapshot_vm.update(values)
-        snapshot_vm.save(session=session)
     return snapshot_vm
 
+@require_context
+def snapshot_vm_get(context, vm_id, snapshot_id):
+    session = get_session() 
+    return _snapshot_vm_get(context, id, session)   
+    
 @require_context
 def snapshot_vm_delete(context, vm_id, snapshot_id):
     session = get_session()
@@ -821,7 +1003,8 @@ def snapshot_vm_delete(context, vm_id, snapshot_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-
+#################################################################################################################
+            
 @require_context
 def vm_recent_snapshot_create(context, values):
     vm_recent_snapshot = models.VMRecentSnapshot()
