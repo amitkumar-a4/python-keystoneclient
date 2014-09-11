@@ -659,7 +659,7 @@ def LinearSnapshotVMs(instances):
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
     for index,item in enumerate(instances):
-        flow.add(UnPauseVM("UnpauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+        flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
     
     return flow
 

@@ -16,6 +16,8 @@ import eventlet
 import mock
 import mox
 from mox import IsA
+from mox import IgnoreArg
+from mox import In
 import StringIO
 
 from oslo.config import cfg
@@ -32,6 +34,7 @@ from workloadmgr.tests import utils as tests_utils
 
 from workloadmgr.workloads.api import API
 from workloadmgr.workflows import cassandraworkflow
+from workloadmgr.workflows import vmtasks_openstack
 
 CONF = cfg.CONF
 
@@ -449,8 +452,24 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         self.mox.StubOutWithMock(client, 'exec_command')
         self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
 
+        self.mox.StubOutWithMock(vmtasks_openstack, 'pre_snapshot_vm')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'snapshot_vm_networks')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'snapshot_vm_flavors')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'snapshot_vm_security_groups')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'pause_vm')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'snapshot_vm')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'unpause_vm')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'get_snapshot_data_size')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'upload_snapshot')
+        self.mox.StubOutWithMock(vmtasks_openstack, 'post_snapshot')
+
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
+        
+        self.store['snapshot'] = tests_utils.create_snapshot(self.context,
+                                      'd296c248-d206-4837-b719-0abed920281d').__dict__
+        self.store['snapshot'].pop('_sa_instance_state')
+        self.store['context']['read_deleted']=self.store['context']['_read_deleted']
   
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
@@ -467,238 +486,79 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         compute_service.get_servers(IsA(amqp.RpcContext), admin=True).AndReturn(tests_utils.build_instances())
         compute_service.get_hypervisors(IsA(amqp.RpcContext)).AndReturn(tests_utils.build_hypervisors())
 
+        # These are presnapshot tasks
+        instances = tests_utils.build_instances()
+        for inst in instances:
+            vmtasks_openstack.pre_snapshot_vm(IsA(amqp.RpcContext), self.db, IgnoreArg(), IgnoreArg())
+
+        # mock snapshot networks, snapshot flavors, snapshot security groups
+        vmtasks_openstack.snapshot_vm_networks(IsA(amqp.RpcContext), self.db, IsA(list), self.store['snapshot'])
+        vmtasks_openstack.snapshot_vm_flavors(IsA(amqp.RpcContext), self.db, IsA(list), self.store['snapshot'])
+        vmtasks_openstack.snapshot_vm_security_groups(IsA(amqp.RpcContext), self.db, IsA(list), self.store['snapshot'])
+
+        # mock nodetool snapshot, part of Snapshot node
+        for inst in instances:
+            cassandraworkflow.connect_server(inst.name,
+                                             int(self.store['SSHPort']),
+                                             self.store['Username'],
+                                             self.store['Password']).\
+                                             InAnyOrder().\
+                                             AndReturn(client)
+            client.exec_command("nodetool snapshot").\
+                InAnyOrder().\
+                AndReturn((sys.stdin, StringIO.StringIO('success'), sys.stderr))
+
+        # mode pausevm task
+        for inst in instances:
+            vmtasks_openstack.pause_vm(IsA(amqp.RpcContext), self.db, IsA(dict))
+
+        # mode snapshotvm
+        for inst in instances:
+            vmtasks_openstack.snapshot_vm(IsA(amqp.RpcContext), self.db, IsA(dict), IgnoreArg())
+
+        # mode unpausevm
+        for inst in instances:
+            vmtasks_openstack.unpause_vm(IsA(amqp.RpcContext), self.db, IsA(dict))
+
+        # mock nodetool clearsnapshot, part of Clearsnapshot node task
+        for inst in instances:
+            cassandraworkflow.connect_server(inst.name,
+                                             int(self.store['SSHPort']),
+                                             self.store['Username'],
+                                             self.store['Password']).\
+                                             InAnyOrder().\
+                                             AndReturn(client)
+            client.exec_command("nodetool clearsnapshot").\
+                InAnyOrder().\
+                AndReturn((sys.stdin, StringIO.StringIO('success'), sys.stderr))
+
+        # mock snapshot_data_size
+        for inst in instances:
+            vmtasks_openstack.get_snapshot_data_size(IsA(amqp.RpcContext),
+                                                     self.db, 
+                                                     IsA(dict),
+                                                     IsA(dict),
+                                                     IgnoreArg()).\
+                                                     InAnyOrder().\
+                                                     AndReturn(1024*1024*1024)
+
+        # mock upload snapshot
+        for inst in instances:
+            vmtasks_openstack.upload_snapshot(IsA(amqp.RpcContext), self.db,
+                                              IsA(dict), IsA(dict),
+                                              IgnoreArg()).\
+                                              InAnyOrder() 
+
+        # mock post snapshot
+        for inst in instances:
+            vmtasks_openstack.post_snapshot(IsA(amqp.RpcContext), self.db, 
+                                              IsA(dict), IsA(dict),
+                                              IgnoreArg()).\
+                                              InAnyOrder() 
+
         self.mox.ReplayAll()
 
         cflow.initflow()
-"""
-{'workflow':
-    {'type': 'linear_flow', 'name': 'taskflow.patterns.linear_flow.Flow: Cassandra; 4',
-     'children': [
-        {'type': 'unordered_flow',
-         'name': 'taskflow.patterns.unordered_flow.Flow: Cassandra#Presnapshot; 1',
-         'children': [
-            {'type': 'unordered_flow',
-             'name': 'taskflow.patterns.unordered_flow.Flow: presnapshotuf; 4',
-             'children': [
-                {'input': [['vm', u'testVM']],
-                 'type': 'Task',
-                 'name': u'PreSnapshot'
-                },
-                {'input': [['vm', u'vmware1']],
-                 'type': 'Task',
-                 'name': u'PreSnapshot'
-                },
-                {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-                 'type': 'Task',
-                 'name': u'PreSnapshot'
-                },
-                {'input': [['vm', u'vm1']],
-                 'type': 'Task',
-                 'name': u'PreSnapshot'
-                }
-              ]
-            }
-         ]
-     },
-     {'type': 'linear_flow',
-      'name': 'taskflow.patterns.linear_flow.Flow: Cassandra#SnapshotMetadata; 3',
-      'children': [
-         {'input': [],
-          'type': 'Task',
-          'name': 'Cassandra#SnapshotVMNetworks'
-         },
-         {'input': [],
-          'type': 'Task',
-          'name': 'Cassandra#SnapshotVMFlavors'
-         },
-         {'input': [],
-          'type': 'Task',
-          'name': 'Cassandra#SnapshotVMSecurityGroups'
-         }
-      ]
-     },
-     {'type': 'linear_flow',
-      'name': 'taskflow.patterns.linear_flow.Flow: cassandrawf; 5',
-      'children': [
-         {'type': 'unordered_flow',
-          'name': 'taskflow.patterns.unordered_flow.Flow: snapshotnodeuf; 4',
-          'children': [
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'SnapshotNode'
-             },
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'SnapshotNode'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'SnapshotNode'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task', 'name': u'SnapshotNode'
-             }
-          ]
-         },
-         {'type': 'unordered_flow',
-          'name': 'taskflow.patterns.unordered_flow.Flow: pausevmsuf; 4',
-          'children': [
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'PauseVM'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'PauseVM'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'PauseVM'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'PauseVM'
-             }
-          ]
-         },
-         {'type': 'unordered_flow',
-          'name': 'taskflow.patterns.unordered_flow.Flow: snapshotvmuf; 4',
-          'children': [
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'SnapshotVM'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'SnapshotVM'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'SnapshotVM'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'SnapshotVM'
-             }
-          ]
-         },
-         {'type': 'unordered_flow',
-          'name': 'taskflow.patterns.unordered_flow.Flow: unpausevmsuf; 4',
-          'children': [
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'UnpauseVM'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'UnpauseVM'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'UnpauseVM'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'UnpauseVM'
-             }
-          ]
-         },
-         {'type': 'unordered_flow',
-          'name': 'taskflow.patterns.unordered_flow.Flow: clearsnapshotuf; 4',
-          'children': [
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'ClearSnapshot'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'ClearSnapshot'
-             },
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'ClearSnapshot'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'ClearSnapshot'
-             }
-           ]
-          }
-      ]
-     },
-     {'type': 'linear_flow',
-      'name': 'taskflow.patterns.linear_flow.Flow: Cassandra#Postsnapshot; 3',
-      'children': [
-         {'type': 'linear_flow',
-          'name': 'taskflow.patterns.linear_flow.Flow: snapshotdatasizelf; 4',
-          'children': [
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'SnapshotDataSize'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'SnapshotDataSize'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'SnapshotDataSize'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'SnapshotDataSize'
-             }
-          ]
-         },
-         {'type': 'linear_flow',
-          'name': 'taskflow.patterns.linear_flow.Flow: uploadsnapshotlf; 4',
-          'children': [
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'UploadSnapshot'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'UploadSnapshot'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'UploadSnapshot'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'UploadSnapshot'
-             }
-          ]
-         },
-         {'type': 'linear_flow',
-          'name': 'taskflow.patterns.linear_flow.Flow: postsnapshotlf; 4',
-          'children': [
-             {'input': [['vm', u'd8848b37-1f6a-4a60-9aa5-d7763f710f2a']],
-              'type': 'Task',
-              'name': u'PostSnapshot'
-             },
-             {'input': [['vm', u'testVM']],
-              'type': 'Task',
-              'name': u'PostSnapshot'
-             },
-             {'input': [['vm', u'vm1']],
-              'type': 'Task',
-              'name': u'PostSnapshot'
-             },
-             {'input': [['vm', u'vmware1']],
-              'type': 'Task',
-              'name': u'PostSnapshot'
-             }
-          ]
-         }
-      ]
-     }
-   ]
-  }
-}
-"""
-        import pdb;pdb.set_trace()
         cflow.execute()
 
     def test_cassandra_snapshot_node_execute(self):

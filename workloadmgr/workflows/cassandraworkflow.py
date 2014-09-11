@@ -206,9 +206,6 @@ class SnapshotNode(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
         self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-        # Make sure profile is disabled, but also save current
-        # profiling state in the flow record? so revert as well
-        # as ResumeDB task sets the right profiling level
         LOG.debug(_('SnapshotNode:'))
         stdin, stdout, stderr = self.client.exec_command("nodetool snapshot")
         out = stdout.read(),
@@ -218,7 +215,6 @@ class SnapshotNode(task.Task):
         return 
 
     def revert(self, *args, **kwargs):
-        # Read profile level from the flow record?
         if not isinstance(kwargs['result'], misc.Failure):
             LOG.debug(_("Reverting SnapshotNode"))
             stdin, stdout, stderr = self.client.exec_command("nodetool clearsnapshot")
@@ -229,9 +225,6 @@ class ClearSnapshot(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
         self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-        # Make sure profile is disabled, but also save current
-        # profiling state in the flow record? so revert as well
-        # as ResumeDB task sets the right profiling level
         LOG.debug(_('ClearSnapshot:'))
         stdin, stdout, stderr = self.client.exec_command("nodetool clearsnapshot")
         out = stdout.read(),
@@ -243,13 +236,13 @@ class ClearSnapshot(task.Task):
 def UnorderedSnapshotNode(instances):
     flow = uf.Flow("snapshotnodeuf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name']))
+        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
 def UnorderedClearSnapshot(instances):
     flow = uf.Flow("clearsnapshotuf")
     for index,item in enumerate(instances):
-        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name']))
+        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
 class CassandraWorkflow(workflow.Workflow):
@@ -267,6 +260,7 @@ class CassandraWorkflow(workflow.Workflow):
                  int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+item['vm_id']] = item
+            self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
         
         snapshotvms = lf.Flow('cassandrawf')
         
