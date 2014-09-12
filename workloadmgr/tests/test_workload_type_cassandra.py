@@ -192,6 +192,8 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
                             self.workload_params['is_public'],
                             self.workload_params['metadata'],)
 
+        workload_type = self.db.workload_type_get(self.context,
+                                                  workload_type['id'])
         workload_type_id = workload_type['id']
         self.assertEqual(workload_type_id,
                          self.db.workload_type_get(self.context,
@@ -201,7 +203,8 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         self.assertEqual(workload_type['display_name'], self.workload_params['display_name'])
         self.assertEqual(workload_type['display_description'], self.workload_params['display_description'])
         self.assertEqual(workload_type['is_public'], self.workload_params['is_public'])
-        self.assertEqual(workload_type['metadata'], self.workload_params['metadata'])
+        for m in workload_type['metadata']:
+            self.assertEqual(self.workload_params['metadata'][m.key], m.value)
 
 
         self.workloadAPI.workload_type_delete(self.context, workload_type_id)

@@ -237,7 +237,7 @@ class ShutdownConfigServer(task.Task):
         # Also make sure the config server command line operations are saved
         return cfgsrvs[0], cmdlineopts
 
-        def revoke(self, *args, **kwargs):
+        def revert(self, *args, **kwargs):
             # Make sure all config servers are resumed
             cfghost = kwargs['result']['cfgsrv'].split(':')[0]
             
@@ -339,18 +339,21 @@ def secondaryhosts_to_backup(cntx, host, port, username, password):
         hosts = hosts.replace('/', '').strip()
         #print 'Getting secondary from hosts in ', hosts
         # Get the replica set for each shard
-        c = MongoClient(hosts,
+        c = pymongo.MongoClient(hosts,
                     read_preference=ReadPreference.SECONDARY)
         status = c.admin.command('replSetGetStatus')
         hosts_list = []
         for m in status['members']:
             if m['stateStr'] == 'SECONDARY':
-                hosts_to_backup.append({'replicaSetName': status['set'], 'secondaryReplica': m['name']})
+                hosts_to_backup.append({'replicaSetName': status['set'],
+                                        'secondaryReplica': m['name']})
                 break
 
     return hosts_to_backup
 
-def get_vms(cntx, dbhost, dbport, mongodbusername, mongodbpassword, sshport, hostusername, hostpassword):
+def get_vms(cntx, dbhost, dbport, mongodbusername,
+            mongodbpassword, sshport,
+            hostusername, hostpassword):
     #
     # Creating connection to mongos server
     #
@@ -462,8 +465,18 @@ class MongoDBWorkflow(workflow.Workflow):
     #
     def initflow(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        self._store['instances'] =  get_vms(cntx, self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'], self._store['HostSSHPort'], self._store['HostUsername'], self._store['HostPassword'])
-        hosts_to_backup = secondaryhosts_to_backup(cntx, self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'])
+        self._store['instances'] =  get_vms(cntx, self._store['DBHost'],
+                                            self._store['DBPort'],
+                                            self._store['DBUser'],
+                                            self._store['DBPassword'],
+                                            self._store['HostSSHPort'],
+                                            self._store['HostUsername'],
+                                            self._store['HostPassword'])
+        hosts_to_backup = secondaryhosts_to_backup(cntx,
+                                                   self._store['DBHost'],
+                                                   self._store['DBPort'],
+                                                   self._store['DBUser'],
+                                                   self._store['DBPassword'])
         for index,item in enumerate(self._store['instances']):
             #self._store['instance_'+str(index)] = item
             self._store['instance_'+item['vm_id']] = item
