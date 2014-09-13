@@ -318,15 +318,27 @@ class VMwareVCDriver(VMwareESXDriver):
                 return obj_ref
         raise exception.VMNotFound()
     
+    def _get_vmfolder_ref_from_parent_folder(self, vmfolder_ref_parent, vmfolder_moid):
+        vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref_parent, "Folder", "childEntity")
+        for vmfolder_ref in vmfolder_refs.ManagedObjectReference:
+            if vmfolder_ref.value == vmfolder_moid:
+                return vmfolder_ref
+            if vmfolder_ref._type == "Folder":
+                result = self._get_vmfolder_ref_from_parent_folder(vmfolder_ref, vmfolder_moid)
+                if result:
+                    return result;
+        return None 
+        
     def _get_vmfolder_ref(self, datacenter_ref, vmfolder_moid = None):
         vmfolder_ref = self._session._call_method(vim_util, "get_dynamic_property", datacenter_ref, "Datacenter", "vmFolder")
         if vmfolder_moid == None or vmfolder_ref.value == vmfolder_moid:
             return vmfolder_ref
-        vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
-        for vmfolder_ref in vmfolder_refs.ManagedObjectReference:
-            if vmfolder_ref.value == vmfolder_moid:
-                return vmfolder_ref
-        raise exception.VMFolderNotFound()                
+        result = self._get_vmfolder_ref_from_parent_folder(vmfolder_ref, vmfolder_moid)
+        if result:
+            return result
+        else:
+            raise exception.VMFolderNotFound()
+                        
     
     def _get_res_pool_ref(self, resourcepool_moid):
         res_pool_ref = None
@@ -879,16 +891,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 elif device.backing.__class__.__name__ == "VirtualEthernetCardDistributedVirtualPortBackingInfo":
                     if 'networks' in instance_options and instance_options['networks']:
                         for network in instance_options['networks']:
-                            """
-                            Remove the below after the instance options include old moid
-                            """
-                            if network['network_name'] == "dvPortGroup":
-                                network['network_moid'] = "dvportgroup-63"
-                            else:
-                                continue
-                            """
-                            Remove the above after the instance options include old moid
-                            """
                             if device.backing.port.portgroupKey == network['network_moid']:
                                 new_network_ref = self._get_network_ref(network['new_network_moid'], datacenter_ref)
                                 break
