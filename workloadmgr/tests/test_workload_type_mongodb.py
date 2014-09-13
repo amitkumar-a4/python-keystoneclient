@@ -54,6 +54,8 @@ mongodb_shards = [{u'host': u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27
 
 shardmap = {u'map': {u'replica4': u'replica4/mongodb4:27024', u'replica3/mongodb1:27023,mongodb2:27023,mongodb3:27023': u'replica3/mongodb1:27023,mongodb2:27023,mongodb3:27023', u'replica1': u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27021', u'replica2': u'replica2/mongodb1:27022,mongodb2:27022,mongodb3:27022', u'replica3': u'replica3/mongodb1:27023,mongodb2:27023,mongodb3:27023', u'mongodb1:27022': u'replica2/mongodb1:27022,mongodb2:27022,mongodb3:27022', u'mongodb1:27023': u'replica3/mongodb1:27023,mongodb2:27023,mongodb3:27023', u'mongodb1:27021': u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27021', u'mongodb2:27021': u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27021', u'replica2/mongodb1:27022,mongodb2:27022,mongodb3:27022': u'replica2/mongodb1:27022,mongodb2:27022,mongodb3:27022', u'mongodb2:27023': u'replica3/mongodb1:27023,mongodb2:27023,mongodb3:27023', u'mongodb2:27022': u'replica2/mongodb1:27022,mongodb2:27022,mongodb3:27022', u'replica4/mongodb4:27024': u'replica4/mongodb4:27024', u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27021': u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27021', u'mongodb4:27024': u'replica4/mongodb4:27024', u'config': u'mongodb1:27019,mongodb2:27019,mongodb3:27019', u'mongodb3:27021': u'replica1/mongodb1:27021,mongodb2:27021,mongodb3:27021', u'mongodb3:27022': u'replica2/mongodb1:27022,mongodb2:27022,mongodb3:27022', u'mongodb3:27023': u'replica3/mongodb1:27023,mongodb2:27023,mongodb3:27023'}, u'ok': 1.0}
 
+cfgcmdlineopts = {u'ok': 1.0, u'parsed': {u'sharding': {u'configDB': u'mongodb1:27019,mongodb2:27019,mongodb3:27019'}, u'processManagement': {u'fork': True}, u'systemLog': {u'path': u'/dev/null', u'destination': u'file'}}, u'argv': [u'mongos', u'--fork', u'--logpath', u'/dev/null', u'--configdb', u'mongodb1:27019,mongodb2:27019,mongodb3:27019']}
+
 repl1Status = {u'date': datetime.datetime(2014, 9, 12, 2, 36, 23), u'myState': 1, u'set': u'replica1', u'ok': 1.0, u'members': [{u'uptime': 2667, u'optime': Timestamp(1399319851, 1), u'name': u'mongodb1:27021', u'self': True, u'optimeDate': datetime.datetime(2014, 5, 5, 19, 57, 31), u'electionTime': Timestamp(1410487024, 1), u'state': 1, u'health': 1.0, u'stateStr': u'PRIMARY', u'_id': 0, u'electionDate': datetime.datetime(2014, 9, 12, 1, 57, 4)}, {u'uptime': 2375, u'optime': Timestamp(1399319851, 1), u'name': u'mongodb2:27021', u'pingMs': 0, u'optimeDate': datetime.datetime(2014, 5, 5, 19, 57, 31), u'syncingTo': u'mongodb1:27021', u'state': 2, u'health': 1.0, u'stateStr': u'SECONDARY', u'lastHeartbeatRecv': datetime.datetime(2014, 9, 12, 2, 36, 21), u'_id': 1, u'lastHeartbeat': datetime.datetime(2014, 9, 12, 2, 36, 22)}, {u'uptime': 2198, u'optime': Timestamp(1399319851, 1), u'name': u'mongodb3:27021', u'pingMs': 0, u'optimeDate': datetime.datetime(2014, 5, 5, 19, 57, 31), u'syncingTo': u'mongodb1:27021', u'state': 2, u'health': 1.0, u'stateStr': u'SECONDARY', u'lastHeartbeatRecv': datetime.datetime(2014, 9, 12, 2, 36, 22), u'_id': 2, u'lastHeartbeat': datetime.datetime(2014, 9, 12, 2, 36, 22)}]}
 
 repl2Status = {u'date': datetime.datetime(2014, 9, 12, 2, 37, 46), u'myState': 1, u'set': u'replica2', u'ok': 1.0, u'members': [{u'uptime': 2465, u'optime': Timestamp(1399319872, 1), u'name': u'mongodb2:27022', u'pingMs': 0, u'optimeDate': datetime.datetime(2014, 5, 5, 19, 57, 52), u'syncingTo': u'mongodb1:27022', u'state': 2, u'health': 1.0, u'stateStr': u'SECONDARY', u'lastHeartbeatRecv': datetime.datetime(2014, 9, 12, 2, 37, 45), u'_id': 0, u'lastHeartbeat': datetime.datetime(2014, 9, 12, 2, 37, 46)}, {u'uptime': 2290, u'optime': Timestamp(1399319872, 1), u'name': u'mongodb3:27022', u'pingMs': 0, u'optimeDate': datetime.datetime(2014, 5, 5, 19, 57, 52), u'syncingTo': u'mongodb1:27022', u'state': 2, u'health': 1.0, u'stateStr': u'SECONDARY', u'lastHeartbeatRecv': datetime.datetime(2014, 9, 12, 2, 37, 45), u'_id': 1, u'lastHeartbeat': datetime.datetime(2014, 9, 12, 2, 37, 46)}, {u'uptime': 2749, u'optime': Timestamp(1399319872, 1), u'name': u'mongodb1:27022', u'self': True, u'optimeDate': datetime.datetime(2014, 5, 5, 19, 57, 52), u'electionTime': Timestamp(1410487014, 1), u'state': 1, u'health': 1.0, u'stateStr': u'PRIMARY', u'_id': 2, u'electionDate': datetime.datetime(2014, 9, 12, 1, 56, 54)}]}
@@ -104,6 +106,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                      }
         self.store["context"] = self.context.__dict__
         self.store["context"]["conf"] = None
+        self.store['context']['read_deleted']=self.store['context']['_read_deleted']
         self.store["snapshot"] = {'status': u'starting',
                                   'project_id': u'fake_project',
                                   'user_id': u'fake_user',
@@ -358,6 +361,8 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                                 self.store['DBPassword'], self.store['HostSSHPort'],
                                 self.store['HostUsername'], self.store['HostPassword'])
 
+            self.assertEqual(4, len(vms))
+
     @mock.patch.object(mongodbflow, 'getShards')
     @mock.patch.object(mongodbflow, 'connect_server')
     def test_mongodb_secondary_hosts_to_backup(self,
@@ -372,7 +377,9 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             mock.patch('pymongo.database.Database')
         ) as (mclient, mdb):
             def multicall(*args, **kwargs):
-               return statuses.pop()
+               x = statuses.pop()
+               statuses.insert(0, x)
+               return x
 
             instance = mclient.return_value
             admin = mdb.return_value
@@ -397,14 +404,342 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             self.assertEqual(len(hosts), replnum)
 
 
-    def test_mongodb_initflow(self):
-        pass
+    @mock.patch.object(mongodbflow, 'getShards')
+    @mock.patch.object(mongodbflow, 'connect_server')
+    @mock.patch.object(paramiko, 'SSHClient')
+    def test_mongodb_initflow(self,
+                              _mock_sshclient,
+                              _mock_connect_server,
+                              _mock_getShards):
 
-    def test_mongodb_details(self):
-        pass
+        statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
+        replnum = len(statuses)
+        class sshclient(object):
+                
+              def load_system_host_keys(self):
+                  return 
+              def set_missing_host_key_policy(self, policy):
+                  return
+  
+              def connect(self, hostname, port, username, password):
+                  self.hostname = hostname
+                  self.port = port
+                  self.username = username
+                  self.password = password
 
-    def test_mongodb_discover(self):
-        pass
+              def exec_command(self, cmd):
+                  assert cmd == 'ifconfig eth0 | grep HWaddr'
+  
+                  eth = ""
+                  if self.hostname == "mongodb1":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
+                  elif self.hostname == "mongodb2":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:e3:97:ec'
+                  elif self.hostname == "mongodb3":
+                      eth =  'eth0      Link encap:Ethernet  HWaddr fa:16:3e:23:0f:ff'
+                  elif self.hostname == "mongodb4":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:7c:0f:ae'
+                  else:
+                       raise "Invalid argument"
 
-    def test_mongodb_execute(self):
-        pass
+                  info1 = StringIO.StringIO(eth)
+                  return (sys.stdin, info1, sys.stderr)
+              def close(self):
+                  return
+
+        def create_sshclient():
+            return sshclient()
+
+        def fake_get_servers(self, cntx, **kwargs):
+            return tests_utils.build_mongodb_instances()
+
+        def fake_get_hypervisors(self, cntx):
+            return tests_utils.build_mongodb_hypervisors()
+
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            def multicall(*args, **kwargs):
+               return statuses.pop()
+
+            instance = mclient.return_value
+            admin = mdb.return_value
+            admin.command.side_effect = multicall
+            
+            instance.admin = admin
+
+            _mock_connect_server.return_value = instance
+            _mock_getShards.return_value = mongodb_shards
+            _mock_sshclient.side_effect = create_sshclient
+
+            self.stubs.Set(nova.API, 'get_servers', fake_get_servers)
+            self.stubs.Set(nova.API, 'get_hypervisors', fake_get_hypervisors)
+
+            mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
+            flow = mdbflow.initflow()
+
+    @mock.patch.object(mongodbflow, 'getShards')
+    @mock.patch.object(mongodbflow, 'connect_server')
+    @mock.patch.object(paramiko, 'SSHClient')
+    def test_mongodb_details(self,
+                              _mock_sshclient,
+                              _mock_connect_server,
+                              _mock_getShards):
+
+        statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
+        replnum = len(statuses)
+        class sshclient(object):
+                
+              def load_system_host_keys(self):
+                  return 
+              def set_missing_host_key_policy(self, policy):
+                  return
+  
+              def connect(self, hostname, port, username, password):
+                  self.hostname = hostname
+                  self.port = port
+                  self.username = username
+                  self.password = password
+
+              def exec_command(self, cmd):
+                  assert cmd == 'ifconfig eth0 | grep HWaddr'
+  
+                  eth = ""
+                  if self.hostname == "mongodb1":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
+                  elif self.hostname == "mongodb2":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:e3:97:ec'
+                  elif self.hostname == "mongodb3":
+                      eth =  'eth0      Link encap:Ethernet  HWaddr fa:16:3e:23:0f:ff'
+                  elif self.hostname == "mongodb4":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:7c:0f:ae'
+                  else:
+                       raise "Invalid argument"
+
+                  info1 = StringIO.StringIO(eth)
+                  return (sys.stdin, info1, sys.stderr)
+              def close(self):
+                  return
+
+        def create_sshclient():
+            return sshclient()
+
+        def fake_get_servers(self, cntx, **kwargs):
+            return tests_utils.build_mongodb_instances()
+
+        def fake_get_hypervisors(self, cntx):
+            return tests_utils.build_mongodb_hypervisors()
+
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            def multicall(*args, **kwargs):
+               return statuses.pop()
+
+            instance = mclient.return_value
+            admin = mdb.return_value
+            admin.command.side_effect = multicall
+            
+            instance.admin = admin
+
+            _mock_connect_server.return_value = instance
+            _mock_getShards.return_value = mongodb_shards
+            _mock_sshclient.side_effect = create_sshclient
+
+            self.stubs.Set(nova.API, 'get_servers', fake_get_servers)
+            self.stubs.Set(nova.API, 'get_hypervisors', fake_get_hypervisors)
+
+            mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
+            mdbflow.initflow()
+            workflow = mdbflow.details()
+            self.assertEqual(4, len(workflow['workflow']['children']))
+            self.assertEqual(4, len(workflow['workflow']['children'][0]['children'][0]['children']))
+            self.assertEqual(3, len(workflow['workflow']['children'][1]['children']))
+            self.assertEqual(9, len(workflow['workflow']['children'][2]['children']))
+            self.assertEqual(3, len(workflow['workflow']['children'][3]['children']))
+            # Beefup the validatation even further
+
+    @mock.patch.object(mongodbflow, 'getShards')
+    @mock.patch.object(mongodbflow, 'connect_server')
+    @mock.patch.object(paramiko, 'SSHClient')
+    def test_mongodb_discover(self,
+                             _mock_sshclient,
+                             _mock_connect_server,
+                             _mock_getShards):
+
+        class sshclient(object):
+                
+              def load_system_host_keys(self):
+                  return 
+              def set_missing_host_key_policy(self, policy):
+                  return
+  
+              def connect(self, hostname, port, username, password):
+                  self.hostname = hostname
+                  self.port = port
+                  self.username = username
+                  self.password = password
+
+              def exec_command(self, cmd):
+                  assert cmd == 'ifconfig eth0 | grep HWaddr'
+  
+                  eth = ""
+                  if self.hostname == "mongodb1":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
+                  elif self.hostname == "mongodb2":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:e3:97:ec'
+                  elif self.hostname == "mongodb3":
+                      eth =  'eth0      Link encap:Ethernet  HWaddr fa:16:3e:23:0f:ff'
+                  elif self.hostname == "mongodb4":
+                      eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:7c:0f:ae'
+                  else:
+                       raise "Invalid argument"
+
+                  info1 = StringIO.StringIO(eth)
+                  return (sys.stdin, info1, sys.stderr)
+              def close(self):
+                  return
+
+        def create_sshclient():
+            return sshclient()
+
+        def fake_get_servers(self, cntx, **kwargs):
+            return tests_utils.build_mongodb_instances()
+
+        def fake_get_hypervisors(self, cntx):
+            return tests_utils.build_mongodb_hypervisors()
+
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            instance = mclient.return_value
+            admin = mdb.return_value
+            
+            instance.admin = admin
+
+            _mock_connect_server.return_value = instance
+            _mock_getShards.return_value = mongodb_shards
+            _mock_sshclient.side_effect = create_sshclient
+
+            self.stubs.Set(nova.API, 'get_servers', fake_get_servers)
+            self.stubs.Set(nova.API, 'get_hypervisors', fake_get_hypervisors)
+
+            mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
+            vms = mdbflow.discover()['instances']
+            self.assertEqual(4, len(vms))
+
+    @mock.patch.object(mongodbflow, 'getShards')
+    @mock.patch.object(mongodbflow, 'connect_server')
+    @mock.patch.object(paramiko, 'SSHClient')
+    def test_mongodb_execute(self,
+                             _mock_sshclient,
+                             _mock_connect_server,
+                             _mock_getShards):
+
+        statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
+        replnum = len(statuses)
+        class sshclient(object):
+                
+              def load_system_host_keys(self):
+                  return 
+              def set_missing_host_key_policy(self, policy):
+                  return
+  
+              def connect(self, hostname, port, username, password):
+                  self.hostname = hostname
+                  self.port = port
+                  self.username = username
+                  self.password = password
+
+              def exec_command(self, cmd):
+  
+                  eth = ""
+                  if cmd == 'ifconfig eth0 | grep HWaddr':
+                      if self.hostname == "mongodb1":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
+                      elif self.hostname == "mongodb2":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:e3:97:ec'
+                      elif self.hostname == "mongodb3":
+                          eth =  'eth0      Link encap:Ethernet  HWaddr fa:16:3e:23:0f:ff'
+                      elif self.hostname == "mongodb4":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:7c:0f:ae'
+                      else:
+                           raise "Invalid argument"
+                  elif cmd == 'mongod --shutdown --port 27019 --configsvr':
+                      eth = 'Success'
+                  elif cmd == 'mongos --fork --logpath /dev/null --configdb '\
+                              'mongodb1:27019,mongodb2:27019,mongodb3:27019 ':
+                      eth = 'Success'
+                  else:
+                      raise "Invalid argument"
+
+                  info1 = StringIO.StringIO(eth)
+                  return (sys.stdin, info1, sys.stderr)
+              def close(self):
+                  return
+
+        def create_sshclient():
+            return sshclient()
+
+        def fake_get_servers(self, cntx, **kwargs):
+            return tests_utils.build_mongodb_instances()
+
+        def fake_get_hypervisors(self, cntx):
+            return tests_utils.build_mongodb_hypervisors()
+
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            def multicall(*args, **kwargs):
+               if args[0] == 'replSetGetStatus':
+                   x = statuses.pop()
+                   statuses.insert(0, x)
+                   return x
+               elif args[0] == 'getShardMap':
+                   return shardmap
+               elif args[0] == 'getCmdLineOpts':
+                   return cfgcmdlineopts
+               else:
+                   raise "Invalid command"
+
+            def taskfunc(*args):
+               return
+
+            def fake_data_size(*args):
+               return 1024 * 1024 * 1024
+
+            instance = mclient.return_value
+            admin = mdb.return_value
+            admin.command.side_effect = multicall
+
+            instance.admin = admin
+
+            self.store['snapshot'] = tests_utils.create_snapshot(self.context,
+                                      'd296c248-d206-4837-b719-0abed920281d').__dict__
+            self.store['snapshot'].pop('_sa_instance_state')
+
+            _mock_connect_server.return_value = instance
+            _mock_getShards.return_value = mongodb_shards
+            _mock_sshclient.side_effect = create_sshclient
+
+            self.stubs.Set(nova.API, 'get_servers', fake_get_servers)
+            self.stubs.Set(nova.API, 'get_hypervisors', fake_get_hypervisors)
+
+            self.stubs.Set(vmtasks_openstack, 'pre_snapshot_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm_networks', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm_flavors', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm_security_groups', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'pause_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'unpause_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'get_snapshot_data_size', fake_data_size)
+            self.stubs.Set(vmtasks_openstack, 'upload_snapshot', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'post_snapshot', taskfunc)
+
+            mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
+            mdbflow.initflow()
+            workflow = mdbflow.execute()
