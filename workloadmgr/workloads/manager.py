@@ -98,6 +98,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         LOG.info(_("Cleaning up incomplete operations"))
         
+        self.db.snapshot_mark_incomplete_as_error(ctxt, self.host)
+        self.db.restore_mark_incomplete_as_error(ctxt, self.host)        
+        
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):
         """
         calculate the restore data size
@@ -220,11 +223,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         try:
             self.db.snapshot_update(context, 
-                                    snapshot_id, 
-                                    {'progress_percent': 0, 
-                                     'progress_msg': 'Snapshot of workload is starting',
-                                     'status': 'starting'
-                                    })
+                                    snapshot_id,
+                                     {'host': self.host,
+                                      'progress_percent': 0, 
+                                      'progress_msg': 'Snapshot of workload is starting',
+                                      'status': 'starting'
+                                      })
             
             snapshot = self.db.snapshot_get(context, snapshot_id)
             snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, snapshot.workload_id)
@@ -314,14 +318,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if restore_type == 'test':
                 self.db.restore_update( context, 
                             restore_id, 
-                            {'progress_percent': 0, 
+                            {'host': self.host,
+                             'progress_percent': 0, 
                              'progress_msg': 'Create testbubble from snapshot is starting',
                              'status': 'starting'
                             })  
             else:
                 self.db.restore_update( context, 
                             restore_id, 
-                            {'progress_percent': 0, 
+                            {'host': self.host,
+                             'progress_percent': 0, 
                              'progress_msg': 'Restore from snapshot is starting',
                              'status': 'starting'
                             })

@@ -764,7 +764,22 @@ def workload_vms_delete(context, id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 ######################################################################################################
-                    
+@require_admin_context
+def snapshot_mark_incomplete_as_error(context, host):
+    """
+    mark the snapshots that are left hanging from previous run on host as 'error'
+    """
+    session = get_session()
+    snapshots =  model_query(context, models.Snapshots, session=session).\
+                            filter_by(host=host).all()
+    for snapshot in snapshots:
+        if snapshot.status != 'available' and snapshot.status != 'error':
+            values =  {'progress_percent': 100, 'progress_msg': '',
+                       'error_msg': 'Snapshot did not finish successfully',
+                       'status': 'error' }
+            snapshot.update(values)
+            snapshot.save(session=session)
+        
 @require_context
 def snapshot_get(context, snapshot_id):
     session = get_session()
@@ -1649,7 +1664,23 @@ def get_metadata_value(metadata, key, default=None):
             return kvpair['value']
     return default
 
+########################################################################################################
 # Restore Functions
+@require_admin_context
+def restore_mark_incomplete_as_error(context, host):
+    """
+    mark the snapshots that are left hanging from previous run on host as 'error'
+    """
+    session = get_session()
+    restores =  model_query(context, models.Restores, session=session).\
+                            filter_by(host=host).all()
+    for restore in restores:
+        if restore.status != 'available' and restore.status != 'error':
+            values =  {'progress_percent': 100, 'progress_msg': '',
+                       'error_msg': 'Restore did not finish successfully',
+                       'status': 'error' }
+            restore.update(values)
+            restore.save(session=session)
 
 @require_context
 def restore_get(context, restore_id):

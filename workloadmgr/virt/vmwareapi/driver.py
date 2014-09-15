@@ -17,6 +17,7 @@ import shutil
 import math
 
 
+
 from eventlet import event
 from oslo.config import cfg
 
@@ -26,6 +27,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import loopingcall
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.openstack.common import fileutils
+from workloadmgr.openstack.common import timeutils
 
 from workloadmgr.virt import driver
 from workloadmgr.virt.vmwareapi import error_util
@@ -220,9 +222,31 @@ class VMwareESXDriver(driver.ComputeDriver):
             poweron_task = self._session._call_method(
                                         self._session._get_vim(),
                                         "PowerOnVM_Task", vm_ref)
+            vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
+                                                   "VirtualMachine", "summary")
+
+            while vmSummary.runtime.powerState != "poweredOn":
+                start = timeutils.utcnow()
+                if hasattr(vmSummary.runtime, 'question') and vmSummary.runtime.question:
+                    if "msg.uuid.copied" in vmSummary.runtime.question.text or \
+                       "msg.uuid.altered" in vmSummary.runtime.question.text or \
+                       "msg.uuid.moved" in vmSummary.runtime.question.text:
+                        for choiceInfo in vmSummary.runtime.question.choice.choiceInfo:
+                            if "copied" in choiceInfo.label:
+                                self._session._call_method(self._session._get_vim(),"AnswerVM", vm_ref,
+                                                           questionId=vmSummary.runtime.question.id, 
+                                                           answerChoice=choiceInfo.key)
+                                break
+                vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
+                                                       "VirtualMachine", "summary")
+                end = timeutils.utcnow()                            
+                delay = CONF.vmware.task_poll_interval - timeutils.delta_seconds(start, end)
+                if delay <= 0:
+                    LOG.warn(_('timeout waiting for a question during poweron'))
+                time.sleep(delay if delay > 0 else 0)
+                       
             self._session._wait_for_task(instance['uuid'], poweron_task)
             LOG.debug(_("Powered on the VM"), instance=instance)
-
 
     def get_host_ip_addr(self):
         """Retrieves the IP address of the ESX host."""
@@ -830,6 +854,7 @@ class VMwareVCDriver(VMwareESXDriver):
         """Register VM on ESX host."""
         LOG.debug(_("Registering VM on the ESX host"))
         # Create the VM on the ESX host
+        vm_folder_ref = None
         if 'vmfolder' in instance_options:
             if 'moid' in instance_options['vmfolder']:
                 vm_folder_ref = self._get_vmfolder_ref(datacenter_ref, instance_options['vmfolder']['moid'])

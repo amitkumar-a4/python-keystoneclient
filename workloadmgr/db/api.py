@@ -159,6 +159,9 @@ def workload_vms_get(context, workload_id):
 
 def workload_vms_delete(context, vm_id, workload_id):
     return IMPL.workload_vms_delete(context, vm_id, workload_id)
+
+def snapshot_mark_incomplete_as_error(context, host):
+    return IMPL.snapshot_mark_incomplete_as_error(context, host)
     
 def snapshot_create(context, values):
     return IMPL.snapshot_create(context, values)
@@ -283,6 +286,9 @@ def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
     
 def get_metadata_value(metadata, key, default=None):
     return IMPL.get_metadata_value(metadata, key, default=None)
+
+def restore_mark_incomplete_as_error(context, host):
+    return IMPL.restore_mark_incomplete_as_error(context, host)
 
 def restore_get(context, restore_id):
     return IMPL.restore_get(context, restore_id)

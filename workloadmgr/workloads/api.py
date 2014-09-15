@@ -514,7 +514,8 @@ class API(base.Base):
                    'workload_id': workload_id,
                    'snapshot_type': snapshot_type,
                    'display_name': name,
-                   'display_description': description,                   
+                   'display_description': description,
+                   'host':'',                   
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
         self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
@@ -652,6 +653,7 @@ class API(base.Base):
                    'display_name': name,
                    'display_description': description,
                    'pickle': pickle.dumps(options, 0),
+                   'host':'',                   
                    'status': 'restoring',}
         restore = self.db.restore_create(context, values)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
