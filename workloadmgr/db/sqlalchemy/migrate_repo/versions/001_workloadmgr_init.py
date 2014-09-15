@@ -167,6 +167,7 @@ def upgrade(migrate_engine):
         Column('progress_percent', Integer, nullable=False),   
         Column('progress_msg', String(length=255)),
         Column('error_msg', String(length=255)),
+        Column('host', String(length=255)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -346,6 +347,7 @@ def upgrade(migrate_engine):
         Column('progress_percent', Integer, nullable=False),   
         Column('progress_msg', String(length=255)),
         Column('error_msg', String(length=255)),
+        Column('host', String(length=255)),        
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )

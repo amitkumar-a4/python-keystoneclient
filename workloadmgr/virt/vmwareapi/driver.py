@@ -17,6 +17,7 @@ import shutil
 import math
 
 
+
 from eventlet import event
 from oslo.config import cfg
 
@@ -26,6 +27,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import loopingcall
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.openstack.common import fileutils
+from workloadmgr.openstack.common import timeutils
 
 from workloadmgr.virt import driver
 from workloadmgr.virt.vmwareapi import error_util
@@ -220,9 +222,31 @@ class VMwareESXDriver(driver.ComputeDriver):
             poweron_task = self._session._call_method(
                                         self._session._get_vim(),
                                         "PowerOnVM_Task", vm_ref)
+            vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
+                                                   "VirtualMachine", "summary")
+
+            while vmSummary.runtime.powerState != "poweredOn":
+                start = timeutils.utcnow()
+                if hasattr(vmSummary.runtime, 'question') and vmSummary.runtime.question:
+                    if "msg.uuid.copied" in vmSummary.runtime.question.text or \
+                       "msg.uuid.altered" in vmSummary.runtime.question.text or \
+                       "msg.uuid.moved" in vmSummary.runtime.question.text:
+                        for choiceInfo in vmSummary.runtime.question.choice.choiceInfo:
+                            if "copied" in choiceInfo.label:
+                                self._session._call_method(self._session._get_vim(),"AnswerVM", vm_ref,
+                                                           questionId=vmSummary.runtime.question.id, 
+                                                           answerChoice=choiceInfo.key)
+                                break
+                vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
+                                                       "VirtualMachine", "summary")
+                end = timeutils.utcnow()                            
+                delay = CONF.vmware.task_poll_interval - timeutils.delta_seconds(start, end)
+                if delay <= 0:
+                    LOG.warn(_('timeout waiting for a question during poweron'))
+                time.sleep(delay if delay > 0 else 0)
+                       
             self._session._wait_for_task(instance['uuid'], poweron_task)
             LOG.debug(_("Powered on the VM"), instance=instance)
-
 
     def get_host_ip_addr(self):
         """Retrieves the IP address of the ESX host."""
@@ -318,15 +342,27 @@ class VMwareVCDriver(VMwareESXDriver):
                 return obj_ref
         raise exception.VMNotFound()
     
+    def _get_vmfolder_ref_from_parent_folder(self, vmfolder_ref_parent, vmfolder_moid):
+        vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref_parent, "Folder", "childEntity")
+        for vmfolder_ref in vmfolder_refs.ManagedObjectReference:
+            if vmfolder_ref.value == vmfolder_moid:
+                return vmfolder_ref
+            if vmfolder_ref._type == "Folder":
+                result = self._get_vmfolder_ref_from_parent_folder(vmfolder_ref, vmfolder_moid)
+                if result:
+                    return result;
+        return None 
+        
     def _get_vmfolder_ref(self, datacenter_ref, vmfolder_moid = None):
         vmfolder_ref = self._session._call_method(vim_util, "get_dynamic_property", datacenter_ref, "Datacenter", "vmFolder")
         if vmfolder_moid == None or vmfolder_ref.value == vmfolder_moid:
             return vmfolder_ref
-        vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
-        for vmfolder_ref in vmfolder_refs.ManagedObjectReference:
-            if vmfolder_ref.value == vmfolder_moid:
-                return vmfolder_ref
-        raise exception.VMFolderNotFound()                
+        result = self._get_vmfolder_ref_from_parent_folder(vmfolder_ref, vmfolder_moid)
+        if result:
+            return result
+        else:
+            raise exception.VMFolderNotFound()
+                        
     
     def _get_res_pool_ref(self, resourcepool_moid):
         res_pool_ref = None
@@ -774,7 +810,10 @@ class VMwareVCDriver(VMwareESXDriver):
         restore_obj = db.restore_get(cntx, restore['id'])
         snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
         instance['uuid']= instance_uuid = instance_options['id']
-        instance['name']= instance_name = instance_options['name']
+        if 'name' in instance_options and instance_options['name']: 
+            instance['name']= instance_name = instance_options['name']
+        else:
+            instance['name']= instance_name = instance_options['name'] = instance['vm_name']
     
         msg = 'Creating VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id  
         db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
@@ -790,6 +829,7 @@ class VMwareVCDriver(VMwareESXDriver):
         datacenter_name = dc_info[1]
         
         vm_folder_name = restore['id'] + '-' + instance_options['name']
+        vm_folder_name = vm_folder_name.replace(' ', '-')
         vm_folder_path = vm_util.build_datastore_path(datastore_name, vm_folder_name)
         self._mkdir(vm_folder_path, datacenter_ref)
     
@@ -814,6 +854,7 @@ class VMwareVCDriver(VMwareESXDriver):
         """Register VM on ESX host."""
         LOG.debug(_("Registering VM on the ESX host"))
         # Create the VM on the ESX host
+        vm_folder_ref = None
         if 'vmfolder' in instance_options:
             if 'moid' in instance_options['vmfolder']:
                 vm_folder_ref = self._get_vmfolder_ref(datacenter_ref, instance_options['vmfolder']['moid'])
@@ -822,21 +863,37 @@ class VMwareVCDriver(VMwareESXDriver):
         
         resourcepool_ref = self._get_res_pool_ref(instance_options['resourcepool']['moid'])
         vmx_path = vm_util.build_datastore_path(datastore_name, vmx_name)
-        vm_register_task = self._session._call_method(
-                                self._session._get_vim(),
-                                "RegisterVM_Task", 
-                                vm_folder_ref,
-                                path=vmx_path,
-                                name=instance_options['name'],
-                                asTemplate=False,
-                                pool=resourcepool_ref,
-                                #host=computeresource_ref,
-                                )
-        self._session._wait_for_task(instance['uuid'], vm_register_task)
+        
+        try:
+            vm_register_task = self._session._call_method(
+                                    self._session._get_vim(),
+                                    "RegisterVM_Task", 
+                                    vm_folder_ref,
+                                    path=vmx_path,
+                                    name=instance_options['name'],
+                                    asTemplate=False,
+                                    pool=resourcepool_ref,
+                                    #host=computeresource_ref,
+                                    )
+            self._session._wait_for_task(instance['uuid'], vm_register_task)
+            vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance_options['name'])
+        except Exception as ex:
+            instance_options['name'] = instance_options['name'] + '-' + str(uuid.uuid4())
+            vm_register_task = self._session._call_method(
+                                    self._session._get_vim(),
+                                    "RegisterVM_Task", 
+                                    vm_folder_ref,
+                                    path=vmx_path,
+                                    name= instance_options['name'],
+                                    asTemplate=False,
+                                    pool=resourcepool_ref,
+                                    #host=computeresource_ref,
+                                    )
+            self._session._wait_for_task(instance['uuid'], vm_register_task)
+
 
         LOG.debug(_("Registered VM on the ESX host"))
-        
-        vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance_options['name'])
+        vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance_options['name'])            
         hardware_devices = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
                                                       "VirtualMachine", "config.hardware.device")
         if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
@@ -848,26 +905,48 @@ class VMwareVCDriver(VMwareESXDriver):
         
               
         for device in hardware_devices:
-            if hasattr(device, 'backing') and \
-               device.backing and \
-               device.backing.__class__.__name__ == "VirtualEthernetCardNetworkBackingInfo":
-                if 'networks' in instance_options and instance_options['networks']:
-                    for network in instance_options['networks']:
-                        if device.backing.deviceName == network['network_name']:
-                            device.backing.deviceName = network['new_network_name']
-                            device.backing.network = self._get_network_ref(network['new_network_moid'], datacenter_ref) 
-                            virtual_device_config_spec = client_factory.create('ns0:VirtualDeviceConfigSpec')
-                            virtual_device_config_spec.device = device
-                            virtual_device_config_spec.operation = "edit"
-                            vm_config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
-                            vm_config_spec.deviceChange = [virtual_device_config_spec]
-                            LOG.debug(_("Reconfiguring VM instance %(instance_name)s for nic %(nic_label)s"),{'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
-                            reconfig_task = self._session._call_method( self._session._get_vim(),
-                                                                        "ReconfigVM_Task", vm_ref,
-                                                                        spec=vm_config_spec)
-                            self._session._wait_for_task(instance_uuid, reconfig_task)
-                            LOG.debug(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
-                                        {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
+            if hasattr(device, 'backing') and device.backing:
+                new_network_ref = None
+                if device.backing.__class__.__name__ == "VirtualEthernetCardNetworkBackingInfo":
+                    if 'networks' in instance_options and instance_options['networks']:
+                        for network in instance_options['networks']:
+                            if device.backing.deviceName == network['network_name']:
+                                new_network_ref = self._get_network_ref(network['new_network_moid'], datacenter_ref)
+                                break                   
+                elif device.backing.__class__.__name__ == "VirtualEthernetCardDistributedVirtualPortBackingInfo":
+                    if 'networks' in instance_options and instance_options['networks']:
+                        for network in instance_options['networks']:
+                            if device.backing.port.portgroupKey == network['network_moid']:
+                                new_network_ref = self._get_network_ref(network['new_network_moid'], datacenter_ref)
+                                break
+                else:
+                    continue  
+                if new_network_ref._type == "Network":
+                    device.backing = client_factory.create('ns0:VirtualEthernetCardNetworkBackingInfo') 
+                    device.backing.deviceName = network['new_network_name']
+                    device.backing.network = new_network_ref
+                elif new_network_ref._type == "DistributedVirtualPortgroup":
+                    dvportgroup_config = self._session._call_method(vim_util,"get_dynamic_property", new_network_ref,
+                                                                    "DistributedVirtualPortgroup", "config")
+                    dvswitch_uuid = self._session._call_method(vim_util,"get_dynamic_property", dvportgroup_config.distributedVirtualSwitch,
+                                                               "VmwareDistributedVirtualSwitch", "uuid")
+                    device.backing = client_factory.create('ns0:VirtualEthernetCardDistributedVirtualPortBackingInfo')
+                    device.backing.port.portgroupKey = dvportgroup_config.key
+                    device.backing.port.switchUuid = dvswitch_uuid
+                    device.backing.port.portKey = None
+                     
+                virtual_device_config_spec = client_factory.create('ns0:VirtualDeviceConfigSpec')
+                virtual_device_config_spec.device = device
+                virtual_device_config_spec.operation = "edit"
+                vm_config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
+                vm_config_spec.deviceChange = [virtual_device_config_spec]
+                LOG.debug(_("Reconfiguring VM instance %(instance_name)s for nic %(nic_label)s"),{'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
+                reconfig_task = self._session._call_method( self._session._get_vim(),
+                                                            "ReconfigVM_Task", vm_ref,
+                                                            spec=vm_config_spec)
+                self._session._wait_for_task(instance_uuid, reconfig_task)
+                LOG.debug(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
+                            {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
                         
         #restore, rebase, commit & upload
         for snapshot_vm_resource in snapshot_vm_resources:
@@ -1042,6 +1121,7 @@ class VMwareVCDriver(VMwareESXDriver):
 
         restored_instance_id = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
                                                           "VirtualMachine", "config.uuid")
+        
         restored_instance_name =  instance_options['name']                                                
         restored_vm_values = {'vm_id': restored_instance_id,
                               'vm_name':  restored_instance_name,    

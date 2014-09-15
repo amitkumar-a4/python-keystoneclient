@@ -229,6 +229,7 @@ class Snapshots(BASE, WorkloadsBase):
     progress_percent = Column(Integer)
     progress_msg = Column(String(255))
     error_msg =  Column(String(4096))   
+    host = Column(String(255))    
     status =  Column(String(32), nullable=False)
 
 class SnapshotVMs(BASE, WorkloadsBase):
@@ -393,7 +394,8 @@ class Restores(BASE, WorkloadsBase):
     uploaded_size = Column(BigInteger)  
     progress_percent = Column(Integer)
     progress_msg = Column(String(255))
-    error_msg =  Column(String(4096))   
+    error_msg =  Column(String(4096))
+    host = Column(String(255))         
     status =  Column(String(32), nullable=False)
 
 class RestoredVMs(BASE, WorkloadsBase):
