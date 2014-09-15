@@ -192,79 +192,148 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                           self.context,
                           workload_type_id)
 
-    def test_mongodb_pausedb_instance_execute(self):
-        snaptask = cassandraworkflow.SnapshotNode()
-        client = paramiko.SSHClient()
-        self.mox.StubOutWithMock(client, 'exec_command')
-        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
+    @mock.patch.object(mongodbflow, 'connect_server')
+    def test_mongodb_pausedb_instance_execute(self,
+                                              _mock_connect_server):
+        h = {'replicaSetName': u'replica1', 'secondaryReplica': u'mongodb2:27021'}
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            instance = mclient.return_value
+            mclient.is_locked = True
+            mclient.fsync.return_value = True
+            admin = mdb.return_value
+            
+            instance.admin = admin
+            _mock_connect_server.return_value = instance
+
+            mdbflow = mongodbflow.PauseDBInstance()
+            mdbflow.execute(h, self.store['DBUser'], self.store['DBPassword'])
+
+            self.assertEqual(mclient.is_locked, True)
+            mdbflow.client.fsync.assert_called_with(lock=True)
+
+    @mock.patch.object(mongodbflow, 'connect_server')
+    def test_mongodb_pausedb_instance_revert(self,
+                                             _mock_connect_server):
+        h = {'replicaSetName': u'replica1', 'secondaryReplica': u'mongodb2:27021'}
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            instance = mclient.return_value
+            mclient.is_locked = True
+            mclient.fsync.return_value = True
+            admin = mdb.return_value
+            
+            instance.admin = admin
+            _mock_connect_server.return_value = instance
+
+            mdbflow = mongodbflow.PauseDBInstance()
+            mdbflow.execute(h, self.store['DBUser'], self.store['DBPassword'])
+            mdbflow.revert()
+
+            self.assertEqual(mclient.is_locked, True)
+            mdbflow.client.unlock.assert_called_with()
+
+    @mock.patch.object(mongodbflow, 'connect_server')
+    def test_mongodb_resumedb_instance_execute(self,
+                                               _mock_connect_server):
+        h = {'replicaSetName': u'replica1', 'secondaryReplica': u'mongodb2:27021'}
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            instance = mclient.return_value
+            admin = mdb.return_value
+            
+            instance.admin = admin
+            _mock_connect_server.return_value = instance
+
+            mdbflow = mongodbflow.ResumeDBInstance()
+            mdbflow.execute(h, self.store['DBUser'], self.store['DBPassword'])
+
+            mdbflow.client.unlock.assert_called_with()
+
+    @mock.patch.object(mongodbflow, 'connect_server')
+    @mock.patch.object(paramiko, 'SSHClient')
+    def test_mongodb_shutdown_configsvr_execute(self,
+                                                _mock_sshclient,
+                                                _mock_connect_server):
+        class sshclient(object):
+                
+              def load_system_host_keys(self):
+                  return 
+              def set_missing_host_key_policy(self, policy):
+                  return
   
-        cassandraworkflow.connect_server(self.store['DBHost'],
-                                         int(self.store['HostSSHPort']),
-                                         self.store['HostUsername'],
-                                         self.store['HostPassword']).AndReturn(client)
+              def connect(self, hostname, port, username, password):
+                  self.hostname = hostname
+                  self.port = port
+                  self.username = username
+                  self.password = password
 
-        client.exec_command("nodetool snapshot").\
-            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+              def exec_command(self, cmd):
+                  eth = ""
+                  if cmd == 'ifconfig eth0 | grep HWaddr':
+                      if self.hostname == "mongodb1":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
+                      elif self.hostname == "mongodb2":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:e3:97:ec'
+                      elif self.hostname == "mongodb3":
+                          eth =  'eth0      Link encap:Ethernet  HWaddr fa:16:3e:23:0f:ff'
+                      elif self.hostname == "mongodb4":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:7c:0f:ae'
+                      else:
+                           raise "Invalid argument"
+                  elif cmd == 'mongod --shutdown --port 27019 --configsvr':
+                      eth = 'Success'
+                  elif cmd == 'mongos --fork --logpath /dev/null --configdb '\
+                              'mongodb1:27019,mongodb2:27019,mongodb3:27019 ':
+                      eth = 'Success'
+                  else:
+                      raise "Invalid argument"
 
-        self.mox.ReplayAll()
-        cassnodes = snaptask.execute(self.store['DBHost'],
-                                     self.store['HostSSHPort'],
-                                     self.store['HostUsername'],
-                                     self.store['HostPassword'])
+                  info1 = StringIO.StringIO(eth)
+                  return (sys.stdin, info1, sys.stderr)
 
-    def test_mongodb_pausedb_instance_revert(self):
-        snaptask = cassandraworkflow.SnapshotNode()
-        client = paramiko.SSHClient()
-        snaptask.client = client
-        self.mox.StubOutWithMock(client, 'exec_command')
-  
-        client.exec_command("nodetool clearsnapshot").\
-            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+              def close(self):
+                  return
 
-        self.mox.ReplayAll()
-        snaptask.revert([], result=-1)
+        def create_sshclient():
+            return sshclient()
 
-    def test_mongodb_resumedb_instance_execute(self):
-        snaptask = cassandraworkflow.SnapshotNode()
-        client = paramiko.SSHClient()
-        self.mox.StubOutWithMock(client, 'exec_command')
-        self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
-  
-        cassandraworkflow.connect_server(self.store['DBHost'],
-                                         int(self.store['HostSSHPort']),
-                                         self.store['HostUsername'],
-                                         self.store['Password']).AndReturn(client)
+        h = {'replicaSetName': u'replica1', 'secondaryReplica': u'mongodb2:27021'}
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            def multicall(*args, **kwargs):
+               if args[0] == 'replSetGetStatus':
+                   x = statuses.pop()
+                   statuses.insert(0, x)
+                   return x
+               elif args[0] == 'getShardMap':
+                   return shardmap
+               elif args[0] == 'getCmdLineOpts':
+                   return cfgcmdlineopts
+               else:
+                   raise "Invalid command"
+            instance = mclient.return_value
+            admin = mdb.return_value
+            instance.admin = admin
+            admin.command.side_effect = multicall
+            _mock_sshclient.side_effect = create_sshclient
 
-        client.exec_command("nodetool snapshot").\
-            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+            _mock_connect_server.return_value = instance
 
-        self.mox.ReplayAll()
-        cassnodes = snaptask.execute(self.store['DBHost'],
-                                     self.store['HostSSHPort'],
-                                     self.store['HostUsername'],
-                                     self.store['Password'])
+            mdbflow = mongodbflow.ShutdownConfigServer()
 
-    def test_mondodb_pause_balancer_execute(self):
-        snaptask = cassandraworkflow.SnapshotNode()
-        client = paramiko.SSHClient()
-        snaptask.client = client
-        self.mox.StubOutWithMock(client, 'exec_command')
-  
-        client.exec_command("nodetool clearsnapshot").\
-            AndReturn((sys.stdin, self.snapshotio, sys.stderr))
+            x, y = mdbflow.execute(self.store['DBHost'], self.store['DBPort'],
+                            self.store['DBUser'], self.store['DBPassword'],
+                            self.store['HostUsername'], self.store['HostPassword'])
 
-        self.mox.ReplayAll()
-        snaptask.revert([], result=-1)
-
-    def test_mongodb_pause_balancer_revert(self):
-        pass
-
-
-    def test_mongodb_resume_balancer_execute(self):
-        pass
-
-    def test_mongodb_shutdown_configsvr_execute(self):
-        pass
 
     def test_mongodb_shutdown_configsvr_revert(self):
         pass
