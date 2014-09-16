@@ -228,9 +228,7 @@ class VMwareESXDriver(driver.ComputeDriver):
             while vmSummary.runtime.powerState != "poweredOn":
                 start = timeutils.utcnow()
                 if hasattr(vmSummary.runtime, 'question') and vmSummary.runtime.question:
-                    if "msg.uuid.copied" in vmSummary.runtime.question.text or \
-                       "msg.uuid.altered" in vmSummary.runtime.question.text or \
-                       "msg.uuid.moved" in vmSummary.runtime.question.text:
+                    if "I copied it" in vmSummary.runtime.question.text:
                         for choiceInfo in vmSummary.runtime.question.choice.choiceInfo:
                             if "copied" in choiceInfo.label:
                                 self._session._call_method(self._session._get_vim(),"AnswerVM", vm_ref,
