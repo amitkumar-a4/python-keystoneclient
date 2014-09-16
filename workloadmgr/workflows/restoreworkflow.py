@@ -12,6 +12,7 @@ import time
 import datetime 
 import paramiko
 import uuid
+import cPickle as pickle
 
 from taskflow import engines
 from taskflow.utils import misc
@@ -28,6 +29,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
+from workloadmgr import utils
 
 import vmtasks
 import workflow
@@ -40,14 +42,44 @@ def get_vms(cntx, restore_id):
     restore = db.restore_get(cntx, restore_id)
     snapshot = db.snapshot_get(cntx, restore.snapshot_id)
     
-    vms = []
-    for snapshot_vm in db.snapshot_vms_get(cntx, snapshot.id): 
+    restore_options = pickle.loads(str(restore.pickle))
+    snapshot_vms = db.snapshot_vms_get(cntx, snapshot.id)
+    
+    vms_without_power_sequence = []
+    for snapshot_vm in snapshot_vms: 
         vm = {'vm_id' : snapshot_vm.vm_id,
               'vm_name' : snapshot_vm.vm_name,
               'hypervisor_hostname' : 'None',
               'hypervisor_type' :  'QEMU'}
-        vms.append(vm)
-    return vms
+        instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
+        if 'power' in instance_options and \
+           instance_options['power'] and \
+           'sequence' in instance_options['power'] and \
+           instance_options['power']['sequence']:
+            pass
+        else:
+            vms_without_power_sequence.append(vm)    
+    
+    vms_with_power_sequence = []
+    sequence = 0
+    while (len(vms_with_power_sequence) +  len(vms_without_power_sequence)) < len(snapshot_vms):
+        for snapshot_vm in snapshot_vms: 
+            vm = {'vm_id' : snapshot_vm.vm_id,
+                  'vm_name' : snapshot_vm.vm_name,
+                  'hypervisor_hostname' : 'None',
+                  'hypervisor_type' :  'QEMU'}
+            
+            instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
+            if 'power' in instance_options and \
+               instance_options['power'] and \
+               'sequence' in instance_options['power'] and \
+               instance_options['power']['sequence']:
+                if sequence == int(instance_options['power']['sequence']):
+                    vms_with_power_sequence.append(vm)
+        sequence = sequence + 1
+
+            
+    return vms_with_power_sequence + vms_without_power_sequence
 
 class RestoreWorkflow(object):
     """

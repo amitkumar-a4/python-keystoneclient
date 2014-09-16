@@ -1357,3 +1357,11 @@ class ChunkedFile(object):
             self.fp.close()
             self.fp = None
             
+def get_instance_restore_options(restore_options, instance_id, platform):
+    if restore_options and platform in restore_options:
+        if 'instances' in restore_options[platform]:
+            for instance in restore_options[platform]['instances']:
+                if instance['id'] == instance_id:
+                    return instance
+    return None
+

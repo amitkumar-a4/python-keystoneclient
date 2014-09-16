@@ -42,14 +42,7 @@ def _get_pit_resource(snapshot_vm_common_resources, pit_id):
         if snapshot_vm_resource.resource_pit_id == pit_id:
             return snapshot_vm_resource 
             
-def _get_instance_restore_options(restore_options, instance_id):
-    if restore_options and 'openstack' in restore_options:
-        if 'instances' in restore_options['openstack']:
-            for instance in restore_options['openstack']['instances']:
-                if instance['id'] == instance_id:
-                    return instance
-    return None
-                
+             
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
     try:
@@ -434,7 +427,7 @@ def restore_vm_flavor(cntx, db, instance, restore):
     
     
     restore_options = pickle.loads(str(restore_obj.pickle))
-    instance_options = _get_instance_restore_options(restore_options, instance['vm_id'])
+    instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'],'openstack')
     if instance_options and 'flavor' in instance_options:
         if instance_options['flavor'].get('vcpus', "") != "":
             vcpus = instance_options['flavor'].get('vcpus', vcpus)
@@ -539,7 +532,7 @@ def restore_vm_networks(cntx, db, restore):
     """
    
     def _get_nic_restore_options(restore_options, instance_id, mac_address):
-        instance_options = _get_instance_restore_options(restore_options, instance_id)
+        instance_options = utils.get_instance_restore_options(restore_options, instance_id, 'openstack')
         if instance_options and 'nics' in instance_options:
             for nic_options in instance_options['nics']:
                 if 'mac_adress' in nic_options:
@@ -584,7 +577,7 @@ def restore_vm_networks(cntx, db, restore):
             return new_port
             
 
-        instance_options = _get_instance_restore_options(restore_options, instance_id) 
+        instance_options = utils.get_instance_restore_options(restore_options, instance_id, 'openstack') 
         nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
         
         if nic_options:
@@ -803,7 +796,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
     
     restore_obj = db.restore_get(cntx, restore['id']) 
     restore_options = pickle.loads(str(restore_obj.pickle))
-    instance_options = _get_instance_restore_options(restore_options, instance['vm_id'])
+    instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'],'openstack')
          
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
     return virtdriver.restore_vm( cntx, db, instance, restore, 

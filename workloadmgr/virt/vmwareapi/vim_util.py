@@ -87,13 +87,18 @@ def build_recursive_traversal_spec(client_factory):
                                 "vm", False,
                                 [rp_to_rp_select_spec, rp_to_vm_select_spec])
 
+    # For getting to Host System from Cluster Compute Resource
+    ccr_to_h = build_traversal_spec(client_factory, "ccr_to_h",
+                                   "ClusterComputeResource", "host", False, [])   
+
     # Get the assorted traversal spec which takes care of the objects to
     # be searched for from the root folder
     traversal_spec = build_traversal_spec(client_factory, "visitFolders",
                                   "Folder", "childEntity", False,
                                   [visit_folders_select_spec, dc_to_hf,
-                                   dc_to_vmf, cr_to_ds, cr_to_h, cr_to_rp,
+                                   dc_to_vmf, cr_to_ds, cr_to_h, ccr_to_h, cr_to_rp,
                                    rp_to_rp, h_to_vm, rp_to_vm])
+    
     return traversal_spec
 
 

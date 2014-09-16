@@ -1448,6 +1448,8 @@ class VMwareVMOps(object):
                     resourcepools = self._session._call_method(vim_util,
                                                                "continue_to_get_objects",
                                                                token)
+                else:
+                    break                    
             raise exception.ResourcePoolNotFound()                
             
         else:

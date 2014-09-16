@@ -224,8 +224,9 @@ class VMwareESXDriver(driver.ComputeDriver):
                                         "PowerOnVM_Task", vm_ref)
             vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
                                                    "VirtualMachine", "summary")
-
+            
             while vmSummary.runtime.powerState != "poweredOn":
+                question_answered = False
                 start = timeutils.utcnow()
                 if hasattr(vmSummary.runtime, 'question') and vmSummary.runtime.question:
                     if "I copied it" in vmSummary.runtime.question.text:
@@ -234,7 +235,10 @@ class VMwareESXDriver(driver.ComputeDriver):
                                 self._session._call_method(self._session._get_vim(),"AnswerVM", vm_ref,
                                                            questionId=vmSummary.runtime.question.id, 
                                                            answerChoice=choiceInfo.key)
+                                question_answered = True
                                 break
+                if question_answered:
+                    break
                 vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
                                                        "VirtualMachine", "summary")
                 end = timeutils.utcnow()                            
@@ -328,6 +332,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 datacenters = self._session._call_method(vim_util,
                                                            "continue_to_get_objects",
                                                            token)
+            else:
+                break                
         raise exception.DatacenterNotFound()                
 
     def _get_vm_ref_from_name_folder(self, vmfolder_ref, name):
@@ -360,7 +366,68 @@ class VMwareVCDriver(VMwareESXDriver):
             return result
         else:
             raise exception.VMFolderNotFound()
-                        
+
+    def _get_computeresource_host_ref(self, computeresource_moid):
+        computeresource_ref = None
+        computeresources = self._session._call_method(vim_util, "get_objects", "ComputeResource")
+        while computeresources:
+            token = vm_util._get_token(computeresources)
+            for obj_content in computeresources.objects:
+                if obj_content.obj.value == computeresource_moid:
+                    computeresource_ref =  obj_content.obj
+            if computeresource_ref:
+                if token:
+                    self._session._call_method(vim_util,
+                                         "cancel_retrieve",
+                                         token)
+                return computeresource_ref, None
+            if token:
+                computeresources = self._session._call_method(vim_util,
+                                                           "continue_to_get_objects",
+                                                           token)
+            else:
+                break
+        
+        computeresources = self._session._call_method(vim_util, "get_objects", "ClusterComputeResource")
+        while computeresources:
+            token = vm_util._get_token(computeresources)
+            for obj_content in computeresources.objects:
+                if obj_content.obj.value == computeresource_moid:
+                    computeresource_ref =  obj_content.obj
+            if computeresource_ref:
+                if token:
+                    self._session._call_method(vim_util,
+                                         "cancel_retrieve",
+                                         token)
+                return computeresource_ref, None
+            if token:
+                computeresources = self._session._call_method(vim_util,
+                                                           "continue_to_get_objects",
+                                                           token)
+            else:
+                break
+        
+        hosts = self._session._call_method(vim_util, "get_objects", "HostSystem")
+        while hosts:
+            token = vm_util._get_token(hosts)
+            for obj_content in hosts.objects:
+                if obj_content.obj.value == computeresource_moid:
+                    host_ref =  obj_content.obj
+                    computeresource_ref = self._session._call_method(vim_util, "get_dynamic_property", host_ref, "HostSystem", "parent")
+            if computeresource_ref:
+                if token:
+                    self._session._call_method(vim_util,
+                                         "cancel_retrieve",
+                                         token)
+                return computeresource_ref, host_ref
+            if token:
+                hosts = self._session._call_method(vim_util,
+                                                   "continue_to_get_objects",
+                                                   token)
+            else:
+                break                                
+                
+        raise exception.ResourcePoolNotFound()    
     
     def _get_res_pool_ref(self, resourcepool_moid):
         res_pool_ref = None
@@ -380,6 +447,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 resourcepools = self._session._call_method(vim_util,
                                                            "continue_to_get_objects",
                                                            token)
+            else:
+                break                
         raise exception.ResourcePoolNotFound()                
     
     def _get_network_ref(self, network_moid, dc_ref):
@@ -859,9 +928,21 @@ class VMwareVCDriver(VMwareESXDriver):
         if not vm_folder_ref:
             vm_folder_ref = self._get_vmfolder_ref(datacenter_ref)    
         
-        resourcepool_ref = self._get_res_pool_ref(instance_options['resourcepool']['moid'])
-        vmx_path = vm_util.build_datastore_path(datastore_name, vmx_name)
         
+        resourcepool_ref = None
+        computeresource_ref = None
+        host_ref = None
+        if 'resourcepool' in instance_options and \
+           instance_options['resourcepool'] and \
+           'moid' in instance_options['resourcepool'] and \
+           instance_options['resourcepool']['moid']:
+            resourcepool_ref = self._get_res_pool_ref(instance_options['resourcepool']['moid'])
+        else:
+            computeresource_ref, host_ref =  self._get_computeresource_host_ref(instance_options['computeresource']['moid'])
+            resourcepool_ref = self._session._call_method(vim_util, "get_dynamic_property", computeresource_ref, 
+                                                          computeresource_ref._type, "resourcePool")
+            
+        vmx_path = vm_util.build_datastore_path(datastore_name, vmx_name)
         try:
             vm_register_task = self._session._call_method(
                                     self._session._get_vim(),
@@ -871,10 +952,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                     name=instance_options['name'],
                                     asTemplate=False,
                                     pool=resourcepool_ref,
-                                    #host=computeresource_ref,
-                                    )
+                                    host=host_ref)
             self._session._wait_for_task(instance['uuid'], vm_register_task)
-            vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance_options['name'])
         except Exception as ex:
             instance_options['name'] = instance_options['name'] + '-' + str(uuid.uuid4())
             vm_register_task = self._session._call_method(
@@ -882,13 +961,11 @@ class VMwareVCDriver(VMwareESXDriver):
                                     "RegisterVM_Task", 
                                     vm_folder_ref,
                                     path=vmx_path,
-                                    name= instance_options['name'],
+                                    name=instance_options['name'],
                                     asTemplate=False,
                                     pool=resourcepool_ref,
-                                    #host=computeresource_ref,
-                                    )
+                                    host=host_ref)
             self._session._wait_for_task(instance['uuid'], vm_register_task)
-
 
         LOG.debug(_("Registered VM on the ESX host"))
         vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance_options['name'])            
@@ -1127,7 +1204,12 @@ class VMwareVCDriver(VMwareESXDriver):
                               'status': 'available'}
         restored_vm = db.restored_vm_create(cntx,restored_vm_values)
         
-        self.power_on(vm_ref, instance)
+        if 'power' in instance_options and \
+           instance_options['power'] and \
+           'state' in instance_options['power'] and \
+           instance_options['power']['state'] and \
+           instance_options['power']['state'] =='on':
+            self.power_on(vm_ref, instance)
         
         
         

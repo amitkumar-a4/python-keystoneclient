@@ -13,19 +13,13 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
 from workloadmgr.virt import driver
 from workloadmgr.vault import vault
+from workloadmgr import utils
 
 
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
-def _get_instance_restore_options(restore_options, instance_id):
-    if restore_options and 'vmware' in restore_options:
-        if 'instances' in restore_options['vmware']:
-            for instance in restore_options['vmware']['instances']:
-                if instance['id'] == instance_id:
-                    return instance
-    return None
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
@@ -129,7 +123,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
     
     restore_obj = db.restore_get(cntx, restore['id']) 
     restore_options = pickle.loads(str(restore_obj.pickle))
-    instance_options = _get_instance_restore_options(restore_options, instance['vm_id'])
+    instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'], 'vmware')
     
     virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
     return virtdriver.restore_vm( cntx, db, instance, restore, 
