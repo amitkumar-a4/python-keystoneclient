@@ -245,8 +245,29 @@ def configure_form():
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
 
-@bottle.route('/task_status')
-@bottle.view('task_status')
+@bottle.route('/configure_vmware')
+@bottle.view('configure_form_vmware')
+@authorize()
+def configure_form_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+
+@bottle.route('/configure_openstack')
+@bottle.view('configure_form_openstack')
+@authorize()
+def configure_form_openstack():
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+
+@bottle.route('/task_status_vmware')
+@bottle.view('task_status_vmware')
+@authorize()
+def task_status_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    return {}
+
+@bottle.route('/task_status_openstack')
+@bottle.view('task_status_openstack')
 @authorize()
 def task_status():
     bottle.request.environ['beaker.session']['error_message'] = ''
@@ -390,15 +411,18 @@ def authenticate_with_keystone():
             #cinder is optional
             config_data['cinder_production_endpoint_template'] = ''
              
-        
-        #object
-        kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-        object_public_url = keystone.service_catalog.url_for(**kwargs)
-        config_data['wlm_vault_swift_url']  =  object_public_url.replace(
-                                                                object_public_url.split("/")[-1], 
-                                                                'AUTH_') 
-        config_data['wlm_vault_service']  = 'swift'     
-        
+        try:        
+            #object
+            kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+            object_public_url = keystone.service_catalog.url_for(**kwargs)
+            config_data['wlm_vault_swift_url']  =  object_public_url.replace(
+                                                                    object_public_url.split("/")[-1], 
+                                                                    'AUTH_') 
+            config_data['wlm_vault_service']  = 'swift'     
+        except Exception as exception:
+            #swift is not configured
+            config_data['wlm_vault_swift_url']  =  ''
+            config_data['wlm_vault_service']  = 'local'        
         
         
         #workloadmanager
@@ -545,6 +569,8 @@ def configure_api():
                                     
             replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])
             replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
+            
+            
                    
         else:
             command = ['sudo', 'service', 'mysql', 'stop'];
@@ -775,9 +801,56 @@ def register_workloadtypes():
     time.sleep(1)
     return {'status':'Success'}
 
-@bottle.post('/configure')
+@bottle.post('/configure_vmware')
 @authorize()
-def configure():
+def configure_vmware():
+    global config_data
+    config_data = {}
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    
+    try:    
+        config_inputs = bottle.request.POST
+       
+        config_data['nodetype'] = config_inputs['nodetype']
+        config_data['tvault_ipaddress'] = get_lan_ip()
+        config_data['floating_ipaddress'] = config_data['tvault_ipaddress']
+        config_data['name_server'] = config_inputs['name-server']
+        config_data['domain_search_order'] = config_inputs['domain-search-order']        
+        
+        if config_data['nodetype'] == 'controller':
+            config_data['tvault_primary_node'] = config_data['floating_ipaddress']
+            
+        config_data['vcenter'] = config_inputs['vcenter']
+        config_data['vcenter_admin_username'] = config_inputs['vcenter-admin-username']
+        config_data['vcenter_admin_password'] = config_inputs['vcenter-admin-password']
+        
+        config_data['keystone_admin_url'] = "http://" + config_data['tvault_primary_node'] + ":35357/v2.0"
+        config_data['keystone_public_url'] = "http://" + config_data['tvault_primary_node'] + ":5000/v2.0"
+        config_data['admin_username'] = 'admin'
+        config_data['admin_password'] = '52T8FVYZJse'        
+        config_data['admin_tenant_name'] = 'admin'
+        config_data['region_name'] = 'nova'
+        
+        parse_result = urlparse(config_data['keystone_admin_url'])
+        config_data['keystone_host'] = parse_result.hostname
+        config_data['keystone_admin_port'] = parse_result.port
+        config_data['keystone_admin_protocol'] = parse_result.scheme
+        
+        parse_result = urlparse(config_data['keystone_public_url'])
+        config_data['keystone_public_port'] = parse_result.port
+        config_data['keystone_public_protocol'] = parse_result.scheme
+        
+        bottle.redirect("/task_status_vmware")
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           bottle.redirect("/configure_vmware")
+           
+@bottle.post('/configure_openstack')
+@authorize()
+def configure_openstack():
     global config_data
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
@@ -790,8 +863,6 @@ def configure():
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
         config_data['name_server'] = config_inputs['name-server']
         config_data['domain_search_order'] = config_inputs['domain-search-order']        
-        
-    
         
         config_data['keystone_admin_url'] = config_inputs['keystone-admin-url']
         config_data['keystone_public_url'] = config_inputs['keystone-public-url']
@@ -809,7 +880,27 @@ def configure():
         config_data['keystone_public_port'] = parse_result.port
         config_data['keystone_public_protocol'] = parse_result.scheme
  
-        bottle.redirect("/task_status")
+        bottle.redirect("/task_status_openstack")
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           bottle.redirect("/configure_openstack")
+
+@bottle.post('/configure')
+@authorize()
+def configure():
+    global config_data
+    config_data = {}
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    
+    try:    
+        config_inputs = bottle.request.POST
+       
+        config_data['configuration_type'] = config_inputs['configuration_type']
+ 
+        bottle.redirect("/configure_" + config_data['configuration_type'])
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
