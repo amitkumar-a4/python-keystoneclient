@@ -1,427 +1,7 @@
-time: 2014-09-05 13:07:23.301864Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_day
-time: 2014-09-05 13:07:23.377233Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_day [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-2EA
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 668, in test_day
-    begin, end = utils.last_completed_audit_period(unit='day')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 668, in test_day
-    begin, end = utils.last_completed_audit_period(unit='day')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.377538Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_after_current
-time: 2014-09-05 13:07:23.382657Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_after_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-324
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 688, in test_day_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='day@10')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 688, in test_day_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='day@10')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.382949Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_before_current
-time: 2014-09-05 13:07:23.387759Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_day_with_offset_before_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-324
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 677, in test_day_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='day@6')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 677, in test_day_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='day@6')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.388041Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour
-time: 2014-09-05 13:07:23.392397Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-2EE
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 630, in test_hour
-    begin, end = utils.last_completed_audit_period(unit='hour')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 630, in test_hour
-    begin, end = utils.last_completed_audit_period(unit='hour')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.392664Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_after_current
-time: 2014-09-05 13:07:23.397250Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_after_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-328
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 655, in test_hour_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='hour@30')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 655, in test_hour_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='hour@30')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.397516Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_before_current
-time: 2014-09-05 13:07:23.401770Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_hour_with_offset_before_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-32A
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 642, in test_hour_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='hour@10')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 642, in test_hour_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='hour@10')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.402042Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_month
-time: 2014-09-05 13:07:23.408557Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_month [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-2F2
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 699, in test_month
-    begin, end = utils.last_completed_audit_period(unit='month')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 699, in test_month
-    begin, end = utils.last_completed_audit_period(unit='month')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.408852Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_after_current
-time: 2014-09-05 13:07:23.413204Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_after_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-32C
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 717, in test_month_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='month@15')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 717, in test_month_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='month@15')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.413470Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_before_current
-time: 2014-09-05 13:07:23.417973Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_month_with_offset_before_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-32C
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 708, in test_month_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='month@2')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 708, in test_month_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='month@2')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.418246Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_year
-time: 2014-09-05 13:07:23.422469Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_year [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-2EE
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 726, in test_year
-    begin, end = utils.last_completed_audit_period(unit='year')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 726, in test_year
-    begin, end = utils.last_completed_audit_period(unit='year')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.422732Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_after_current
-time: 2014-09-05 13:07:23.427183Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_after_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-326
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 744, in test_year_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='year@6')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 744, in test_year_with_offset_after_current
-    begin, end = utils.last_completed_audit_period(unit='year@6')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.427451Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_before_current
-time: 2014-09-05 13:07:23.431689Z
-failure: workloadmgr.tests.test_utils.AuditPeriodTest.test_year_with_offset_before_current [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-328
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 735, in test_year_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='year@2')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 735, in test_year_with_offset_before_current
-    begin, end = utils.last_completed_audit_period(unit='year@2')
-AttributeError: 'module' object has no attribute 'last_completed_audit_period'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.431978Z
+time: 2014-09-21 18:42:11.350079Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.ExecuteTestCase.test_check_exit_code_boolean
-time: 2014-09-05 13:07:23.457502Z
+time: 2014-09-21 18:42:11.375971Z
 failure: workloadmgr.tests.test_utils.ExecuteTestCase.test_check_exit_code_boolean [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -497,10 +77,10 @@ Stderr: ''
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.477598Z
+time: 2014-09-21 18:42:11.456356Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.ExecuteTestCase.test_retry_on_failure
-time: 2014-09-05 13:07:23.661481Z
+time: 2014-09-21 18:42:11.603211Z
 failure: workloadmgr.tests.test_utils.ExecuteTestCase.test_retry_on_failure [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -534,7 +114,7 @@ Traceback (most recent call last):
   File "workloadmgr/utils.py", line 187, in execute
     cmd=' '.join(cmd))
 ProcessExecutionError: Unexpected error while running command.
-Command: /tmp/tmp7O7zCM/tmp6POiWM /tmp/tmp7O7zCM/tmpD8GHHa
+Command: /tmp/tmpu9pUG8/tmpvUI46O /tmp/tmpu9pUG8/tmpuaGLRh
 Exit code: 1
 Stdout: ''
 Stderr: ''
@@ -568,7 +148,7 @@ Traceback (most recent call last):
   File "workloadmgr/utils.py", line 187, in execute
     cmd=' '.join(cmd))
 ProcessExecutionError: Unexpected error while running command.
-Command: /tmp/tmp7O7zCM/tmp6POiWM /tmp/tmp7O7zCM/tmpD8GHHa
+Command: /tmp/tmpu9pUG8/tmpvUI46O /tmp/tmpu9pUG8/tmpuaGLRh
 Exit code: 1
 Stdout: ''
 Stderr: ''
@@ -576,10 +156,10 @@ Stderr: ''
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.661853Z
+time: 2014-09-21 18:42:11.603573Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.ExecuteTestCase.test_unknown_kwargs_raises_error
-time: 2014-09-05 13:07:23.667899Z
+time: 2014-09-21 18:42:11.610009Z
 failure: workloadmgr.tests.test_utils.ExecuteTestCase.test_unknown_kwargs_raises_error [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -647,45 +227,10 @@ Error: Got unknown keyword args to utils.execute: {'this_is_not_a_valid_kwarg': 
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.668642Z
-tags: worker-0
-test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection
-time: 2014-09-05 13:07:23.673999Z
-failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-2F2
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 456, in test_check_ssh_injection
-    self.assertIsNone(utils.check_ssh_injection(cmd_list))
-AttributeError: 'module' object has no attribute 'check_ssh_injection'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_utils.py", line 456, in test_check_ssh_injection
-    self.assertIsNone(utils.check_ssh_injection(cmd_list))
-AttributeError: 'module' object has no attribute 'check_ssh_injection'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.674666Z
+time: 2014-09-21 18:42:11.615759Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection_on_error
-time: 2014-09-05 13:07:23.679323Z
+time: 2014-09-21 18:42:11.620954Z
 failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_check_ssh_injection_on_error [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -717,10 +262,10 @@ AttributeError: 'module' object has no attribute 'SSHInjectionThreat'
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.684980Z
+time: 2014-09-21 18:42:11.625760Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_generate_glance_url
-time: 2014-09-05 13:07:23.689362Z
+time: 2014-09-21 18:42:11.630436Z
 failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_generate_glance_url [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -752,10 +297,10 @@ AttributeError: 'module' object has no attribute 'generate_glance_url'
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.699134Z
+time: 2014-09-21 18:42:11.639488Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_get_file_mode
-time: 2014-09-05 13:07:23.703803Z
+time: 2014-09-21 18:42:11.643850Z
 failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_get_file_mode [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -791,10 +336,10 @@ NameError: global name 'stat' is not defined
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.734338Z
+time: 2014-09-21 18:42:11.674250Z
 tags: worker-0
 test: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_read_file_as_root
-time: 2014-09-05 13:07:23.741086Z
+time: 2014-09-21 18:42:11.679146Z
 failure: workloadmgr.tests.test_utils.GenericUtilsTestCase.test_read_file_as_root [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
@@ -874,292 +419,434 @@ Stderr: None
 0
 ]
 tags: -worker-0
-time: 2014-09-05 13:07:23.807249Z
+time: 2014-09-21 18:42:11.753793Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type.BaseWorkloadTypeTestCase.test_create_delete_workload_type
+time: 2014-09-21 18:42:11.908228Z
+failure: workloadmgr.tests.test_workload_type.BaseWorkloadTypeTestCase.test_create_delete_workload_type [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+608
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type.py", line 65, in test_create_delete_workload_type
+    self.assertEqual(workload_type['metadata'], {})
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: [] != {}
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type.py", line 65, in test_create_delete_workload_type
+    self.assertEqual(workload_type['metadata'], {})
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: [] != {}
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:42:11.908550Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type.BaseWorkloadTypeTestCase.test_create_workload_type_invalid_metadata
+time: 2014-09-21 18:42:11.927137Z
+failure: workloadmgr.tests.test_workload_type.BaseWorkloadTypeTestCase.test_create_workload_type_invalid_metadata [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+57A
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type.py", line 98, in test_create_workload_type_invalid_metadata
+    self.assertEqual(workload_type['metadata'], {})
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: [] != {}
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type.py", line 98, in test_create_workload_type_invalid_metadata
+    self.assertEqual(workload_type['metadata'], {})
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: [] != {}
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:42:58.945239Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type_cassandra.BaseWorkloadTypeCassandraTestCase.test_create_delete_workload_type
+time: 2014-09-21 18:42:59.005533Z
+failure: workloadmgr.tests.test_workload_type_cassandra.BaseWorkloadTypeCassandraTestCase.test_create_delete_workload_type [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+616
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_cassandra.py", line 216, in test_create_delete_workload_type
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x533d2d0>
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_cassandra.py", line 216, in test_create_delete_workload_type
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x533d2d0>
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:42:59.005902Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type_cassandra.BaseWorkloadTypeCassandraTestCase.test_create_workload_type_invalid_metadata
+time: 2014-09-21 18:42:59.046410Z
+failure: workloadmgr.tests.test_workload_type_cassandra.BaseWorkloadTypeCassandraTestCase.test_create_workload_type_invalid_metadata [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+62A
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_cassandra.py", line 248, in test_create_workload_type_invalid_metadata
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x5515d90>
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_cassandra.py", line 248, in test_create_workload_type_invalid_metadata
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x5515d90>
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:42:59.046767Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type_mongodb.BaseWorkloadTypeMongoDBTestCase.test_create_delete_workload_type
+time: 2014-09-21 18:42:59.118523Z
+failure: workloadmgr.tests.test_workload_type_mongodb.BaseWorkloadTypeMongoDBTestCase.test_create_delete_workload_type [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+612
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_mongodb.py", line 161, in test_create_delete_workload_type
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x52cc890>
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_mongodb.py", line 161, in test_create_delete_workload_type
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x52cc890>
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:42:59.118856Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type_mongodb.BaseWorkloadTypeMongoDBTestCase.test_create_workload_type_invalid_metadata
+time: 2014-09-21 18:42:59.159000Z
+failure: workloadmgr.tests.test_workload_type_mongodb.BaseWorkloadTypeMongoDBTestCase.test_create_workload_type_invalid_metadata [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+626
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_mongodb.py", line 193, in test_create_workload_type_invalid_metadata
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x535a950>
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stderr
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+Traceback (most recent call last):
+  File "workloadmgr/tests/test_workload_type_mongodb.py", line 193, in test_create_workload_type_invalid_metadata
+    workload_type_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: <function workload_type_get at 0x2b806e0> returned <workloadmgr.db.sqlalchemy.models.WorkloadTypes object at 0x535a950>
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:43:44.699784Z
+tags: worker-0
+test: workloadmgr.tests.test_workload_type_mongodb.BaseWorkloadTypeMongoDBTestCase.test_mongodb_secondary_hosts_to_backup
+time: 2014-09-21 18:43:44.708285Z
+failure: workloadmgr.tests.test_workload_type_mongodb.BaseWorkloadTypeMongoDBTestCase.test_mongodb_secondary_hosts_to_backup [ multipart
+Content-Type: text/x-traceback;charset=""utf8""
+traceback
+7C4
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+stderr: {{{
+workloadmgr/tests/test_workload_type_mongodb.py:446: DeprecationWarning: With-statements now directly support multiple context managers
+  mock.patch('pymongo.database.Database')
+}}}
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
+    return func(*args, **keywargs)
+  File "workloadmgr/tests/test_workload_type_mongodb.py", line 473, in test_mongodb_secondary_hosts_to_backup
+    self.assertEqual(len(hosts), replnum)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: 3 != 4
+
+Traceback (most recent call last):
+_StringException: Empty attachments:
+  pythonlogging:''-1
+  stdout
+
+pythonlogging:'': {{{
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+}}}
+
+stderr: {{{
+workloadmgr/tests/test_workload_type_mongodb.py:446: DeprecationWarning: With-statements now directly support multiple context managers
+  mock.patch('pymongo.database.Database')
+}}}
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
+    return func(*args, **keywargs)
+  File "workloadmgr/tests/test_workload_type_mongodb.py", line 473, in test_mongodb_secondary_hosts_to_backup
+    self.assertEqual(len(hosts), replnum)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
+    self.assertThat(observed, matcher, message)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
+    raise mismatch_error
+MismatchError: 3 != 4
+
+0
+]
+tags: -worker-0
+time: 2014-09-21 18:43:44.722226Z
 tags: worker-0
 test: workloadmgr.tests.test_workloads.BaseWorkloadTestCase.test_create_delete_workload
-time: 2014-09-05 13:07:23.929764Z
+time: 2014-09-21 18:43:44.796995Z
 failure: workloadmgr.tests.test_workloads.BaseWorkloadTestCase.test_create_delete_workload [ multipart
 Content-Type: text/x-traceback;charset=""utf8""
 traceback
-308
+A82
 Traceback (most recent call last):
 _StringException: Empty attachments:
-  pythonlogging:''
   pythonlogging:''-1
   stderr
   stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_workloads.py", line 46, in test_create_delete_workload
-    self.workload.create_workload(self.context, workload_id)
-AttributeError: 'BaseWorkloadTestCase' object has no attribute 'workload'
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_workloads.py", line 46, in test_create_delete_workload
-    self.workload.create_workload(self.context, workload_id)
-AttributeError: 'BaseWorkloadTestCase' object has no attribute 'workload'
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:23.963456Z
-tags: worker-0
-test: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation
-time: 2014-09-05 13:07:23.987565Z
-failure: workloadmgr.tests.test_wsgi.ExceptionTest.test_workloadmgr_exception_with_localized_explanation [ multipart
-Content-Type: text/plain;charset=""utf8""
-pythonlogging:''
-4A7
-Caught error: 
-Traceback (most recent call last):
-  File "workloadmgr/api/middleware/fault.py", line 60, in __call__
-    return req.get_response(self.application)
-  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1296, in send
-    application, catch_exc_info=False)
-  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1260, in call_application
-    app_iter = application(self.environ, start_response)
-  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 130, in __call__
-    resp = self.call_func(req, *args, **self.kwargs)
-  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 195, in call_func
-    return self.func(req, *args, **kwargs)
-  File "workloadmgr/tests/test_wsgi.py", line 283, in fail
-    raise MyWorkloadNotFound()
-  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
-    self.msg = message
-  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
-    self.msg = message
-  File "/usr/lib/python2.7/bdb.py", line 49, in trace_dispatch
-    return self.dispatch_line(frame)
-  File "/usr/lib/python2.7/bdb.py", line 68, in dispatch_line
-    if self.quitting: raise BdbQuit
-BdbQuit
-http://localhost/ returned with HTTP 500
-0
-Content-Type: text/plain;charset=""utf8""
-stdout
-63
-> /opt/stack/workloadmgr/workloadmgr/tests/test_wsgi.py(281)__init__()
--> self.msg = message
-(Pdb) 0
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-1247
-Traceback (most recent call last):
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
-    return func(*args, **keywargs)
-  File "workloadmgr/tests/test_wsgi.py", line 292, in test_workloadmgr_exception_with_localized_explanation
-    resp = webob.Request.blank('/').get_response(api)
-  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
-    self.assertThat(observed, matcher, message)
-  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
-    raise mismatch_error
-MismatchError: 404 != 500
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''-1
-  stderr
 
 pythonlogging:'': {{{
-Caught error: 
-Traceback (most recent call last):
-  File "workloadmgr/api/middleware/fault.py", line 60, in __call__
-    return req.get_response(self.application)
-  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1296, in send
-    application, catch_exc_info=False)
-  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1260, in call_application
-    app_iter = application(self.environ, start_response)
-  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 130, in __call__
-    resp = self.call_func(req, *args, **self.kwargs)
-  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 195, in call_func
-    return self.func(req, *args, **kwargs)
-  File "workloadmgr/tests/test_wsgi.py", line 283, in fail
-    raise MyWorkloadNotFound()
-  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
-    self.msg = message
-  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
-    self.msg = message
-  File "/usr/lib/python2.7/bdb.py", line 49, in trace_dispatch
-    return self.dispatch_line(frame)
-  File "/usr/lib/python2.7/bdb.py", line 68, in dispatch_line
-    if self.quitting: raise BdbQuit
-BdbQuit
-http://localhost/ returned with HTTP 500
-}}}
-
-stdout: {{{
-> /opt/stack/workloadmgr/workloadmgr/tests/test_wsgi.py(281)__init__()
--> self.msg = message
-(Pdb)
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+[0m [0;33mWorkloadMgrManager.workload_create[0;35m ENTER [0m(<workloadmgr.workloads.manager.WorkloadMgrManager object at 0x56bee10>, <workloadmgr.context.RequestContext object at 0x56c05d0>, e17c441a-8fac-49fa-8632-00136696d9e2)
+[0m [0;33mWorkloadMgrManager.workload_create[0;34m EXIT [0m(Return Value(s):None)
+[0m [0;33mworkload_delete[0;35m ENTER [0m(<workloadmgr.workloads.manager.WorkloadMgrManager object at 0x56bee10>, <workloadmgr.context.RequestContext object at 0x56c05d0>, e17c441a-8fac-49fa-8632-00136696d9e2)
+[0m [0;33mworkload_delete[0;34m EXIT [0m(Return Value(s):None)
 }}}
 
 Traceback (most recent call last):
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
-    return func(*args, **keywargs)
-  File "workloadmgr/tests/test_wsgi.py", line 292, in test_workloadmgr_exception_with_localized_explanation
-    resp = webob.Request.blank('/').get_response(api)
-  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
-    self.assertThat(observed, matcher, message)
+  File "workloadmgr/tests/test_workloads.py", line 74, in test_create_delete_workload
+    workload_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
   File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
     raise mismatch_error
-MismatchError: 404 != 500
+MismatchError: <function workload_get at 0x2b807d0> returned <workloadmgr.db.sqlalchemy.models.Workloads object at 0x56293d0>
 
 Traceback (most recent call last):
 _StringException: Empty attachments:
   pythonlogging:''-1
   stderr
+  stdout
 
 pythonlogging:'': {{{
-Caught error: 
-Traceback (most recent call last):
-  File "workloadmgr/api/middleware/fault.py", line 60, in __call__
-    return req.get_response(self.application)
-  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1296, in send
-    application, catch_exc_info=False)
-  File "/usr/lib/python2.7/dist-packages/webob/request.py", line 1260, in call_application
-    app_iter = application(self.environ, start_response)
-  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 130, in __call__
-    resp = self.call_func(req, *args, **self.kwargs)
-  File "/usr/lib/python2.7/dist-packages/webob/dec.py", line 195, in call_func
-    return self.func(req, *args, **kwargs)
-  File "workloadmgr/tests/test_wsgi.py", line 283, in fail
-    raise MyWorkloadNotFound()
-  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
-    self.msg = message
-  File "workloadmgr/tests/test_wsgi.py", line 281, in __init__
-    self.msg = message
-  File "/usr/lib/python2.7/bdb.py", line 49, in trace_dispatch
-    return self.dispatch_line(frame)
-  File "/usr/lib/python2.7/bdb.py", line 68, in dispatch_line
-    if self.quitting: raise BdbQuit
-BdbQuit
-http://localhost/ returned with HTTP 500
-}}}
-
-stdout: {{{
-> /opt/stack/workloadmgr/workloadmgr/tests/test_wsgi.py(281)__init__()
--> self.msg = message
-(Pdb)
+Started thread pool with 0 core threads and 20 maximum threads
+Scheduler started
+[0m [0;33mWorkloadMgrManager.workload_create[0;35m ENTER [0m(<workloadmgr.workloads.manager.WorkloadMgrManager object at 0x56bee10>, <workloadmgr.context.RequestContext object at 0x56c05d0>, e17c441a-8fac-49fa-8632-00136696d9e2)
+[0m [0;33mWorkloadMgrManager.workload_create[0;34m EXIT [0m(Return Value(s):None)
+[0m [0;33mworkload_delete[0;35m ENTER [0m(<workloadmgr.workloads.manager.WorkloadMgrManager object at 0x56bee10>, <workloadmgr.context.RequestContext object at 0x56c05d0>, e17c441a-8fac-49fa-8632-00136696d9e2)
+[0m [0;33mworkload_delete[0;34m EXIT [0m(Return Value(s):None)
 }}}
 
 Traceback (most recent call last):
-  File "/usr/local/lib/python2.7/dist-packages/mock.py", line 1201, in patched
-    return func(*args, **keywargs)
-  File "workloadmgr/tests/test_wsgi.py", line 292, in test_workloadmgr_exception_with_localized_explanation
-    resp = webob.Request.blank('/').get_response(api)
-  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 348, in assertEqual
-    self.assertThat(observed, matcher, message)
+  File "workloadmgr/tests/test_workloads.py", line 74, in test_create_delete_workload
+    workload_id)
+  File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 420, in assertRaises
+    self.assertThat(our_callable, matcher)
   File "/usr/local/lib/python2.7/dist-packages/testtools/testcase.py", line 433, in assertThat
     raise mismatch_error
-MismatchError: 404 != 500
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:24.024905Z
-tags: worker-0
-test: workloadmgr.tests.test_wsgi.TestWSGIServer.test_app_using_ipv6_and_ssl
-time: 2014-09-05 13:07:24.427270Z
-failure: workloadmgr.tests.test_wsgi.TestWSGIServer.test_app_using_ipv6_and_ssl [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-55E
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_wsgi.py", line 181, in test_app_using_ipv6_and_ssl
-    server.start()
-  File "workloadmgr/wsgi.py", line 191, in start
-    backlog=backlog)
-  File "workloadmgr/wsgi.py", line 141, in _get_socket
-    family=family)
-  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
-    sock.bind(addr)
-  File "/usr/lib/python2.7/socket.py", line 224, in meth
-    return getattr(self._sock,name)(*args)
-gaierror: [Errno -9] Address family for hostname not supported
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_wsgi.py", line 181, in test_app_using_ipv6_and_ssl
-    server.start()
-  File "workloadmgr/wsgi.py", line 191, in start
-    backlog=backlog)
-  File "workloadmgr/wsgi.py", line 141, in _get_socket
-    family=family)
-  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
-    sock.bind(addr)
-  File "/usr/lib/python2.7/socket.py", line 224, in meth
-    return getattr(self._sock,name)(*args)
-gaierror: [Errno -9] Address family for hostname not supported
-
-0
-]
-tags: -worker-0
-time: 2014-09-05 13:07:24.468366Z
-tags: worker-0
-test: workloadmgr.tests.test_wsgi.TestWSGIServer.test_start_random_port_with_ipv6
-time: 2014-09-05 13:07:24.713797Z
-failure: workloadmgr.tests.test_wsgi.TestWSGIServer.test_start_random_port_with_ipv6 [ multipart
-Content-Type: text/x-traceback;charset=""utf8""
-traceback
-568
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_wsgi.py", line 118, in test_start_random_port_with_ipv6
-    server.start()
-  File "workloadmgr/wsgi.py", line 191, in start
-    backlog=backlog)
-  File "workloadmgr/wsgi.py", line 141, in _get_socket
-    family=family)
-  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
-    sock.bind(addr)
-  File "/usr/lib/python2.7/socket.py", line 224, in meth
-    return getattr(self._sock,name)(*args)
-gaierror: [Errno -9] Address family for hostname not supported
-
-Traceback (most recent call last):
-_StringException: Empty attachments:
-  pythonlogging:''
-  pythonlogging:''-1
-  stderr
-  stdout
-
-Traceback (most recent call last):
-  File "workloadmgr/tests/test_wsgi.py", line 118, in test_start_random_port_with_ipv6
-    server.start()
-  File "workloadmgr/wsgi.py", line 191, in start
-    backlog=backlog)
-  File "workloadmgr/wsgi.py", line 141, in _get_socket
-    family=family)
-  File "/usr/local/lib/python2.7/dist-packages/eventlet/convenience.py", line 39, in listen
-    sock.bind(addr)
-  File "/usr/lib/python2.7/socket.py", line 224, in meth
-    return getattr(self._sock,name)(*args)
-gaierror: [Errno -9] Address family for hostname not supported
+MismatchError: <function workload_get at 0x2b807d0> returned <workloadmgr.db.sqlalchemy.models.Workloads object at 0x56293d0>
 
 0
 ]

@@ -331,7 +331,8 @@ def get_disks(hardware_devices):
             disk['label'] = device.deviceInfo.label
             disk['capacityInKB'] = device.capacityInKB
             backings = [] # using list as a stack for the disk backings            
-            if device.backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo":
+            if device.backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo" or \
+               device.backing.__class__.__name__ == "VirtualDiskSparseVer2BackingInfo":
                 disk['datastore_ref'] = device.backing.datastore
                 disk['vmdk_file_path'] = device.backing.fileName
                 disk['datastore_name'] = split_datastore_path(device.backing.fileName)[0]

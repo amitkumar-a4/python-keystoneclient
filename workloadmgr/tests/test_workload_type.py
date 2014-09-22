@@ -41,7 +41,7 @@ class BaseWorkloadTypeTestCase(test.TestCase):
             'display_description': 'this is a test workload_type',
             'status': 'creating',
             'is_public': True,
-            'metadata': None, }
+            'metadata': {}, }
 
     def tearDown(self):
         super(BaseWorkloadTypeTestCase, self).tearDown()
@@ -78,7 +78,7 @@ class BaseWorkloadTypeTestCase(test.TestCase):
         workload_type = self.workloadAPI.workload_type_create(self.context, 
                             'test_workload',
                             'this is a test workload_type',
-                            False, None)
+                            False, {})
         workload_type_id = workload_type['id']
         expected = {
             'status': 'available',

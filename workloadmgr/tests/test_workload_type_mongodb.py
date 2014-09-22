@@ -166,7 +166,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         workload_type = self.workloadAPI.workload_type_create(self.context,
                             'test_workload',
                             'this is a test workload_type',
-                            False, None)
+                            False, {})
         workload_type_id = workload_type['id']
         expected = {
             'status': 'available',
@@ -183,7 +183,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                          self.db.workload_type_get(self.context,
                                                    workload_type_id).id)
 
-        self.assertEqual(workload_type['metadata'], {})
+        self.assertEqual(len(workload_type['metadata']), 0)
         self.workloadAPI.workload_type_delete(self.context, workload_type_id)
         workload_type = db.workload_type_get(self.context, workload_type_id)
         self.assertEqual(workload_type['status'], 'deleted')

@@ -1365,3 +1365,123 @@ def get_instance_restore_options(restore_options, instance_id, platform):
                     return instance
     return None
 
+def last_completed_audit_period(unit=None):
+    """This method gives you the most recently *completed* audit period.
+
+    arguments:
+            units: string, one of 'hour', 'day', 'month', 'year'
+                    Periods normally begin at the beginning (UTC) of the
+                    period unit (So a 'day' period begins at midnight UTC,
+                    a 'month' unit on the 1st, a 'year' on Jan, 1)
+                    unit string may be appended with an optional offset
+                    like so:  'day@18'  This will begin the period at 18:00
+                    UTC.  'month@15' starts a monthly period on the 15th,
+                    and year@3 begins a yearly one on March 1st.
+
+
+    returns:  2 tuple of datetimes (begin, end)
+              The begin timestamp of this audit period is the same as the
+              end of the previous.
+    """
+    if not unit:
+        unit = CONF.volume_usage_audit_period
+
+    offset = 0
+    if '@' in unit:
+        unit, offset = unit.split("@", 1)
+        offset = int(offset)
+
+    rightnow = timeutils.utcnow()
+    if unit not in ('month', 'day', 'year', 'hour'):
+        raise ValueError('Time period must be hour, day, month or year')
+    if unit == 'month':
+        if offset == 0:
+            offset = 1
+        end = datetime.datetime(day=offset,
+                                month=rightnow.month,
+                                year=rightnow.year)
+        if end >= rightnow:
+            year = rightnow.year
+            if 1 >= rightnow.month:
+                year -= 1
+                month = 12 + (rightnow.month - 1)
+            else:
+                month = rightnow.month - 1
+            end = datetime.datetime(day=offset,
+                                    month=month,
+                                    year=year)
+        year = end.year
+        if 1 >= end.month:
+            year -= 1
+            month = 12 + (end.month - 1)
+        else:
+            month = end.month - 1
+        begin = datetime.datetime(day=offset, month=month, year=year)
+
+    elif unit == 'year':
+        if offset == 0:
+            offset = 1
+        end = datetime.datetime(day=1, month=offset, year=rightnow.year)
+        if end >= rightnow:
+            end = datetime.datetime(day=1,
+                                    month=offset,
+                                    year=rightnow.year - 1)
+            begin = datetime.datetime(day=1,
+                                      month=offset,
+                                      year=rightnow.year - 2)
+        else:
+            begin = datetime.datetime(day=1,
+                                      month=offset,
+                                      year=rightnow.year - 1)
+
+    elif unit == 'day':
+        end = datetime.datetime(hour=offset,
+                                day=rightnow.day,
+                                month=rightnow.month,
+                                year=rightnow.year)
+        if end >= rightnow:
+            end = end - datetime.timedelta(days=1)
+        begin = end - datetime.timedelta(days=1)
+
+    elif unit == 'hour':
+        end = rightnow.replace(minute=offset, second=0, microsecond=0)
+        if end >= rightnow:
+            end = end - datetime.timedelta(hours=1)
+        begin = end - datetime.timedelta(hours=1)
+
+    return (begin, end)
+
+def check_ssh_injection(cmd_list):
+    ssh_injection_pattern = ['`', '$', '|', '||', ';', '&', '&&', '>', '>>',
+                             '<']
+
+    # Check whether injection attacks exist
+    for arg in cmd_list:
+        arg = arg.strip()
+
+        # Check for matching quotes on the ends
+        is_quoted = re.match('^(?P<quote>[\'"])(?P<quoted>.*)(?P=quote)$', arg)
+        if is_quoted:
+            # Check for unescaped quotes within the quoted argument
+            quoted = is_quoted.group('quoted')
+            if quoted:
+                if (re.match('[\'"]', quoted) or
+                        re.search('[^\\\\][\'"]', quoted)):
+                    raise exception.SSHInjectionThreat(command=str(cmd_list))
+        else:
+            # We only allow spaces within quoted arguments, and that
+            # is the only special character allowed within quotes
+            if len(arg.split()) > 1:
+                raise exception.SSHInjectionThreat(command=str(cmd_list))
+
+        # Second, check whether danger character in command. So the shell
+        # special operator must be a single argument.
+        for c in ssh_injection_pattern:
+            if arg == c:
+                continue
+
+            result = arg.find(c)
+            if not result == -1:
+                if result == 0 or not arg[result - 1] == '\\':
+                    raise exception.SSHInjectionThreat(command=cmd_list)
+
