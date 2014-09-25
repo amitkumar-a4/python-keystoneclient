@@ -1147,6 +1147,15 @@ class VMwareVCDriver(VMwareESXDriver):
                                                           name=vmdk_path,
                                                           datacenter=datacenter_ref,
                                                           spec=vmdk_create_spec)
+            if vmdk_create_task == []:
+                vmdk_create_task = self._session._call_method(self._session._get_vim(),
+                                                              "CreateVirtualDisk_Task",
+                                                              service_content.virtualDiskManager,
+                                                              name=vmdk_path,
+                                                              datacenter=datacenter_ref,
+                                                              spec=vmdk_create_spec)
+
+            cookies = self._session._get_vim().client.options.transport.cookiejar
             self._session._wait_for_task(instance['uuid'], vmdk_create_task)
             self._delete_datastore_file(instance, flat_vmdk_path, datacenter_ref)
                     
