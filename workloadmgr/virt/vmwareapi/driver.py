@@ -1205,7 +1205,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     
 
         restored_instance_id = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
-                                                          "VirtualMachine", "config.uuid")
+                                                          "VirtualMachine", "config.instanceUuid")
         
         restored_instance_name =  instance_options['name']                                                
         restored_vm_values = {'vm_id': restored_instance_id,
