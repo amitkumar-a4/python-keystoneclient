@@ -907,12 +907,13 @@ class VMwareVCDriver(VMwareESXDriver):
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'vmx':
                 vmx_name = "%s/%s" % (vm_folder_name, os.path.basename(snapshot_vm_resource.resource_name))
+                url_compatible = vmx_name.replace(" ", "%20")
                 vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
                                         self._session._host_ip,
                                         datacenter_name,
                                         datastore_name,
                                         cookies,
-                                        vmx_name,
+                                        url_compatible,
                                         snapshot_vm_resource.size)
                 vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
                 vmdk_write_file_handle.write(vmx_file_data)
@@ -1211,7 +1212,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     
 
         restored_instance_id = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
-                                                          "VirtualMachine", "config.uuid")
+                                                          "VirtualMachine", "config.instanceUuid")
         
         restored_instance_name =  instance_options['name']                                                
         restored_vm_values = {'vm_id': restored_instance_id,
