@@ -1178,6 +1178,13 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                 'id':restore['id']}):
                 vmdk_write_file_handle.write(chunk)
             vmdk_write_file_handle.close()
+            
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
+            try:
+                shutil.rmtree(temp_directory)
+            except OSError as exc:
+                pass 
+            
 
             adapter_type = db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type')
             capacityInKB = db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB')

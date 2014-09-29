@@ -567,8 +567,11 @@ def configure_api():
             command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
             subprocess.call(command, shell=False)
                                     
-            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])
+            replace_line('admin_endpoint = ', '    ip: ', '    ip: ' + config_data['keystone_host'])
             replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
+            
+            #configure keystone
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])            
             
             
                    
@@ -607,6 +610,82 @@ def configure_api():
             subprocess.call(command, shell=False)         
             command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
             subprocess.call(command, shell=False)
+            
+            #keystone
+            command = ['sudo', 'service', 'keystone', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/keystone.override"];
+            subprocess.call(command, shell=False)              
+                       
+            #nova
+            command = ['sudo', 'service', 'nova-compute', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-cert', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-api', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-consoleauth', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-conductor', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-scheduler', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-novncproxy', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'nova-xvpvncproxy', 'stop'];
+            subprocess.call(command, shell=False)
+                                                
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-compute.override"];
+            subprocess.call(command, shell=False)                                                 
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-cert.override"];
+            subprocess.call(command, shell=False)   
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-api.override"];
+            subprocess.call(command, shell=False)   
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-consoleauth.override"];
+            subprocess.call(command, shell=False)   
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-conductor.override"];
+            subprocess.call(command, shell=False)   
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-scheduler.override"];
+            subprocess.call(command, shell=False)   
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-novncproxy.override"];
+            subprocess.call(command, shell=False)   
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-xvpvncproxy.override"];
+            subprocess.call(command, shell=False)   
+            
+            #neutron
+            command = ['sudo', 'service', 'neutron-dhcp-agent', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'neutron-metadata-agent', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'neutron-plugin-openvswitch-agent', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'neutron-l3-agent', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'neutron-server', 'stop'];
+            subprocess.call(command, shell=False)
+            
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-dhcp-agent.override"];
+            subprocess.call(command, shell=False)    
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-metadata-agent.override"];
+            subprocess.call(command, shell=False)    
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-plugin-openvswitch-agent.override"];
+            subprocess.call(command, shell=False)    
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-l3-agent.override"];
+            subprocess.call(command, shell=False)    
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-server.override"];
+            subprocess.call(command, shell=False)             
+            
+            #glance
+            command = ['sudo', 'service', 'glance-registry', 'stop'];
+            subprocess.call(command, shell=False)
+            command = ['sudo', 'service', 'glance-api', 'stop'];
+            subprocess.call(command, shell=False)
+            
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/glance-registry.override"];
+            subprocess.call(command, shell=False)      
+            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/glance-api.override"];
+            subprocess.call(command, shell=False)      
+           
             
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
