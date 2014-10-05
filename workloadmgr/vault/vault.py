@@ -148,7 +148,6 @@ class VaultBackupService(base.Base):
         restore_to_file_path_handle.close()
         return    
 
-
 def get_vault_service(context):
     if FLAGS.wlm_vault_service == 'swift':
         return swift.SwiftBackupService(context)

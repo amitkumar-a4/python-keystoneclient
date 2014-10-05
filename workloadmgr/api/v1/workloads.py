@@ -296,6 +296,20 @@ class WorkloadMgrsController(wsgi.Controller):
 
         return workload_topology    
 
+    def import_workloads(self, req):
+        LOG.debug(_('importing workloads from the backup store'), id)
+        context = req.environ['workloadmgr.context']
+
+        LOG.audit(_('import workloads from backup store'), context=context)
+        try:
+            self.workload_api.import_workloads(context)
+        except exception.WorkloadMgrNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidWorkloadMgr as error:
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+
+        return webob.Response(status_int=202)
+
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
 

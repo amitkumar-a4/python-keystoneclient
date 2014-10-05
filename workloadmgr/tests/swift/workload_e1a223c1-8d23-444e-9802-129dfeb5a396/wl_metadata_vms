@@ -1,0 +1,250 @@
+[
+  {
+    "created_at": "2014-10-04T02:57:10.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "319acb8f-ce22-44a4-8bd2-525c222e37fc", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:57:11.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "e4d93c76-7d1f-493b-bae1-fd01c32d5f4a", 
+        "key": "br100", 
+        "updated_at": null, 
+        "value": "network-107", 
+        "workload_vm_id": "319acb8f-ce22-44a4-8bd2-525c222e37fc"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:11.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "bdfac096-c143-4a48-a9fb-b58264d42f6d", 
+        "key": "imported_from_vcenter", 
+        "updated_at": null, 
+        "value": "True", 
+        "workload_vm_id": "319acb8f-ce22-44a4-8bd2-525c222e37fc"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:11.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "766d1b45-ad33-4cfd-8736-d3f8af30890e", 
+        "key": "mac_addresses", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:e4:5d", 
+        "workload_vm_id": "319acb8f-ce22-44a4-8bd2-525c222e37fc"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:11.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "621a5f77-aa0a-4f58-b060-c566771e5da9", 
+        "key": "vmware_moid", 
+        "updated_at": null, 
+        "value": "vm-645", 
+        "workload_vm_id": "319acb8f-ce22-44a4-8bd2-525c222e37fc"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:11.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "d7073a88-7964-4622-9902-35779f50bc74", 
+        "key": "vmware_uuid", 
+        "updated_at": null, 
+        "value": "5037a70f-b4e9-a654-50f6-12987ae6d8b2", 
+        "workload_vm_id": "319acb8f-ce22-44a4-8bd2-525c222e37fc"
+      }
+    ], 
+    "updated_at": null, 
+    "vm_id": "5037a70f-b4e9-a654-50f6-12987ae6d8b2", 
+    "vm_name": "mongodb2", 
+    "workload_id": "e1a223c1-8d23-444e-9802-129dfeb5a396"
+  }, 
+  {
+    "created_at": "2014-10-04T02:57:12.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "b7fa01dd-f64f-42c3-899b-5b71e0e18b74", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "205ec5ba-cc39-4666-a2d5-12a2f6eca7cb", 
+        "key": "br100", 
+        "updated_at": null, 
+        "value": "network-107", 
+        "workload_vm_id": "b7fa01dd-f64f-42c3-899b-5b71e0e18b74"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "246093d0-b15f-4137-bb43-3364b5ba0125", 
+        "key": "imported_from_vcenter", 
+        "updated_at": null, 
+        "value": "True", 
+        "workload_vm_id": "b7fa01dd-f64f-42c3-899b-5b71e0e18b74"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:13.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "d5db900c-697a-446c-a339-bb6b2dd2d788", 
+        "key": "mac_addresses", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:9b:09", 
+        "workload_vm_id": "b7fa01dd-f64f-42c3-899b-5b71e0e18b74"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "f4297a06-1e28-46d2-aba2-934ee74549d0", 
+        "key": "vmware_moid", 
+        "updated_at": null, 
+        "value": "vm-649", 
+        "workload_vm_id": "b7fa01dd-f64f-42c3-899b-5b71e0e18b74"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "73d25876-5bca-4c34-ace0-4a079d37d2ec", 
+        "key": "vmware_uuid", 
+        "updated_at": null, 
+        "value": "50377145-9ed7-2713-74e4-e9a0de225924", 
+        "workload_vm_id": "b7fa01dd-f64f-42c3-899b-5b71e0e18b74"
+      }
+    ], 
+    "updated_at": null, 
+    "vm_id": "50377145-9ed7-2713-74e4-e9a0de225924", 
+    "vm_name": "mongodb4", 
+    "workload_id": "e1a223c1-8d23-444e-9802-129dfeb5a396"
+  }, 
+  {
+    "created_at": "2014-10-04T02:57:10.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "b8b2bdab-f6f5-4bd5-82a8-fe113480d674", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:57:10.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "2a1f6f11-538b-445c-a1a5-8208d30fe62c", 
+        "key": "br100", 
+        "updated_at": null, 
+        "value": "network-107", 
+        "workload_vm_id": "b8b2bdab-f6f5-4bd5-82a8-fe113480d674"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:10.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "fb62ea87-5f7a-4d42-b0ba-c4bb4c256d52", 
+        "key": "imported_from_vcenter", 
+        "updated_at": null, 
+        "value": "True", 
+        "workload_vm_id": "b8b2bdab-f6f5-4bd5-82a8-fe113480d674"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:10.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "9677ed65-fae4-491e-aa0e-ac2308eeb19c", 
+        "key": "mac_addresses", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:ec:36", 
+        "workload_vm_id": "b8b2bdab-f6f5-4bd5-82a8-fe113480d674"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:10.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "21077d0c-0ce2-4fc6-a57b-fa340db7e186", 
+        "key": "vmware_moid", 
+        "updated_at": null, 
+        "value": "vm-648", 
+        "workload_vm_id": "b8b2bdab-f6f5-4bd5-82a8-fe113480d674"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:10.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "d1bc3571-5949-424b-9c25-d6005ddf5e3c", 
+        "key": "vmware_uuid", 
+        "updated_at": null, 
+        "value": "5037f45f-7ee0-16b5-9e1d-3523484298bc", 
+        "workload_vm_id": "b8b2bdab-f6f5-4bd5-82a8-fe113480d674"
+      }
+    ], 
+    "updated_at": null, 
+    "vm_id": "5037f45f-7ee0-16b5-9e1d-3523484298bc", 
+    "vm_name": "mongodb3", 
+    "workload_id": "e1a223c1-8d23-444e-9802-129dfeb5a396"
+  }, 
+  {
+    "created_at": "2014-10-04T02:57:11.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "f359b673-d564-49fd-8f0d-0c6593c53788", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "4f4b1c53-f7f4-4c01-b738-87d7cfc11143", 
+        "key": "br100", 
+        "updated_at": null, 
+        "value": "network-107", 
+        "workload_vm_id": "f359b673-d564-49fd-8f0d-0c6593c53788"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "d6e8f7a9-488e-48f5-b1f0-794dda0bcc3d", 
+        "key": "imported_from_vcenter", 
+        "updated_at": null, 
+        "value": "True", 
+        "workload_vm_id": "f359b673-d564-49fd-8f0d-0c6593c53788"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "cd7b8996-4031-4c6a-b5a1-bde66860bdc4", 
+        "key": "mac_addresses", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:89:06", 
+        "workload_vm_id": "f359b673-d564-49fd-8f0d-0c6593c53788"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "095c4288-166a-4d52-b9c2-c25867cd1e35", 
+        "key": "vmware_moid", 
+        "updated_at": null, 
+        "value": "vm-643", 
+        "workload_vm_id": "f359b673-d564-49fd-8f0d-0c6593c53788"
+      }, 
+      {
+        "created_at": "2014-10-04T02:57:12.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "730ba37c-7f3b-40c8-a2ce-2b2958a047d6", 
+        "key": "vmware_uuid", 
+        "updated_at": null, 
+        "value": "5037f170-1bd0-b96a-0494-d18a54600348", 
+        "workload_vm_id": "f359b673-d564-49fd-8f0d-0c6593c53788"
+      }
+    ], 
+    "updated_at": null, 
+    "vm_id": "5037f170-1bd0-b96a-0494-d18a54600348", 
+    "vm_name": "mongodb1", 
+    "workload_id": "e1a223c1-8d23-444e-9802-129dfeb5a396"
+  }
+]

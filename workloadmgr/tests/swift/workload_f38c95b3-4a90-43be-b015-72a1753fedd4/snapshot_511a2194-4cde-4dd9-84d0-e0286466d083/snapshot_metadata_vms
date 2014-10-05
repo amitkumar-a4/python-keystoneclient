@@ -1,0 +1,130 @@
+[
+  {
+    "created_at": "2014-10-04T02:22:23.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "ae5ef23c-3d38-4b0a-bcb9-3cc736387975", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:22:23.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "dd1f291f-9fab-4653-a65c-43655fe4d77a", 
+        "key": "br100", 
+        "snapshot_vm_id": "ae5ef23c-3d38-4b0a-bcb9-3cc736387975", 
+        "updated_at": null, 
+        "value": "network-107"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:24.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "180ea404-845e-40dc-b39b-66c817dc9273", 
+        "key": "imported_from_vcenter", 
+        "snapshot_vm_id": "ae5ef23c-3d38-4b0a-bcb9-3cc736387975", 
+        "updated_at": null, 
+        "value": "True"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:24.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "67f4808b-89ed-46b3-b320-bb0bf5365f46", 
+        "key": "mac_addresses", 
+        "snapshot_vm_id": "ae5ef23c-3d38-4b0a-bcb9-3cc736387975", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:48:a0"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:24.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "c0e7666d-df1d-45c4-8bc9-591ec78c0b75", 
+        "key": "vmware_moid", 
+        "snapshot_vm_id": "ae5ef23c-3d38-4b0a-bcb9-3cc736387975", 
+        "updated_at": null, 
+        "value": "vm-117"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:24.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "f4bc466a-f893-4a39-9ada-3533df162d47", 
+        "key": "vmware_uuid", 
+        "snapshot_vm_id": "ae5ef23c-3d38-4b0a-bcb9-3cc736387975", 
+        "updated_at": null, 
+        "value": "503714b9-bf43-0da0-8061-0c62cdd39b67"
+      }
+    ], 
+    "size": 4294991872, 
+    "snapshot_id": "511a2194-4cde-4dd9-84d0-e0286466d083", 
+    "status": "creating", 
+    "updated_at": "2014-10-04T02:23:40.000000", 
+    "vm_id": "503714b9-bf43-0da0-8061-0c62cdd39b67", 
+    "vm_name": "hadoop1"
+  }, 
+  {
+    "created_at": "2014-10-04T02:22:23.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "e3faab2c-26e0-479f-a158-d56eaae68d9a", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:22:23.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "1a699808-358b-479c-a4e8-bd1c5435d190", 
+        "key": "br100", 
+        "snapshot_vm_id": "e3faab2c-26e0-479f-a158-d56eaae68d9a", 
+        "updated_at": null, 
+        "value": "network-107"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:23.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "ea6b3c19-6132-4e09-a794-8014495c5fe1", 
+        "key": "imported_from_vcenter", 
+        "snapshot_vm_id": "e3faab2c-26e0-479f-a158-d56eaae68d9a", 
+        "updated_at": null, 
+        "value": "True"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:23.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "6f3960e5-0da3-46d4-86cc-a21a125bf17e", 
+        "key": "mac_addresses", 
+        "snapshot_vm_id": "e3faab2c-26e0-479f-a158-d56eaae68d9a", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:b0:e3"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:23.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "32c7f12f-140a-45a7-a922-de9fa22ca7df", 
+        "key": "vmware_moid", 
+        "snapshot_vm_id": "e3faab2c-26e0-479f-a158-d56eaae68d9a", 
+        "updated_at": null, 
+        "value": "vm-116"
+      }, 
+      {
+        "created_at": "2014-10-04T02:22:23.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "1ef15968-c850-422c-b545-23eaaf97e6a2", 
+        "key": "vmware_uuid", 
+        "snapshot_vm_id": "e3faab2c-26e0-479f-a158-d56eaae68d9a", 
+        "updated_at": null, 
+        "value": "5037bc07-3324-08b4-40ab-40b4edb75076"
+      }
+    ], 
+    "size": 2147491840, 
+    "snapshot_id": "511a2194-4cde-4dd9-84d0-e0286466d083", 
+    "status": "available", 
+    "updated_at": "2014-10-04T02:26:22.000000", 
+    "vm_id": "5037bc07-3324-08b4-40ab-40b4edb75076", 
+    "vm_name": "vm1"
+  }
+]

@@ -32,11 +32,13 @@ from workloadmgr.virt import driver
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import jsonutils
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 from workloadmgr.workflows import vmtasks_openstack
+from workloadmgr.workflows import vmtasks
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception as wlm_exceptions
 
@@ -199,22 +201,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         try:
             workload = self.db.workload_get(context, workload_id)
-            #vm = self.db.workload_vms_get(context, workload_id)
+            vms = self.db.workload_vms_get(context, workload_id)
+
+            # Create swift container for the workload
+            json_wl = jsonutils.dumps(workload)
+            json_wl_vms = jsonutils.dumps(vms)
 
             self.db.workload_update(context, 
                                     workload_id, 
-                                    {'host': self.host})
-
+                                    {
+                                     'host': self.host,
+                                     'status': 'available',
+                                     'availability_zone': self.az
+                                    })
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
                                       {'status': 'error',
                                        'fail_reason': unicode(err)})
-
-        self.db.workload_update(context, 
-                                workload_id, 
-                                {'status': 'available',
-                                 'availability_zone': self.az})
         
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
@@ -259,7 +263,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             }
             for kvpair in workload.metadata:
                 store[kvpair['key']] = kvpair['value']
-                
+
             workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
             workflow.initflow()
@@ -276,6 +280,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'status': 'available'
                                     })             
+            # Upload snapshot metadata to the swift
+            vmtasks.UploadSnapshotDBEntry(context, self.db.snapshot_get(context, snapshot_id))
+
         except Exception as ex:
             msg = _("Error creating workload snapshot %(snapshot_id)s with failure: %(exception)s") %{
                     'snapshot_id': snapshot_id, 'exception': ex,}

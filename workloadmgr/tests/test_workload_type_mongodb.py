@@ -44,6 +44,9 @@ from workloadmgr.tests import utils as tests_utils
 from workloadmgr.workloads.api import API
 from workloadmgr.workflows import mongodbflow
 from workloadmgr.workflows import vmtasks_openstack
+from workloadmgr.workflows import vmtasks
+from workloadmgr.vault import vault
+from workloadmgr.tests.swift import fake_swift_client
 
 CONF = cfg.CONF
 
@@ -812,3 +815,123 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
             mdbflow.initflow()
             workflow = mdbflow.execute()
+
+    @mock.patch.object(mongodbflow, 'getShards')
+    @mock.patch.object(mongodbflow, 'connect_server')
+    @mock.patch.object(paramiko, 'SSHClient')
+    def test_mongodb_execute_and_upload(self,
+                                        _mock_sshclient,
+                                        _mock_connect_server,
+                                        _mock_getShards):
+
+        statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
+        replnum = len(statuses)
+        class sshclient(object):
+                
+              def load_system_host_keys(self):
+                  return 
+              def set_missing_host_key_policy(self, policy):
+                  return
+  
+              def connect(self, hostname, port, username, password):
+                  self.hostname = hostname
+                  self.port = port
+                  self.username = username
+                  self.password = password
+
+              def exec_command(self, cmd):
+  
+                  eth = ""
+                  if cmd == 'ifconfig eth0 | grep HWaddr':
+                      if self.hostname == "mongodb1":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
+                      elif self.hostname == "mongodb2":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:e3:97:ec'
+                      elif self.hostname == "mongodb3":
+                          eth =  'eth0      Link encap:Ethernet  HWaddr fa:16:3e:23:0f:ff'
+                      elif self.hostname == "mongodb4":
+                          eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:7c:0f:ae'
+                      else:
+                           raise "Invalid argument"
+                  elif cmd == 'mongod --shutdown --port 27019 --configsvr':
+                      eth = 'Success'
+                  elif cmd == 'mongos --fork --logpath /dev/null --configdb '\
+                              'mongodb1:27019,mongodb2:27019,mongodb3:27019 ':
+                      eth = 'Success'
+                  else:
+                      raise "Invalid argument"
+
+                  info1 = StringIO.StringIO(eth)
+                  return (sys.stdin, info1, sys.stderr)
+              def close(self):
+                  return
+
+        def create_sshclient():
+            return sshclient()
+
+        def fake_get_servers(self, cntx, **kwargs):
+            return tests_utils.build_mongodb_instances()
+
+        def fake_get_hypervisors(self, cntx):
+            return tests_utils.build_mongodb_hypervisors()
+
+        with contextlib.nested (
+            mock.patch('pymongo.MongoClient'),
+            mock.patch('pymongo.database.Database')
+        ) as (mclient, mdb):
+            def multicall(*args, **kwargs):
+               if args[0] == 'replSetGetStatus':
+                   x = statuses.pop()
+                   statuses.insert(0, x)
+                   return x
+               elif args[0] == 'getShardMap':
+                   return shardmap
+               elif args[0] == 'getCmdLineOpts':
+                   return cfgcmdlineopts
+               else:
+                   raise "Invalid command"
+
+            def taskfunc(*args):
+               return
+
+            def fake_data_size(*args):
+                return 1024 * 1024 * 1024
+            def servicefunc(*args):
+                return fake_swift_client.FakeSwiftClient()
+
+
+            instance = mclient.return_value
+            admin = mdb.return_value
+            admin.command.side_effect = multicall
+
+            instance.admin = admin
+
+            self.store['snapshot'] = tests_utils.create_snapshot(self.context,
+                                      'd296c248-d206-4837-b719-0abed920281d').__dict__
+            self.store['snapshot'].pop('_sa_instance_state')
+
+            _mock_connect_server.return_value = instance
+            _mock_getShards.return_value = mongodb_shards
+            _mock_sshclient.side_effect = create_sshclient
+
+            self.stubs.Set(nova.API, 'get_servers', fake_get_servers)
+            self.stubs.Set(nova.API, 'get_hypervisors', fake_get_hypervisors)
+            self.stubs.Set(vault, 'get_vault_service', servicefunc)
+
+            self.stubs.Set(vmtasks_openstack, 'pre_snapshot_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm_networks', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm_flavors', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm_security_groups', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'pause_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'snapshot_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'unpause_vm', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'get_snapshot_data_size', fake_data_size)
+            self.stubs.Set(vmtasks_openstack, 'upload_snapshot', taskfunc)
+            self.stubs.Set(vmtasks_openstack, 'post_snapshot', taskfunc)
+
+            mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
+            mdbflow.initflow()
+            workflow = mdbflow.execute()
+           
+            vmtasks.UploadSnapshotDBEntry(self.context, 
+                     db.snapshot_get(self.context, self.store['snapshot']['id']))

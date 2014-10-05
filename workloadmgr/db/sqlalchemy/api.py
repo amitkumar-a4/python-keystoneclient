@@ -793,7 +793,7 @@ def snapshot_get(context, snapshot_id):
     return result
 
 @require_admin_context
-def snapshot_get_all(context):
+def snapshot_get_all(context, workload_id=None):
     session = get_session()
     return model_query(context, models.Snapshots, session=session).all()
 
@@ -1179,6 +1179,22 @@ def snapshot_vm_resources_get(context, vm_id, snapshot_id):
         raise exception.SnapshotVMResourcesNotFound(vm_id = vm_id, snapshot_id = snapshot_id)
     
     return snapshot_vm_resources
+
+@require_context
+def snapshot_resources_get(context, snapshot_id):
+    session = get_session()
+    try:
+        query = session.query(models.SnapshotVMResources)\
+                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
+                       .filter_by(snapshot_id=snapshot_id)
+
+        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        snapshot_resources = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.SnapshotVMResourcesNotFound(snapshot_id = snapshot_id)
+    
+    return snapshot_resources
 
 @require_context
 def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name):

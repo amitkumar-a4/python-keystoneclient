@@ -27,10 +27,12 @@ from workloadmgr.db import base
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import jsonutils
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.image import glance
 from workloadmgr import context
+from workloadmgr.workflows import vmtasks
 
 workload_lock = threading.Lock()
 
@@ -421,6 +423,11 @@ class API(base.Base):
 
         self.db.workload_delete(context, workload_id)
         
+    def import_workloads(self, context):
+        vmtasks.import_workloads(context)
+
+        return
+
     def workload_get_workflow(self, context, workload_id):
         """
         Get the workflow of the workload. RPC call is made

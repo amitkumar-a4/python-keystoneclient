@@ -1,0 +1,66 @@
+[
+  {
+    "created_at": "2014-10-04T02:03:20.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "c097f454-3cda-4a38-b02e-463f72b76a7b", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:03:20.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "b76c8068-fa3d-40ec-b522-78887e0275cb", 
+        "key": "br100", 
+        "snapshot_vm_id": "c097f454-3cda-4a38-b02e-463f72b76a7b", 
+        "updated_at": null, 
+        "value": "network-107"
+      }, 
+      {
+        "created_at": "2014-10-04T02:03:20.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "23309830-a8f3-46e8-82db-50ca0a1d4835", 
+        "key": "imported_from_vcenter", 
+        "snapshot_vm_id": "c097f454-3cda-4a38-b02e-463f72b76a7b", 
+        "updated_at": null, 
+        "value": "True"
+      }, 
+      {
+        "created_at": "2014-10-04T02:03:21.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "13fc379e-d401-41ba-a582-ed1d154a8f82", 
+        "key": "mac_addresses", 
+        "snapshot_vm_id": "c097f454-3cda-4a38-b02e-463f72b76a7b", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:b0:e3"
+      }, 
+      {
+        "created_at": "2014-10-04T02:03:20.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "dc735aee-b9b6-4226-9367-a6a5820f5684", 
+        "key": "vmware_moid", 
+        "snapshot_vm_id": "c097f454-3cda-4a38-b02e-463f72b76a7b", 
+        "updated_at": null, 
+        "value": "vm-116"
+      }, 
+      {
+        "created_at": "2014-10-04T02:03:21.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "e13701ee-2798-4e7c-a55d-b4c8d785a45d", 
+        "key": "vmware_uuid", 
+        "snapshot_vm_id": "c097f454-3cda-4a38-b02e-463f72b76a7b", 
+        "updated_at": null, 
+        "value": "5037bc07-3324-08b4-40ab-40b4edb75076"
+      }
+    ], 
+    "size": 2147483648, 
+    "snapshot_id": "3c3d76e8-a782-4ff1-bae1-1b2cfd4fc554", 
+    "status": "creating", 
+    "updated_at": "2014-10-04T02:03:55.000000", 
+    "vm_id": "5037bc07-3324-08b4-40ab-40b4edb75076", 
+    "vm_name": "vm1"
+  }
+]

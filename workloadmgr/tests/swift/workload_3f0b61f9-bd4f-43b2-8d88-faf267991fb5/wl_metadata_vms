@@ -1,0 +1,64 @@
+[
+  {
+    "created_at": "2014-10-04T02:00:47.000000", 
+    "deleted": false, 
+    "deleted_at": null, 
+    "id": "d830a139-6caf-4371-9e20-282d704fff3b", 
+    "metadata": [
+      {
+        "created_at": "2014-10-04T02:00:47.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "72072519-95d8-4c37-99d7-7039252af231", 
+        "key": "br100", 
+        "updated_at": null, 
+        "value": "network-107", 
+        "workload_vm_id": "d830a139-6caf-4371-9e20-282d704fff3b"
+      }, 
+      {
+        "created_at": "2014-10-04T02:00:48.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "ce518a2c-f030-426d-b220-ac097ca3b8d6", 
+        "key": "imported_from_vcenter", 
+        "updated_at": null, 
+        "value": "True", 
+        "workload_vm_id": "d830a139-6caf-4371-9e20-282d704fff3b"
+      }, 
+      {
+        "created_at": "2014-10-04T02:00:48.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "7f0624bf-db58-4da0-bba1-42d51d0dff8d", 
+        "key": "mac_addresses", 
+        "updated_at": null, 
+        "value": "00:50:56:b7:b0:e3", 
+        "workload_vm_id": "d830a139-6caf-4371-9e20-282d704fff3b"
+      }, 
+      {
+        "created_at": "2014-10-04T02:00:48.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "4dbee575-f49c-46e2-a34d-192e990b3cfa", 
+        "key": "vmware_moid", 
+        "updated_at": null, 
+        "value": "vm-116", 
+        "workload_vm_id": "d830a139-6caf-4371-9e20-282d704fff3b"
+      }, 
+      {
+        "created_at": "2014-10-04T02:00:48.000000", 
+        "deleted": false, 
+        "deleted_at": null, 
+        "id": "6e3ac432-4253-480e-a627-6cc84ef18e83", 
+        "key": "vmware_uuid", 
+        "updated_at": null, 
+        "value": "5037bc07-3324-08b4-40ab-40b4edb75076", 
+        "workload_vm_id": "d830a139-6caf-4371-9e20-282d704fff3b"
+      }
+    ], 
+    "updated_at": null, 
+    "vm_id": "5037bc07-3324-08b4-40ab-40b4edb75076", 
+    "vm_name": "vm1", 
+    "workload_id": "3f0b61f9-bd4f-43b2-8d88-faf267991fb5"
+  }
+]

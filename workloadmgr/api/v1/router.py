@@ -100,12 +100,25 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='detail',
                        conditions={"method": ['GET']})  
         
+        #import workloads
+        mapper.connect("workloads_import",
+                       "/{project_id}/workloads/import_workloads",
+                       controller=self.resources['workloads'],
+                       action='import_workloads',
+                       conditions={"method": ['POST']})         
+
         #get the specified workload
         mapper.connect("workloads_4",
                        "/{project_id}/workloads/{id}",
                        controller=self.resources['workloads'],
                        action='show',
                        conditions={"method": ['GET']})        
+        #import workloads
+        mapper.connect("workloads_import",
+                       "/{project_id}/workloads/import_workloads",
+                       controller=self.resources['workloads'],
+                       action='import_workloads',
+                       conditions={"method": ['POST']})         
         
         #take a snapshot of the workload
         mapper.connect("workload_snapshot",
@@ -153,6 +166,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='unlock',
                        conditions={"method": ['POST']})         
+
         
         ###################################################################################################        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)

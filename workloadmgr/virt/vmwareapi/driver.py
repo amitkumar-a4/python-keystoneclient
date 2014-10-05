@@ -760,7 +760,7 @@ class VMwareVCDriver(VMwareESXDriver):
         cookies = self._session._get_vim().client.options.transport.cookiejar
                 
                 
-        for disk in snapshot_data['disks']: 
+        for disk in snapshot_data['disks']:
             vm_disk_size = 0
             snapshot_vm_resource_metadata = {}
             snapshot_vm_resource_metadata['vmdk_controler_key'] = disk['vmdk_controler_key']
@@ -800,16 +800,16 @@ class VMwareVCDriver(VMwareESXDriver):
 
             if full:
                 for backing in disk['backings']:
-                    vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(backing['datastore_ref'], 
-                                                                                             backing['vmdk_file_path'], 
-                                                                                             vm_disk_resource_snap_backing_id, 
+                    vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(backing['datastore_ref'],
+                                                                                             backing['vmdk_file_path'],
+                                                                                             vm_disk_resource_snap_backing_id,
                                                                                              False)
                     vm_disk_size = vm_disk_size + vmdk_extent_size
                     
             vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(disk['datastore_ref'],
                                                                                      disk['vmdk_file_path'], 
-                                                                                     vm_disk_resource_snap_backing_id, 
-                                                                                     True)                    
+                                                                                     vm_disk_resource_snap_backing_id,
+                                                                                     True)
             vm_disk_size = vm_disk_size + vmdk_extent_size
             db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vm_disk_size})
             
@@ -821,18 +821,18 @@ class VMwareVCDriver(VMwareESXDriver):
                                                 cookies,
                                                 snapshot_data['vmx_file']['vmx_file_name'])
         vmx_file_size = int(vmx_file_handle.get_size())
-        #TODO(giri): throw exception if the size is more than 65536    
+        #TODO(giri): throw exception if the size is more than 65536
         vmx_file_data = vmx_file_handle.read(vmx_file_size)
-        vmx_file_handle.close()        
+        vmx_file_handle.close()
         snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                        'vm_id': instance['vm_id'],
-                                       'snapshot_id': snapshot_obj.id,       
+                                       'snapshot_id': snapshot_obj.id,
                                        'resource_type': 'vmx',
                                        'resource_name':  snapshot_data['vmx_file']['vmx_file_name'],
                                        'metadata': {'vmx_file_data':vmx_file_data},
                                        'status': 'creating'}
 
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
+        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
         db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vmx_file_size})
             
     @autolog.log_method(Logger, 'vmwareapi.driver.post_snapshot_vm')
@@ -840,9 +840,9 @@ class VMwareVCDriver(VMwareESXDriver):
         
         def _get_snapshot_to_remove(snapshot_list):
             snapshot_to_remove = None
-            if snapshot_list:    
+            if snapshot_list:
                 for vmw_snapshot in snapshot_list:
-                    if vmw_snapshot.name == ('snapshot_id:' + vm_recent_snapshot.snapshot_id) :
+                    if vmw_snapshot.name == ('snapshot_id:' + vm_recent_snapshot.snapshot_id):
                         snapshot_to_remove = vmw_snapshot.snapshot
                         break
                     if hasattr(vmw_snapshot, 'childSnapshotList'):
@@ -858,7 +858,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         'vmware_uuid':instance['vm_metadata']['vmware_uuid'],
                                                         })
             root_snapshot_array = self._session._call_method(vim_util,"get_dynamic_property", vm_ref, "VirtualMachine", "snapshot.rootSnapshotList")
-           
+
             if root_snapshot_array and len(root_snapshot_array) > 0 : 
                 snapshot_to_remove = _get_snapshot_to_remove(root_snapshot_array[0])
                 if snapshot_to_remove :

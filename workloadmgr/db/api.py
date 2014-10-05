@@ -227,6 +227,9 @@ def snapshot_vm_resource_update(context, id, vaules, purge_metadata=False):
 def snapshot_vm_resources_get(context, vm_id, snapshot_id):
     return IMPL.snapshot_vm_resources_get(context, vm_id, snapshot_id)
 
+def snapshot_resources_get(context, snapshot_id):
+    return IMPL.snapshot_resources_get(context, snapshot_id)
+
 def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name):
     return IMPL.snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name)
 

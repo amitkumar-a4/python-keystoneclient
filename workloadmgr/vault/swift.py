@@ -38,6 +38,7 @@ from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
+from workloadmgr.openstack.common import jsonutils
 from swiftclient import client as swift
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.virt import qemuimages
@@ -150,23 +151,54 @@ class SwiftBackupService(base.Base):
             LOG.debug(_('container %s exists') % container)
             return True
 
-    def _create_container(self, context, container):
+    def _create_workload_container_n_metadata(self, context, workload):
         try:
-            lock.acquire()        
-            if container is None:
-                container = FLAGS.wlm_vault_swift_container
+            lock.acquire()
+            container = self._generate_workload_container_name(workload)
             if not self._check_container_exists(container):
                 self.conn.put_container(container)
+                self._write_wl_metadata(workload, container)
             return container
         finally:
             lock.release()        
 
+    def _create_snapshot_metadata(self, context, snapshot):
+        try:
+            lock.acquire()
+            workload = WorkloadMgrDB().db.workload_get(context, snapshot.workload_id)
+            container = self._generate_workload_container_name(workload)
+            self._write_snapshot_metadata(snapshot, container)
+            return container
+        finally:
+            lock.release()        
+
+    def _generate_workload_container_name(self, workload):
+        container = 'workload_%s' % (workload.id)
+        LOG.debug(_('_generate_workload_container_name: %s') % container)
+        return container
+
+    def _generate_workload_object_name_prefix(self, workload):
+        wl = 'workload_%s' % (workload.id)
+        LOG.debug(_('_generate_workload_object_name_prefix: %s') % wl)
+        return wl
+
+    def _generate_snapshot_object_name_prefix(self, snapshot):
+        workload = WorkloadMgrDB().db.workload_get(self.context, snapshot.workload_id)
+        wl = 'workload_%s' % (workload.id)
+        snap = 'snapshot_%s' % (snapshot.id)
+
+        prefix = wl + '/' + snap
+
+        LOG.debug(_('_generate_swift_object_name_prefix: %s') % prefix)
+        return prefix
+
     def _generate_swift_object_name_prefix(self, snapshot_metadata):
-        jobrun = 'snapshot_%s' % (snapshot_metadata['snapshot_id'])
+        snap = WorkloadMgrDB().db.snapshot_get(self.context, snapshot_metadata['snapshot_id'])
+        snapprefix = self._generate_snapshot_object_name_prefix(snap)
         vm_id = 'vm_id_%s' % (snapshot_metadata['snapshot_vm_id'])
         vm_res_id = 'vm_res_id_%s_%s' % (snapshot_metadata['snapshot_vm_resource_id'],
                                          snapshot_metadata['resource_name'])
-        prefix = jobrun + '/' + vm_id + '/' + vm_res_id
+        prefix = snapprefix + '/' + vm_id + '/' + vm_res_id
         LOG.debug(_('_generate_swift_object_name_prefix: %s') % prefix)
         return prefix
 
@@ -181,11 +213,87 @@ class SwiftBackupService(base.Base):
         LOG.debug(_('generated object list: %s') % swift_object_names)
         return swift_object_names
 
+    def _wl_metadata_filename(self, workload):
+        object_prefix = self._generate_workload_object_name_prefix(workload)
+        meta = '%s/wl_metadata' % (object_prefix)
+        meta_vms = '%s/wl_metadata_vms' % (object_prefix)
+        return meta, meta_vms
+
+    def _snapshot_metadata_filename(self, snapshot):
+        object_prefix = self._generate_snapshot_object_name_prefix(snapshot)
+        meta = '%s/snapshot_metadata' % (object_prefix)
+        meta_vms = '%s/snapshot_metadata_vms' % (object_prefix)
+        return meta, meta_vms
+
+    def _write_wl_metadata(self, workload, container):
+        meta, meta_vms = self._wl_metadata_filename(workload)
+        LOG.debug(_('_write_wl_metadata started, container name: %(container)s,'
+                    ' metadata filename: %(meta)s') % locals())
+        metadata_json = jsonutils.dumps(workload, sort_keys=True, indent=2)
+        reader = StringIO.StringIO(metadata_json)
+        etag = self.conn.put_object(container, meta, reader)
+        md5 = hashlib.md5(metadata_json).hexdigest()
+        if etag != md5:
+            err = _('error writing metadata file to swift, MD5 of metadata'
+                    ' file in swift [%(etag)s] is not the same as MD5 of '
+                    'metadata file sent to swift [%(md5)s]') % locals()
+            raise exception.InvalidBackup(reason=err)
+
+        vms = WorkloadMgrDB().db.workload_vms_get(self.context, workload.id)
+        metadata_vms_json = jsonutils.dumps(vms, sort_keys=True, indent=2)
+        reader = StringIO.StringIO(metadata_vms_json)
+        etag = self.conn.put_object(container, meta_vms, reader)
+        md5 = hashlib.md5(metadata_vms_json).hexdigest()
+        if etag != md5:
+            err = _('error writing metadata file to swift, MD5 of metadata'
+                    ' file in swift [%(etag)s] is not the same as MD5 of '
+                    'metadata file sent to swift [%(md5)s]') % locals()
+            raise exception.InvalidBackup(reason=err)
+
+        LOG.debug(_('_write_wl_metadata finished'))
+
+    def _write_snapshot_metadata(self, snapshot, container):
+        meta, meta_vms = self._snapshot_metadata_filename(snapshot)
+        LOG.debug(_('_write_wl_metadata started, container name: %(container)s,'
+                    ' metadata filename: %(meta)s') % locals())
+        metadata_json = jsonutils.dumps(snapshot, sort_keys=True, indent=2)
+        reader = StringIO.StringIO(metadata_json)
+        etag = self.conn.put_object(container, meta, reader)
+        md5 = hashlib.md5(metadata_json).hexdigest()
+        if etag != md5:
+            err = _('error writing metadata file to swift, MD5 of metadata'
+                    ' file in swift [%(etag)s] is not the same as MD5 of '
+                    'metadata file sent to swift [%(md5)s]') % locals()
+            raise exception.InvalidBackup(reason=err)
+
+        vms = WorkloadMgrDB().db.snapshot_vms_get(self.context, snapshot.id)
+        metadata_vms_json = jsonutils.dumps(vms, sort_keys=True, indent=2)
+        reader = StringIO.StringIO(metadata_vms_json)
+        etag = self.conn.put_object(container, meta_vms, reader)
+        md5 = hashlib.md5(metadata_vms_json).hexdigest()
+        if etag != md5:
+            err = _('error writing metadata file to swift, MD5 of metadata'
+                    ' file in swift [%(etag)s] is not the same as MD5 of '
+                    'metadata file sent to swift [%(md5)s]') % locals()
+            raise exception.InvalidBackup(reason=err)
+
+        LOG.debug(_('_write_wl_metadata finished'))
+
     def _metadata_filename(self, snapshot_metadata):
         object_prefix = self._generate_swift_object_name_prefix(snapshot_metadata)
         swift_object_name = snapshot_metadata['vm_disk_resource_snap_id']
         filename = '%s/%s_metadata' % (object_prefix, swift_object_name)
         return filename
+
+    def put_object(self, container, url, json_data):
+        reader = StringIO.StringIO(json_data)
+        etag = self.conn.put_object(container, url, reader)
+        md5 = hashlib.md5(json_data).hexdigest()
+        if etag != md5:
+            err = _('error writing metadata file to swift, MD5 of metadata'
+                    ' file in swift [%(etag)s] is not the same as MD5 of '
+                    'metadata file sent to swift [%(md5)s]') % locals()
+            raise exception.InvalidBackup(reason=err)
 
     def _write_metadata(self, snapshot_metadata, container, object_list):
         filename = self._metadata_filename(snapshot_metadata)
@@ -222,7 +330,15 @@ class SwiftBackupService(base.Base):
         """Backup the given file to swift using the given snapshot metadata."""
            
         try:
-            container = self._create_container(self.context, FLAGS.wlm_vault_swift_container)
+            # upload snapshot metadata
+            snapshot = WorkloadMgrDB().db.snapshot_get(self.context, snapshot_metadata['snapshot_id'])
+
+            # upload workload metadata
+            workload = WorkloadMgrDB().db.workload_get(self.context, snapshot.workload_id)
+            self._create_workload_container_n_metadata(self.context, workload)
+
+            self._create_snapshot_metadata(self.context, snapshot)
+            container = self._generate_workload_container_name(workload)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
@@ -279,7 +395,8 @@ class SwiftBackupService(base.Base):
         """Restore a v1 swift volume snapshot from swift."""
 
         try:
-            container = self._create_container(self.context, FLAGS.wlm_vault_swift_container)
+            snapshot = WorkloadMgrDB().db.snapshot_get(snapshot_metadata['snapshot_id'])
+            container = self._generate_snapshot_object_name_prefix(snapshot)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         
@@ -369,5 +486,3 @@ class SwiftBackupService(base.Base):
                 eventlet.sleep(0)
 
         LOG.debug(_('delete %s finished') % snapshot_metadata['snapshot_id'])
-
-
