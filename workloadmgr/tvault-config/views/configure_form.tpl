@@ -45,8 +45,8 @@
   <div style="margin-left:auto; margin-right:auto; padding:20px">
   <form role="form" class="form-configure" action="/configure" method="post">
   	<br>
-    <input name = "configuration_type" type="radio"  value="openstack" checked>  OpenStack <br> <br>
-    <input name = "configuration_type" type="radio"  value="vmware">   VMware <br> <br> 
+    <input name = "configuration-type" type="radio"  value="openstack" checked>  OpenStack <br> <br>
+    <input name = "configuration-type" type="radio"  value="vmware">   VMware <br> <br> 
     <br>
     <button type="submit" class="btn btn-lg btn-primary btn-block">Next</button>
   </form>

@@ -43,7 +43,7 @@
  		</div>
   % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
-  <form role="form" class="form-configure" action="/configure" method="post">
+  <form role="form" class="form-configure" action="/configure_openstack" method="post">
     <input name = "nodetype" type="radio"  value="controller" checked>  Controller Node
     <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
    
