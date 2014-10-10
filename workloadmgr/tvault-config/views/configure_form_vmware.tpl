@@ -49,20 +49,20 @@
 
     <div class="input-group">
     	<label class="input-group-addon">Primary Node&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-    	<input name="tvault-primary-node" type="text" required="" placeholder="192.168.2.216" class="form-control"><br>
+    	<input name="tvault-primary-node" type="text" required placeholder="192.168.2.216" class="form-control"><br>
     </div><br>
    
     <div class="input-group">
     	<label class="input-group-addon">vCenter&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-    	<input name="vcenter" type="text" required="" placeholder="vcenter.local" class="form-control"><br>
+    	<input name="vcenter" type="text" required placeholder="vcenter.local" class="form-control"><br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">vCenter Administrator</label>
-    	<input name="vcenter-admin-username" type="text" required="" placeholder="administrator@vsphere.local" class="form-control"> <br>
+    	<input name="vcenter-admin-username" type="text" required placeholder="administrator@vsphere.local" class="form-control"> <br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">vCenter Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="vcenter-admin-password" type="password" required="" placeholder="password" class="form-control"> <br>
+    	<input name="vcenter-admin-password" type="password" required placeholder="" class="form-control"> <br>
     </div><br>
     
 	<div class="panel-group" id="accordion">

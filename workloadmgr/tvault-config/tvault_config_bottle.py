@@ -285,9 +285,34 @@ def configure_keystone():
         replace_line('/etc/keystone/keystone.conf', 'log_dir = ', 'log_dir = ' + '/var/log/keystone')
 
         command = ['sudo', 'rm', "/etc/init/keystone.override"];
+        subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'keystone', 'restart'];
         subprocess.call(command, shell=False)
         time.sleep(3) 
+        try:
+            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       username=config_data['admin_username'], 
+                                       password=config_data['admin_password'], 
+                                       tenant_name=config_data['admin_tenant_name'])
+            keystone.management_url = keystone.auth_url                
+            #delete orphan keystone services
+            services = keystone.services.list()
+            endpoints = keystone.endpoints.list()
+            for service in services:
+                if service.type == 'identity' or service.type == 'keystone':
+                    for endpoint in endpoints:
+                        if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                            keystone.services.delete(service.id)
+            #create service and endpoint
+            identity_service = keystone.services.create('keystone', 'identity', 'trilioVault Identity Service')
+            public_url = 'http://' + config_data['tvault_primary_node'] + ':5000' + '/v2.0'
+            admin_url = 'http://' + config_data['tvault_primary_node'] + ':35357' + '/v2.0'
+            keystone.endpoints.create(config_data['region_name'], identity_service.id, public_url, admin_url, public_url)
+
+        except Exception as exception:
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception                            
+        
     else:
         command = ['sudo', 'service', 'keystone', 'stop'];
         subprocess.call(command, shell=False)
@@ -1282,9 +1307,9 @@ def main():
         gateway     = propertyMap["gateway"]
         hostname    = propertyMap["hostname"]
         
-        replace_line('/etc/network/interfaces', 'address ', '\t\taddress ' + ip)
-        replace_line('/etc/network/interfaces', 'netmask ', '\t\tnetmask ' + netmask)
-        replace_line('/etc/network/interfaces', 'gateway ', '\t\tgateway ' + gateway)
+        replace_line('/etc/network/interfaces', 'address ', '\taddress ' + ip)
+        replace_line('/etc/network/interfaces', 'netmask ', '\tnetmask ' + netmask)
+        replace_line('/etc/network/interfaces', 'gateway ', '\tgateway ' + gateway)
         
         #adjust hostname       
         fh, abs_path = mkstemp()
@@ -1298,7 +1323,10 @@ def main():
         subprocess.call(command, shell=False)
         os.chmod('/etc/hostname', 0644)
         command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
-        subprocess.call(command, shell=False)  
+        subprocess.call(command, shell=False)
+
+        command = ['sudo', 'hostname', hostname];
+        subprocess.call(command, shell=False)        
                 
         # adjust hosts file
         fh, abs_path = mkstemp()
