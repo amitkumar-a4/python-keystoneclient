@@ -346,7 +346,7 @@ def configure_nova():
         
         replace_line('/etc/nova/nova.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_admin_password'])               
         replace_line('/etc/nova/nova.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_admin_username'])               
-        replace_line('/etc/nova/nova.conf', 'vcenter = ', 'vcenter = ' + config_data['vcenter'])
+        replace_line('/etc/nova/nova.conf', 'host_ip = ', 'vcenter = ' + config_data['vcenter'])
         
         command = ['sudo', 'rm', "/etc/init/nova-compute.override"];
         subprocess.call(command, shell=False)                                                 
@@ -1040,7 +1040,7 @@ def configure_service():
         if 'vcenter_admin_username' in config_data:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_admin_username'])
         if 'vcenter' in config_data:               
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vcenter = ', 'vcenter = ' + config_data['vcenter'])        
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_ip = ', 'vcenter = ' + config_data['vcenter'])        
         
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
