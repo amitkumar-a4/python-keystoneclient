@@ -18,6 +18,7 @@ from tempfile import mkstemp
 from shutil import move
 from os import remove, close
 from urlparse import urlparse
+from xml.dom.minidom import parseString
     
 import bottle
 from bottle import static_file
@@ -29,7 +30,6 @@ import keystoneclient
 import keystoneclient.v2_0.client as ksclient
 import workloadmgrclient
 import workloadmgrclient.v1.client as wlmclient
-
 
 
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.DEBUG)
@@ -238,10 +238,374 @@ def get_lan_ip():
                 pass
     return ip
 
+def configure_mysql():
+    if config_data['nodetype'] == 'controller':
+        #configure mysql server
+        command = ['sudo', 'rm', "/etc/init/mysql.override"];
+        subprocess.call(command, shell=False)              
+        command = ['sudo', 'service', 'mysql', 'start'];
+        subprocess.call(command, shell=False)
+        stmt = 'GRANT ALL PRIVILEGES ON *.* TO ' +  '\'' + 'root' + '\'' + '@' +'\'' + '%' + '\'' + ' identified by ' + '\'' + TVAULT_SERVICE_PASSWORD + '\'' + ';'
+        command = ['sudo', 'mysql', '-uroot', '-p'+TVAULT_SERVICE_PASSWORD, '-h127.0.0.1', '-e', stmt]
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'mysql', 'restart'];
+        subprocess.call(command, shell=False)
+    else:
+        command = ['sudo', 'service', 'mysql', 'stop'];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/mysql.override"];
+        subprocess.call(command, shell=False)
+        
+def configure_rabbitmq():
+    if config_data['nodetype'] == 'controller':                    
+        #configure rabittmq
+        command = ['sudo', 'rm', "/etc/init/rabbitmq-server.override"];
+        subprocess.call(command, shell=False)                     
+        command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'start']
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
+        subprocess.call(command, shell=False)
+    else:
+        command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/rabbitmq-server.override"];
+        subprocess.call(command, shell=False)     
+
+def configure_keystone():
+    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
+        #configure keystone
+        replace_line('/etc/keystone/keystone.conf', 'admin_endpoint = ', 'admin_endpoint = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":%(admin_port)s/")            
+        replace_line('/etc/keystone/keystone.conf', 'public_endpoint = ', 'public_endpoint = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":%(public_port)s/")            
+        replace_line('/etc/keystone/keystone.conf', 'connection = ', 'connection = ' + 
+                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/keystone?charset=utf8")            
+        replace_line('/etc/keystone/keystone.conf', 'log_dir = ', 'log_dir = ' + '/var/log/keystone')
+
+        command = ['sudo', 'rm', "/etc/init/keystone.override"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'keystone', 'restart'];
+        subprocess.call(command, shell=False)
+        time.sleep(3) 
+        try:
+            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       username=config_data['admin_username'], 
+                                       password=config_data['admin_password'], 
+                                       tenant_name=config_data['admin_tenant_name'])
+            keystone.management_url = keystone.auth_url                
+            #delete orphan keystone services
+            services = keystone.services.list()
+            endpoints = keystone.endpoints.list()
+            for service in services:
+                if service.type == 'identity' or service.type == 'keystone':
+                    for endpoint in endpoints:
+                        if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                            keystone.services.delete(service.id)
+            #create service and endpoint
+            identity_service = keystone.services.create('keystone', 'identity', 'trilioVault Identity Service')
+            public_url = 'http://' + config_data['tvault_primary_node'] + ':5000' + '/v2.0'
+            admin_url = 'http://' + config_data['tvault_primary_node'] + ':35357' + '/v2.0'
+            keystone.endpoints.create(config_data['region_name'], identity_service.id, public_url, admin_url, public_url)
+
+        except Exception as exception:
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception                            
+        
+    else:
+        command = ['sudo', 'service', 'keystone', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/keystone.override"];
+        subprocess.call(command, shell=False)
+        
+def configure_nova():
+    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
+        #configure nova
+        replace_line('/etc/nova/nova.conf', 'neutron_url = ', 'neutron_url = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":9696") 
+        replace_line('/etc/nova/nova.conf', 'neutron_admin_auth_url = ', 'neutron_admin_auth_url = ' + config_data['keystone_admin_url'])
+        replace_line('/etc/nova/nova.conf', 'glance_api_servers = ', 'glance_api_servers = ' + 
+                     config_data['tvault_primary_node'] + ":9292")      
+        replace_line('/etc/nova/nova.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['tvault_primary_node'])  
+        replace_line('/etc/nova/nova.conf', 'ec2_dmz_host = ', 'ec2_dmz_host = ' + config_data['tvault_primary_node'])                        
+        replace_line('/etc/nova/nova.conf', 'vncserver_proxyclient_address = ', 'vncserver_proxyclient_address = ' + config_data['tvault_primary_node']) 
+        replace_line('/etc/nova/nova.conf', 'vncserver_listen = ', 'vncserver_listen = ' + config_data['tvault_primary_node']) 
+        replace_line('/etc/nova/nova.conf', 'xvpvncproxy_base_url = ', 'xvpvncproxy_base_url = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":6081/console")                            
+        replace_line('/etc/nova/nova.conf', 'novncproxy_base_url = ', 'novncproxy_base_url = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":6080/vnc_auto.html")          
+        replace_line('/etc/nova/nova.conf', 'sql_connection = ', 'sql_connection = ' + 
+                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/nova?charset=utf8")  
+        replace_line('/etc/nova/nova.conf', 'my_ip = ', 'my_ip = ' + config_data['tvault_primary_node'])             
+        replace_line('/etc/nova/nova.conf', 's3_host = ', 's3_host = ' + config_data['tvault_primary_node'])  
+        replace_line('/etc/nova/nova.conf', 'auth_host = ', 'auth_host = ' + config_data['tvault_primary_node'])
+        replace_line('/etc/nova/nova.conf', 'html5proxy_base_url = ', 'html5proxy_base_url = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":6082/spice_auto.html")    
+        replace_line('/etc/nova/nova.conf', 'log_dir = ', 'log_dir = ' + '/var/log/nova')
+        
+        replace_line('/etc/nova/nova.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_admin_password'])               
+        replace_line('/etc/nova/nova.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_admin_username'])               
+        replace_line('/etc/nova/nova.conf', 'host_ip = ', 'vcenter = ' + config_data['vcenter'])
+        
+        command = ['sudo', 'rm', "/etc/init/nova-compute.override"];
+        subprocess.call(command, shell=False)                                                 
+        command = ['sudo', 'rm', "/etc/init/nova-cert.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'rm', "/etc/init/nova-api.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'rm', "/etc/init/nova-consoleauth.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'rm', "/etc/init/nova-conductor.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'rm', "/etc/init/nova-scheduler.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'rm', "/etc/init/nova-novncproxy.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'rm', "/etc/init/nova-xvpvncproxy.override"];
+        subprocess.call(command, shell=False) 
+        
+        command = ['sudo', 'service', 'nova-compute', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-cert', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-api', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-consoleauth', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-conductor', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-scheduler', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-novncproxy', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-xvpvncproxy', 'restart'];
+        subprocess.call(command, shell=False)
+        
+        try:
+            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       username=config_data['admin_username'], 
+                                       password=config_data['admin_password'], 
+                                       tenant_name=config_data['admin_tenant_name'])                
+            #delete orphan nova services
+            services = keystone.services.list()
+            endpoints = keystone.endpoints.list()
+            for service in services:
+                if service.type == 'compute' or service.type == 'computev3':
+                    for endpoint in endpoints:
+                        if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                            keystone.services.delete(service.id)
+            #create service and endpoint
+            compute_service_v2 = keystone.services.create('nova', 'compute', 'trilioVault Compute Service')
+            public_url = 'http://' + config_data['tvault_primary_node'] + ':8774' + '/v2/$(tenant_id)s'
+            keystone.endpoints.create(config_data['region_name'], compute_service_v2.id, public_url, public_url, public_url)
+            
+            compute_service_v3 = keystone.services.create('trilioVaultCS-V3', 'computev3', 'trilioVault Compute Service')
+            public_url = 'http://' + config_data['tvault_primary_node'] + ':8774' + '/v3/$(tenant_id)s'
+            keystone.endpoints.create(config_data['region_name'], compute_service_v3.id, public_url, public_url, public_url)
+        except Exception as exception:
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception                            
+
+    else:
+        command = ['sudo', 'service', 'nova-compute', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-cert', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-api', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-consoleauth', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-conductor', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-scheduler', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-novncproxy', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'nova-xvpvncproxy', 'stop'];
+        subprocess.call(command, shell=False)
+                                            
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-compute.override"];
+        subprocess.call(command, shell=False)                                                 
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-cert.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-api.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-consoleauth.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-conductor.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-scheduler.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-novncproxy.override"];
+        subprocess.call(command, shell=False)   
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-xvpvncproxy.override"];
+        subprocess.call(command, shell=False)   
+
+def configure_neutron():
+    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
+        #configure neutron
+        replace_line('/etc/neutron/neutron.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['tvault_primary_node'])  
+        replace_line('/etc/neutron/neutron.conf', 'auth_host = ', 'auth_host = ' + config_data['tvault_primary_node'])  
+        replace_line('/etc/neutron/neutron.conf', 'log_dir = ', 'log_dir = ' + '/var/log/neutron')
+                               
+        replace_line('/etc/neutron/metadata_agent.ini', 'nova_metadata_ip = ', 'nova_metadata_ip = ' + config_data['tvault_primary_node']) 
+        replace_line('/etc/neutron/metadata_agent.ini', 'auth_url = ', 'auth_url = ' + config_data['keystone_public_url'])
+        
+        replace_line('/etc/neutron/plugins/ml2/ml2_conf.ini', 'connection = ', 'connection = ' + 
+                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/neutron_ml2?charset=utf8")  
+        replace_line('/etc/neutron/plugins/ml2/ml2_conf.ini', 'local_ip = ', 'local_ip = ' + config_data['tvault_primary_node'])
+
+ 
+        
+        command = ['sudo', 'rm', "/etc/init/neutron-dhcp-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'rm', "/etc/init/neutron-metadata-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'rm', "/etc/init/neutron-plugin-openvswitch-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'rm', "/etc/init/neutron-l3-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'rm', "/etc/init/neutron-server.override"];
+        subprocess.call(command, shell=False)
+        
+        command = ['sudo', 'service', 'neutron-dhcp-agent', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-metadata-agent', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-plugin-openvswitch-agent', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-l3-agent', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-server', 'restart'];
+        subprocess.call(command, shell=False)        
+              
+        try:
+            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       username=config_data['admin_username'], 
+                                       password=config_data['admin_password'], 
+                                       tenant_name=config_data['admin_tenant_name'])               
+            #delete orphan neutron services
+            services = keystone.services.list()
+            endpoints = keystone.endpoints.list()
+            for service in services:
+                if service.type == 'network':
+                    for endpoint in endpoints:
+                        if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                            keystone.services.delete(service.id)
+            #create service and endpoint
+            network_service = keystone.services.create('neutron', 'network', 'trilioVault Network Service')
+            public_url = 'http://' + config_data['tvault_primary_node'] + ':9696' + '/'
+            keystone.endpoints.create(config_data['region_name'], network_service.id, public_url, public_url, public_url)
+
+        except Exception as exception:
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception                            
+    else:
+        command = ['sudo', 'service', 'neutron-dhcp-agent', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-metadata-agent', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-plugin-openvswitch-agent', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-l3-agent', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'neutron-server', 'stop'];
+        subprocess.call(command, shell=False)
+        
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-dhcp-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-metadata-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-plugin-openvswitch-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-l3-agent.override"];
+        subprocess.call(command, shell=False)    
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-server.override"];
+        subprocess.call(command, shell=False)           
+
+def configure_glance():
+    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
+        #configure glance
+        replace_line('/etc/glance/glance-api.conf', 'sql_connection = ', 'sql_connection = ' + 
+                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/glance?charset=utf8")
+        replace_line('/etc/glance/glance-api.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['tvault_primary_node'])  
+        replace_line('/etc/glance/glance-api.conf', 'auth_uri = ', 'auth_uri = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":5000/")                      
+        replace_line('/etc/glance/glance-api.conf', 'auth_host = ', 'auth_host = ' + config_data['tvault_primary_node']) 
+        
+        replace_line('/etc/glance/glance-cache.conf', 'auth_url = ', 'auth_url = ' + config_data['keystone_admin_url'])
+        
+        replace_line('/etc/glance/glance-registry.conf', 'sql_connection = ', 'sql_connection = ' + 
+                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/glance?charset=utf8")            
+        replace_line('/etc/glance/glance-registry.conf', 'auth_uri = ', 'auth_uri = ' + 
+                     "http://" + config_data['tvault_primary_node'] + ":5000/")      
+        replace_line('/etc/glance/glance-registry.conf', 'auth_host = ', 'auth_host = ' + config_data['tvault_primary_node']) 
+        
+        command = ['sudo', 'rm', "/etc/init/glance-registry.override"];
+        subprocess.call(command, shell=False)      
+        command = ['sudo', 'rm', "/etc/init/glance-api.override"];
+        subprocess.call(command, shell=False)  
+        
+        command = ['sudo', 'service', 'glance-registry', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'glance-api', 'restart'];
+        subprocess.call(command, shell=False)        
+        
+        try:
+            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       username=config_data['admin_username'], 
+                                       password=config_data['admin_password'], 
+                                       tenant_name=config_data['admin_tenant_name'])               
+            #delete orphan glance services
+            services = keystone.services.list()
+            endpoints = keystone.endpoints.list()
+            for service in services:
+                if service.type == 'image':
+                    for endpoint in endpoints:
+                        if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                            keystone.services.delete(service.id)
+            #create service and endpoint
+            image_service = keystone.services.create('glance', 'image', 'trilioVault Image Service')
+            public_url = 'http://' + config_data['tvault_primary_node'] + ':9292'
+            keystone.endpoints.create(config_data['region_name'], image_service.id, public_url, public_url, public_url)
+
+        except Exception as exception:
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception                            
+
+    else:
+        #glance
+        command = ['sudo', 'service', 'glance-registry', 'stop'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'glance-api', 'stop'];
+        subprocess.call(command, shell=False)
+        
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/glance-registry.override"];
+        subprocess.call(command, shell=False)      
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/glance-api.override"];
+        subprocess.call(command, shell=False) 
+        
+def configure_horizon():
+    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware': 
+        #configure horizon            
+        replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
+        command = ['sudo', 'rm', "/etc/init/apache2.override"];
+        subprocess.call(command, shell=False)    
+        
+        command = ['sudo', 'service', 'apache2', 'restart'];
+        subprocess.call(command, shell=False)
+    else:
+        command = ['sudo', 'service', 'apache2', 'stop'];
+        subprocess.call(command, shell=False)             
+        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
+        subprocess.call(command, shell=False)                       
+            
 @bottle.route('/configure')
 @bottle.view('configure_form')
 @authorize()
 def configure_form():
+    bottle.redirect("/configure_vmware")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
 
@@ -316,19 +680,35 @@ def configure_host():
             command = ['sudo', 'resolvconf',  '-u']
             subprocess.call(command, shell=False)    
         
-        command = ['sudo', 'umount', '/dev/vdb']
-        subprocess.call(command, shell=False)
-        
-        command = ['sudo', 'mkfs', '-t', 'ext4', '/dev/vdb']
-        subprocess.check_call(command, shell=False) 
-        
-        command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
-        subprocess.call(command, shell=False)
-        
-        command = ['sudo', 'mount', '/dev/vdb', '/opt/stack/data/wlm']
-        subprocess.check_call(command, shell=False) 
-        
-        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /opt/stack/data/wlm ext4 defaults 0' >> /etc/fstab"]
+        try:
+            command = ['sudo', 'rescan-scsi-bus']
+            subprocess.call(command, shell=False)
+                        
+            command = ['sudo', 'umount', '/dev/vdb']
+            subprocess.call(command, shell=False)
+            
+            command = ['sudo', 'mkfs.ext4', '-F', '/dev/vdb']
+            subprocess.call(command, shell=False) 
+            
+            command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
+            subprocess.call(command, shell=False)
+            
+            command = ['sudo', 'mount', '/dev/vdb', '/opt/stack/data/wlm']
+            subprocess.check_call(command, shell=False) 
+        except Exception as exception:
+            command = ['sudo', 'umount', '/dev/sdb']
+            subprocess.call(command, shell=False)
+            
+            command = ['sudo', 'mkfs.ext4', '-F', '/dev/sdb']
+            subprocess.call(command, shell=False) 
+            
+            command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
+            subprocess.call(command, shell=False)
+            
+            command = ['sudo', 'mount', '/dev/sdb', '/opt/stack/data/wlm']
+            subprocess.check_call(command, shell=False) 
+                    
+        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /opt/stack/data/wlm ext4 defaults,nobootwait,nofail 0' >> /etc/fstab"]
         #subprocess.check_call(command, shell=False)        
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -344,6 +724,14 @@ def configure_host():
 def authenticate_with_keystone():
     # Authenticate with Keystone
     try:
+        configure_mysql()
+        configure_rabbitmq()
+        configure_keystone()
+        configure_nova()
+        configure_neutron()
+        configure_glance()
+        configure_horizon()
+        
         #test admin url
         keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                    username=config_data['admin_username'], 
@@ -428,7 +816,6 @@ def authenticate_with_keystone():
         #workloadmanager
         if  config_data['nodetype'] == 'controller':
             #this is the first node
-            config_data['wlm_controller_node'] = True
             config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
             config_data['rabbit_host'] = config_data['floating_ipaddress']
             config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
@@ -437,7 +824,6 @@ def authenticate_with_keystone():
             wlm_public_url = keystone.service_catalog.url_for(**kwargs)
             parse_result = urlparse(wlm_public_url)
             
-            config_data['wlm_controller_node'] = False
             config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
             config_data['rabbit_host'] = parse_result.hostname
             config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
@@ -455,7 +841,7 @@ def authenticate_with_keystone():
 @authorize()
 def register_service():
     # Python code to here register the service with keystone
-    if config_data['wlm_controller_node'] == False:
+    if config_data['nodetype'] != 'controller':
         #nothing to do
         return {'status':'Success'}
     try:
@@ -532,25 +918,7 @@ def register_service():
 def configure_api():
     # Python code to configure api service
     try:
-        if config_data['wlm_controller_node'] == True:
-            #configure mysql server
-            command = ['sudo', 'service', 'mysql', 'start'];
-            subprocess.call(command, shell=False)
-            stmt = 'GRANT ALL PRIVILEGES ON *.* TO ' +  '\'' + 'root' + '\'' + '@' +'\'' + '%' + '\'' + ' identified by ' + '\'' + TVAULT_SERVICE_PASSWORD + '\'' + ';'
-            command = ['sudo', 'mysql', '-uroot', '-p'+TVAULT_SERVICE_PASSWORD, '-h127.0.0.1', '-e', stmt]
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'mysql', 'restart'];
-            subprocess.call(command, shell=False)
-            
-            #configure rabittmq
-            command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'start']
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
-            subprocess.call(command, shell=False)
-                     
-                
+        if config_data['nodetype'] == 'controller':
             command = ['sudo', 'rm', "/etc/init/wlm-api.override"];
             #shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
@@ -567,21 +935,16 @@ def configure_api():
             command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
             subprocess.call(command, shell=False)
                                     
-            replace_line('admin_endpoint = ', '    ip: ', '    ip: ' + config_data['keystone_host'])
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])
             replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
             
-            #configure keystone
-            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])            
-            
-            
-                   
+            if 'vcenter' in config_data and config_data['vcenter']:
+                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    name: ', '    name: vCenter')
+                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    value: ', '    value: ' + config_data['vcenter'])                 
+            else:
+                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    name: ', '    name: Region')
+                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    value: ', '    value: ' + config_data['region_name'])                 
         else:
-            command = ['sudo', 'service', 'mysql', 'stop'];
-            subprocess.call(command, shell=False)    
-            
-            command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
-            subprocess.call(command, shell=False)
-            
             command = ['sudo', 'service', 'wlm-api', 'stop'];
             subprocess.call(command, shell=False)
             
@@ -610,83 +973,7 @@ def configure_api():
             subprocess.call(command, shell=False)         
             command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
             subprocess.call(command, shell=False)
-            
-            #keystone
-            command = ['sudo', 'service', 'keystone', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/keystone.override"];
-            subprocess.call(command, shell=False)              
-                       
-            #nova
-            command = ['sudo', 'service', 'nova-compute', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-cert', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-api', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-consoleauth', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-conductor', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-scheduler', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-novncproxy', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'nova-xvpvncproxy', 'stop'];
-            subprocess.call(command, shell=False)
-                                                
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-compute.override"];
-            subprocess.call(command, shell=False)                                                 
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-cert.override"];
-            subprocess.call(command, shell=False)   
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-api.override"];
-            subprocess.call(command, shell=False)   
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-consoleauth.override"];
-            subprocess.call(command, shell=False)   
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-conductor.override"];
-            subprocess.call(command, shell=False)   
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-scheduler.override"];
-            subprocess.call(command, shell=False)   
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-novncproxy.override"];
-            subprocess.call(command, shell=False)   
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/nova-xvpvncproxy.override"];
-            subprocess.call(command, shell=False)   
-            
-            #neutron
-            command = ['sudo', 'service', 'neutron-dhcp-agent', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'neutron-metadata-agent', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'neutron-plugin-openvswitch-agent', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'neutron-l3-agent', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'neutron-server', 'stop'];
-            subprocess.call(command, shell=False)
-            
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-dhcp-agent.override"];
-            subprocess.call(command, shell=False)    
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-metadata-agent.override"];
-            subprocess.call(command, shell=False)    
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-plugin-openvswitch-agent.override"];
-            subprocess.call(command, shell=False)    
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-l3-agent.override"];
-            subprocess.call(command, shell=False)    
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/neutron-server.override"];
-            subprocess.call(command, shell=False)             
-            
-            #glance
-            command = ['sudo', 'service', 'glance-registry', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'glance-api', 'stop'];
-            subprocess.call(command, shell=False)
-            
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/glance-registry.override"];
-            subprocess.call(command, shell=False)      
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/glance-api.override"];
-            subprocess.call(command, shell=False)      
-           
-            
+
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception       
@@ -698,7 +985,7 @@ def configure_api():
 def configure_scheduler():
     # Python code here to configure scheduler
     try:
-        if config_data['wlm_controller_node'] == True:
+        if config_data['nodetype'] == 'controller':
             command = ['sudo', 'rm', "/etc/init/wlm-scheduler.override"];
             #shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)        
@@ -748,6 +1035,13 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])
         
+        if 'vcenter_admin_password' in config_data:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_admin_password'])               
+        if 'vcenter_admin_username' in config_data:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_admin_username'])
+        if 'vcenter' in config_data:               
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_ip = ', 'vcenter = ' + config_data['vcenter'])        
+        
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
@@ -764,7 +1058,7 @@ def configure_service():
 def start_api():
     # Python code to configure api service
     try:
-        if config_data['wlm_controller_node'] == True:
+        if config_data['nodetype'] == 'controller':
             command = ['sudo', 'service', 'wlm-api', 'restart'];
             subprocess.call(command, shell=False)
             
@@ -778,7 +1072,10 @@ def start_api():
             command = ['sudo', 'service', 'tvault-gui-web', 'restart'];
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'tvault-gui-web-1', 'restart'];
-            subprocess.call(command, shell=False)                                                
+            subprocess.call(command, shell=False) 
+            
+
+                                                               
         
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -791,7 +1088,7 @@ def start_api():
 def start_scheduler():
     # Python code here to configure scheduler
     try:
-        if config_data['wlm_controller_node'] == True:        
+        if config_data['nodetype'] == 'controller':        
             command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
             #shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
@@ -820,7 +1117,7 @@ def start_service():
 def register_workloadtypes():
     # Python code here to configure workloadmgr
     try:    
-        if config_data['wlm_controller_node'] == True:
+        if config_data['nodetype'] == 'controller':
             time.sleep(5)
             wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                    username=config_data['admin_username'], 
@@ -887,18 +1184,17 @@ def configure_vmware():
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
     
-    try:    
+    try: 
         config_inputs = bottle.request.POST
        
+        config_data['configuration_type'] = 'vmware'
         config_data['nodetype'] = config_inputs['nodetype']
-        config_data['tvault_ipaddress'] = get_lan_ip()
+        config_data['tvault_primary_node'] = config_inputs['tvault-primary-node']
+        config_data['tvault_ipaddress'] = config_data['tvault_primary_node']
         config_data['floating_ipaddress'] = config_data['tvault_ipaddress']
         config_data['name_server'] = config_inputs['name-server']
         config_data['domain_search_order'] = config_inputs['domain-search-order']        
         
-        if config_data['nodetype'] == 'controller':
-            config_data['tvault_primary_node'] = config_data['floating_ipaddress']
-            
         config_data['vcenter'] = config_inputs['vcenter']
         config_data['vcenter_admin_username'] = config_inputs['vcenter-admin-username']
         config_data['vcenter_admin_password'] = config_inputs['vcenter-admin-password']
@@ -906,9 +1202,9 @@ def configure_vmware():
         config_data['keystone_admin_url'] = "http://" + config_data['tvault_primary_node'] + ":35357/v2.0"
         config_data['keystone_public_url'] = "http://" + config_data['tvault_primary_node'] + ":5000/v2.0"
         config_data['admin_username'] = 'admin'
-        config_data['admin_password'] = '52T8FVYZJse'        
+        config_data['admin_password'] = 'password'        
         config_data['admin_tenant_name'] = 'admin'
-        config_data['region_name'] = 'nova'
+        config_data['region_name'] = 'RegionOne'
         
         parse_result = urlparse(config_data['keystone_admin_url'])
         config_data['keystone_host'] = parse_result.hostname
@@ -936,7 +1232,8 @@ def configure_openstack():
     
     try:    
         config_inputs = bottle.request.POST
-       
+
+        config_data['configuration_type'] = 'openstack'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_ipaddress'] = get_lan_ip()
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
@@ -970,16 +1267,12 @@ def configure_openstack():
 @bottle.post('/configure')
 @authorize()
 def configure():
-    global config_data
-    config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
     
-    try:    
+    try:
         config_inputs = bottle.request.POST
        
-        config_data['configuration_type'] = config_inputs['configuration_type']
- 
-        bottle.redirect("/configure_" + config_data['configuration_type'])
+        bottle.redirect("/configure_" + config_inputs['configuration-type'])
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -987,10 +1280,78 @@ def configure():
         else:
            bottle.redirect("/configure")
 
-    
+def findXmlSection(dom, sectionName):
+    sections = dom.getElementsByTagName(sectionName)
+    return sections[0]
+ 
+def getPropertyMap(ovfEnv):
+    dom = parseString(ovfEnv)
+    section = findXmlSection(dom, "PropertySection")
+    propertyMap = {}
+    for property in section.getElementsByTagName("Property"):
+        key   = property.getAttribute("oe:key")
+        value = property.getAttribute("oe:value")
+        propertyMap[key] = value
+    dom.unlink()
+    return propertyMap    
 # #  Web application main  # #
 
 def main():
+    #configure the networking
+    try:
+        ovfEnv = subprocess.Popen("echo `vmtoolsd --cmd \"info-get guestinfo.ovfenv\"`", shell=True, stdout=subprocess.PIPE).stdout.read()
+        propertyMap = getPropertyMap(ovfEnv)
+         
+        ip          = propertyMap["ip"]
+        netmask     = propertyMap["netmask"]
+        gateway     = propertyMap["gateway"]
+        hostname    = propertyMap["hostname"]
+        
+        replace_line('/etc/network/interfaces', 'address ', '\taddress ' + ip)
+        replace_line('/etc/network/interfaces', 'netmask ', '\tnetmask ' + netmask)
+        replace_line('/etc/network/interfaces', 'gateway ', '\tgateway ' + gateway)
+        
+        #adjust hostname       
+        fh, abs_path = mkstemp()
+        new_file = open(abs_path,'w')
+        new_file.write(hostname)
+        #close temp file
+        new_file.close()
+        close(fh)
+        #Move new file
+        command = ['sudo', 'mv', abs_path, "/etc/hostname"];
+        subprocess.call(command, shell=False)
+        os.chmod('/etc/hostname', 0644)
+        command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+        subprocess.call(command, shell=False)
+
+        command = ['sudo', 'hostname', hostname];
+        subprocess.call(command, shell=False)        
+                
+        # adjust hosts file
+        fh, abs_path = mkstemp()
+        new_file = open(abs_path,'w')
+        new_file.write('127.0.0.1 localhost\n')
+        new_file.write('127.0.0.1 ' + hostname + '\n')
+        new_file.write(ip + ' ' + hostname + '\n')
+        #close temp file
+        new_file.close()
+        close(fh)
+        #Move new file
+        command = ['sudo', 'mv', abs_path, "/etc/hosts"];
+        subprocess.call(command, shell=False)
+        os.chmod('/etc/hosts', 0644)
+        command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+        subprocess.call(command, shell=False)
+        
+        command = ['sudo', 'ifdown', 'br-eth0']
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'ifup', 'br-eth0']
+        subprocess.call(command, shell=False)                 
+                
+    except Exception as exception:
+        #TODO: implement logging
+        pass
 
     # Start the Bottle webapp
     bottle.debug(True)

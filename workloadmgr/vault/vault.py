@@ -103,6 +103,10 @@ class VaultBackupService(base.Base):
         LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
                 
         return copy_to_file_path   
+    
+    def put_object(self, parent, path, workload_json):
+        #place holder for now
+        return    
         
          
     def restore_local(self, snapshot_metadata, restore_to_file_path):
