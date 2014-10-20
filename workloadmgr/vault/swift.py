@@ -395,8 +395,9 @@ class SwiftBackupService(base.Base):
         """Restore a v1 swift volume snapshot from swift."""
 
         try:
-            snapshot = WorkloadMgrDB().db.snapshot_get(snapshot_metadata['snapshot_id'])
-            container = self._generate_snapshot_object_name_prefix(snapshot)
+            snapshot = WorkloadMgrDB().db.snapshot_get(self.context, snapshot_metadata['snapshot_id'])
+            workload = WorkloadMgrDB().db.workload_get(self.context, snapshot.workload_id)
+            container = self._generate_workload_container_name(workload)
         except socket.error as err:
             raise exception.SwiftConnectionFailed(reason=str(err))
         

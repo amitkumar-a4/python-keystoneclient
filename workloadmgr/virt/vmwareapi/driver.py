@@ -348,6 +348,8 @@ class VMwareVCDriver(VMwareESXDriver):
     
     def _get_vmfolder_ref_from_parent_folder(self, vmfolder_ref_parent, vmfolder_moid):
         vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref_parent, "Folder", "childEntity")
+        if not len(vmfolder_refs):
+            return None
         for vmfolder_ref in vmfolder_refs.ManagedObjectReference:
             if vmfolder_ref.value == vmfolder_moid:
                 return vmfolder_ref
@@ -997,6 +999,10 @@ class VMwareVCDriver(VMwareESXDriver):
                                 break
                 else:
                     continue  
+                if new_network_ref is None:
+                    # We only get into this situaltion when the vmx network settings does 
+                    # not match with mob of the VM. We run into this once
+                    continue
                 if new_network_ref._type == "Network":
                     device.backing = client_factory.create('ns0:VirtualEthernetCardNetworkBackingInfo') 
                     device.backing.deviceName = network['new_network_name']
@@ -1318,7 +1324,7 @@ class VMwareAPISession(object):
         # ESX host
         try:
             # May not have been able to connect to VC, so vim is still None
-            if self.vim:
+            if self.vim is None:
                 self.vim.Logout(self.vim.get_service_content().sessionManager)
         except Exception as excep:
             # It is just cautionary on our part to do a logout in del just

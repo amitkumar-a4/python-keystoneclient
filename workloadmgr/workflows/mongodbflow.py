@@ -153,6 +153,7 @@ class ResumeDBInstance(task.Task):
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
         self.client = connect_server(host_info[0], int(host_info[1]), '', '')
+        import pdb;pdb.set_trace()
         self.client.unlock()
 
 class PauseBalancer(task.Task):
@@ -163,7 +164,7 @@ class PauseBalancer(task.Task):
         # Pause the DB
         db = self.client.config
     
-        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, true);
+        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
         balancer_info = db.locks.find_one({'_id': 'balancer'})
         while int(str(balancer_info['state'])) > 0:
             LOG.debug(_('\t\twaiting for migration'))
@@ -488,6 +489,7 @@ class MongoDBWorkflow(workflow.Workflow):
         # Add disable profile task. Stopping balancer fails if profile process
         # is running
         snapshotvms.add(DisableProfiling('DisableProfiling', provides='proflevel'))
+        snapshotvms.add(PauseBalancer('PauseBalancer'))
     
         # This will be a flow that needs to be added to mongo db flow.
         # This is a flow that pauses all related VMs in unordered pattern
@@ -515,6 +517,7 @@ class MongoDBWorkflow(workflow.Workflow):
         # will eventually get into sync with primary
         snapshotvms.add(ResumeDBInstances(hosts_to_backup))
     
+        snapshotvms.add(ResumeBalancer('ResumeBalancer'))
         # enable profiling to the level before the flow started
         snapshotvms.add(EnableProfiling('EnableProfiling'))
 
