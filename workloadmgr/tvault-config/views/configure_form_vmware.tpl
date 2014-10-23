@@ -48,7 +48,7 @@
     <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
 
     <div class="input-group">
-    	<label class="input-group-addon">Primary Node&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<label class="input-group-addon">Controller Node&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
     	<input name="tvault-primary-node" type="text" required placeholder="192.168.2.216" class="form-control"><br>
     </div><br>
    
@@ -57,12 +57,12 @@
     	<input name="vcenter" type="text" required placeholder="vcenter.local" class="form-control"><br>
     </div><br>
     <div class="input-group">
-    	<label class="input-group-addon">vCenter Administrator</label>
-    	<input name="vcenter-admin-username" type="text" required placeholder="administrator@vsphere.local" class="form-control"> <br>
+    	<label class="input-group-addon">vCenter User&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<input name="vcenter-username" type="text" required placeholder="administrator@vsphere.local" class="form-control"> <br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">vCenter Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="vcenter-admin-password" type="password" required placeholder="" class="form-control"> <br>
+    	<input name="vcenter-password" type="password" required placeholder="" class="form-control"> <br>
     </div><br>
     
 	<div class="panel-group" id="accordion">
@@ -70,11 +70,43 @@
 	    <div class="panel-heading">
 	      <h4 class="panel-title">
 	        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">
-	          Optional
+	          LDAP ( Optional)
 	        </a>
 	      </h4>
 	    </div>
 	    <div id="collapseOne" class="panel-collapse collapse">
+	      <div class="panel-body">
+			<div class="input-group">
+				<label class="input-group-addon">Server URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<input name="ldap-server-url" type="text" placeholder="ldap://example.com" class="form-control"><br>
+			</div><br>
+			<div class="input-group">
+				<label class="input-group-addon">DN for domain name</label>
+				<input name="ldap-domain-name-suffix" type="text" placeholder="dc=example,dc=com" class="form-control"> <br>
+			</div><br>
+			<div class="input-group">
+				<label class="input-group-addon">Base DN for users&nbsp;&nbsp;&nbsp;</label>
+				<input name="ldap-user-tree-dn" type="text" placeholder="cn=users,dc=example,dc=com" class="form-control"><br>
+			</div><br>
+			<div class="input-group">
+				<label class="input-group-addon">Username(DN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<input name="ldap-user-dn" type="text" placeholder="cn=triliovault,cn=users,dc=example,dc=com" class="form-control"> <br>
+			</div><br>						
+	      </div>
+	    </div>
+	  </div>
+	</div>    
+    
+	<div class="panel-group" id="accordion">
+	  <div class="panel panel-default" id="panel2">
+	    <div class="panel-heading">
+	      <h4 class="panel-title">
+	        <a data-toggle="collapse" data-target="#collapseTwo" href="#collapseTwo">
+	          NameServer ( Optional)
+	        </a>
+	      </h4>
+	    </div>
+	    <div id="collapseTwo" class="panel-collapse collapse">
 	      <div class="panel-body">
     		<div class="input-group" >
 		    	<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
