@@ -19,6 +19,7 @@ from shutil import move
 from os import remove, close
 from urlparse import urlparse
 from xml.dom.minidom import parseString
+import ConfigParser
     
 import bottle
 from bottle import static_file
@@ -121,7 +122,7 @@ def change_password():
 
 
 @bottle.route('/')
-@bottle.view('landing_page')
+@bottle.view('landing_page_vmware')
 def index():
     return {}
 
@@ -190,16 +191,22 @@ def send_tvault_gui_logs1(filename):
 
 """############################ tvault config API's ########################"""
 
-def replace_line(file_path, pattern, substitute):
+def replace_line(file_path, pattern, substitute, starts_with = False):
     #Create temp file
     fh, abs_path = mkstemp()
     new_file = open(abs_path,'w')
     old_file = open(file_path)
     for line in old_file:
-        if pattern in line:
-            new_file.write(substitute+'\n')
+        if starts_with == True:
+            if line.startswith(pattern):
+                new_file.write(substitute+'\n')
+            else:
+                new_file.write(line)            
         else:
-            new_file.write(line)
+            if pattern in line:
+                new_file.write(substitute+'\n')
+            else:
+                new_file.write(line)
     #close temp file
     new_file.close()
     close(fh)
@@ -283,6 +290,26 @@ def configure_keystone():
         replace_line('/etc/keystone/keystone.conf', 'connection = ', 'connection = ' + 
                      "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/keystone?charset=utf8")            
         replace_line('/etc/keystone/keystone.conf', 'log_dir = ', 'log_dir = ' + '/var/log/keystone')
+        
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/keystone/keystone.conf')
+        Config.set('ldap','url', config_data['ldap_server_url'])
+        Config.set('ldap','suffix', config_data['ldap_domain_name_suffix'])
+        Config.set('ldap','user_tree_dn', config_data['ldap_user_tree_dn'])
+        Config.set('ldap','user', config_data['ldap_user_dn'])
+        Config.set('ldap','password', config_data['ldap_user_password'])
+        Config.set('ldap','use_dumb_member', config_data['ldap_use_dumb_member'])
+        Config.set('ldap','user_allow_create', config_data['ldap_user_allow_create'])
+        Config.set('ldap','user_allow_update', config_data['ldap_user_allow_update'])
+        Config.set('ldap','user_allow_delete', config_data['ldap_user_allow_delete'])
+        Config.set('ldap','tenant_allow_create', config_data['ldap_tenant_allow_create'])
+        Config.set('ldap','tenant_allow_update', config_data['ldap_tenant_allow_update'])
+        Config.set('ldap','tenant_allow_delete', config_data['ldap_tenant_allow_delete'])
+        Config.set('ldap','role_allow_create', config_data['ldap_role_allow_create'])
+        Config.set('ldap','role_allow_update', config_data['ldap_role_allow_update'])
+        Config.set('ldap','role_allow_delete', config_data['ldap_role_allow_delete']) 
+        with open('/etc/keystone/keystone.conf', 'wb') as configfile:
+            Config.write(configfile)         
 
         command = ['sudo', 'rm', "/etc/init/keystone.override"];
         subprocess.call(command, shell=False)
@@ -290,11 +317,12 @@ def configure_keystone():
         subprocess.call(command, shell=False)
         time.sleep(3) 
         try:
-            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                                       username=config_data['admin_username'], 
-                                       password=config_data['admin_password'], 
-                                       tenant_name=config_data['admin_tenant_name'])
-            keystone.management_url = keystone.auth_url                
+            keystone = ksclient.Client(endpoint=config_data['keystone_admin_url'], token='52T8FVYZJse')
+                                       #username=config_data['admin_username'], 
+                                       #password=config_data['admin_password'], 
+                                       #tenant_name=config_data['admin_tenant_name'])
+                                       
+            keystone.management_url = config_data['keystone_admin_url']                
             #delete orphan keystone services
             services = keystone.services.list()
             endpoints = keystone.endpoints.list()
@@ -308,6 +336,25 @@ def configure_keystone():
             public_url = 'http://' + config_data['tvault_primary_node'] + ':5000' + '/v2.0'
             admin_url = 'http://' + config_data['tvault_primary_node'] + ':35357' + '/v2.0'
             keystone.endpoints.create(config_data['region_name'], identity_service.id, public_url, admin_url, public_url)
+
+            for tenant in keystone.tenants.list():
+                if tenant.name == 'admin':
+                    admin_tenant_id = tenant.id
+                if tenant.name == 'service':
+                    service_tenant_id = tenant.id                      
+            for role in keystone.roles.list():
+                if role.name == 'admin':
+                    admin_role_id = role.id
+                            
+            try:
+                keystone.users.get(config_data['vcenter_username'])
+            except Exception as exception:
+                keystone.users.create(config_data['vcenter_username'], config_data['vcenter_password'],
+                                      email=None, tenant_id=admin_tenant_id, enabled=True) 
+            try:           
+                keystone.roles.add_user_role(user=config_data['vcenter_username'], role=admin_role_id, tenant=admin_tenant_id)
+            except ksclient.exceptions.Conflict as exception:
+                pass
 
         except Exception as exception:
             bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -344,9 +391,27 @@ def configure_nova():
                      "http://" + config_data['tvault_primary_node'] + ":6082/spice_auto.html")    
         replace_line('/etc/nova/nova.conf', 'log_dir = ', 'log_dir = ' + '/var/log/nova')
         
-        replace_line('/etc/nova/nova.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_admin_password'])               
-        replace_line('/etc/nova/nova.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_admin_username'])               
-        replace_line('/etc/nova/nova.conf', 'host_ip = ', 'vcenter = ' + config_data['vcenter'])
+        replace_line('/etc/nova/nova.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_password'])               
+        replace_line('/etc/nova/nova.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_username'])               
+        replace_line('/etc/nova/nova.conf', 'host_ip = ', 'host_ip = ' + config_data['vcenter'])
+        
+        replace_line('/etc/nova/nova.conf', 'admin_user = ', 'admin_user = ' + config_data['vcenter_username'], starts_with=True)
+        replace_line('/etc/nova/nova.conf', 'admin_password = ', 'admin_password = ' + config_data['vcenter_password'], starts_with=True)
+        replace_line('/etc/nova/nova.conf', 'neutron_admin_username = ', 'neutron_admin_username = ' + config_data['vcenter_username'])
+        replace_line('/etc/nova/nova.conf', 'neutron_admin_password = ', 'neutron_admin_password = ' + config_data['vcenter_password'])
+        
+        """
+        ConfigParser will not work for multiple values option
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/nova/nova.conf')
+        Config.set('keystone_authtoken','admin_user', config_data['vcenter_username'])
+        Config.set('keystone_authtoken','admin_password', config_data['vcenter_password'])
+        Config.set('DEFAULT','neutron_admin_username', config_data['vcenter_username'])
+        Config.set('DEFAULT','neutron_admin_password', config_data['vcenter_password'])        
+        with open('/etc/nova/nova.conf', 'wb') as configfile:
+            Config.write(configfile)
+        """         
+        
         
         command = ['sudo', 'rm', "/etc/init/nova-compute.override"];
         subprocess.call(command, shell=False)                                                 
@@ -456,7 +521,28 @@ def configure_neutron():
                      "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/neutron_ml2?charset=utf8")  
         replace_line('/etc/neutron/plugins/ml2/ml2_conf.ini', 'local_ip = ', 'local_ip = ' + config_data['tvault_primary_node'])
 
- 
+        replace_line('/etc/neutron/neutron.conf', 'admin_user = ', 'admin_user = ' + config_data['vcenter_username'])
+        replace_line('/etc/neutron/neutron.conf', 'admin_password = ', 'admin_password = ' + config_data['vcenter_password'])
+
+        replace_line('/etc/neutron/metadata_agent.ini', 'admin_user = ', 'admin_user = ' + config_data['vcenter_username'])
+        replace_line('/etc/neutron/metadata_agent.ini', 'admin_password = ', 'admin_password = ' + config_data['vcenter_password'])
+        
+        """
+        ConfigParser doesn't support multiple values
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/neutron/neutron.conf')
+        Config.set('keystone_authtoken','admin_user', config_data['vcenter_username'])
+        Config.set('keystone_authtoken','admin_password', config_data['vcenter_password'])
+        with open('/etc/neutron/neutron.conf', 'wb') as configfile:
+            Config.write(configfile)  
+            
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/neutron/metadata_agent.ini')
+        Config.set('DEFAULT','admin_user', config_data['vcenter_username'])
+        Config.set('DEFAULT','admin_password', config_data['vcenter_password'])
+        with open('/etc/neutron/metadata_agent.ini', 'wb') as configfile:
+            Config.write(configfile)
+        """              
         
         command = ['sudo', 'rm', "/etc/init/neutron-dhcp-agent.override"];
         subprocess.call(command, shell=False)    
@@ -541,6 +627,27 @@ def configure_glance():
         replace_line('/etc/glance/glance-registry.conf', 'auth_uri = ', 'auth_uri = ' + 
                      "http://" + config_data['tvault_primary_node'] + ":5000/")      
         replace_line('/etc/glance/glance-registry.conf', 'auth_host = ', 'auth_host = ' + config_data['tvault_primary_node']) 
+        
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/glance/glance-api.conf')
+        Config.set('keystone_authtoken','admin_user', config_data['vcenter_username'])
+        Config.set('keystone_authtoken','admin_password', config_data['vcenter_password'])
+        with open('/etc/glance/glance-api.conf', 'wb') as configfile:
+            Config.write(configfile) 
+            
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/glance/glance-cache.conf')
+        Config.set('DEFAULT','admin_user', config_data['vcenter_username'])
+        Config.set('DEFAULT','admin_password', config_data['vcenter_password'])
+        with open('/etc/glance/glance-cache.conf', 'wb') as configfile:
+            Config.write(configfile)   
+            
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/glance/glance-registry.conf')
+        Config.set('keystone_authtoken','admin_user', config_data['vcenter_username'])
+        Config.set('keystone_authtoken','admin_password', config_data['vcenter_password'])
+        with open('/etc/glance/glance-registry.conf', 'wb') as configfile:
+            Config.write(configfile)                                 
         
         command = ['sudo', 'rm', "/etc/init/glance-registry.override"];
         subprocess.call(command, shell=False)      
@@ -745,7 +852,10 @@ def authenticate_with_keystone():
                 config_data['admin_tenant_id'] = tenant.id            
                 
         if 'service_tenant_id' not in config_data:
-            raise Exception('No service tenant found')
+            if config_data['configuration_type'] == 'vmware':
+                config_data['service_tenant_id'] = config_data['admin_tenant_id']
+            else:
+                raise Exception('No service tenant found')
         
     
         #test public url
@@ -840,10 +950,13 @@ def authenticate_with_keystone():
 @bottle.route('/register_service')
 @authorize()
 def register_service():
-    # Python code to here register the service with keystone
+    # Python code to  register workloadmgr with keystone
     if config_data['nodetype'] != 'controller':
         #nothing to do
         return {'status':'Success'}
+    if config_data['configuration_type'] == 'vmware':
+        #nothing to do
+        return {'status':'Success'}    
     try:
         keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                    username=config_data['admin_username'], 
@@ -854,7 +967,7 @@ def register_service():
             wlm_user = None
             users = keystone.users.list()
             for user in users:
-                if user.name == 't-workloadmgr' and user.tenantId == config_data['service_tenant_id']:
+                if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
                     wlm_user = user
                     break
                 
@@ -872,7 +985,7 @@ def register_service():
                    raise exception
             
             
-            wlm_user = keystone.users.create('t-workloadmgr', TVAULT_SERVICE_PASSWORD, 'workloadmgr@trilioData.com',
+            wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
                                              tenant_id=config_data['service_tenant_id'],
                                              enabled=True)
             
@@ -1023,6 +1136,7 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_auth_url = ', 'nova_admin_auth_url = ' + config_data['nova_admin_auth_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_production_endpoint_template = ', 'nova_production_endpoint_template = ' + config_data['nova_production_endpoint_template'])
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_username = ', 'nova_admin_username = ' + config_data['nova_admin_username'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_password = ', 'nova_admin_password = ' + config_data['nova_admin_password'])
         
@@ -1035,17 +1149,19 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])
         
-        if 'vcenter_admin_password' in config_data:
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_admin_password'])               
-        if 'vcenter_admin_username' in config_data:
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_admin_username'])
+        if 'vcenter_password' in config_data:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_password = ', 'host_password = ' + config_data['vcenter_password'])               
+        if 'vcenter_username' in config_data:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_username'])
         if 'vcenter' in config_data:               
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_ip = ', 'vcenter = ' + config_data['vcenter'])        
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_ip = ', 'host_ip = ' + config_data['vcenter'])        
         
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_protocol = ', 'auth_protocol = ' + config_data['keystone_admin_protocol'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])        
         
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -1196,13 +1312,47 @@ def configure_vmware():
         config_data['domain_search_order'] = config_inputs['domain-search-order']        
         
         config_data['vcenter'] = config_inputs['vcenter']
-        config_data['vcenter_admin_username'] = config_inputs['vcenter-admin-username']
-        config_data['vcenter_admin_password'] = config_inputs['vcenter-admin-password']
+        config_data['vcenter_username'] = config_inputs['vcenter-username']
+        config_data['vcenter_password'] = config_inputs['vcenter-password']
         
+        config_data['ldap_server_url'] = config_inputs['ldap-server-url']
+        if config_data['ldap_server_url']:
+            config_data['ldap_domain_name_suffix'] = config_inputs['ldap-domain-name-suffix']
+            config_data['ldap_user_tree_dn'] = config_inputs['ldap-user-tree-dn']
+            config_data['ldap_user_dn'] = config_inputs['ldap-user-dn']
+            config_data['ldap_user_password'] = config_data['vcenter_password'] 
+            config_data['ldap_use_dumb_member'] = False
+            config_data['ldap_user_allow_create'] = False
+            config_data['ldap_user_allow_update'] = False
+            config_data['ldap_user_allow_delete'] = False
+            config_data['ldap_tenant_allow_create'] = False
+            config_data['ldap_tenant_allow_update'] = False
+            config_data['ldap_tenant_allow_delete'] = False
+            config_data['ldap_role_allow_create'] = False
+            config_data['ldap_role_allow_update'] = False
+            config_data['ldap_role_allow_delete'] = False            
+                      
+        else:
+            config_data['ldap_server_url'] = "ldap://localhost"
+            config_data['ldap_domain_name_suffix'] = "dc=openstack,dc=org"
+            config_data['ldap_user_tree_dn'] = "ou=Users,dc=openstack,dc=org"
+            config_data['ldap_user_dn'] = "dc=Manager,dc=openstack,dc=org"
+            config_data['ldap_user_password'] = "52T8FVYZJse"
+            config_data['ldap_use_dumb_member'] = True
+            config_data['ldap_user_allow_create'] = True
+            config_data['ldap_user_allow_update'] = True
+            config_data['ldap_user_allow_delete'] = True
+            config_data['ldap_tenant_allow_create'] = True
+            config_data['ldap_tenant_allow_update'] = True
+            config_data['ldap_tenant_allow_delete'] = True
+            config_data['ldap_role_allow_create'] = True
+            config_data['ldap_role_allow_update'] = True
+            config_data['ldap_role_allow_delete'] = True
+
         config_data['keystone_admin_url'] = "http://" + config_data['tvault_primary_node'] + ":35357/v2.0"
         config_data['keystone_public_url'] = "http://" + config_data['tvault_primary_node'] + ":5000/v2.0"
-        config_data['admin_username'] = 'admin'
-        config_data['admin_password'] = 'password'        
+        config_data['admin_username'] = config_data['vcenter_username']
+        config_data['admin_password'] = config_data['vcenter_password']        
         config_data['admin_tenant_name'] = 'admin'
         config_data['region_name'] = 'RegionOne'
         
@@ -1214,6 +1364,9 @@ def configure_vmware():
         parse_result = urlparse(config_data['keystone_public_url'])
         config_data['keystone_public_port'] = parse_result.port
         config_data['keystone_public_protocol'] = parse_result.scheme
+        
+        config_data['workloadmgr_user'] = config_data['vcenter_username']
+        config_data['workloadmgr_user_password'] = config_data['vcenter_password']
         
         bottle.redirect("/task_status_vmware")
     except Exception as exception:
@@ -1255,6 +1408,9 @@ def configure_openstack():
         parse_result = urlparse(config_data['keystone_public_url'])
         config_data['keystone_public_port'] = parse_result.port
         config_data['keystone_public_protocol'] = parse_result.scheme
+        
+        config_data['workloadmgr_user'] = 'triliovault'
+        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD      
  
         bottle.redirect("/task_status_openstack")
     except Exception as exception:
