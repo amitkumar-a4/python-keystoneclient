@@ -212,7 +212,17 @@ class SnapshotVMNetworks(task.Task):
         # Snapshot the networking configuration of VMs
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
-        
+  
+        # refresh the VM configuration such as network etc
+        if source_platform == "vmware":
+            compute_service = nova.API(production=True)
+            search_opts = {}
+            search_opts['vmref'] = '1'
+            for instance in instances:
+                newinst = compute_service.get_server_by_id(cntx,
+                                           instance['vm_metadata']['vmware_moid'],
+                                           search_opts=search_opts)
+
         return vmtasks_openstack.snapshot_vm_networks(cntx, db, instances, snapshot)
         """
         if source_platform == 'openstack':

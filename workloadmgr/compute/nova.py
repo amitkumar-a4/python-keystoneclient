@@ -14,6 +14,8 @@ import pkgutil
 import os
 import imp
 import pkg_resources
+import six
+from six.moves.urllib import parse
 from threading import Lock
 
 
@@ -338,16 +340,30 @@ class API(base.Base):
             return 
     
     @synchronized(novalock)    
-    def get_server_by_id(self, context, id, admin=False):
+    def get_server_by_id(self, context, id, admin=False, search_opts=None):
         """
         :param id to query.
         :rtype: :class:`Server`
         """   
         try:
-            servers = self._get_servers(context, search_opts=None, admin=admin)
-            for server in servers:
-                if server.id == id:
-                    return server 
+            if search_opts == None:
+                servers = self._get_servers(context, search_opts, admin=admin)
+                for server in servers:
+                    if server.id == id:
+                        return server 
+            else:
+                qparams = {}
+
+                for opt, val in six.iteritems(search_opts):
+                    if val:
+                        qparams[opt] = val
+                if qparams:
+                    new_qparams = sorted(qparams.items(), key=lambda x: x[0])
+                    query_string = "?%s" % parse.urlencode(new_qparams)
+                else:
+                    query_string = ""
+                server = novaclient(context, self._production, admin=admin).servers._get("/servers/%s%s" % (id, query_string), "server")
+                return server
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception 
