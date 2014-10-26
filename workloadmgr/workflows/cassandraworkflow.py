@@ -364,6 +364,12 @@ class CassandraWorkflow(workflow.Workflow):
         return dict(instances=instances)
     
     def execute(self):
+        if self._store['source_platform'] == "vmware":
+            compute_service = nova.API(production=True)
+            search_opts = {}
+            search_opts['deep_discover'] = '1'
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+            compute_service.get_servers(cntx, search_opts=search_opts)
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
     
@@ -393,7 +399,7 @@ cwf = CassandraWorkflow("testflow", store)
 #print json.dumps(cwf.discover())
 #print json.dumps(cwf.topology())
 cwf.initflow()
-import pdb;pdb.set_trace()
+#import pdb;pdb.set_trace()
 print json.dumps(cwf.details())
 
 #result = engines.load(cwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)

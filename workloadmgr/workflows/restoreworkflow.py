@@ -117,3 +117,10 @@ class RestoreWorkflow(object):
           
     def execute(self):
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
+        restore = pickle.loads(self._store['restore']['pickle'].encode('ascii','ignore'))
+        if 'type' in restore and restore['type'] == "vmware":
+            compute_service = nova.API(production=True)
+            search_opts = {}
+            search_opts['deep_discover'] = '1'
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+            compute_service.get_servers(cntx, search_opts=search_opts)
