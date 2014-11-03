@@ -15,6 +15,11 @@ from Queue import Queue
 import cPickle as pickle
 import shutil
 import math
+from tempfile import mkstemp
+import subprocess
+from os import remove, close
+from Queue import Queue, Empty
+from threading  import Thread
 
 
 
@@ -93,7 +98,11 @@ CONF.register_opts(vmwareapi_opts, 'vmware')
 
 TIME_BETWEEN_API_CALL_RETRIES = 2.0
 
-
+def enqueue_output(out, queue):
+    for line in iter(out.readline, b''):
+        queue.put(line)
+    out.close()
+    
 class Failure(Exception):
     """Base Exception class for handling task failures."""
 
@@ -334,7 +343,21 @@ class VMwareVCDriver(VMwareESXDriver):
                                                            token)
             else:
                 break                
-        raise exception.DatacenterNotFound()                
+        raise exception.DatacenterNotFound()
+    
+    def _get_host_ref_and_name(self, datastore_ref):
+        """
+        Get the host name and the reference from datastore.
+        This gives the first hostmount. TODO: handle multiple host mounts
+        """
+        datastore_host_mounts = self._session._call_method(vim_util, "get_dynamic_property", datastore_ref, "Datastore", "host")
+        for datastore_host_mount in datastore_host_mounts:
+            host_ref =  datastore_host_mount[1][0].key
+            host_name = self._session._call_method(vim_util, "get_dynamic_property", host_ref, "HostSystem", "name")
+            return host_ref, host_name
+        raise exception.HostNotFound()
+             
+                    
 
     def _get_vm_ref_from_name_folder(self, vmfolder_ref, name):
         obj_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
@@ -484,22 +507,24 @@ class VMwareVCDriver(VMwareESXDriver):
                     "disk %(disk_key)s"),
                   {'instance_name': instance_name, 'disk_key': disk_key})
 
-    def _rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
+    def _rebase_vmdk(self, base, orig_base, base_descriptor, base_monolithicsparse,
+                            top, orig_top, top_descriptor, top_monolithicsparse):
         """
         rebase the top to base
         """
-        base_path, base_filename = os.path.split(base)
-        orig_base_path, orig_base_filename = os.path.split(orig_base)
-        base_extent_path = base_path
-        base_extent_filename = base_filename + '.extent' 
-        if(os.path.isfile(os.path.join(base_extent_path,base_extent_filename)) == False):
-            os.rename(base, os.path.join(base_extent_path,base_extent_filename)) 
-            base_descriptor = base_descriptor.replace((' "' + orig_base_filename +'"'), (' "' + base_extent_filename +'"'))
-            if top_descriptor is not None:
-                top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
-                base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
-            with open(base, "w") as base_descriptor_file:
-                base_descriptor_file.write("%s"%base_descriptor)
+        if base_monolithicsparse == False:
+            base_path, base_filename = os.path.split(base)
+            orig_base_path, orig_base_filename = os.path.split(orig_base)
+            base_extent_path = base_path
+            base_extent_filename = base_filename + '.extent' 
+            if(os.path.isfile(os.path.join(base_extent_path,base_extent_filename)) == False):
+                os.rename(base, os.path.join(base_extent_path,base_extent_filename)) 
+                base_descriptor = base_descriptor.replace((' "' + orig_base_filename +'"'), (' "' + base_extent_filename +'"'))
+                if top_descriptor is not None:
+                    top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
+                    base_descriptor = re.sub(r'(^CID=)(\w+)', "CID=%s"%top_parentCID, base_descriptor)
+                with open(base, "w") as base_descriptor_file:
+                    base_descriptor_file.write("%s"%base_descriptor)
 
         
         if top_descriptor is not None:
@@ -558,7 +583,26 @@ class VMwareVCDriver(VMwareESXDriver):
         
     @autolog.log_method(Logger, 'vmwareapi.driver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
-        pass 
+        pass
+        instance_uuid = instance['vm_id']
+        instance_name = instance['vm_name']
+        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
+                                                    'vm_name': instance['vm_name'],
+                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                                    }) 
+        
+        if vm_ref.capability.changeTrackingSupported == True and vm_ref.config.changeTrackingEnabled == False:
+            client_factory = self._session._get_vim().client.factory
+            vm_config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
+            vm_config_spec.changeTrackingEnabled = True
+            LOG.debug(_("Reconfiguring VM instance %(instance_name)s to enable Changed Block Tracking"),{'instance_name': instance_name})
+            reconfig_task = self._session._call_method( self._session._get_vim(),
+                                                        "ReconfigVM_Task", vm_ref,
+                                                        spec=vm_config_spec)
+            self._session._wait_for_task(instance_uuid, reconfig_task)
+            LOG.debug(_("Reconfigured VM instance %(instance_name)s to enable Changed Block Tracking"),{'instance_name': instance_name})
+               
+         
     
     @autolog.log_method(Logger, 'vmwareapi.driver.freeze_vm')
     def freeze_vm(self, cntx, db, instance, snapshot):
@@ -610,7 +654,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     memory=False,
                     quiesce=True)
         self._session._wait_for_task(instance['vm_id'], snapshot_task)
-        snapshot_data = {'disks' : disks, 'vmx_file' : vmx_file}
+        snapshot_data = {'disks' : disks, 'vmx_file' : vmx_file, 'vm_moid' : vm_ref.value}
         return snapshot_data
     
     @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_data_size')
@@ -625,7 +669,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         self._session._host_ip,
                                                         self._get_datacenter_ref_and_name(datastore_ref)[1],
                                                         datastore_name,
-                                                        cookies,
+                                                        self._session._get_vim().client.options.transport.cookiejar,
                                                         vmdk_data_file)
             
             except Exception as ex:
@@ -634,14 +678,14 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         self._session._host_ip,
                                                         self._get_datacenter_ref_and_name(datastore_ref)[1],
                                                         datastore_name,
-                                                        cookies,
+                                                        self._session._get_vim().client.options.transport.cookiejar,
                                                         vmdk_data_file)                     
                      
             vmdk_file_size = int(vmdk_data_file_handle.get_size())
+            vmdk_data_file_handle.close()
             return vmdk_file_size            
        
         vm_data_size = 0
-        cookies = self._session._get_vim().client.options.transport.cookiejar
         for disk in  snapshot_data['disks']:         
             full = True
             if snapshot['snapshot_type'] != 'full':
@@ -676,14 +720,17 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'vmwareapi.driver..upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
         
-        def _upload_vmdk_extent(datastore_ref, vmdk_extent_file, vm_disk_resource_snap_backing_id, top):
-            datastore_name, vmdk_descriptor_file = vm_util.split_datastore_path(vmdk_extent_file)
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        vault_service = vault.get_vault_service(cntx)
+       
+        def _upload_vmdk(datastore_ref, vmdk_file, vm_disk_resource_snap_backing_id, top, snapshot_obj, vm_disk_resource_snap_size):
+            datastore_name, vmdk_descriptor_file = vm_util.split_datastore_path(vmdk_file)
                             
             vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
                                                     self._session._host_ip,
                                                     self._get_datacenter_ref_and_name(datastore_ref)[1],
                                                     datastore_name,
-                                                    cookies,
+                                                    self._session._get_vim().client.options.transport.cookiejar,
                                                     vmdk_descriptor_file)
             vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
             #TODO(giri): throw exception if the size is more than 65536    
@@ -696,7 +743,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         self._session._host_ip,
                                                         self._get_datacenter_ref_and_name(datastore_ref)[1],
                                                         datastore_name,
-                                                        cookies,
+                                                        self._session._get_vim().client.options.transport.cookiejar,
                                                         vmdk_data_file)
             
             except Exception as ex:
@@ -705,7 +752,165 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         self._session._host_ip,
                                                         self._get_datacenter_ref_and_name(datastore_ref)[1],
                                                         datastore_name,
-                                                        cookies,
+                                                        self._session._get_vim().client.options.transport.cookiejar,
+                                                        vmdk_data_file)                     
+            
+            vmdk_data_file_handle.close()
+                        
+            # create an entry in the vm_disk_resource_snaps table
+            vm_disk_resource_snap_id = str(uuid.uuid4())
+            vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
+            vm_disk_resource_snap_metadata.setdefault('disk_format','vmdk')
+            vm_disk_resource_snap_metadata.setdefault('vmware_disktype','thin')
+            vm_disk_resource_snap_metadata.setdefault('vmware_adaptertype','lsiLogic')
+            vm_disk_resource_snap_metadata.setdefault('vmdk_descriptor',vmdk_descriptor)
+            vm_disk_resource_snap_metadata.setdefault('vmdk_data_file_name',vmdk_data_file)
+            vm_disk_resource_snap_metadata.setdefault('monolithicsparse',True)
+            vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
+                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                             'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                                             'metadata': vm_disk_resource_snap_metadata,       
+                                             'top':  True,
+                                             'size': vm_disk_resource_snap_size,                                             
+                                             'status': 'creating'}     
+                                                 
+            vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values) 
+    
+            vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
+                              'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                              'resource_name':  disk['label'],
+                              'snapshot_vm_id': instance['vm_id'],
+                              'snapshot_id': snapshot_obj.id}
+
+
+            
+            db.snapshot_update( cntx, snapshot_obj.id, 
+                                {'progress_msg': 'Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                 'status': 'uploading'
+                                })            
+            LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'] + '; backing file:' + vmdk_data_file))
+
+            copy_to_file_path = vault_service.get_snapshot_file_path(vault_metadata)
+            head, tail = os.path.split(copy_to_file_path)    
+            fileutils.ensure_tree(head)          
+            vix_disk_lib_env = os.environ.copy()
+            vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+            #trilio-vix-disk-cli -clone "[datastore207]testvm/testvm.vmdk" -source remote -host 192.168.2.211 -user admin -password password -vm "moref=vm-1273" /tmp/testvm.vmdk
+            #trilio-vix-disk-cli -clone /tmp/testvm.vmdk -source local -host 192.168.2.211 -user admin -password password -vm "moref=vm-1273" "[datastore207] testvm/testvm.vmdk"
+            cmd =   "trilio-vix-disk-cli -clone '" + vmdk_file + \
+                    "' -source remote -host " + self._session._host_ip + \
+                    " -user '" + self._session._host_username + "' -password '" + '*******' + \
+                    "' -vm 'moref=" + snapshot_data['vm_moid'] + "' '" + copy_to_file_path + "'"
+                    
+            vmxspec = 'moref=' + snapshot_data['vm_moid']
+            process = subprocess.Popen(['trilio-vix-disk-cli',
+                                        '-clone', vmdk_file,
+                                        '-source', 'remote',
+                                        '-host', self._session._host_ip,
+                                        '-user', self._session._host_username,
+                                        '-password', self._session._host_password,
+                                        '-vm', vmxspec,
+                                        copy_to_file_path],
+                                        stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        bufsize= -1,
+                                        env=vix_disk_lib_env,
+                                        close_fds=True,
+                                        shell=False)
+
+            queue = Queue()
+            read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+            read_thread.daemon = True # thread dies with the program
+            read_thread.start()            
+            
+            uploaded_size = 0
+            uploaded_size_incremental = 0
+            previous_uploaded_size = 0
+            while process.poll() is None:
+                try:
+                    try:
+                        #output = process.stdout.readline()
+                        output = queue.get(timeout=5)
+                    except Empty:
+                        print 'empty'
+                        continue 
+                    except Exception as ex:
+                        LOG.exception(ex)                    
+                    print output
+                    percent_done_string = re.search(r'\d+% Done',output).group()
+                    percent_done = int(percent_done_string.split("%")[0])
+                    uploaded_size_incremental = ((vm_disk_resource_snap_size * percent_done)/100) - previous_uploaded_size
+                    uploaded_size = ((vm_disk_resource_snap_size * percent_done)/100)
+                    snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
+                    print "progress_percent: " + str(snapshot_obj.progress_percent) + "%"
+                    #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
+                    previous_uploaded_size = uploaded_size                        
+                except Exception as ex:
+                    LOG.exception(ex)
+            
+            
+            process.stdin.close()
+            _returncode = process.returncode  # pylint: disable=E1101
+            if _returncode:
+                LOG.debug(_('Result was %s') % _returncode)
+                raise exception.ProcessExecutionError(
+                    exit_code=_returncode,
+                    stdout=process.stdout,
+                    stderr=process.stderr,
+                    cmd=cmd)
+  
+            vm_disk_resource_snap_size = os.path.getsize(copy_to_file_path)
+            uploaded_size_incremental = vm_disk_resource_snap_size - previous_uploaded_size
+            if uploaded_size_incremental > 0:                  
+                snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': vm_disk_resource_snap_size - previous_uploaded_size})
+            db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap_id, {'size': vm_disk_resource_snap_size} )
+            
+            db.snapshot_update( cntx, snapshot_obj.id, 
+                                {'progress_msg': 'Uploaded '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                 'status': 'uploading'
+                                })   
+             
+            # update the entry in the vm_disk_resource_snap table
+            vm_disk_resource_snap_values = {'vault_service_url' :  copy_to_file_path ,
+                                            'vault_service_metadata' : 'None',
+                                            'status': 'available'}
+            db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+            
+            return vm_disk_resource_snap_size, vm_disk_resource_snap.id                             
+
+        
+        def _upload_vmdk_extent(datastore_ref, vmdk_extent_file, vm_disk_resource_snap_backing_id, top):
+            datastore_name, vmdk_descriptor_file = vm_util.split_datastore_path(vmdk_extent_file)
+                            
+            vmdk_descriptor_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                    self._session._host_ip,
+                                                    self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                    datastore_name,
+                                                    self._session._get_vim().client.options.transport.cookiejar,
+                                                    vmdk_descriptor_file)
+            vmdk_descriptor_file_size = int(vmdk_descriptor_file_handle.get_size())
+            #TODO(giri): throw exception if the size is more than 65536    
+            vmdk_descriptor = vmdk_descriptor_file_handle.read(vmdk_descriptor_file_size)
+            vmdk_descriptor_file_handle.close()
+            
+            try:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-delta.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                        datastore_name,
+                                                        self._session._get_vim().client.options.transport.cookiejar,
+                                                        vmdk_data_file)
+            
+            except Exception as ex:
+                vmdk_data_file = self._replace_last(vmdk_descriptor_file, '.vmdk', '-flat.vmdk')
+                vmdk_data_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                        self._session._host_ip,
+                                                        self._get_datacenter_ref_and_name(datastore_ref)[1],
+                                                        datastore_name,
+                                                        self._session._get_vim().client.options.transport.cookiejar,
                                                         vmdk_data_file)                     
                      
             vmdk_extent_size = int(vmdk_data_file_handle.get_size())
@@ -756,11 +961,6 @@ class VMwareVCDriver(VMwareESXDriver):
             
             return vmdk_extent_size, vm_disk_resource_snap.id             
            
-       
-        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
-        vault_service = vault.get_vault_service(cntx)
-        cookies = self._session._get_vim().client.options.transport.cookiejar
-                
                 
         for disk in snapshot_data['disks']:
             vm_disk_size = 0
@@ -801,14 +1001,14 @@ class VMwareVCDriver(VMwareESXDriver):
                             full = False                           
 
             if full:
-                for backing in disk['backings']:
-                    vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(backing['datastore_ref'],
-                                                                                             backing['vmdk_file_path'],
-                                                                                             vm_disk_resource_snap_backing_id,
-                                                                                             False)
-                    vm_disk_size = vm_disk_size + vmdk_extent_size
+                vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk(disk['datastore_ref'],
+                                                                                  disk['vmdk_file_path'], 
+                                                                                  vm_disk_resource_snap_backing_id,
+                                                                                  True, snapshot_obj,
+                                                                                  disk['capacityInKB']*1024)                
                     
-            vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(disk['datastore_ref'],
+            else:
+                vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(disk['datastore_ref'],
                                                                                      disk['vmdk_file_path'], 
                                                                                      vm_disk_resource_snap_backing_id,
                                                                                      True)
@@ -820,7 +1020,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                 self._session._host_ip,
                                                 self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['datastore_ref'])[1],
                                                 snapshot_data['vmx_file']['datastore_name'],
-                                                cookies,
+                                                self._session._get_vim().client.options.transport.cookiejar,
                                                 snapshot_data['vmx_file']['vmx_file_name'])
         vmx_file_size = int(vmx_file_handle.get_size())
         #TODO(giri): throw exception if the size is more than 65536
@@ -889,7 +1089,6 @@ class VMwareVCDriver(VMwareESXDriver):
         
         client_factory = self._session._get_vim().client.factory
         service_content = self._session._get_vim().get_service_content()
-        cookies = self._session._get_vim().client.options.transport.cookiejar
         ds = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastore']['moid'])
         datastore_ref = ds[0]
         datastore_name = ds[1]
@@ -914,7 +1113,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                         self._session._host_ip,
                                         datacenter_name,
                                         datastore_name,
-                                        cookies,
+                                        self._session._get_vim().client.options.transport.cookiejar,
                                         url_compatible,
                                         snapshot_vm_resource.size)
                 vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
@@ -1031,6 +1230,11 @@ class VMwareVCDriver(VMwareESXDriver):
                             {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
                         
         #restore, rebase, commit & upload
+        LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
+        db.restore_update(cntx,  restore['id'], 
+                          {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
+                           'status': 'uploading' 
+                          })          
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
@@ -1043,6 +1247,7 @@ class VMwareVCDriver(VMwareESXDriver):
             
             commit_queue = Queue() # queue to hold the files to be committed                 
             vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
+            vm_disk_resource_size = vm_disk_resource_snap.size
             disk_filename_extention = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
             restored_file_path =temp_directory + '/' + vm_disk_resource_snap.id + \
                                 '_' + snapshot_vm_resource.resource_name + '.' \
@@ -1066,13 +1271,17 @@ class VMwareVCDriver(VMwareESXDriver):
                     self._rebase_vmdk(restored_file_path,
                                      db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
                                      db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'),
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata, 'monolithicsparse', False),
                                      None,
                                      None,
-                                     None)
-                    commit_queue.put(restored_file_path)  
+                                     None,
+                                     False)
+                    commit_queue.put(restored_file_path)
+              
                                  
             while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                vm_disk_resource_size = vm_disk_resource_size + vm_disk_resource_snap_backing.size
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
                 restored_file_path_backing =temp_directory + '/' + vm_disk_resource_snap_backing.id + \
                                             '_' + snapshot_vm_resource_backing.resource_name + '.' \
@@ -1112,41 +1321,25 @@ class VMwareVCDriver(VMwareESXDriver):
                     self._rebase_vmdk(restored_file_path_backing,
                                      db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_data_file_name'),
                                      db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_descriptor'),
+                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'monolithicsparse',False),
                                      restored_file_path,
                                      db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
-                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'))               
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'),
+                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'monolithicsparse',False))               
                 commit_queue.put(restored_file_path)                                 
                 vm_disk_resource_snap = vm_disk_resource_snap_backing
                 restored_file_path = restored_file_path_backing
 
-            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
-                while commit_queue.empty() is not True:
-                    file_to_commit = commit_queue.get_nowait()
-                    try:
-                        LOG.debug('Commiting QCOW2 ' + file_to_commit)
-                        qemuimages.commit_qcow2(file_to_commit)
-                    except Exception, ex:
-                        LOG.exception(ex)                       
-                    if restored_file_path != file_to_commit:
-                        utils.delete_if_exists(file_to_commit)
-            elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
-                    file_to_commit = commit_queue.get_nowait()
-                    commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
-                    commit_to = commit_to.replace(" ", "")
-                    LOG.debug('Commiting VMDK ' + file_to_commit)
-                    restored_file_path = self._commit_vmdk(file_to_commit, commit_to, test=False)
-           
-            #create vmdk
-            file_size = int(os.path.getsize(restored_file_path))
             vmdk_name = "%s/%s.vmdk" % (vm_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
             vmdk_path = vm_util.build_datastore_path(instance_options['datastore']['name'], vmdk_name)
+            file_size = int(os.path.getsize(restored_file_path))
             flat_vmdk_name = "%s/%s-flat.vmdk" % (vm_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
             flat_vmdk_path = vm_util.build_datastore_path(instance_options['datastore']['name'], flat_vmdk_name)
             
             vmdk_create_spec = vm_util.get_vmdk_create_spec(client_factory,
-                                                            file_size/1024,  #vmdk_file_size_in_kb, 
-                                                            'lsiLogic',      #adapter_type,
-                                                            'preallocated'   #disk_type
+                                                            db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB'),  #vmdk_file_size_in_kb, 
+                                                            db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type'),  #adapter_type,
+                                                            'thin'   #disk_type
                                                             )
             vmdk_create_task = self._session._call_method(self._session._get_vim(),
                                                           "CreateVirtualDisk_Task",
@@ -1162,36 +1355,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                               datacenter=datacenter_ref,
                                                               spec=vmdk_create_spec)
 
-            cookies = self._session._get_vim().client.options.transport.cookiejar
             self._session._wait_for_task(instance['uuid'], vmdk_create_task)
-            self._delete_datastore_file(instance, flat_vmdk_path, datacenter_ref)
-                    
-            LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
-            db.restore_update(cntx,  restore['id'], 
-                              {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
-                               'status': 'uploading' 
-                              })                  
-            
-            vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
-                                        self._session._host_ip,
-                                        datacenter_name,
-                                        datastore_name,
-                                        cookies,
-                                        flat_vmdk_name,
-                                        file_size)
-
-            for chunk in utils.ChunkedFile(restored_file_path, {'function': WorkloadMgrDB().db.restore_update,
-                                                                'context': cntx,
-                                                                'id':restore['id']}):
-                vmdk_write_file_handle.write(chunk)
-            vmdk_write_file_handle.close()
-            
-            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
-            try:
-                shutil.rmtree(temp_directory)
-            except OSError as exc:
-                pass 
-            
 
             adapter_type = db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type')
             capacityInKB = db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB')
@@ -1200,12 +1364,121 @@ class VMwareVCDriver(VMwareESXDriver):
             disk_type = db.get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
             device_name = db.get_metadata_value(snapshot_vm_resource.metadata,'label')
             linked_clone = False
-
             self._volumeops.attach_disk_to_vm( vm_ref, instance,
                                                adapter_type, disk_type, vmdk_path,
                                                capacityInKB, linked_clone,
-                                               vmdk_controler_key, unit_number, device_name)
-            
+                                               vmdk_controler_key, unit_number, device_name)            
+             
+            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
+                while commit_queue.empty() is not True:
+                    file_to_commit = commit_queue.get_nowait()
+                    try:
+                        LOG.debug('Commiting QCOW2 ' + file_to_commit)
+                        qemuimages.commit_qcow2(file_to_commit)
+                    except Exception, ex:
+                        LOG.exception(ex)                       
+                    if restored_file_path != file_to_commit:
+                        utils.delete_if_exists(file_to_commit)
+                #TODO:covert restored_file_path to VMDK
+                self._delete_datastore_file(instance, flat_vmdk_path, datacenter_ref)
+                vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
+                                            self._session._host_ip,
+                                            datacenter_name,
+                                            datastore_name,
+                                            self._session._get_vim().client.options.transport.cookiejar,
+                                            flat_vmdk_name,
+                                            file_size)
+    
+                for chunk in utils.ChunkedFile(restored_file_path, {'function': WorkloadMgrDB().db.restore_update,
+                                                                    'context': cntx,
+                                                                    'id':restore['id']}):
+                    vmdk_write_file_handle.write(chunk)
+                vmdk_write_file_handle.close()  
+                
+            elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
+                self._delete_datastore_file(instance, vmdk_path, datacenter_ref)
+                self._delete_datastore_file(instance, flat_vmdk_path, datacenter_ref)                    
+                  
+                file_to_commit = commit_queue.get_nowait()
+                #commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
+                #commit_to = commit_to.replace(" ", "")
+                #LOG.debug('Commiting VMDK ' + file_to_commit)
+                #restored_file_path = self._commit_vmdk(file_to_commit, commit_to, test=False)
+                
+                #Upload the vmdk directly to ESXi ( commit will happen automatically )
+                vix_disk_lib_env = os.environ.copy()
+                vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+                #trilio-vix-disk-cli -clone "[datastore207]testvm/testvm.vmdk" -source remote -host 192.168.2.211 -user admin -password password -vm "moref=vm-1273" /tmp/testvm.vmdk
+                #trilio-vix-disk-cli -clone /tmp/testvm.vmdk -source local -host 192.168.2.211 -user admin -password password -vm "moref=vm-1273" "[datastore207] testvm/testvm.vmdk"
+                cmd =   "trilio-vix-disk-cli -clone '" + file_to_commit + \
+                        "' -source local -host " + self._session._host_ip + \
+                        " -user '" + self._session._host_username + "' -password '" + '*******' + \
+                        "' -vm 'moref=" + vm_ref.value + "' '" + vmdk_path + "'"
+                        
+                vmxspec = 'moref=' + vm_ref.value
+                process = subprocess.Popen(['trilio-vix-disk-cli',
+                                            '-clone', file_to_commit,
+                                            '-source', 'local',
+                                            '-host', self._session._host_ip,
+                                            '-user', self._session._host_username,
+                                            '-password', self._session._host_password,
+                                            '-vm', vmxspec,
+                                            vmdk_path],
+                                            stdin=subprocess.PIPE,
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE,
+                                            bufsize= -1,
+                                            env=vix_disk_lib_env,
+                                            close_fds=True,
+                                            shell=False)
+                
+                queue = Queue()
+                read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                read_thread.daemon = True # thread dies with the program
+                read_thread.start()            
+                
+                uploaded_size = 0
+                uploaded_size_incremental = 0
+                previous_uploaded_size = 0
+                while process.poll() is None:
+                    try:
+                        try:
+                            #output = process.stdout.readline()
+                            output = queue.get(timeout=5)
+                        except Empty:
+                            print 'empty'
+                            continue 
+                        except Exception as ex:
+                            LOG.exception(ex)                    
+                        print output
+                        percent_done_string = re.search(r'\d+% Done',output).group()
+                        percent_done = int(percent_done_string.split("%")[0])
+                        uploaded_size_incremental = ((vm_disk_resource_size * percent_done)/100) - previous_uploaded_size
+                        uploaded_size = ((vm_disk_resource_size * percent_done)/100)
+                        restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': uploaded_size_incremental})
+                        print "progress_percent: " + str(restore_obj.progress_percent) + "%"
+                        #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})
+                        previous_uploaded_size = uploaded_size                        
+                    except Exception as ex:
+                        LOG.exception(ex)
+                
+                process.stdin.close()
+                _returncode = process.returncode  # pylint: disable=E1101
+                if _returncode:
+                    LOG.debug(_('Result was %s') % _returncode)
+                    raise exception.ProcessExecutionError(
+                        exit_code=_returncode,
+                        stdout=process.stdout,
+                        stderr=process.stderr,
+                        cmd=cmd)
+                restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': (vm_disk_resource_size - uploaded_size)})
+                    
+           
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
+            try:
+                shutil.rmtree(temp_directory)
+            except OSError as exc:
+                pass 
             
             restore_obj = db.restore_get(cntx, restore['id'])
             progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
@@ -1247,7 +1520,11 @@ class VMwareVCDriver(VMwareESXDriver):
                 shutil.rmtree(temp_directory)
             except OSError as exc:
                 pass 
-
+        temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'])
+        try:
+            shutil.rmtree(temp_directory)
+        except OSError as exc:
+            pass 
          
         db.restore_update(cntx,restore_obj.id, 
                           {'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,

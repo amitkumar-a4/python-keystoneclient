@@ -1315,7 +1315,8 @@ class ChunkedFile(object):
             object = self.update['function'](self.update['context'], 
                                              self.update['id'], 
                                              {'uploaded_size_incremental': self.uploaded_size_incremental})
-            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+            print "progress_percent: " + str(object.progress_percent) + "%"
+            #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
             self.uploaded_size_incremental = 0
 
     def __iter__(self):

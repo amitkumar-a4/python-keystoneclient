@@ -90,7 +90,8 @@ class ReadWrapper(object):
             object = self.update['function'](self.update['context'], 
                                              self.update['id'], 
                                              {'uploaded_size_incremental': self.uploaded_size_incremental})
-            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+            print "progress_percent: " + str(object.progress_percent) + "%"
+            #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
             self.uploaded_size_incremental = 0
 
         return chunk
@@ -439,7 +440,8 @@ class SwiftBackupService(base.Base):
                     object = WorkloadMgrDB().db.restore_update(self.context, 
                                                                snapshot_metadata['restore_id'], 
                                                                {'uploaded_size_incremental': uploaded_size_incremental})
-                    LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+                    print "progress_percent: " + str(object.progress_percent) + "%"
+                    #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
                     uploaded_size_incremental = 0                
                 
             # force flush every write to avoid long blocking write on close

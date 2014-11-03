@@ -71,7 +71,8 @@ class VMwareHTTPFile(object):
     def close(self):
         """Close the file handle."""
         try:
-            self.file_handle.close()
+            if hasattr(self, 'file_handle') and self.file_handle:
+                self.file_handle.close()
         except Exception as exc:
             LOG.exception(exc)
 

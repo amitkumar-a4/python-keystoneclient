@@ -645,7 +645,7 @@ private:
 static int
 PrintUsage(void)
 {
-    printf("Usage: vixdisklibsample.exe command [options] diskPath\n");
+    printf("Usage: trilio-vix-disk-cli command [options] diskPath\n");
     printf("commands:\n");
     printf(" -create : creates a sparse virtual disk with capacity "
            "specified by -cap\n");
@@ -840,6 +840,11 @@ static int
 ParseArguments(int argc, char* argv[])
 {
     int i;
+    /*
+    for (i = 1; i < argc; i++) {
+    	cout << argv[i] << endl;
+    } 
+    */   
     if (argc < 3) {
         return PrintUsage();
     }
@@ -1611,7 +1616,8 @@ static Bool
 CloneProgressFunc(void * /*progressData*/,      // IN
                   int percentCompleted)         // IN
 {
-   cout << "Cloning : " << percentCompleted << "% Done" << "\r";
+   //cout << "Cloning : " << percentCompleted << "% Done" << "\r";
+   cout << "Cloning : " << percentCompleted << "% Done" << endl;
    return TRUE;
 }
 
