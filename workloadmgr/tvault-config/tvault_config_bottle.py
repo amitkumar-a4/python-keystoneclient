@@ -1536,6 +1536,9 @@ def main():
         subprocess.call(command, shell=False)
         command = ['sudo', 'ifup', 'br-eth0']
         subprocess.call(command, shell=False)                 
+               
+        command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
+        subprocess.call(command, shell=False)
                 
     except Exception as exception:
         #TODO: implement logging
