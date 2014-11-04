@@ -986,52 +986,52 @@ def register_service():
         #nothing to do
         return {'status':'Success'}
     if config_data['configuration_type'] == 'vmware':
-        #nothing to do
-        return authenticate_with_keystone()
+         authenticate_with_keystone()
     try:
         
         keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 
                                    tenant_name=config_data['admin_tenant_name'])
-        #create user
-        try:
-            wlm_user = None
-            users = keystone.users.list()
-            for user in users:
-                if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
-                    wlm_user = user
-                    break
-                
-            admin_role = None
-            roles = keystone.roles.list()
-            for role in roles:
-                if role.name == 'admin':
-                    admin_role = role
-                    break                
-                      
+        
+        if config_data['configuration_type'] == 'openstack':
+            #create user
             try:
-                keystone.users.delete(wlm_user.id)
+                wlm_user = None
+                users = keystone.users.list()
+                for user in users:
+                    if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
+                        wlm_user = user
+                        break
+                    
+                admin_role = None
+                roles = keystone.roles.list()
+                for role in roles:
+                    if role.name == 'admin':
+                        admin_role = role
+                        break                
+                          
+                try:
+                    keystone.users.delete(wlm_user.id)
+                except Exception as exception:
+                    if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+                       raise exception
+                
+                
+                wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
+                                                 tenant_id=config_data['service_tenant_id'],
+                                                 enabled=True)
+                
+                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+            
             except Exception as exception:
-                if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
-                   raise exception
-            
-            
-            wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
-                                             tenant_id=config_data['service_tenant_id'],
-                                             enabled=True)
-            
-            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-        
-        except Exception as exception:
-            if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
-                pass
-            elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
-                pass            
-            else:
-                bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-                raise exception        
-        
+                if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
+                    pass
+                elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
+                    pass            
+                else:
+                    bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+                    raise exception        
         
         try:
             #delete orphan wlm services
@@ -1044,7 +1044,7 @@ def register_service():
                             keystone.services.delete(service.id)
             #create service and endpoint
             wlm_service = keystone.services.create('trilioVaultWLM', 'workloads', 'trilioVault Workload Manager Service')
-            wlm_url = 'http://' + config_data['floating_ipaddress'] + ':8780' + '/v1/$(tenant_id)s'
+            wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
             keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
             
         except Exception as exception:
