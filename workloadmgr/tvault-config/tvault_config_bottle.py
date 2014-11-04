@@ -33,7 +33,7 @@ import workloadmgrclient
 import workloadmgrclient.v1.client as wlmclient
 
 
-logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
 
@@ -245,6 +245,16 @@ def get_lan_ip():
                 pass
     return ip
 
+def authenticate_vcenter():
+    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
+        from workloadmgr.virt.vmwareapi import vim
+        vim_obj = vim.Vim(protocol="https", host=config_data['vcenter'])
+        session = vim_obj.Login(vim_obj.get_service_content().sessionManager,
+                                userName=config_data['vcenter_username'],
+                                password=config_data['vcenter_password'])
+        vim_obj.Logout(vim_obj.get_service_content().sessionManager)
+
+
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
         #configure mysql server
@@ -281,6 +291,11 @@ def configure_rabbitmq():
         subprocess.call(command, shell=False)     
 
 def configure_keystone():
+    def _get_user_id_from_name(name):
+        for user in keystone.users.list():
+            if user.name == name:
+                return user.id
+        
     if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
         #configure keystone
         replace_line('/etc/keystone/keystone.conf', 'admin_endpoint = ', 'admin_endpoint = ' + 
@@ -345,14 +360,15 @@ def configure_keystone():
             for role in keystone.roles.list():
                 if role.name == 'admin':
                     admin_role_id = role.id
-                            
-            try:
-                keystone.users.get(config_data['vcenter_username'])
-            except Exception as exception:
+                    
+            user_id = _get_user_id_from_name(config_data['vcenter_username'])
+            if user_id is None:
                 keystone.users.create(config_data['vcenter_username'], config_data['vcenter_password'],
                                       email=None, tenant_id=admin_tenant_id, enabled=True) 
+                user_id = _get_user_id_from_name(config_data['vcenter_username'])
+                    
             try:           
-                keystone.roles.add_user_role(user=config_data['vcenter_username'], role=admin_role_id, tenant=admin_tenant_id)
+                keystone.roles.add_user_role(user=user_id, role=admin_role_id, tenant=admin_tenant_id)
             except ksclient.exceptions.Conflict as exception:
                 pass
 
@@ -826,6 +842,21 @@ def configure_host():
     time.sleep(1)
     return {'status':'Success'}
 
+@bottle.route('/authenticate_with_vcenter')
+@authorize()
+def authenticate_with_vcenter():
+    # Authenticate with Keystone
+    try:
+        authenticate_vcenter()
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           raise exception        
+    time.sleep(1)
+    return {'status':'Success'}
+        
 @bottle.route('/authenticate_with_keystone')
 @authorize()
 def authenticate_with_keystone():
@@ -956,8 +987,9 @@ def register_service():
         return {'status':'Success'}
     if config_data['configuration_type'] == 'vmware':
         #nothing to do
-        return {'status':'Success'}    
+        return authenticate_with_keystone()
     try:
+        
         keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 
