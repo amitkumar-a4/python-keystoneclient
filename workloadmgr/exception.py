@@ -460,4 +460,7 @@ class InstancePowerOffFailure(Invalid):
     msg_fmt = _("Failed to power off instance: %(reason)s.")  
     
 class DatacenterNotFound(NotFound):
-    message = _("Could not find the Datacenter.")                            
+    message = _("Could not find the Datacenter.")       
+    
+class HostNotFound(NotFound):
+    message = _("Could not find the Host.")                          

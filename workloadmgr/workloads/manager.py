@@ -340,7 +340,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             })
             
             self.db.restore_update(context, restore.id, {'status': 'executing'})
-                         
+          
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':                     
                 self.db.restore_update( context, restore_id, {'size': restore_size})

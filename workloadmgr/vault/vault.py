@@ -89,7 +89,8 @@ class VaultBackupService(base.Base):
             #update every 5MB
             if uploaded_size_incremental > (5 * 1024 * 1024):
                 snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
-                LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
+                print "progress_percent: " + str(snapshot_obj.progress_percent) + "%"
+                #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
                 uploaded_size_incremental = 0
         
         vault_file.close()

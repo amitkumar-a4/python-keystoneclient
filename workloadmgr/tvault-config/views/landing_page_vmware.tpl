@@ -50,7 +50,7 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a>http://&lt;ipaddress-of-tvault-controller&gt;:3000</a>
+                        	<a href="/" onclick="javascript:event.target.port=3000">http://&lt;ipaddress-of-tvault-vm&gt;:3000</a>
                         </div>
                     </li>
                 </ol>

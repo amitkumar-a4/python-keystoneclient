@@ -32,6 +32,7 @@ function loadXMLDoc(url, callback)
 function taskfunction()
 {
 	$("#alert").hide();
+	document.getElementById("final_status").innerHTML = "Final Status";	
    	loadXMLDoc("configure_host", function() {
    	   document.getElementById("configure_host").children[0].classList.add("glyphicon-refresh");
 	   if (xmlhttp.readyState != 4) return;
@@ -48,29 +49,29 @@ function taskfunction()
 		  document.getElementById("configure_host").classList.add("list-group-item-danger");
 		  document.getElementById("configure_host").children[0].classList.add("glyphicon-remove");
 		  document.getElementById("final_status").classList.add("list-group-item-danger");
-		  document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		  //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		  return;
 	   }
 	   // Call authenticate with keystone
-	   loadXMLDoc("authenticate_with_keystone", function() {
-   	   	  document.getElementById("authenticate_with_keystone").children[0].classList.add("glyphicon-refresh");
+	   loadXMLDoc("authenticate_with_vcenter", function() {
+   	   	  document.getElementById("authenticate_with_vcenter").children[0].classList.add("glyphicon-refresh");
 	      if (xmlhttp.readyState != 4) return;
-	      document.getElementById("authenticate_with_keystone").children[0].classList.remove("glyphicon-refresh");
+	      document.getElementById("authenticate_with_vcenter").children[0].classList.remove("glyphicon-refresh");
 	      if (xmlhttp.readyState != 4) return;
 	      if (xmlhttp.readyState==4 && xmlhttp.status==200)
 	      {
-	         document.getElementById("authenticate_with_keystone").classList.add("list-group-item-success");
-	         document.getElementById("authenticate_with_keystone").children[0].classList.add("glyphicon-ok");
+	         document.getElementById("authenticate_with_vcenter").classList.add("list-group-item-success");
+	         document.getElementById("authenticate_with_vcenter").children[0].classList.add("glyphicon-ok");
 	      }
 	      else
 	      {
 			 //$("#error_message").html(xmlhttp.responseText);
 			 $("#error_message").html(xmlhttp.responseText);
 			 $("#alert").show();	      
-	         document.getElementById("authenticate_with_keystone").classList.add("list-group-item-danger");
-	         document.getElementById("authenticate_with_keystone").children[0].classList.add("glyphicon-remove");
+	         document.getElementById("authenticate_with_vcenter").classList.add("list-group-item-danger");
+	         document.getElementById("authenticate_with_vcenter").children[0].classList.add("glyphicon-remove");
 	         document.getElementById("final_status").classList.add("list-group-item-danger");
-	         document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+	         //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 	         return;
 	      }
 		  // Call register_service api
@@ -90,7 +91,7 @@ function taskfunction()
 		        document.getElementById("register_service").classList.add("list-group-item-danger");
 		        document.getElementById("register_service").children[0].classList.add("glyphicon-remove");
 		        document.getElementById("final_status").classList.add("list-group-item-danger");
-		        document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		        //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		        return;
 		     }
 		     // Call configure_api
@@ -110,7 +111,7 @@ function taskfunction()
 		           document.getElementById("configure_api").classList.add("list-group-item-danger");
 		           document.getElementById("configure_api").children[0].classList.add("glyphicon-remove");
 		           document.getElementById("final_status").classList.add("list-group-item-danger");
-		           document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		           //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		           return;
 		        }
 		        // Call configure_scheduler
@@ -130,7 +131,7 @@ function taskfunction()
 		              document.getElementById("configure_scheduler").classList.add("list-group-item-danger");
 		              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-remove");
 		              document.getElementById("final_status").classList.add("list-group-item-danger");
-		              document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		              //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		              return;
 		           }
 		           // Call configure_service
@@ -150,7 +151,7 @@ function taskfunction()
 		                 document.getElementById("configure_service").classList.add("list-group-item-danger");
 		                 document.getElementById("configure_service").children[0].classList.add("glyphicon-remove");
 		                 document.getElementById("final_status").classList.add("list-group-item-danger");
-		                 document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		                 //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		                 return;
 		              }
 		              // Call start_api
@@ -170,7 +171,7 @@ function taskfunction()
 		                    document.getElementById("start_api").classList.add("list-group-item-danger");
 		                    document.getElementById("start_api").children[0].classList.add("glyphicon-remove");
 		                    document.getElementById("final_status").classList.add("list-group-item-danger");
-		                    document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		                    //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		                    return;
 		                 }
 		                 // Call start_scheduler
@@ -190,7 +191,7 @@ function taskfunction()
 		                       document.getElementById("start_scheduler").classList.add("list-group-item-danger");
 		                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-remove");
 		                       document.getElementById("final_status").classList.add("list-group-item-danger");
-		                       document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		                       //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		                       return;
 		                    }
 		                    // Call start_service
@@ -210,7 +211,7 @@ function taskfunction()
 		                          document.getElementById("start_service").classList.add("list-group-item-danger");
 		                          document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
 		                          document.getElementById("final_status").classList.add("list-group-item-danger");
-		                          document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		                          //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		                          return;
 		                       }
 		                       loadXMLDoc("register_workloadtypes",function() {
@@ -229,11 +230,12 @@ function taskfunction()
 		                             document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
 		                             document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
 		                             document.getElementById("final_status").classList.add("list-group-item-danger");
-		                             document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		                             //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 		                             return;
 		                          }
 		                          document.getElementById("final_status").classList.add("list-group-item-success");
-		                          document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+		                          //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+		                          document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
 		                       });
 		                    });
 		                 });
@@ -279,23 +281,23 @@ $( document ).ready(function() {
   <!-- List group -->
   <ul class="list-group">
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>
-                Configuring tVault host</li>  
-    <li id="authenticate_with_keystone" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with keystone</li>                 
+                Configuring trilioVault host</li>  
+    <li id="authenticate_with_vcenter" class="list-group-item"><span class="glyphicon"></span>
+                Authenticating with vCenter</li>                 
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
-                Registering tVault service with keystone</li>
+                Registering trilioVault service</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>
-                Configuring tVault API service</li>
+                Configuring trilioVault API service</li>
     <li id="configure_scheduler" class="list-group-item"><span class="glyphicon"></span>
-                Configuring tVault scheduler service </li>
+                Configuring trilioVault scheduler service </li>
     <li id="configure_service" class="list-group-item"><span class="glyphicon"></span>
-                Configuring tVault service </li>
+                Configuring trilioVault service </li>
     <li id="start_api" class="list-group-item"><span class="glyphicon"></span>
-                Starting tVault API service</li>
+                Starting trilioVault API service</li>
     <li id="start_scheduler" class="list-group-item"><span class="glyphicon"></span>
-                Starting tVault scheduler service</li>
+                Starting trilioVault scheduler service</li>
     <li id="start_service" class="list-group-item"><span class="glyphicon"></span>
-                Starting tVault service</li>
+                Starting trilioVault service</li>
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
