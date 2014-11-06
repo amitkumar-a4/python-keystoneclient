@@ -168,6 +168,21 @@ def get_cassandra_nodes(cntx, host, port, username, password):
             import socket
             ips[socket.gethostbyname(name['Address'])] = 1
 
+    interfaces = {}
+    for ip in ips:
+        try:
+            client = paramiko.SSHClient()
+            client.load_system_host_keys()
+            if password == '':
+                client.set_missing_host_key_policy(paramiko.WarningPolicy())
+            else:
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(ip, port=int(port), username=username, password=password)
+            stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr')
+            interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
+        finally:
+            client.close()
+
     # call nova list
     compute_service = nova.API(production=True)
     instances = compute_service.get_servers(cntx, admin=True)
@@ -182,7 +197,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
             # IP Addresses
             ifs = instance.addresses[addr]
             for _if in ifs:
-                if _if['addr'] in ips:
+                if _if['OS-EXT-IPS-MAC:mac_addr'] in interfaces:
                     #this is our vm
                     hypervisor_hostname = None
                     hypervisor_type = None
