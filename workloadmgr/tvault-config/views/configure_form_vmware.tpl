@@ -10,6 +10,23 @@
 <script src="js/jquery-1.11.0.min.js"></script>
 <!-- Latest compiled and minified JavaScript -->
 <script src="js/bootstrap.min.js"></script>
+
+<!-- 
+<script>
+$(function() {
+  var $storagetype = $("input[name='storage-type']");
+  $storagetype.each(function() {
+    $(this).on("click",function() {
+      $storagetype.each(function() {
+        var textField = $(this).nextAll("input").first();
+        if (textField) textField.prop("disabled",!this.checked);
+      });    
+    });    
+  });
+});  
+</script>  
+-->   
+
 </head>
 
 <body>
@@ -66,11 +83,38 @@
     </div><br>
     
 	<div class="panel-group" id="accordion">
+	  <div class="panel panel-default" id="panel3">
+	    <div class="panel-heading">
+	      <h4 class="panel-title">
+	        <a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree">
+	          Storage
+	        </a>
+	      </h4>
+	    </div>
+	    <div id="collapseThree" class="panel-collapse collapse in">
+	      <div class="panel-body">
+    		<div class="input-group" >
+    			<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device 
+    			<input name="storage-local-device" id="storage-local-device" type="text" required placeholder="/dev/sdb" value="/dev/sdb" class="form-control" /> <br/>
+    			<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs"> NFS Export 
+    			<input name="storage-nfs-export" id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" /> <br/>
+ 		    	<!---   			
+    			<input name="storage-type" id="storage-type-object" type="radio"  value="object" disabled> Object Store 
+    			<input name="storage-object-url" id="storage-object-url" type="text" required placeholder="" class="form-control">	<br/>
+		    	-->	    	
+    		</div><br>   	      
+	      </div>
+	    </div>
+	  </div>
+	</div>
+    
+    
+	<div class="panel-group" id="accordion">
 	  <div class="panel panel-default" id="panel1">
 	    <div class="panel-heading">
 	      <h4 class="panel-title">
 	        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">
-	          LDAP ( Optional)
+	          LDAP (Optional)
 	        </a>
 	      </h4>
 	    </div>
@@ -102,7 +146,7 @@
 	    <div class="panel-heading">
 	      <h4 class="panel-title">
 	        <a data-toggle="collapse" data-target="#collapseTwo" href="#collapseTwo">
-	          NameServer ( Optional)
+	          NameServer (Optional)
 	        </a>
 	      </h4>
 	    </div>

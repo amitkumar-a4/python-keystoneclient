@@ -781,6 +781,7 @@ def configure_host():
         command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
         subprocess.call(command, shell=False)
 
+        
         if len(config_data['name_server']):
             fh, abs_path = mkstemp()
             new_file = open(abs_path,'w')
@@ -801,38 +802,47 @@ def configure_host():
             command = ['sudo', 'chown', 'root:root', "/etc/resolvconf/resolv.conf.d/base"];
             subprocess.call(command, shell=False)
             command = ['sudo', 'resolvconf',  '-u']
-            subprocess.call(command, shell=False)    
+            subprocess.call(command, shell=False)
         
         try:
+            command = ['sudo', 'umount', '/opt/stack/data/wlm']
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass
+        
+        try:
+            command = ['sudo', 'umount', '/opt/stack/data/wlm']
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass           
+        
+        try:
+            command = ['sudo', 'umount', '/opt/stack/data/wlm']
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass                
+             
+
+        if config_data['storage_type'] == 'nfs': 
+            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', config_data['storage_nfs_export'], '/opt/stack/data/wlm']
+            subprocess.check_call(command, shell=False) 
+            replace_line('/etc/fstab', '/opt/stack/data/wlm', config_data['storage_nfs_export'] + " /opt/stack/data/wlm nfs rw,hard,intr,bg 0 0")
+            replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
+        else:       
             command = ['sudo', 'rescan-scsi-bus']
             subprocess.call(command, shell=False)
-                        
-            command = ['sudo', 'umount', '/dev/vdb']
-            subprocess.call(command, shell=False)
             
-            command = ['sudo', 'mkfs.ext4', '-F', '/dev/vdb']
+            command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
             subprocess.call(command, shell=False) 
             
             command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
             subprocess.call(command, shell=False)
             
-            command = ['sudo', 'mount', '/dev/vdb', '/opt/stack/data/wlm']
+            command = ['sudo', 'mount', config_data['storage_local_device'], '/opt/stack/data/wlm']
             subprocess.check_call(command, shell=False) 
-        except Exception as exception:
-            command = ['sudo', 'umount', '/dev/sdb']
-            subprocess.call(command, shell=False)
-            
-            command = ['sudo', 'mkfs.ext4', '-F', '/dev/sdb']
-            subprocess.call(command, shell=False) 
-            
-            command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
-            subprocess.call(command, shell=False)
-            
-            command = ['sudo', 'mount', '/dev/sdb', '/opt/stack/data/wlm']
-            subprocess.check_call(command, shell=False) 
-                    
-        #command = ['sudo', 'sh', '-c', "echo '/dev/vdb /opt/stack/data/wlm ext4 defaults,nobootwait,nofail 0' >> /etc/fstab"]
-        #subprocess.check_call(command, shell=False)        
+
+            replace_line('/etc/fstab', '/opt/stack/data/wlm', config_data['storage_local_device'] + " /opt/stack/data/wlm ext4 defaults,nobootwait,nofail 0")
+
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -1221,10 +1231,6 @@ def start_api():
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'tvault-gui-web-1', 'restart'];
             subprocess.call(command, shell=False) 
-            
-
-                                                               
-        
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception         
@@ -1286,21 +1292,39 @@ def register_workloadtypes():
             if workload_type_names['Hadoop'] == False:
                 #Hadoop
                 time.sleep(2)
-                metadata = { 'Namenode':'string', 'NamenodeSSHPort':'string', 'Username':'string', 'Password':'password', 'capabilities':'discover:topology'}
+                metadata = {'Namenode':'{"default": "", "display_name": "Hadoop Host", "required": "True", "type": "string", "tooltip": "One of the nodes of the Hadoop cluster", "group_name": "Host Settings"}', 
+                            'NamenodeSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"(Optional) Enter ssh port number if it is other than default", "group_name": "Host Settings"}', 
+                            'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "group_name": "Host Settings"}', 
+                            'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "group_name": "Host Settings"}', 
+                            'capabilities':'discover:topology',
+                            'group_ordering' :'[{"ordinal": 10, "name": "Host Settings"}]'}
+                
                 wlm.workload_types.create(metadata=metadata, is_public = True, name= 'Hadoop', description = 'Hadoop workload')
             
             if workload_type_names['MongoDB'] == False:
                 #MongoDB
                 time.sleep(2)
-                metadata = {'HostUsername':'string', 'HostPassword':'password', 'HostSSHPort':'string', 'DBHost':'string',
-                            'DBPort':'string', 'DBUser':'string', 'DBPassword':'password',
-                            'RunAsRoot':'boolean', 'capabilities':'discover:topology'}         
+                metadata = {'HostUsername':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "group_name": "Host Settings", "ordinal":10}', 
+                            'HostPassword':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "group_name": "Host Settings", "ordinal":20}', 
+                            'HostSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"(Optional) Enter ssh port number if it is other than default", "group_name": "Host Settings", "ordinal":40}', 
+                            'DBHost':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "One of the nodes of the MongoDB cluster", "group_name": "Host Settings", "ordinal":30}',
+                            'DBPort':'{"default": "27019", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "MongoDB database port", "group_name": "Database Settings", "ordinal":30}', 
+                            'DBUser':'{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "group_name": "Database Settings", "ordinal":10}', 
+                            'DBPassword':'{"default": "", "display_name": "Database Password", "required": "False", "type": "string", "tooltip": "MongoDB password", "group_name": "Database Settings", "ordinal":20}',
+                            'RunAsRoot':'{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "group_name": "Database Settings", "ordinal":40}', 
+                            'capabilities':'discover:topology',
+                            'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "name": "Database Settings"}]'}         
                 wlm.workload_types.create(metadata=metadata, is_public = True, name= 'MongoDB', description = 'MongoDB workload')
                 
             if workload_type_names['Cassandra'] == False:                
                 #Cassandra
                 time.sleep(2)
-                metadata = {'CassandraNode':'string', 'SSHPort':'string', 'Username':'string', 'Password':'password','capabilities':'discover:topology' }                       
+                metadata = {'CassandraNode':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "One of the nodes of the Cassandra cluster", "group_name": "Host Settings"}', 
+                            'SSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"(Optional) Enter ssh port number if it is other than default", "group_name": "Host Settings"}', 
+                            'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "group_name": "Host Settings"}', 
+                            'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "group_name": "Host Settings"}',
+                            'capabilities':'discover:topology',
+                            'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}]'}                       
                 wlm.workload_types.create(metadata=metadata, is_public = True, name= 'Cassandra', description = 'Cassandra workload')
                 
             if workload_type_names['Serial'] == False:
@@ -1347,6 +1371,10 @@ def configure_vmware():
         config_data['vcenter_username'] = config_inputs['vcenter-username']
         config_data['vcenter_password'] = config_inputs['vcenter-password']
         
+        config_data['storage_type'] = config_inputs['storage-type']
+        config_data['storage_local_device'] = config_inputs['storage-local-device']       
+        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
+               
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']
         if config_data['ldap_server_url']:
             config_data['ldap_domain_name_suffix'] = config_inputs['ldap-domain-name-suffix']
