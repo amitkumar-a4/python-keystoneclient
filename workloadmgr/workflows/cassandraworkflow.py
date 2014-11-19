@@ -96,7 +96,11 @@ def getcassandranodes(connection):
     #UN  172.17.17.5  86.46 KB   99.8%             a03a1287-7d32-42ed-9018-8206fc295dd9  -9218601096928798970                     17
 
     cassout = cassout.split("\n")
+    for idx, val in enumerate(cassout):
+        if val.startswith("Datacenter"):
+           break
 
+    cassout = cassout[idx:]
     casskeys = cassout[4].split()
 
     cassnodes = []
@@ -222,7 +226,7 @@ class SnapshotNode(task.Task):
     def execute(self, CassandraNode, SSHPort, Username, Password):
         self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
         LOG.debug(_('SnapshotNode:'))
-        stdin, stdout, stderr = self.client.exec_command("nodetool snapshot")
+        stdin, stdout, stderr = self.client.exec_command("nodetool snapshot mykeyspace")
         out = stdout.read(),
         LOG.debug(_("nodetool snapshot output:" + str(out)))
 
