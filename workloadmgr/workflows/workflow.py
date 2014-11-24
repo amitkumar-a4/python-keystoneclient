@@ -146,11 +146,7 @@ class Workflow(object):
         return dict(topology=topology)
 
     def discover(self):
-        instances = []
-        for instance in instances:
-            del instance['hypervisor_hostname']
-            del instance['hypervisor_type']
-        return dict(instances=self._store['instances'])
+        pass
 
     def details(self):
         """Provides the workflow details in json format."""

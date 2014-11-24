@@ -296,6 +296,22 @@ class WorkloadMgrsController(wsgi.Controller):
 
         return workload_topology    
 
+    def discover_instances(self, req, id):
+        """discover_instances of a workload_type using the metadata"""
+        LOG.debug(_('discover_instances of a workload %s'), id)
+
+        context = req.environ['workloadmgr.context']
+
+        LOG.audit(_("discover_instances of a workload %s"), locals(), context=context)
+
+        retval = None
+        try:
+            instances = self.workload_api.workload_discover_instances(context, id)
+        except exception:
+            pass
+ 
+        return instances                
+
     def import_workloads(self, req):
         LOG.debug(_('importing workloads from the backup store'), id)
         context = req.environ['workloadmgr.context']

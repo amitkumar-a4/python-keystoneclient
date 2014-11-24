@@ -838,14 +838,13 @@ class VMwareVCDriver(VMwareESXDriver):
                         continue 
                     except Exception as ex:
                         LOG.exception(ex)                    
-                    print output
                     percent_done_string = re.search(r'\d+% Done',output).group()
                     percent_done = int(percent_done_string.split("%")[0])
                     uploaded_size_incremental = ((vm_disk_resource_snap_size * percent_done)/100) - previous_uploaded_size
                     uploaded_size = ((vm_disk_resource_snap_size * percent_done)/100)
                     snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
-                    print "progress_percent: " + str(snapshot_obj.progress_percent) + "%"
-                    #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
+                    #print "progress_percent: " + str(snapshot_obj.progress_percent) + "%"
+                    LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
                     previous_uploaded_size = uploaded_size                        
                 except Exception as ex:
                     LOG.exception(ex)

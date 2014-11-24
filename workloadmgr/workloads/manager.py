@@ -129,7 +129,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 return metadata['value']
                 
     @autolog.log_method(logger=Logger)        
-    def workload_type_discover_instances(self, context, workload_type_id, metadata):
+    def workload_type_discover_instances(self, context, workload_type_id,
+                                         metadata, workload_id=None):
         """
         Discover instances of a workload_type
         """        
@@ -138,7 +139,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         context_dict['conf'] =  None # RpcContext object looks for this during init
         store = {
             'context': context_dict,                # context dictionary
-            'source_platform': 'openstack'
+            'source_platform': 'openstack',
+            'workload_id': workload_id,
         }
 
         for key in metadata:
@@ -148,6 +150,29 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workflow = workflow_class("discover_instances", store)
         instances = workflow.discover()
         return instances   
+
+    @autolog.log_method(logger=Logger)        
+    def workload_discover_instances(self, context, workload_id):
+        """
+        Discover instances of workload
+        """        
+        workload = self.db.workload_get(context, workload_id)
+        context_dict = dict([('%s' % key, value)
+                          for (key, value) in context.to_dict().iteritems()])            
+        context_dict['conf'] =  None # RpcContext object looks for this during init
+        store = {
+            'context': context_dict,                # context dictionary
+            'source_platform': 'openstack',
+            'workload_id': workload_id,
+        }
+
+        for meta in workload.metadata:
+            store[meta.key] = meta.value
+        
+        workflow_class = get_workflow_class(context, workload.workload_type_id)
+        workflow = workflow_class("discover_instances", store)
+        instances = workflow.discover()
+        return instances
 
     @autolog.log_method(logger=Logger)
     def workload_get_topology(self, context, workload_id):
@@ -207,12 +232,27 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             json_wl = jsonutils.dumps(workload)
             json_wl_vms = jsonutils.dumps(vms)
 
+            # update metadata hostnames
+            metadatahash = {}
+            for meta in workload.metadata:
+                metadatahash[meta.key] = meta.value
+
+            instances = self.workload_type_discover_instances(context,
+                                         workload.workload_type_id,
+                                         metadatahash,
+                                         workload_id=workload_id)
+            hostnames = ""
+            for inst in instances['instances']:
+                hostnames += inst['hostname']
+                hostnames += ";"
+
             self.db.workload_update(context, 
                                     workload_id, 
                                     {
                                      'host': self.host,
                                      'status': 'available',
-                                     'availability_zone': self.az
+                                     'availability_zone': self.az,
+                                     'metadata': {'hostnames': hostnames}, 
                                     })
         except Exception as err:
             with excutils.save_and_reraise_exception():
@@ -242,6 +282,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     full_snapshot_exists = True
                     break
     
+            workload = self.db.workload_get(context, snapshot.workload_id)
+
             snapshot = self.db.snapshot_get(context, snapshot_id)
             if snapshot.snapshot_type != 'full' and full_snapshot_exists == True:
                 snapshot.snapshot_type = 'incremental'
@@ -253,7 +295,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
-            workload = self.db.workload_get(context, snapshot.workload_id)
             store = {
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
@@ -280,6 +321,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'status': 'available'
                                     })             
+
+            # update metadata hostnames
+            instances = workflow.discover()
+            hostnames = ""
+            for inst in instances['instances']:
+                hostnames += inst['hostname']
+                hostnames += ";"
+
+            self.db.workload_update(context, 
+                                    snapshot.workload_id, 
+                                    {'metadata': {'hostnames': hostnames}, 
+                                    })             
+             
             # Upload snapshot metadata to the swift
             vmtasks.UploadSnapshotDBEntry(context, self.db.snapshot_get(context, snapshot_id))
 

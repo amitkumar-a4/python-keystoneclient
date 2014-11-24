@@ -96,10 +96,17 @@ class DisableProfiling(task.Task):
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
         
-        cfghost = cfgsrvs[0].split(':')[0]
-        cfgport = cfgsrvs[0].split(':')[1]
-        self.cfgclient = connect_server(cfghost, int(cfgport), DBUser, DBPassword)
-        
+        for cfgsrv in cfgsrvs:
+            cfghost = cfgsrv.split(':')[0]
+            cfgport = cfgsrv.split(':')[1]
+            try:
+                self.cfgclient = connect_server(cfghost, int(cfgport),
+                                                DBUser, DBPassword)
+                break
+            except:
+                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                pass
+
         proflevel = self.cfgclient.admin.profiling_level()
         
         # diable profiling
@@ -120,13 +127,19 @@ class EnableProfiling(task.Task):
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
     
-        cfghost = cfgsrvs[0].split(':')[0]
-        cfgport = cfgsrvs[0].split(':')[1]
-        self.cfgclient = connect_server(cfghost, int(cfgport), DBUser, DBPassword)
-    
+        for cfgsrv in cfgsrvs:
+            cfghost = cfgsrv.split(':')[0]
+            cfgport = cfgsrv.split(':')[1]
+            try:
+                self.cfgclient = connect_server(cfghost, int(cfgport),
+                                                DBUser, DBPassword)
+                break
+            except:
+                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                pass
+
         # Read profile level from the flow record?
         self.cfgclient.admin.set_profiling_level(proflevel)
-
 
 class PauseDBInstance(task.Task):
 
@@ -209,9 +222,16 @@ class ShutdownConfigServer(task.Task):
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
         
-        cfghost = cfgsrvs[0].split(':')[0]
-        cfgport = cfgsrvs[0].split(':')[1]
-        self.cfgclient = connect_server(cfghost, int(cfgport), DBUser, DBPassword)
+        for cfgsrv in cfgsrvs:
+            cfghost = cfgsrv.split(':')[0]
+            cfgport = cfgsrv.split(':')[1]
+            try:
+                self.cfgclient = connect_server(cfghost, int(cfgport),
+                                                DBUser, DBPassword)
+                break
+            except:
+                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                pass
         
         cmdlineopts = self.cfgclient.admin.command('getCmdLineOpts')
         
@@ -235,7 +255,7 @@ class ShutdownConfigServer(task.Task):
             client.close()
     
         # Also make sure the config server command line operations are saved
-        return cfgsrvs[0], cmdlineopts
+        return cfgsrv, cmdlineopts
 
         def revert(self, *args, **kwargs):
             # Make sure all config servers are resumed
@@ -420,6 +440,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                    
                     utils.append_unique(vms, {'vm_id' : instance.id,
                                               'vm_name' : instance.name,
+                                              'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
                                               'vm_metadata' : instance.metadata,                                                
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
@@ -455,6 +476,23 @@ class MongoDBWorkflow(workflow.Workflow):
         super(MongoDBWorkflow, self).__init__(name)
         self._store = store
 
+    def find_first_alive_node(self):
+        # Iterate thru all hosts and pick the one that is alive
+        if 'hostnames' in self._store:
+            for host in self._store['hostnames'].split(";"):
+                try:
+                    connection = connect_server(host, 
+                                                int(self._store['DBPort']),
+                                                self._store['DBUser'],
+                                                self._store['DBPassword'])
+                    self._store['DBHost'] = host
+                    LOG.debug(_( 'Chose "' + host +'" for mongodb connection'))
+                    return
+                except:
+                    LOG.debug(_( '"' + host +'" appears to be offline'))
+                    pass
+        LOG.warning(_( 'MongoDB cluster appears to be offline'))
+
     #
     # MongoDB flow is an directed acyclic flow. 
     # :param host - One of the mongo db node in the cluster that has mongos 
@@ -464,6 +502,7 @@ class MongoDBWorkflow(workflow.Workflow):
     # : usename/password - username and password to authenticate to the database
     #
     def initflow(self):
+        self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['DBHost'],
                                             self._store['DBPort'],
@@ -534,6 +573,7 @@ class MongoDBWorkflow(workflow.Workflow):
         #
         # Creating connection to mongos server
         #
+        self.find_first_alive_node()
         LOG.debug(_( 'Connecting to mongos server ' + self._store['DBHost']))
         connection = connect_server(self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'])
 
@@ -625,6 +665,7 @@ class MongoDBWorkflow(workflow.Workflow):
         return dict(workflow=workflow)
 
     def discover(self):
+        self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = get_vms(cntx, self._store['DBHost'],
                             self._store['DBPort'], self._store['DBUser'],
@@ -644,6 +685,7 @@ class MongoDBWorkflow(workflow.Workflow):
             search_opts['deep_discover'] = '1'
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             compute_service.get_servers(cntx, search_opts=search_opts)
+        self.find_first_alive_node()
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
 

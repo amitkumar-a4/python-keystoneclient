@@ -52,9 +52,13 @@ def connect_server(host, port, user, password):
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
         client.connect(host, port, user, password)
         LOG.debug(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
+        stdin, stdout, stderr = client.exec_command("nodetool status")
+        if stderr.read() != '':
+            raise Exception(_("Cassandra service is not running on %s"), host)
 
     except Exception, e:
         LOG.error(_( 'There was an error connecting to cassandra node. Error %s. Try again...'), str(e))
+        raise e
     return client
 
 def getnodeinfo(host, port, user, password):
@@ -215,6 +219,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                                               'vm_name' : instance.name,
                                               'vm_metadata' : instance.metadata,                                                
                                               'vm_flavor_id' : instance.flavor['id'],
+                                              'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
                                               'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                               'hypervisor_hostname' : hypervisor_hostname,
                                               'hypervisor_type' :  hypervisor_type}, 
@@ -224,13 +229,16 @@ def get_cassandra_nodes(cntx, host, port, username, password):
 class SnapshotNode(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
-        self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-        LOG.debug(_('SnapshotNode:'))
-        stdin, stdout, stderr = self.client.exec_command("nodetool snapshot mykeyspace")
-        out = stdout.read(),
-        LOG.debug(_("nodetool snapshot output:" + str(out)))
+        try:
+            self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
+            LOG.debug(_('SnapshotNode:'))
+            stdin, stdout, stderr = self.client.exec_command("nodetool snapshot")
+            out = stdout.read(),
+            LOG.debug(_("nodetool snapshot output:" + str(out)))
+        except:
+            LOG.warning(_("Cannot run nodetool snapshot command on %s"), CassandraNode)
+            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
 
-        #find out if it is successful or not. If failure, throw exception
         return 
 
     def revert(self, *args, **kwargs):
@@ -243,12 +251,16 @@ class SnapshotNode(task.Task):
 class ClearSnapshot(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
-        self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-        LOG.debug(_('ClearSnapshot:'))
-        stdin, stdout, stderr = self.client.exec_command("nodetool clearsnapshot")
-        out = stdout.read(),
+        try:
+            self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
+            LOG.debug(_('ClearSnapshot:'))
+            stdin, stdout, stderr = self.client.exec_command("nodetool clearsnapshot")
+            out = stdout.read(),
 
-        LOG.debug(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
+            LOG.debug(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
+        except:
+            LOG.warning(_("Cannot run nodetool clearsnapshot command on %s"), CassandraNode)
+            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
 
         return 
 
@@ -273,8 +285,27 @@ class CassandraWorkflow(workflow.Workflow):
         super(CassandraWorkflow, self).__init__(name)
         self._store = store
         
+    def find_first_alive_node(self):
+        # Iterate thru all hosts and pick the one that is alive
+        if 'hostnames' in self._store:
+            for host in self._store['hostnames'].split(";"):
+                try:
+                    connection = connect_server(host, 
+                                                int(self._store['SSHPort']),
+                                                self._store['Username'],
+                                                self._store['Password'])
+                    self._store['CassandraNode'] = host
+                    LOG.debug(_( 'Chose "' + host +'" for cassandra nodetool'))
+                    return
+                except:
+                    LOG.debug(_( '"' + host +'" appears to be offline'))
+                    pass
+        LOG.warning(_( 'Cassandra cluster appears to be offline'))
+
     def initflow(self):
+        self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
+
         self._store['instances'] =  get_cassandra_nodes(cntx, self._store['CassandraNode'], 
                  int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
         for index,item in enumerate(self._store['instances']):
@@ -306,8 +337,9 @@ class CassandraWorkflow(workflow.Workflow):
 
 
     def topology(self):
-
         LOG.debug(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
+        self.find_first_alive_node()
+
         connection = connect_server(self._store['CassandraNode'], int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
         cassnodes = getcassandranodes(connection)
         dcs = {'name': "Cassandra Cluster", "datacenters":{}, "input":[]}
@@ -375,6 +407,7 @@ class CassandraWorkflow(workflow.Workflow):
         return dict(workflow=workflow)
 
     def discover(self):
+        self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances = get_cassandra_nodes(cntx, self._store['CassandraNode'], int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
         for instance in instances:
@@ -389,6 +422,10 @@ class CassandraWorkflow(workflow.Workflow):
             search_opts['deep_discover'] = '1'
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             compute_service.get_servers(cntx, search_opts=search_opts)
+
+        # Iterate thru all hosts and pick the one that is alive
+        self.find_first_alive_node()
+
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
     

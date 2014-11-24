@@ -275,10 +275,8 @@ class API(base.Base):
                         if 'imported_from_vcenter' in instance_with_name.metadata and \
                             instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
                             source_platform = "vmware"
-                        
-                        
-                        
         
+        metadata['hostnames'] = ""
         workload_type_id_valid = False
         workload_types = self.workload_type_get_all(context)            
         for workload_type in workload_types:
@@ -442,6 +440,14 @@ class API(base.Base):
         return self.workloads_rpcapi.workload_get_topology(context,
                                                            socket.gethostname(),
                                                            workload_id)   
+
+    def workload_discover_instances(self, context, workload_id):
+        """
+        Discover Instances of a workload_type. RPC call is made
+        """
+        return self.workloads_rpcapi.workload_discover_instances(context,
+                                                                 socket.gethostname(),
+                                                                 workload_id)
                      
     def _is_workload_paused(self, context, workload_id): 
         workload = self.workload_get(context, workload_id)
@@ -509,7 +515,7 @@ class API(base.Base):
         try:
             workload_lock.acquire()
             workload = self.workload_get(context, workload_id)
-            if workload['status'] != 'available':
+            if workload['status'].lower() != 'available':
                 msg = _("Workload must be in the 'available' state to take a snapshot")
                 raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
             self.db.workload_update(context, workload_id, {'status': 'locked'})

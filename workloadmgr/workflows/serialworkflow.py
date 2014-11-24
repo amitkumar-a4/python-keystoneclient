@@ -64,6 +64,7 @@ def get_vms(cntx, workload_id):
               'vm_name' : vm_instance.name,
               'vm_metadata' : vm_instance.metadata,
               'vm_flavor_id' : vm_instance.flavor['id'],
+              'hostname': vm_instance.name,
               'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
               'hypervisor_hostname' : vm_hypervisor.hypervisor_hostname,
               'hypervisor_type' :  vm_hypervisor.hypervisor_type
@@ -111,6 +112,14 @@ class SerialWorkflow(workflow.Workflow):
         _snapshotvms.add(vmtasks.LinearThawVMs(self._store['instances']))        
 
         super(SerialWorkflow, self).initflow(_snapshotvms)
+
+    def discover(self):
+        cntx = amqp.RpcContext.from_dict(self._store['context'])
+        instances = get_vms(cntx, self._store['workload_id'])
+        for instance in instances:
+            del instance['hypervisor_hostname']
+            del instance['hypervisor_type']
+        return dict(instances=instances)
           
     def execute(self):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
