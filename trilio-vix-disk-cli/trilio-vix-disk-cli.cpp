@@ -47,6 +47,9 @@ using std::vector;
 #define COMMAND_READBENCH       (1 << 10)
 #define COMMAND_WRITEBENCH      (1 << 11)
 #define COMMAND_CHECKREPAIR     (1 << 12)
+#define COMMAND_DOWNLOAD        (1 << 13)
+#define COMMAND_UPLOAD          (1 << 14)
+#define COMMAND_COMPARE         (1 << 15)
 
 #define VIXDISKLIB_VERSION_MAJOR 5
 #define VIXDISKLIB_VERSION_MINOR 5
@@ -57,6 +60,9 @@ using std::vector;
 // Print updated statistics for read/write benchmarks roughly every
 // BUFS_PER_STAT sectors (current value is 64MBytes worth of data)
 #define BUFS_PER_STAT (128 * 1024)
+
+// buffer size for downloading and uploading data from and to remote disk
+#define VIXDISKLIB_BUF_SIZE (128 * VIXDISKLIB_SECTOR_SIZE)
 
 // Per-thread information for multi-threaded VixDiskLib test.
 struct ThreadData {
@@ -73,6 +79,8 @@ static struct {
     char *transportModes;
     char *diskPath;
     char *parentPath;
+    char *remotePath;
+    char *localPath;
     char *metaKey;
     char *metaVal;
     int filler;
@@ -91,6 +99,7 @@ static struct {
     int port;
     char *srcPath;
     VixDiskLibConnection connection;
+    VixDiskLibConnection localConnection;
     char *vmxSpec;
     bool useInitEx;
     char *cfgFile;
@@ -115,6 +124,9 @@ static int BitCount(int number);
 static void DumpBytes(const uint8 *buf, size_t n, int step);
 static void DoRWBench(bool read);
 static void DoCheckRepair(Bool repair);
+static void DoDownload(void);
+static void DoUpload(void);
+static void DoCompare(void);
 
 
 #define THROW_ERROR(vixError) \
@@ -656,6 +668,11 @@ PrintUsage(void)
            "in hexadecimal\n");
     printf(" -fill : fills specified range of sectors with byte value "
            "specified by -val\n");
+    printf(" -download remotePath: downloads the data from remote disk to local disk\n"
+           "  with the extent specified by -start -count parameters\n");
+    printf(" -upload localPath: uploads the data from the local disk to remote disk\n"
+           "  with the extent specified by -start -count parameters\n");
+    printf(" -compare localPath: Compares contents of the local disk to remote disk\n");
     printf(" -wmeta key value : writes (key,value) entry into disk's metadata table\n");
     printf(" -rmeta key : displays the value of the specified metada entry\n");
     printf(" -meta : dumps all entries of the disk's metadata\n");
@@ -781,6 +798,24 @@ main(int argc, char* argv[])
             DoRedo();
         } else if (appGlobals.command & COMMAND_FILL) {
             DoFill();
+        } else if (appGlobals.command & COMMAND_DOWNLOAD) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams,
+                                          &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoDownload();
+        } else if (appGlobals.command & COMMAND_UPLOAD) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams,
+                                          &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoUpload();
+        } else if (appGlobals.command & COMMAND_COMPARE) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams,
+                                          &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoCompare();
         } else if (appGlobals.command & COMMAND_DUMP) {
             DoDump();
         } else if (appGlobals.command & COMMAND_READ_META) {
@@ -892,6 +927,24 @@ ParseArguments(int argc, char* argv[])
             }
             appGlobals.command |= COMMAND_REDO;
             appGlobals.parentPath = argv[++i];
+        } else if (!strcmp(argv[i], "-download")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_DOWNLOAD;
+            appGlobals.remotePath = argv[++i];
+        } else if (!strcmp(argv[i], "-upload")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_UPLOAD;
+            appGlobals.localPath = argv[++i];
+        } else if (!strcmp(argv[i], "-compare")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_COMPARE;
+            appGlobals.localPath = argv[++i];
         } else if (!strcmp(argv[i], "-val")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -1193,6 +1246,176 @@ DoFill(void)
                                    appGlobals.startSector + startSector,
                                    1, buf);
        CHECK_AND_THROW(vixError);
+    }
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * DoDownload --
+ *
+ *      Downloads an extent from a remote disk to local disk
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoDownload(void)
+{
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, appGlobals.openFlags);
+    VixDisk remoteDisk(appGlobals.connection, appGlobals.remotePath, appGlobals.openFlags);
+    uint8 buf[VIXDISKLIB_BUF_SIZE];
+    VixDiskLibSectorType numSectors;
+    VixDiskLibSectorType startSector;
+    VixDiskLibSectorType i;
+    VixError vixError;
+    
+    numSectors = appGlobals.numSectors;
+    startSector = appGlobals.startSector;
+
+    while (numSectors)
+    {
+        
+        VixDiskLibSectorType nsec = (numSectors >= VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE) ?
+                                      VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE : numSectors;
+
+        // Read from remote disk and copy it to local disk
+        vixError = VixDiskLib_Read(remoteDisk.Handle(),
+                                   startSector,
+                                   nsec, buf);
+        CHECK_AND_THROW(vixError);
+
+        vixError = VixDiskLib_Write(localDisk.Handle(),
+                                    startSector,
+                                    nsec, buf);
+        CHECK_AND_THROW(vixError);
+        startSector += nsec;
+        numSectors -= nsec;
+    }
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * DoCompare --
+ *
+ *      Compares contents of a local disk to remote disk 
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoCompare(void)
+{
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.localPath, appGlobals.openFlags);
+    VixDisk remoteDisk(appGlobals.connection, appGlobals.diskPath, appGlobals.openFlags);
+    uint8 buf1[VIXDISKLIB_BUF_SIZE];
+    uint8 buf2[VIXDISKLIB_BUF_SIZE];
+    VixDiskLibSectorType numSectors;
+    VixDiskLibSectorType startSector;
+    VixDiskLibInfo *info = NULL;
+    VixDiskLibSectorType i;
+    VixError vixError;
+    
+    vixError = VixDiskLib_GetInfo(localDisk.Handle(), &info);
+    CHECK_AND_THROW(vixError);
+    numSectors = info->capacity;
+    startSector = 0;
+
+    VixDiskLib_FreeInfo(info);
+
+    vixError = VixDiskLib_GetInfo(remoteDisk.Handle(), &info);
+    VixDiskLibSectorType rsec = info->capacity;
+    VixDiskLib_FreeInfo(info);
+
+    if (numSectors != rsec)
+    {
+        CHECK_AND_THROW(VIX_E_DISK_CAPACITY_MISMATCH);
+    }
+
+    while (numSectors)
+    {
+        
+        VixDiskLibSectorType nsec = (numSectors >= VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE) ?
+                                     VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE : numSectors;
+
+        // Read from remote disk and copy it to local disk
+        vixError = VixDiskLib_Read(localDisk.Handle(),
+                                   startSector,
+                                   nsec, buf1);
+        CHECK_AND_THROW(vixError);
+
+        vixError = VixDiskLib_Read(remoteDisk.Handle(),
+                                    startSector,
+                                    nsec, buf2);
+        CHECK_AND_THROW(vixError);
+
+        if (memcmp(buf1, buf2, VIXDISKLIB_BUF_SIZE))
+        {
+            CHECK_AND_THROW(VIX_E_FAIL);
+        }
+        numSectors -= nsec;
+        startSector += nsec;
+    }
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * DoUpload --
+ *
+ *      Uploads an extent from a local disk to remote disk 
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoUpload(void)
+{
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.localPath, appGlobals.openFlags);
+    VixDisk remoteDisk(appGlobals.connection, appGlobals.diskPath, appGlobals.openFlags);
+    uint8 buf[VIXDISKLIB_BUF_SIZE];
+    VixDiskLibSectorType numSectors;
+    VixDiskLibSectorType startSector;
+    VixDiskLibSectorType i;
+    VixError vixError;
+    
+    numSectors = appGlobals.numSectors;
+    startSector = appGlobals.startSector;
+
+    while (numSectors)
+    {
+        
+        VixDiskLibSectorType nsec = (numSectors >= VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE) ?
+                                     VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE : numSectors;
+
+        // Read from remote disk and copy it to local disk
+        vixError = VixDiskLib_Read(localDisk.Handle(),
+                                   startSector,
+                                   nsec, buf);
+        CHECK_AND_THROW(vixError);
+
+        vixError = VixDiskLib_Write(remoteDisk.Handle(),
+                                    startSector,
+                                    nsec, buf);
+        CHECK_AND_THROW(vixError);
+        numSectors -= nsec;
+        startSector += nsec;
     }
 }
 

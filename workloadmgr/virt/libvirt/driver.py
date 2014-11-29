@@ -449,6 +449,10 @@ class LibvirtDriver(driver.ComputeDriver):
         vast_params = {'test1': 'test1','test2': 'test2'}
         compute_service.vast_thaw(cntx, instance['vm_id'], vast_params)               
 
+    @autolog.log_method(Logger, 'vmwareapi.driver.enable_cbt')
+    def enable_cbt(self, cntx, db, instance):
+        pass
+
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_vm')
     def snapshot_vm(self, cntx, db, instance, snapshot):
         

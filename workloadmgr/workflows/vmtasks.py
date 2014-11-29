@@ -508,8 +508,19 @@ class SnapshotVM(task.Task):
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})        
-        db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'], {'snapshot_id': kwargs['snapshot']['id']})
+        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'],
+                              kwargs['snapshot']['id'], {'status': 'error',})        
+        db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'],
+                              {'snapshot_id': kwargs['snapshot']['id']})
+
+        if 'result' in kwargs:
+            result = kwargs['result']
+            if kwargs['source_platform'] == 'openstack':
+                vmtasks_openstack.post_snapshot(cntx, db, kwargs['instance'],
+                               kwargs['snapshot'], result)
+            else:
+                vmtasks_vcloud.post_snapshot(cntx, db, kwargs['instance'],
+                               kwargs['snapshot'], result)
   
 class SnapshotDataSize(task.Task):
 
@@ -758,7 +769,7 @@ def CreateVMSnapshotDBEntries(context, instances, snapshot):
         snapshot_vm = db.snapshot_vm_create(cntx, options)
 
 def UploadSnapshotDBEntry(cntx, snapshot):
-    vault_service = vault.get_vault_service(cntx)
+    vault_service = vault.get_vault_service(cntx, None)
 
     parent = "workload_" + snapshot['workload_id']
 

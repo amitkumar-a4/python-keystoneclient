@@ -29,6 +29,7 @@ from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr import manager
 from workloadmgr.virt import driver
+from workloadmgr.virt import virtapi
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
@@ -89,6 +90,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
         self.scheduler.start()
+        self.driver = driver.load_compute_driver(None, None)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
         
     def init_host(self):
@@ -120,8 +122,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 vm_disk_resource_snap  = vm_disk_resource_snap_backing                           
 
         return instance_size                  
-        
-
         
     def _get_metadata_value(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
@@ -241,6 +241,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                          workload.workload_type_id,
                                          metadatahash,
                                          workload_id=workload_id)
+
+            for inst in instances['instances']:
+                self.driver.enable_cbt(context, self.db, inst)
+
             hostnames = ""
             for inst in instances['instances']:
                 hostnames += inst['hostname']
@@ -307,6 +311,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
+            instances = workflow.discover()
+
+            for inst in instances['instances']:
+                self.driver.enable_cbt(context, self.db, inst)
+
             workflow.initflow()
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -323,7 +332,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })             
 
             # update metadata hostnames
-            instances = workflow.discover()
             hostnames = ""
             for inst in instances['instances']:
                 hostnames += inst['hostname']

@@ -35,6 +35,7 @@ from eventlet import pools
 
 from workloadmgr import exception
 from workloadmgr import flags
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import lockutils
@@ -1315,8 +1316,7 @@ class ChunkedFile(object):
             object = self.update['function'](self.update['context'], 
                                              self.update['id'], 
                                              {'uploaded_size_incremental': self.uploaded_size_incremental})
-            print "progress_percent: " + str(object.progress_percent) + "%"
-            #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
             self.uploaded_size_incremental = 0
 
     def __iter__(self):

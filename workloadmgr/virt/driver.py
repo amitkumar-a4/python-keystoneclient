@@ -13,6 +13,7 @@ import sys
 
 from oslo.config import cfg
 
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import utils
@@ -161,8 +162,6 @@ def load_compute_driver(virtapi, compute_driver=None):
         LOG.error(_("Unable to load the virtualization driver: %s") % (e))
         sys.exit(1)
 
-
-
 def compute_driver_matches(match):
     return CONF.compute_driver.endswith(match)
 
@@ -175,6 +174,9 @@ def freeze_vm(self, cntx, db, instance, snapshot):
 def thaw_vm(self, cntx, db, instance, snapshot):
     raise NotImplementedError()
  
+def enable_cbt(self, cntx, db, instance): 
+    raise NotImplementedError()
+
 def snapshot_vm(self, cntx, db, instance, snapshot): 
     raise NotImplementedError()  
 

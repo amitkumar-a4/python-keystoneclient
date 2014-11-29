@@ -1008,7 +1008,7 @@ def _snapshot_vm_get(context, vm_id, snapshot_id, session):
 @require_context
 def snapshot_vm_get(context, vm_id, snapshot_id):
     session = get_session() 
-    return _snapshot_vm_get(context, id, session)   
+    return _snapshot_vm_get(context, vm_id, snapshot_id, session)   
     
 @require_context
 def snapshot_vm_delete(context, vm_id, snapshot_id):

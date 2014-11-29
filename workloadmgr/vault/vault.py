@@ -12,6 +12,7 @@ import StringIO
 import types
 import time
 from ctypes import *
+from subprocess import call
 
 import eventlet
 from oslo.config import cfg
@@ -49,8 +50,9 @@ FLAGS.register_opts(wlm_vault_opts)
 
 
 class VaultBackupService(base.Base):
-    def __init__(self, context):
+    def __init__(self, context, driver):
         self.context = context
+        self.driver = driver
         
     def get_snapshot_file_path(self, snapshot_metadata):
         snapshot_file_path = '/snapshots'
@@ -65,13 +67,36 @@ class VaultBackupService(base.Base):
         return snapshot_file_path
                  
 
-    def store(self, snapshot_metadata, iterator, size):
+    def store(self, cntx, snapshot_metadata):
         """Backup from the given iterator to trilioFS using the given snapshot metadata."""
         copy_to_file_path = self.get_snapshot_file_path(snapshot_metadata) 
+        localfilename = copy_to_file_path
         head, tail = os.path.split(copy_to_file_path)
+
+        uploaded_size_incremental = 0
+
+        position = 0
+        snapshot_ref = snapshot_metadata['snapshot_ref']
+        vm_ref = snapshot_metadata['vm_ref']
+        deviceKey = snapshot_metadata['key']
+        backingFile = snapshot_metadata['backingFile']
+        changeId = snapshot_metadata['changeId']
+        parentvmdk = snapshot_metadata['parenturl']
+        uploaded_size_incremental = snapshot_metadata['uploaded_size_incremental']
+
         if FLAGS.wlm_vault_service == 'local':
             fileutils.ensure_tree(head)
-            vault_file = open(copy_to_file_path, 'wb') 
+
+            # Create empty vmdk file
+            if changeId == "*":
+                cmdline = "trilio-vix-disk-cli -create " 
+                cmdline += "-cap " + str(snapshot_metadata['capacity'] / (1024 * 1024))
+                cmdline += " " + localfilename
+                call(cmdline.split(" "))
+            else:
+                # Create redo volume with previous backup file as backing file
+                cmdline = "trilio-vix-disk-cli -redo " + parentvmdk + " " + localfilename
+                call(cmdline.split(" "))
         else:
             from workloadmgr.vault.glusterapi import gfapi
             volume = gfapi.Volume("localhost", "vault")
@@ -82,19 +107,39 @@ class VaultBackupService(base.Base):
         #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(self.context, snapshot_metadata['snapshot_id'])
-        uploaded_size_incremental = 0
-        for chunk in iterator:
-            vault_file.write(chunk)
-            uploaded_size_incremental = uploaded_size_incremental + len(chunk)
-            #update every 5MB
-            if uploaded_size_incremental > (5 * 1024 * 1024):
-                snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
-                print "progress_percent: " + str(snapshot_obj.progress_percent) + "%"
-                #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
-                uploaded_size_incremental = 0
-        
-        vault_file.close()
-        
+
+        while position < snapshot_metadata['capacity']:
+            changes = self.driver._session._call_method(
+                                                self.driver._session._get_vim(),
+                                                "QueryChangedDiskAreas", vm_ref,
+                                                snapshot=snapshot_ref,
+                                                deviceKey=deviceKey,
+                                                startOffset=position,
+                                                changeId=changeId)
+           
+            length = changes.length;
+            offset = changes.startOffset;
+            if 'changedArea' in changes:
+                for extent in changes.changedArea:
+                    start = extent.start
+                    length = extent.length
+ 
+                    uploaded_size_incremental += length
+
+                    cmdline = "trilio-vix-disk-cli -download".split(" ")
+                    cmdline.append(str(backingFile))
+                    cmdline += ("-start " + str(start/512)).split(" ")
+                    cmdline += ("-count " + str(length/512)).split(" ")
+                    cmdline += ("-host 192.168.1.110").split(" ")
+                    cmdline += ("-user root").split(" ")
+                    cmdline += ("-password project1").split(" ")
+                    restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental/snapshot_obj.size * 100})
+                    cmdline.append(localfilename)
+                    call(cmdline)
+            #
+            # Go get and save disk data here
+            position = changes.startOffset + changes.length;
+
         if uploaded_size_incremental > 0:
             snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
             uploaded_size_incremental = 0
@@ -103,7 +148,7 @@ class VaultBackupService(base.Base):
         LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
         LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
                 
-        return copy_to_file_path   
+        return uploaded_size_incremental, copy_to_file_path   
     
     def put_object(self, parent, path, workload_json):
         #place holder for now
@@ -153,8 +198,8 @@ class VaultBackupService(base.Base):
         restore_to_file_path_handle.close()
         return    
 
-def get_vault_service(context):
+def get_vault_service(context, driver):
     if FLAGS.wlm_vault_service == 'swift':
-        return swift.SwiftBackupService(context)
+        return swift.SwiftBackupService(context, driver)
     else:
-        return VaultBackupService(context)
+        return VaultBackupService(context, driver)
