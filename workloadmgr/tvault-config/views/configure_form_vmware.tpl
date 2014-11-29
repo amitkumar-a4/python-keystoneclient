@@ -97,7 +97,7 @@ $(function() {
     			<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device 
     			<input name="storage-local-device" id="storage-local-device" type="text" required placeholder="/dev/sdb" value="/dev/sdb" class="form-control" /> <br/>
     			<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs"> NFS Export 
-    			<input name="storage-nfs-export" id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" /> <br/>
+    			<input name="storage-nfs-export" id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" value="server:/var/nfs" class="form-control" /> <br/>
  		    	<!---   			
     			<input name="storage-type" id="storage-type-object" type="radio"  value="object" disabled> Object Store 
     			<input name="storage-object-url" id="storage-object-url" type="text" required placeholder="" class="form-control">	<br/>

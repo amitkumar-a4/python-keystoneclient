@@ -992,11 +992,13 @@ def authenticate_with_keystone():
 @authorize()
 def register_service():
     # Python code to  register workloadmgr with keystone
+    if config_data['configuration_type'] == 'vmware':
+         authenticate_with_keystone()
+    
     if config_data['nodetype'] != 'controller':
         #nothing to do
         return {'status':'Success'}
-    if config_data['configuration_type'] == 'vmware':
-         authenticate_with_keystone()
+    
     try:
         
         keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
