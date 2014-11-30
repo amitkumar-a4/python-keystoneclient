@@ -20,7 +20,13 @@ from workloadmgr import utils
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
-virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+virtdriver = None
+
+def get_virtdriver():
+    global virtdriver
+    if virtdriver == None:
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+    return virtdriver
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
@@ -44,17 +50,15 @@ def unpause_vm(cntx, db, instance):
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.suspend_vm')
 def suspend_vm(cntx, db, instance):
-    #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    return virtdriver.suspend(cntx, db, instance)  
+    return get_virtdriver().suspend(cntx, db, instance)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.resume_vm')
 def resume_vm(cntx, db, instance):
-    #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    return virtdriver.resume(cntx, db, instance)  
+    return get_virtdriver().resume(cntx, db, instance)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.pre_snapshot_vm')
 def pre_snapshot_vm(cntx, db, instance, snapshot):
-    return None
+    return get_virtdriver().pre_snapshot_vm(cntx, db, instance, snapshot)
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.freeze_vm')
 def freeze_vm(cntx, db, instance, snapshot):
@@ -66,27 +70,23 @@ def thaw_vm(cntx, db, instance, snapshot):
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm')
 def snapshot_vm(cntx, db, instance, snapshot):
-    #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    return virtdriver.snapshot_vm(cntx, db, instance, snapshot)  
+    return get_virtdriver().snapshot_vm(cntx, db, instance, snapshot)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_snapshot_data_size')
 def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):
     LOG.debug(_("instance: %(instance_id)s") %{'instance_id': instance['vm_id'],})
     vm_data_size = 0;
-    #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
     vm_data_size = virtdriver.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
     LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
     return vm_data_size
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.upload_snapshot')
 def upload_snapshot(cntx, db, instance, snapshot, snapshot_data):
-    #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)  
+    get_virtdriver().upload_snapshot(cntx, db, instance, snapshot, snapshot_data)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_snapshot')
 def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
-    #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
+    get_virtdriver().post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
       
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
@@ -127,12 +127,12 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
     instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'], 'vmware')
     
     #virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-    return virtdriver.restore_vm( cntx, db, instance, restore, 
-                                  restored_net_resources,
-                                  restored_security_groups,
-                                  restored_compute_flavor,
-                                  restored_nics,
-                                  instance_options)    
+    return get_virtdriver().restore_vm( cntx, db, instance, restore, 
+                                      restored_net_resources,
+                                      restored_security_groups,
+                                      restored_compute_flavor,
+                                      restored_nics,
+                                      instance_options)    
     return None
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_restore_vm')

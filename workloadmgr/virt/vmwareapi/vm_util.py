@@ -330,6 +330,11 @@ def get_disks(hardware_devices):
             disk = {}
             disk['label'] = device.deviceInfo.label
             disk['capacityInKB'] = device.capacityInKB
+            if hasattr(device, 'capacityInBytes') == False:
+                device['capacityInBytes'] = device.capacityInKB * 1024
+            else:
+                device['capacityInBytes'] = device.capacityInBytes
+
             backings = [] # using list as a stack for the disk backings            
             if device.backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo" or \
                device.backing.__class__.__name__ == "VirtualDiskSparseVer2BackingInfo":
