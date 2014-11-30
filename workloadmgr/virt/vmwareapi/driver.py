@@ -974,7 +974,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         cmdline += ['-user', self._session._host_username,]
                         cmdline += ['-password', self._session._host_password,]
                         cmdline += ['-vm', vmxspec,]
-                        restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': 0/snapshot_obj.size * 100})
+                        restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': length})
                         cmdline.append(localfilename)
                         check_call(cmdline)
                         ctkfile.write(str(start) + "," + str(length)+"\n")
@@ -1292,7 +1292,6 @@ class VMwareVCDriver(VMwareESXDriver):
 
             vm_disk_resource_size = disk_snap.size
 
-            import pdb;pdb.set_trace()
             vix_disk_lib_env = os.environ.copy()
             vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                         
@@ -1302,10 +1301,14 @@ class VMwareVCDriver(VMwareESXDriver):
                        '-source', 'local',
                        '-host', self._session._host_ip,
                        '-user', self._session._host_username,
-                       '-password', self._session._host_password,
+                       '-password', "***********",
                        '-vm', vmxspec,]
             cmdspec.append(vmdk_path)
             cmd = " ".join(cmdspec)
+            for idx, opt in enumerate(cmdspec):
+                if opt == "-password":
+                    cmdspec[idx+1] = self._session._host_password
+                    break
 
             process = subprocess.Popen(cmdspec,
                                        stdin=subprocess.PIPE,
@@ -1334,13 +1337,11 @@ class VMwareVCDriver(VMwareESXDriver):
                         continue 
                     except Exception as ex:
                         LOG.exception(ex)                    
-                    print output
                     percent_done_string = re.search(r'\d+% Done',output).group()
                     percent_done = int(percent_done_string.split("%")[0])
                     uploaded_size_incremental = ((vm_disk_resource_size * percent_done)/100) - previous_uploaded_size
                     uploaded_size = ((vm_disk_resource_size * percent_done)/100)
                     restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': uploaded_size_incremental})
-                    print "progress_percent: " + str(restore_obj.progress_percent) + "%"
                     #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})
                     previous_uploaded_size = uploaded_size                        
                 except Exception as ex:

@@ -933,6 +933,7 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.command |= COMMAND_DOWNLOAD;
+            appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
             appGlobals.remotePath = argv[++i];
         } else if (!strcmp(argv[i], "-upload")) {
             if (i >= argc - 2) {
@@ -945,6 +946,7 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.command |= COMMAND_COMPARE;
+            appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
             appGlobals.localPath = argv[++i];
         } else if (!strcmp(argv[i], "-val")) {
             if (i >= argc - 2) {
@@ -1268,7 +1270,8 @@ DoFill(void)
 static void
 DoDownload(void)
 {
-    VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, appGlobals.openFlags);
+    uint32 localFlags = appGlobals.openFlags & ~VIXDISKLIB_FLAG_OPEN_READ_ONLY;
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, localFlags);
     VixDisk remoteDisk(appGlobals.connection, appGlobals.remotePath, appGlobals.openFlags);
     uint8 buf[VIXDISKLIB_BUF_SIZE];
     VixDiskLibSectorType numSectors;
