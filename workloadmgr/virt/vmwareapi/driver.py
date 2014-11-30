@@ -1253,7 +1253,6 @@ class VMwareVCDriver(VMwareESXDriver):
 
             # get the size of the disk
             disk_snap = vm_disk_resource_snap
-            import pdb;pdb.set_trace()
             while disk_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                 vm_disk_resource_snap_size = vm_disk_resource_snap_backing.size
@@ -1312,7 +1311,6 @@ class VMwareVCDriver(VMwareESXDriver):
                     #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})
                     previous_uploaded_size = uploaded_size                        
                 except Exception as ex:
-                    import pdb;pdb.set_trace()
                     LOG.exception(ex)
                 
             process.stdin.close()
