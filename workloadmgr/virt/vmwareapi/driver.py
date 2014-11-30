@@ -718,6 +718,8 @@ class VMwareVCDriver(VMwareESXDriver):
                    backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo" or \
                    backing.__class__.__name__ == "VirtualDiskSparseVer1BackingInfo" or \
                    backing.__class__.__name__ == "VirtualDiskSparseVer2BackingInfo" :
+                   if not 'capacityInBytes' in device:
+                       device['capacityInBytes'] = device.capacityInKB * 1024
                    snapshot_devices.append(device) 
             
         snapshot_data['snapshot_devices'] = snapshot_devices
@@ -1241,6 +1243,38 @@ class VMwareVCDriver(VMwareESXDriver):
                 continue
             vmdk_name = "%s/%s.vmdk" % (vm_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
             vmdk_path = vm_util.build_datastore_path(instance_options['datastore']['name'], vmdk_name)
+            vmdk_create_spec = vm_util.get_vmdk_create_spec(client_factory,
+                                                            db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB'),  #vmdk_file_size_in_kb, 
+                                                            db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type'),  #adapter_type,
+                                                            'thin'   #disk_type
+                                                            )
+            vmdk_create_task = self._session._call_method(self._session._get_vim(),
+                                                          "CreateVirtualDisk_Task",
+                                                          service_content.virtualDiskManager,
+                                                          name=vmdk_path,
+                                                          datacenter=datacenter_ref,
+                                                          spec=vmdk_create_spec)
+            if vmdk_create_task == []:
+                vmdk_create_task = self._session._call_method(self._session._get_vim(),
+                                                              "CreateVirtualDisk_Task",
+                                                              service_content.virtualDiskManager,
+                                                              name=vmdk_path,
+                                                              datacenter=datacenter_ref,
+                                                              spec=vmdk_create_spec)
+
+            self._session._wait_for_task(instance['uuid'], vmdk_create_task)
+
+            adapter_type = db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type')
+            capacityInKB = db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB')
+            vmdk_controler_key = db.get_metadata_value(snapshot_vm_resource.metadata,'vmdk_controler_key')
+            unit_number = db.get_metadata_value(snapshot_vm_resource.metadata,'unit_number')
+            disk_type = db.get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
+            device_name = db.get_metadata_value(snapshot_vm_resource.metadata,'label')
+            linked_clone = False
+            self._volumeops.attach_disk_to_vm( vm_ref, instance,
+                                               adapter_type, disk_type, vmdk_path,
+                                               capacityInKB, linked_clone,
+                                               vmdk_controler_key, unit_number, device_name)            
 
             LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
             db.restore_update(cntx,  restore['id'], 
@@ -1254,12 +1288,11 @@ class VMwareVCDriver(VMwareESXDriver):
             # get the size of the disk
             disk_snap = vm_disk_resource_snap
             while disk_snap.vm_disk_resource_snap_backing_id is not None:
-                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-                vm_disk_resource_snap_size = vm_disk_resource_snap_backing.size
-                disk_snap  = vm_disk_resource_snap_backing                           
+                disk_snap = db.vm_disk_resource_snap_get(cntx, disk_snap.vm_disk_resource_snap_backing_id)
 
             vm_disk_resource_size = disk_snap.size
 
+            import pdb;pdb.set_trace()
             vix_disk_lib_env = os.environ.copy()
             vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                         
@@ -1324,20 +1357,6 @@ class VMwareVCDriver(VMwareESXDriver):
                         cmd=cmd)
 
             restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': (vm_disk_resource_size - uploaded_size)})
-                    
-            adapter_type = db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type')
-            capacityInKB = db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB')
-            vmdk_controler_key = db.get_metadata_value(snapshot_vm_resource.metadata,'vmdk_controler_key')
-            unit_number = db.get_metadata_value(snapshot_vm_resource.metadata,'unit_number')
-            disk_type = db.get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
-            device_name = db.get_metadata_value(snapshot_vm_resource.metadata,'label')
-            linked_clone = False
-
-            self._volumeops.attach_disk_to_vm( vm_ref, instance,
-                                               adapter_type, disk_type, vmdk_path,
-                                               capacityInKB, linked_clone,
-                                               vmdk_controler_key, unit_number, device_name)
-            
             
             restore_obj = db.restore_get(cntx, restore['id'])
             progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
