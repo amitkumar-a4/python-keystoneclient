@@ -769,7 +769,7 @@ def CreateVMSnapshotDBEntries(context, instances, snapshot):
         snapshot_vm = db.snapshot_vm_create(cntx, options)
 
 def UploadSnapshotDBEntry(cntx, snapshot):
-    vault_service = vault.get_vault_service(cntx, None)
+    vault_service = vault.get_vault_service(cntx)
 
     parent = "workload_" + snapshot['workload_id']
 

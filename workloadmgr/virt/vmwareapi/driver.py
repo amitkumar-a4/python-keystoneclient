@@ -20,6 +20,7 @@ from os import remove, close
 from Queue import Queue, Empty
 from threading  import Thread
 from subprocess import call
+from subprocess import check_call
 
 from eventlet import event
 from oslo.config import cfg
@@ -852,7 +853,7 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'vmwareapi.driver..upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
         
-        def _upload_vmdk_extent(dev, disk, uploaded_size_incremental):
+        def _upload_vmdk_extent(dev, disk):
 
             datastore_ref = disk['datastore_ref']
             vmdk_extent_file = disk['vmdk_file_path']
@@ -905,31 +906,95 @@ class VMwareVCDriver(VMwareESXDriver):
             vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
                               'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
                               'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                              'snapshot_id': snapshot_obj.id,
                               'resource_name':  disk['label'],
                               'snapshot_vm_id': instance['vm_id'],
                               'capacity': dev.capacityInBytes,
                               'snapshot_ref': snapshot_data['snapshot_ref'],
-                              'uploaded_size_incremental': uploaded_size_incremental,
                               'vm_ref': snapshot_data['vm_ref'],
                               'key': deviceKey,
                               'changeId': changeId,
                               'backingFile': backingFile,
-                              'parenturl': latest_disk_info.vault_service_url if latest_disk_info else None,
-                              'snapshot_id': snapshot_obj.id}
+                              'parenturl': latest_disk_info.vault_service_url if latest_disk_info else None,}
             
             db.snapshot_update( cntx, snapshot_obj.id, 
                                 {'progress_msg': 'Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'],
                                  'status': 'uploading'
                                 })            
             #LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'] + '; backing file:' + vmdk_data_file))
-            uploaded_size_incremental, vault_service_url = vault_service.store(cntx, vault_metadata);
+
+            """Backup from the given iterator to trilioFS using the given snapshot metadata."""
+            copy_to_file_path = vault_service.get_snapshot_file_path(vault_metadata) 
+            localfilename = copy_to_file_path
+            head, tail = os.path.split(copy_to_file_path)
+
+            position = 0
+            snapshot_ref = snapshot_data['snapshot_ref']
+            vm_ref = snapshot_data['vm_ref']
+            vmxspec = 'moref=' + vm_ref.value
+            parentvmdk = latest_disk_info.vault_service_url if latest_disk_info else None
+
+            fileutils.ensure_tree(head)
+
+            # Create empty vmdk file
+            if changeId == "*":
+                cmdline = "trilio-vix-disk-cli -create " 
+                cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
+                cmdline += " " + localfilename
+                check_call(cmdline.split(" "))
+            else:
+                # Create redo volume with previous backup file as backing file
+                cmdline = "trilio-vix-disk-cli -redo " + parentvmdk + " " + localfilename
+                check_call(cmdline.split(" "))
+        
+            #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
+            ctkfile = open(localfilename + "-ctk", 'w')
+
+            while position < dev.capacityInBytes:
+                changes = self._session._call_method(
+                                                self._session._get_vim(),
+                                                "QueryChangedDiskAreas", vm_ref,
+                                                snapshot=snapshot_ref,
+                                                deviceKey=deviceKey,
+                                                startOffset=position,
+                                                changeId=changeId)
+           
+                if 'changedArea' in changes:
+                    for extent in changes.changedArea:
+                        start = extent.start
+                        length = extent.length
+     
+                        cmdline = "trilio-vix-disk-cli -download".split(" ")
+                        cmdline.append(str(backingFile))
+                        cmdline += ("-start " + str(start/512)).split(" ")
+                        cmdline += ("-count " + str(length/512)).split(" ")
+                        cmdline += ['-host', self._session._host_ip,]
+                        cmdline += ['-user', self._session._host_username,]
+                        cmdline += ['-password', self._session._host_password,]
+                        cmdline += ['-vm', vmxspec,]
+                        restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': 0/snapshot_obj.size * 100})
+                        cmdline.append(localfilename)
+                        check_call(cmdline)
+                        ctkfile.write(str(start) + "," + str(length)+"\n")
+                    
+                #
+                # Go get and save disk data here
+                position = changes.startOffset + changes.length;
+
+            ctkfile.close()
+            db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': 25})
+
+            LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
+            LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
+            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
+                
             db.snapshot_update( cntx, snapshot_obj.id, 
                                 {'progress_msg': 'Uploaded '+ disk['label'] + ' of VM:' + instance['vm_id'],
                                  'status': 'uploading'
                                 })
 
             # update the entry in the vm_disk_resource_snap table
-            vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url,
+            vm_disk_resource_snap_values = {'vault_service_url' : localfilename,
                                             'vault_service_metadata' : 'None',
                                             'status': 'available'}
             db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
@@ -938,7 +1003,7 @@ class VMwareVCDriver(VMwareESXDriver):
             # END of inner function _upload_vmdk_extent
 
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
-        vault_service = vault.get_vault_service(cntx, self)
+        vault_service = vault.get_vault_service(cntx)
         cookies = self._session._get_vim().client.options.transport.cookiejar
         uploaded_size_incremental = 0
 
@@ -965,7 +1030,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                           }
     
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
-            vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(dev, disk, uploaded_size_incremental)
+            vmdk_extent_size, vm_disk_resource_snap_backing_id = _upload_vmdk_extent(dev, disk)
             vm_disk_size = vm_disk_size + vmdk_extent_size
             db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vm_disk_size})
             
@@ -1042,7 +1107,7 @@ class VMwareVCDriver(VMwareESXDriver):
         vm_folder_path = vm_util.build_datastore_path(datastore_name, vm_folder_name)
         self._mkdir(vm_folder_path, datacenter_ref)
     
-        vault_service = vault.get_vault_service(cntx, self)
+        vault_service = vault.get_vault_service(cntx)
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
     
         """Restore vmx file"""
@@ -1188,31 +1253,28 @@ class VMwareVCDriver(VMwareESXDriver):
 
             # get the size of the disk
             disk_snap = vm_disk_resource_snap
-            vm_disk_resource_size = vm_disk_resource_snap.size
+            import pdb;pdb.set_trace()
             while disk_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                 vm_disk_resource_snap_size = vm_disk_resource_snap_backing.size
                 disk_snap  = vm_disk_resource_snap_backing                           
 
+            vm_disk_resource_size = disk_snap.size
+
             vix_disk_lib_env = os.environ.copy()
             vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
-            #cmd =   "trilio-vix-disk-cli -clone '" + vm_disk_resource_snap.vault_service_url + \
-            #" -host " + self._session._host_ip + \
-            #" -user '" + self._session._host_username + "' -password '" + '*******' + \
-            #"' -vm 'moref=" + vm_ref.value + "' '" + vmdk_path + "'"
                         
             vmxspec = 'moref=' + vm_ref.value
             cmdspec = ['trilio-vix-disk-cli',
                        '-clone', vm_disk_resource_snap.vault_service_url,
-                       '-host', '192.168.1.110',
-                       '-user', 'root',
-                       '-password', 'project1',]
+                       '-source', 'local',
+                       '-host', self._session._host_ip,
+                       '-user', self._session._host_username,
+                       '-password', self._session._host_password,
+                       '-vm', vmxspec,]
             cmdspec.append(vmdk_path)
             cmd = " ".join(cmdspec)
-            import pdb;pdb.set_trace()
-            call(cmdspec)
 
-            """
             process = subprocess.Popen(cmdspec,
                                        stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE,
@@ -1250,6 +1312,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})
                     previous_uploaded_size = uploaded_size                        
                 except Exception as ex:
+                    import pdb;pdb.set_trace()
                     LOG.exception(ex)
                 
             process.stdin.close()
@@ -1261,7 +1324,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         stdout=process.stdout,
                         stderr=process.stderr,
                         cmd=cmd)
-            """
+
             restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': (vm_disk_resource_size - uploaded_size)})
                     
             adapter_type = db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type')
