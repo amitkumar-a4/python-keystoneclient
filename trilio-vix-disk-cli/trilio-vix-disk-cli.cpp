@@ -883,6 +883,7 @@ ParseArguments(int argc, char* argv[])
     if (argc < 3) {
         return PrintUsage();
     }
+    appGlobals.source = "local";
     for (i = 1; i < argc - 1; i++) {
         if (!strcmp(argv[i], "-info")) {
             appGlobals.command |= COMMAND_INFO;
