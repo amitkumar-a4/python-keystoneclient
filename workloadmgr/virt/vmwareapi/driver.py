@@ -581,25 +581,7 @@ class VMwareVCDriver(VMwareESXDriver):
         
     @autolog.log_method(Logger, 'vmwareapi.driver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
-        instance_uuid = instance['vm_id']
-        instance_name = instance['vm_name']
-        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                    'vm_name': instance['vm_name'],
-                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
-                                                    }) 
-        
-        if vm_ref.capability.changeTrackingSupported == True and vm_ref.config.changeTrackingEnabled == False:
-            client_factory = self._session._get_vim().client.factory
-            vm_config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
-            vm_config_spec.changeTrackingEnabled = True
-            LOG.debug(_("Reconfiguring VM instance %(instance_name)s to enable Changed Block Tracking"),{'instance_name': instance_name})
-            reconfig_task = self._session._call_method( self._session._get_vim(),
-                                                        "ReconfigVM_Task", vm_ref,
-                                                        spec=vm_config_spec)
-            self._session._wait_for_task(instance_uuid, reconfig_task)
-            LOG.debug(_("Reconfigured VM instance %(instance_name)s to enable Changed Block Tracking"),{'instance_name': instance_name})
-               
-         
+        self.enable_cbt(cntx, db, instance)               
     
     @autolog.log_method(Logger, 'vmwareapi.driver.freeze_vm')
     def freeze_vm(self, cntx, db, instance, snapshot):
@@ -938,16 +920,18 @@ class VMwareVCDriver(VMwareESXDriver):
 
             fileutils.ensure_tree(head)
 
+            vix_disk_lib_env = os.environ.copy()
+            vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
             # Create empty vmdk file
             if changeId == "*":
                 cmdline = "trilio-vix-disk-cli -create " 
                 cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
                 cmdline += " " + localfilename
-                check_call(cmdline.split(" "))
+                check_call(cmdline.split(" "), env=vix_disk_lib_env)
             else:
                 # Create redo volume with previous backup file as backing file
                 cmdline = "trilio-vix-disk-cli -redo " + parentvmdk + " " + localfilename
-                check_call(cmdline.split(" "))
+                check_call(cmdline.split(" "), env=vix_disk_lib_env)
         
             #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
             ctkfile = open(localfilename + "-ctk", 'w')
@@ -976,7 +960,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         cmdline += ['-vm', vmxspec,]
                         restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': 0/snapshot_obj.size * 100})
                         cmdline.append(localfilename)
-                        check_call(cmdline)
+                        check_call(cmdline, env=vix_disk_lib_env)
                         ctkfile.write(str(start) + "," + str(length)+"\n")
                     
                 #
@@ -1292,7 +1276,6 @@ class VMwareVCDriver(VMwareESXDriver):
 
             vm_disk_resource_size = disk_snap.size
 
-            import pdb;pdb.set_trace()
             vix_disk_lib_env = os.environ.copy()
             vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                         
