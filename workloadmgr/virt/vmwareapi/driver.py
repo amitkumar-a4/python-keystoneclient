@@ -623,8 +623,8 @@ class VMwareVCDriver(VMwareESXDriver):
                         raise Exception(_("VM '%s(%s)' changeTracking is not enabled") %
                                           (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
                 else:
-                    raise Exception(_("VM '%s(%s)' already has snapshots and"
-                                      "enable change block tracking feature."
+                    raise Exception(_("VM '%s(%s)' already has snapshots and "
+                                      "enable change block tracking feature. "
                                       "Remove snapshots and create workload again") %
                                       (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
         else:
@@ -785,7 +785,6 @@ class VMwareVCDriver(VMwareESXDriver):
     def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data): 
 
         vm_data_size = 0
-        changeId = "*"
         snapshot_ref = snapshot_data['snapshot_ref']
         vm_ref = snapshot_data['vm_ref']
 
@@ -798,6 +797,7 @@ class VMwareVCDriver(VMwareESXDriver):
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
             deviceKey = dev['key']
             position = 0
+            changeId = "*"
             diskCapacity = dev.capacityInBytes 
             if vm_recent_snapshot:
                 latest_disk_snap = db.snapshot_vm_resource_get_by_resource_name(
@@ -902,10 +902,10 @@ class VMwareVCDriver(VMwareESXDriver):
                               'parenturl': latest_disk_info.vault_service_url if latest_disk_info else None,}
             
             db.snapshot_update( cntx, snapshot_obj.id, 
-                                {'progress_msg': 'Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'],
+                                {'progress_msg': 'Uploading '+ disk['label'] + ' of VM:' + instance['vm_name'],
                                  'status': 'uploading'
                                 })            
-            #LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_id'] + '; backing file:' + vmdk_data_file))
+            #LOG.debug(_('Uploading '+ disk['label'] + ' of VM:' + instance['vm_name'] + '; backing file:' + vmdk_data_file))
 
             """Backup from the given iterator to trilioFS using the given snapshot metadata."""
             copy_to_file_path = vault_service.get_snapshot_file_path(vault_metadata) 
@@ -949,18 +949,27 @@ class VMwareVCDriver(VMwareESXDriver):
                     for extent in changes.changedArea:
                         start = extent.start
                         length = extent.length
-     
-                        cmdline = "trilio-vix-disk-cli -download".split(" ")
-                        cmdline.append(str(backingFile))
-                        cmdline += ("-start " + str(start/512)).split(" ")
-                        cmdline += ("-count " + str(length/512)).split(" ")
-                        cmdline += ['-host', self._session._host_ip,]
-                        cmdline += ['-user', self._session._host_username,]
-                        cmdline += ['-password', self._session._host_password,]
-                        cmdline += ['-vm', vmxspec,]
-                        restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': length})
-                        cmdline.append(localfilename)
-                        check_call(cmdline, env=vix_disk_lib_env)
+                        
+                        chunksize = 64 * 1024 * 1024 
+                           
+                        for chunkstart in xrange(start, start+length, chunksize):
+
+                            if chunkstart + chunksize > start + length:
+                                chunk = start + length - chunkstart
+                            else:
+                                chunk = chunksize
+
+                            cmdline = "trilio-vix-disk-cli -download".split(" ")
+                            cmdline.append(str(backingFile))
+                            cmdline += ("-start " + str(chunkstart/512)).split(" ")
+                            cmdline += ("-count " + str(chunk/512)).split(" ")
+                            cmdline += ['-host', self._session._host_ip,]
+                            cmdline += ['-user', self._session._host_username,]
+                            cmdline += ['-password', self._session._host_password,]
+                            cmdline += ['-vm', vmxspec,]
+                            restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': chunk})
+                            cmdline.append(localfilename)
+                            check_call(cmdline, env=vix_disk_lib_env)
                         ctkfile.write(str(start) + "," + str(length)+"\n")
                     
                 #
@@ -1075,7 +1084,7 @@ class VMwareVCDriver(VMwareESXDriver):
         else:
             instance['name']= instance_name = instance_options['name'] = instance['vm_name']
     
-        msg = 'Creating VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id  
+        msg = 'Creating VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id  
         db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
         
         client_factory = self._session._get_vim().client.factory
@@ -1260,9 +1269,9 @@ class VMwareVCDriver(VMwareESXDriver):
                                                capacityInKB, linked_clone,
                                                vmdk_controler_key, unit_number, device_name)            
 
-            LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
+            LOG.debug('Uploading image and volumes of instance ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id)        
             db.restore_update(cntx,  restore['id'], 
-                              {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
+                              {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
                                'status': 'uploading' 
                               })
             
