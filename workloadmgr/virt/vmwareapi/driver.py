@@ -21,6 +21,7 @@ from Queue import Queue, Empty
 from threading  import Thread
 from subprocess import call
 from subprocess import check_call
+from subprocess import check_output
 
 from eventlet import event
 from oslo.config import cfg
@@ -923,15 +924,20 @@ class VMwareVCDriver(VMwareESXDriver):
             vix_disk_lib_env = os.environ.copy()
             vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
             # Create empty vmdk file
-            if changeId == "*":
-                cmdline = "trilio-vix-disk-cli -create " 
-                cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
-                cmdline += " " + localfilename
-                check_call(cmdline.split(" "), env=vix_disk_lib_env)
-            else:
-                # Create redo volume with previous backup file as backing file
-                cmdline = "trilio-vix-disk-cli -redo " + parentvmdk + " " + localfilename
-                check_call(cmdline.split(" "), env=vix_disk_lib_env)
+            try:
+                if changeId == "*":
+                    cmdline = "trilio-vix-disk-cli -create " 
+                    cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
+                    cmdline += " " + localfilename
+                    check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                else:
+                    # Create redo volume with previous backup file as backing file
+                    cmdline = "trilio-vix-disk-cli -redo " + parentvmdk + " " + localfilename
+                    check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+            except subprocess.CalledProcessError as ex:
+                LOG.debug(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
+                LOG.exception(ex)
+                raise
         
             #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
             ctkfile = open(localfilename + "-ctk", 'w')
@@ -959,17 +965,26 @@ class VMwareVCDriver(VMwareESXDriver):
                             else:
                                 chunk = chunksize
 
-                            cmdline = "trilio-vix-disk-cli -download".split(" ")
-                            cmdline.append(str(backingFile))
-                            cmdline += ("-start " + str(chunkstart/512)).split(" ")
-                            cmdline += ("-count " + str(chunk/512)).split(" ")
-                            cmdline += ['-host', self._session._host_ip,]
-                            cmdline += ['-user', self._session._host_username,]
-                            cmdline += ['-password', self._session._host_password,]
-                            cmdline += ['-vm', vmxspec,]
-                            restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': chunk})
-                            cmdline.append(localfilename)
-                            check_call(cmdline, env=vix_disk_lib_env)
+                            try:
+                                cmdline = "trilio-vix-disk-cli -download".split(" ")
+                                cmdline.append(str(backingFile))
+                                cmdline += ("-start " + str(chunkstart/512)).split(" ")
+                                cmdline += ("-count " + str(chunk/512)).split(" ")
+                                cmdline += ['-host', self._session._host_ip,]
+                                cmdline += ['-user', self._session._host_username,]
+                                cmdline += ['-password', self._session._host_password,]
+                                cmdline += ['-vm', vmxspec,]
+                                restore_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': chunk})
+                                cmdline.append(localfilename)
+                                check_call(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                            except subprocess.CalledProcessError as ex:
+                                for idx, opt in enumerate(cmdline):
+                                    if opt == "-password":
+                                        cmdline[idx+1] = "***********"
+                                        break
+                                LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                                LOG.exception(ex)
+                                raise
                         ctkfile.write(str(start) + "," + str(length)+"\n")
                     
                 #
@@ -1346,8 +1361,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 LOG.debug(_('Result was %s') % _returncode)
                 raise exception.ProcessExecutionError(
                         exit_code=_returncode,
-                        stdout=process.stdout,
-                        stderr=process.stderr,
+                        stdout=output,
+                        stderr=process.stderr.read(),
                         cmd=cmd)
 
             restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': (vm_disk_resource_size - uploaded_size)})

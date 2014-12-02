@@ -185,9 +185,12 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                 client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(ip, port=int(port), username=username, password=password)
-            stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr')
-            interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
+            try:
+                client.connect(ip, port=int(port), username=username, password=password)
+                stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr')
+                interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
+            except:
+                pass
         finally:
             client.close()
 
@@ -205,15 +208,15 @@ def get_cassandra_nodes(cntx, host, port, username, password):
             # IP Addresses
             ifs = instance.addresses[addr]
             for _if in ifs:
+                #this is our vm
+                hypervisor_hostname = None
+                hypervisor_type = None
+                for hypervisor in hypervisors:
+                    if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
+                        hypervisor_hostname = hypervisor.hypervisor_hostname
+                        hypervisor_type = hypervisor.hypervisor_type
+                        break
                 if _if['OS-EXT-IPS-MAC:mac_addr'] in interfaces:
-                    #this is our vm
-                    hypervisor_hostname = None
-                    hypervisor_type = None
-                    for hypervisor in hypervisors:
-                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
-                            hypervisor_hostname = hypervisor.hypervisor_hostname
-                            hypervisor_type = hypervisor.hypervisor_type
-                            break
                    
                     utils.append_unique(vms, {'vm_id' : instance.id,
                                               'vm_name' : instance.name,

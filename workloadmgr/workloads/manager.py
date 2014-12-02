@@ -382,7 +382,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             
+            target_platform = 'vmware'
+            if 'pickle' in restore:
+                options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+                if options and 'type' in options:
+                    target_platform = options['type'] 
+            
             restore_type = restore.restore_type
+            
             
             if restore_type == 'test':
                 self.db.restore_update( context, 
@@ -407,7 +414,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if restore_type == 'test':                     
                 self.db.restore_update( context, restore_id, {'size': restore_size})
             else:
-                self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
+                if target_platform == 'openstack':
+                    self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
+                else:
+                    self.db.restore_update( context, restore_id, {'size': (restore_size)})
+                    
                 
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
