@@ -230,6 +230,9 @@ def snapshot_vm_resources_get(context, vm_id, snapshot_id):
 def snapshot_resources_get(context, snapshot_id):
     return IMPL.snapshot_resources_get(context, snapshot_id)
 
+def snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, resource_pit_id):
+    return IMPL.snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, resource_pit_id)
+
 def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name):
     return IMPL.snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name)
 

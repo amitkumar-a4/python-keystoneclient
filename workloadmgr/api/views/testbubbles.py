@@ -78,6 +78,7 @@ class ViewBuilder(common.ViewBuilder):
         d['description'] =  testbubble['display_description']
         d['progress_percent'] =  testbubble['progress_percent']          
         d['progress_msg'] =  testbubble['progress_msg'] 
+        d['warning_msg'] =  testbubble['warning_msg']
         d['error_msg'] =  testbubble['error_msg'] 
 
         return {'testbubble': d}        

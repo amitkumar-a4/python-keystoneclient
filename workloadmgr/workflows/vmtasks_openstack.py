@@ -507,7 +507,6 @@ def get_vm_restore_data_size(cntx, db, instance, restore):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.get_restore_data_size')
 def get_restore_data_size(cntx, db, restore):
-
     restore_size = 0
     for vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
         restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)

@@ -228,6 +228,7 @@ class Snapshots(BASE, WorkloadsBase):
     uploaded_size = Column(BigInteger)    
     progress_percent = Column(Integer)
     progress_msg = Column(String(255))
+    warning_msg =  Column(String(4096))     
     error_msg =  Column(String(4096))   
     host = Column(String(255))    
     status =  Column(String(32), nullable=False)
@@ -245,6 +246,7 @@ class SnapshotVMs(BASE, WorkloadsBase):
     vm_name = Column(String(255))
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     size = Column(BigInteger)
+    snapshot_type = Column(String(32))        
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMMetadata(BASE, WorkloadsBase):
@@ -284,6 +286,7 @@ class SnapshotVMResources(BASE, WorkloadsBase):
     resource_name = Column(String(255)) #vda etc.
     resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot) 
     size = Column(BigInteger)       
+    snapshot_type = Column(String(32))       
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
@@ -394,6 +397,7 @@ class Restores(BASE, WorkloadsBase):
     uploaded_size = Column(BigInteger)  
     progress_percent = Column(Integer)
     progress_msg = Column(String(255))
+    warning_msg =  Column(String(4096))     
     error_msg =  Column(String(4096))
     host = Column(String(255))         
     status =  Column(String(32), nullable=False)

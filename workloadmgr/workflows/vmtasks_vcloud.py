@@ -102,15 +102,33 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
       
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_restore_data_size')
 def get_vm_restore_data_size(cntx, db, instance, restore):
-    return None
-        
-@autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_restore_data_size')
-def get_restore_data_size(cntx, db, restore): 
-    return None 
+    instance_size = 0          
+    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
+        instance_size = instance_size + vm_disk_resource_snap.size
+        while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+            instance_size = instance_size + vm_disk_resource_snap_backing.size
+            vm_disk_resource_snap  = vm_disk_resource_snap_backing                           
+
+    return instance_size
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.get_restore_data_size')
+def get_restore_data_size(cntx, db, restore):
+    restore_size = 0
+    for vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
+        restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
+
+    return restore_size
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_restore_data_size')                    
 def restore_vm_networks(cntx, db, restore):
     return None 
+
+
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.pre_restore_vm')
 def pre_restore_vm(cntx, db, instance, restore):

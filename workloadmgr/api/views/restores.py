@@ -83,6 +83,7 @@ class ViewBuilder(common.ViewBuilder):
         d['host'] = restore['host']
         d['progress_percent'] =  restore['progress_percent']          
         d['progress_msg'] =  restore['progress_msg'] 
+        d['warning_msg'] =  restore['warning_msg']
         d['error_msg'] =  restore['error_msg']                   
         return {'restore': d}        
 

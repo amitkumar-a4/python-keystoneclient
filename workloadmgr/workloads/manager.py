@@ -39,6 +39,7 @@ from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 from workloadmgr.workflows import vmtasks_openstack
+from workloadmgr.workflows import vmtasks_vcloud
 from workloadmgr.workflows import vmtasks
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception as wlm_exceptions
@@ -415,8 +416,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 self.db.restore_update( context, restore_id, {'size': restore_size})
             else:
                 if target_platform == 'openstack':
+                    restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
                     self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
                 else:
+                    restore_size = vmtasks_vcloud.get_restore_data_size( context, self.db, dict(restore.iteritems()))
                     self.db.restore_update( context, restore_id, {'size': (restore_size)})
                     
                 

@@ -810,7 +810,8 @@ def snapshot_get_all_by_project_workload(context, project_id, workload_id):
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, session=session).\
                             filter_by(project_id=project_id).\
-                            filter_by(workload_id=workload_id).all()
+                            filter_by(workload_id=workload_id).\
+                            order_by(models.Snapshots.created_at.desc()).all()
 
 @require_context
 def snapshot_show(context, snapshot_id):
@@ -1205,6 +1206,24 @@ def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resou
                        .filter_by(vm_id=vm_id)\
                        .filter_by(snapshot_id=snapshot_id)\
                        .filter_by(resource_name=resource_name)
+
+        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        snapshot_vm_resource = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        snapshot_vm_resource = None
+
+    return snapshot_vm_resource
+
+@require_context
+def snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, resource_pit_id):
+    session = get_session()
+    try:
+        query = session.query(models.SnapshotVMResources)\
+                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
+                       .filter_by(vm_id=vm_id)\
+                       .filter_by(snapshot_id=snapshot_id)\
+                       .filter_by(resource_pit_id=resource_pit_id)
 
         #TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()

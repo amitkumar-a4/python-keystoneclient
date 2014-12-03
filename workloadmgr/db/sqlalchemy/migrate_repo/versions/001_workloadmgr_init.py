@@ -166,7 +166,8 @@ def upgrade(migrate_engine):
         Column('uploaded_size', BigInteger, nullable=False),  
         Column('progress_percent', Integer, nullable=False),   
         Column('progress_msg', String(length=255)),
-        Column('error_msg', String(length=255)),
+        Column('warning_msg', String(length=4096)),
+        Column('error_msg', String(length=4096)),
         Column('host', String(length=255)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
@@ -183,6 +184,7 @@ def upgrade(migrate_engine):
         Column('vm_name', String(length=255), nullable= False),
         Column('snapshot_id', String(length=255), ForeignKey('snapshots.id')),
         Column('size', BigInteger, nullable=False),
+        Column('snapshot_type', String(length=32)),        
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -225,6 +227,7 @@ def upgrade(migrate_engine):
         Column('resource_name', String(length=255)),
         Column('resource_pit_id', String(length=255)),
         Column('size', BigInteger, nullable=False),                
+        Column('snapshot_type', String(length=32)),        
         Column('status', String(length=32), nullable=False),
         UniqueConstraint('vm_id', 'snapshot_id', 'resource_name', 'resource_pit_id'),
         mysql_engine='InnoDB'
@@ -346,7 +349,8 @@ def upgrade(migrate_engine):
         Column('uploaded_size', BigInteger, nullable=False),          
         Column('progress_percent', Integer, nullable=False),   
         Column('progress_msg', String(length=255)),
-        Column('error_msg', String(length=255)),
+        Column('warning_msg', String(length=4096)),
+        Column('error_msg', String(length=4096)),
         Column('host', String(length=255)),        
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
