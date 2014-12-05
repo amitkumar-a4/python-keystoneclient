@@ -152,6 +152,7 @@ class WorkloadMgrsController(wsgi.Controller):
             if (body and 'snapshot' in body):
                 name = body['snapshot'].get('name', None)
                 description = body['snapshot'].get('description', None)                
+                snapshot_type = body['snapshot'].get('snapshot_type', None)                
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))

@@ -669,11 +669,11 @@ class VMwareVCDriver(VMwareESXDriver):
             datastore_name, vmx_file_name = vm_util.split_datastore_path(vmx_file_path)
         datastores = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
                                                     "VirtualMachine", "datastore")
-        for datastore in datastores:
-            name = self._session._call_method(vim_util,"get_dynamic_property", datastore[1][0],
+        for datastore in datastores[0]:
+            name = self._session._call_method(vim_util,"get_dynamic_property", datastore,
                                    "Datastore", "name")
             if name == datastore_name:
-                datastore_ref = datastore[1][0]
+                datastore_ref = datastore
                 break
             
         vmx_file = {'vmx_file_path': vmx_file_path, 
@@ -877,9 +877,9 @@ class VMwareVCDriver(VMwareESXDriver):
                                 cmdline += ['-user', self._session._host_username,]
                                 cmdline += ['-password', self._session._host_password,]
                                 cmdline += ['-vm', vmxspec,]
-                                snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': chunk})
                                 cmdline.append(copy_to_file_path)
-                                check_call(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                                check_output(cmdline, stderr=None, env=vix_disk_lib_env)
+                                db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': chunk})
                             except subprocess.CalledProcessError as ex:
                                 for idx, opt in enumerate(cmdline):
                                     if opt == "-password":
@@ -893,8 +893,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 position = changes.startOffset + changes.length;
 
             ctkfile.close()
-            snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id, {'uploaded_size_incremental': 25})
 
+            snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
             LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
             LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
@@ -915,7 +915,30 @@ class VMwareVCDriver(VMwareESXDriver):
 
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         vault_service = vault.get_vault_service(cntx)
+        # make sure the session cookies are upto data by calling the following api
+        datacenter_name = self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['datastore_ref'])[1]
         cookies = self._session._get_vim().client.options.transport.cookiejar
+        #vmx file 
+        vmx_file_handle = read_write_util.VMwareHTTPReadFile(
+                                                self._session._host_ip,
+                                                self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['datastore_ref'])[1],
+                                                snapshot_data['vmx_file']['datastore_name'],
+                                                cookies,
+                                                snapshot_data['vmx_file']['vmx_file_name'])
+        vmx_file_size = int(vmx_file_handle.get_size())
+        #TODO(giri): throw exception if the size is more than 65536
+        vmx_file_data = vmx_file_handle.read(vmx_file_size)
+        vmx_file_handle.close()
+        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                       'vm_id': instance['vm_id'],
+                                       'snapshot_id': snapshot_obj.id,
+                                       'resource_type': 'vmx',
+                                       'resource_name':  snapshot_data['vmx_file']['vmx_file_name'],
+                                       'metadata': {'vmx_file_data':vmx_file_data},
+                                       'status': 'creating'}
+
+        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
+        db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vmx_file_size})
 
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
             vm_disk_size = 0
@@ -945,29 +968,7 @@ class VMwareVCDriver(VMwareESXDriver):
             db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 
                                                                            'size': vmdk_size,
                                                                            'snapshot_type': snapshot_type})
-            
-            
-        #vmx file 
-        vmx_file_handle = read_write_util.VMwareHTTPReadFile(
-                                                self._session._host_ip,
-                                                self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['datastore_ref'])[1],
-                                                snapshot_data['vmx_file']['datastore_name'],
-                                                cookies,
-                                                snapshot_data['vmx_file']['vmx_file_name'])
-        vmx_file_size = int(vmx_file_handle.get_size())
-        #TODO(giri): throw exception if the size is more than 65536
-        vmx_file_data = vmx_file_handle.read(vmx_file_size)
-        vmx_file_handle.close()
-        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                       'vm_id': instance['vm_id'],
-                                       'snapshot_id': snapshot_obj.id,
-                                       'resource_type': 'vmx',
-                                       'resource_name':  snapshot_data['vmx_file']['vmx_file_name'],
-                                       'metadata': {'vmx_file_data':vmx_file_data},
-                                       'status': 'creating'}
 
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
-        db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vmx_file_size})
             
     @autolog.log_method(Logger, 'vmwareapi.driver.remove_snapshot_vm')
     def remove_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_ref): 
@@ -1029,10 +1030,10 @@ class VMwareVCDriver(VMwareESXDriver):
         msg = 'Creating VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id  
         db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
         
+        ds = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastore']['moid'])
         client_factory = self._session._get_vim().client.factory
         service_content = self._session._get_vim().get_service_content()
         cookies = self._session._get_vim().client.options.transport.cookiejar
-        ds = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastore']['moid'])
         datastore_ref = ds[0]
         datastore_name = ds[1]
         dc_info = self._get_datacenter_ref_and_name(datastore_ref)
@@ -1269,7 +1270,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         print 'empty'
                         continue 
                     except Exception as ex:
-                        LOG.exception(ex)                    
+                        LOG.exception(ex)
                     percent_done_string = re.search(r'\d+% Done',output).group()
                     percent_done = int(percent_done_string.split("%")[0])
                     uploaded_size_incremental = ((vm_disk_resource_size * percent_done)/100) - previous_uploaded_size

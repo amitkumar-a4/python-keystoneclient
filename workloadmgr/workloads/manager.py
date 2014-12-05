@@ -43,6 +43,7 @@ from workloadmgr.workflows import vmtasks_vcloud
 from workloadmgr.workflows import vmtasks
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception as wlm_exceptions
+from threading import Lock
 
 from workloadmgr import autolog
 
@@ -82,6 +83,19 @@ def get_workflow_class(context, workload_type_id):
         workflow_class = getattr(workflow_class, comp)            
     return workflow_class        
     
+workloadlock = Lock()
+def synchronized(lock):
+    '''Synchronization decorator.'''
+    def wrap(f):
+        def new_function(*args, **kw):
+            lock.acquire()
+            try:
+                return f(*args, **kw)
+            finally:
+                lock.release()
+        return new_function
+    return wrap
+  
 class WorkloadMgrManager(manager.SchedulerDependentManager):
     """Manages WorkloadMgr """
 
@@ -266,6 +280,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                        'fail_reason': unicode(err)})
         
     @autolog.log_method(logger=Logger)
+    @synchronized(workloadlock)    
     def workload_snapshot(self, context, snapshot_id):
         """
         Take a snapshot of the workload

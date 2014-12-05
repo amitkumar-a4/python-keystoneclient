@@ -531,6 +531,12 @@ class API(base.Base):
                    'host':'',                   
                    'status': 'creating',}
         snapshot = self.db.snapshot_create(context, options)
+        self.db.snapshot_update(context, 
+                                snapshot.id, 
+                                {'progress_percent': 0, 
+                                 'progress_msg': 'Snapshot operation is scheduled',
+                                 'status': 'executing'
+                                })
         self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
         return snapshot
 
