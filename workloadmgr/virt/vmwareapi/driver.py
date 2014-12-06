@@ -747,12 +747,16 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'vmwareapi.driver.get_vmdk_snap_size')
     def get_vmdk_snap_size(self, cntx, db, instance, snapshot, snapshot_data, dev): 
         try:
+            snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             vmdk_snap_size = 0
             for idx, dev in enumerate(snapshot_data['snapshot_devices']):
-                changeId = self.get_parent_changeId(cntx, db, 
-                                                    snapshot['workload_id'],
-                                                    instance['vm_id'], 
-                                                    dev.backing.uuid)
+                if snapshot_obj.snapshot_type == 'full':
+                    changeId = '*'  
+                else:              
+                    changeId = self.get_parent_changeId(cntx, db, 
+                                                        snapshot['workload_id'],
+                                                        instance['vm_id'], 
+                                                        dev.backing.uuid)
                 position = 0
                 while position < dev.capacityInBytes:
                     changes = self._session._call_method(self._session._get_vim(),
