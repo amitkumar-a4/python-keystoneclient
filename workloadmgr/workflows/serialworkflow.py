@@ -124,3 +124,5 @@ class SerialWorkflow(workflow.Workflow):
     def execute(self):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
+
+        

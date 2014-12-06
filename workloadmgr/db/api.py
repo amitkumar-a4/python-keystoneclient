@@ -166,6 +166,9 @@ def snapshot_mark_incomplete_as_error(context, host):
 def snapshot_create(context, values):
     return IMPL.snapshot_create(context, values)
 
+def snapshot_type_update(context, snapshot_id):
+    return IMPL.snapshot_type_update(context, snapshot_id)
+
 def snapshot_delete(context, snapshot_id):
     """Destroy the snapshot or raise if it does not exist."""
     return IMPL.snapshot_delete(context, snapshot_id)
@@ -180,9 +183,9 @@ def snapshot_get_all_by_project(context, project_id):
     """Get all snapshots belonging to a project."""
     return IMPL.snapshot_get_all_by_project(context, project_id)
     
-def snapshot_get_all_by_project_workload(context, project_id, workload_id):
+def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs):
     """Get all snapshots belonging to a project and workload"""
-    return IMPL.snapshot_get_all_by_project_workload(context, project_id, workload_id)
+    return IMPL.snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs)
     
 def snapshot_show(context, snapshot_id):
     """Get more details of the  snapshot or raise if it does not exist."""
@@ -239,8 +242,8 @@ def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resou
 def snapshot_vm_resource_get(context, id):
     return IMPL.snapshot_vm_resource_get(context, id)
 
-def snapshot_vm_resource_delete(context, id, vm_id, snapshot_id):
-    return IMPL.snapshot_vm_resource_delete(context, id, vm_id, snapshot_id)
+def snapshot_vm_resource_delete(context, id):
+    return IMPL.snapshot_vm_resource_delete(context, id)
     
 def vm_disk_resource_snap_create(context, values):
     return IMPL.vm_disk_resource_snap_create(context, values)
@@ -257,8 +260,8 @@ def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
 def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id):
     return IMPL.vm_disk_resource_snap_get(context, vm_disk_resource_snap_id)
 
-def vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id):
-    return IMPL.vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id)
+def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
+    return IMPL.vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id)
 
 def vm_network_resource_snap_create(context, values):
     return IMPL.vm_network_resource_snap_create(context, values)
@@ -272,8 +275,8 @@ def vm_network_resource_snaps_get(context, snapshot_vm_resource_id):
 def vm_network_resource_snap_get(context, snapshot_vm_resource_id):
     return IMPL.vm_network_resource_snap_get(context, snapshot_vm_resource_id)
 
-def vm_network_resource_snaps_delete(context, snapshot_vm_resource_id):
-    return IMPL.vm_network_resource_snaps_delete(context, snapshot_vm_resource_id)
+def vm_network_resource_snap_delete(context, vm_network_resource_snap_id):
+    return IMPL.vm_network_resource_snap_delete(context, vm_network_resource_snap_id)
 
 def vm_security_group_rule_snap_create(context, values):
     return IMPL.vm_security_group_rule_snap_create(context, values)
@@ -287,8 +290,8 @@ def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id):
 def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
     return IMPL.vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id)
 
-def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
-    return IMPL.vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id)
+def vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_id):
+    return IMPL.vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_id)
     
 def get_metadata_value(metadata, key, default=None):
     return IMPL.get_metadata_value(metadata, key, default=None)

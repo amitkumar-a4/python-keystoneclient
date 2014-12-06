@@ -50,6 +50,8 @@ using std::vector;
 #define COMMAND_DOWNLOAD        (1 << 13)
 #define COMMAND_UPLOAD          (1 << 14)
 #define COMMAND_COMPARE         (1 << 15)
+#define COMMAND_COPY         	(1 << 16)
+#define COMMAND_ATTACH         	(1 << 17)
 
 #define VIXDISKLIB_VERSION_MAJOR 5
 #define VIXDISKLIB_VERSION_MINOR 5
@@ -106,7 +108,7 @@ static struct {
     char *libdir;
     char *ssMoRef;
     int repair;
-    char *source;    
+    char *source;       
 } appGlobals;
 
 static int ParseArguments(int argc, char* argv[]);
@@ -127,7 +129,8 @@ static void DoCheckRepair(Bool repair);
 static void DoDownload(void);
 static void DoUpload(void);
 static void DoCompare(void);
-
+static void DoCopy(void);
+static void DoAttach(void);
 
 #define THROW_ERROR(vixError) \
    throw VixDiskLibErrWrapper((vixError), __FILE__, __LINE__)
@@ -673,6 +676,8 @@ PrintUsage(void)
     printf(" -upload localPath: uploads the data from the local disk to remote disk\n"
            "  with the extent specified by -start -count parameters\n");
     printf(" -compare localPath: Compares contents of the local disk to remote disk\n");
+    printf(" -copy sourcePath: Copies contents of the source disk to another local disk\n");    
+    printf(" -attach parentPath: Attaches the child disk to parent disk\n");    
     printf(" -wmeta key value : writes (key,value) entry into disk's metadata table\n");
     printf(" -rmeta key : displays the value of the specified metada entry\n");
     printf(" -meta : dumps all entries of the disk's metadata\n");
@@ -800,20 +805,17 @@ main(int argc, char* argv[])
             DoFill();
         } else if (appGlobals.command & COMMAND_DOWNLOAD) {
             VixDiskLibConnectParams cnxParams = {0};
-            vixError = VixDiskLib_Connect(&cnxParams,
-                                          &appGlobals.localConnection);
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
             CHECK_AND_THROW(vixError);
             DoDownload();
         } else if (appGlobals.command & COMMAND_UPLOAD) {
             VixDiskLibConnectParams cnxParams = {0};
-            vixError = VixDiskLib_Connect(&cnxParams,
-                                          &appGlobals.localConnection);
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
             CHECK_AND_THROW(vixError);
             DoUpload();
         } else if (appGlobals.command & COMMAND_COMPARE) {
             VixDiskLibConnectParams cnxParams = {0};
-            vixError = VixDiskLib_Connect(&cnxParams,
-                                          &appGlobals.localConnection);
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
             CHECK_AND_THROW(vixError);
             DoCompare();
         } else if (appGlobals.command & COMMAND_DUMP) {
@@ -834,6 +836,16 @@ main(int argc, char* argv[])
             DoRWBench(false);
         } else if (appGlobals.command & COMMAND_CHECKREPAIR) {
             DoCheckRepair(appGlobals.repair);
+        } else if (appGlobals.command & COMMAND_COPY) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoCopy();
+        } else if (appGlobals.command & COMMAND_ATTACH) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoAttach();
         }
         retval = 0;
     } catch (const VixDiskLibErrWrapper& e) {
@@ -948,6 +960,12 @@ ParseArguments(int argc, char* argv[])
             appGlobals.command |= COMMAND_COMPARE;
             appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
             appGlobals.localPath = argv[++i];
+        } else if (!strcmp(argv[i], "-copy")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_COPY;
+            appGlobals.srcPath = argv[++i];
         } else if (!strcmp(argv[i], "-val")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -979,6 +997,12 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.source = argv[++i];
+        } else if (!strcmp(argv[i], "-attach")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_ATTACH;
+            appGlobals.parentPath = argv[++i];
         } else if (!strcmp(argv[i], "-readbench")) {
             if (0 && i >= argc - 2) {
                 return PrintUsage();
@@ -1422,6 +1446,84 @@ DoUpload(void)
         startSector += nsec;
     }
 }
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * DoCopy --
+ *
+ *      Copies an extent from a local disk to another local disk
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoCopy(void)
+{
+    uint32 srcFlags = VIXDISKLIB_FLAG_OPEN_READ_ONLY | VIXDISKLIB_FLAG_OPEN_SINGLE_LINK;
+    VixDisk targetDisk(appGlobals.localConnection, appGlobals.diskPath, appGlobals.openFlags);
+    VixDisk srcDisk(appGlobals.localConnection, appGlobals.srcPath, srcFlags);
+    uint8 buf[VIXDISKLIB_BUF_SIZE];
+    VixDiskLibSectorType numSectors;
+    VixDiskLibSectorType startSector;
+    VixDiskLibSectorType i;
+    VixError vixError;
+    
+    numSectors = appGlobals.numSectors;
+    startSector = appGlobals.startSector;
+
+    while (numSectors)
+    {
+        
+        VixDiskLibSectorType nsec = (numSectors >= VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE) ?
+                                      VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE : numSectors;
+
+        // Read from remote disk and copy it to local disk
+        vixError = VixDiskLib_Read(srcDisk.Handle(),
+                                   startSector,
+                                   nsec, buf);
+        CHECK_AND_THROW(vixError);
+
+        vixError = VixDiskLib_Write(targetDisk.Handle(),
+                                    startSector,
+                                    nsec, buf);
+        CHECK_AND_THROW(vixError);
+        startSector += nsec;
+        numSectors -= nsec;
+    }
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * DoAttach --
+ *
+ *      Attaches the disk to specified parent disk
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoAttach(void)
+{
+    VixDisk parentDisk(appGlobals.localConnection, appGlobals.parentPath, appGlobals.openFlags);
+    VixDisk childDisk(appGlobals.localConnection, appGlobals.diskPath, VIXDISKLIB_FLAG_OPEN_SINGLE_LINK);
+    VixError vixError;
+    
+   	vixError = VixDiskLib_Attach(parentDisk.Handle(), childDisk.Handle());
+   	CHECK_AND_THROW(vixError);
+}
+
 
 
 /*

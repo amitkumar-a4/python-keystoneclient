@@ -231,6 +231,7 @@ class Snapshots(BASE, WorkloadsBase):
     warning_msg =  Column(String(4096))     
     error_msg =  Column(String(4096))   
     host = Column(String(255))    
+    finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
 
 class SnapshotVMs(BASE, WorkloadsBase):
@@ -247,6 +248,7 @@ class SnapshotVMs(BASE, WorkloadsBase):
     snapshot_id = Column(String(255), ForeignKey('snapshots.id'))
     size = Column(BigInteger)
     snapshot_type = Column(String(32))        
+    finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMMetadata(BASE, WorkloadsBase):
@@ -287,6 +289,7 @@ class SnapshotVMResources(BASE, WorkloadsBase):
     resource_pit_id = Column(String(255)) #resource point in time id (id at the time of snapshot) 
     size = Column(BigInteger)       
     snapshot_type = Column(String(32))       
+    finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
@@ -315,6 +318,7 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     vault_service_url = Column(String(4096))    
     vault_service_metadata = Column(String(4096))
     size = Column(BigInteger)    
+    finished_at = Column(DateTime)
     status = Column(String(32), nullable=False)    
     
 class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):
@@ -337,7 +341,7 @@ class VMNetworkResourceSnaps(BASE, WorkloadsBase):
     def name(self):
         return FLAGS.workload_name_template % self.id
 
-    pickle = Column(String(4096))
+    pickle = Column(String(65535))
     status = Column(String(32), nullable=False)    
     
 class VMNetworkResourceSnapMetadata(BASE, WorkloadsBase):
@@ -361,7 +365,7 @@ class VMSecurityGroupRuleSnaps(BASE, WorkloadsBase):
     def name(self):
         return FLAGS.workload_name_template % self.id
 
-    pickle = Column(String(4096))
+    pickle = Column(String(65535))
     status = Column(String(32), nullable=False)    
     
 class VMSecurityGroupRuleSnapMetadata(BASE, WorkloadsBase):
@@ -392,7 +396,7 @@ class Restores(BASE, WorkloadsBase):
     restore_type = Column(String(32), nullable=False)
     display_name = Column(String(255))
     display_description = Column(String(255))
-    pickle = Column(String(4096))
+    pickle = Column(String(65535))
     size = Column(BigInteger)    
     uploaded_size = Column(BigInteger)  
     progress_percent = Column(Integer)
@@ -400,6 +404,7 @@ class Restores(BASE, WorkloadsBase):
     warning_msg =  Column(String(4096))     
     error_msg =  Column(String(4096))
     host = Column(String(255))         
+    finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
 
 class RestoredVMs(BASE, WorkloadsBase):
@@ -414,6 +419,7 @@ class RestoredVMs(BASE, WorkloadsBase):
     vm_id = Column(String(255))
     vm_name = Column(String(255))
     restore_id = Column(String(255), ForeignKey('restores.id'))
+    finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
     
 class RestoredVMResources(BASE, WorkloadsBase):
@@ -429,6 +435,7 @@ class RestoredVMResources(BASE, WorkloadsBase):
     restore_id = Column(String(255), ForeignKey('restores.id'))
     resource_type = Column(String(255)) #disk, network, definition
     resource_name = Column(String(255)) #vda etc.
+    finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
     
 class RestoredVMResourceMetadata(BASE, WorkloadsBase):

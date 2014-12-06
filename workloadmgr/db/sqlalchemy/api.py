@@ -754,11 +754,12 @@ def workload_vm_get(context, id):
     return _workload_vm_get(context, id, session)   
     
 @require_context
-def workload_vms_delete(context, id):
+def workload_vms_delete(context, id, workload_id):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadVMs).\
             filter_by(id=id).\
+            filter_by(workload_id=workload_id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
@@ -805,10 +806,10 @@ def snapshot_get_all_by_project(context, project_id):
                             filter_by(project_id=project_id).all()
         
 @require_context
-def snapshot_get_all_by_project_workload(context, project_id, workload_id):
+def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs):
     session = get_session()
     authorize_project_context(context, project_id)
-    return model_query(context, models.Snapshots, session=session).\
+    return model_query(context, models.Snapshots, session=session, **kwargs).\
                             filter_by(project_id=project_id).\
                             filter_by(workload_id=workload_id).\
                             order_by(models.Snapshots.created_at.desc()).all()
@@ -867,6 +868,28 @@ def snapshot_update(context, snapshot_id, values):
         lock.release()
     return snapshot
 
+@require_context
+def snapshot_type_update(context, snapshot_id):
+    snapshot_type_full = False
+    snapshot_type_incremental = False
+    snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+        if snapshot_vm_resource.snapshot_type == 'full':
+            snapshot_type_full = True
+        if snapshot_vm_resource.snapshot_type == 'incremental':
+            snapshot_type_incremental = True
+        
+    if snapshot_type_full and snapshot_type_incremental:
+        snapshot_type = 'mixed'
+    elif snapshot_type_incremental:
+        snapshot_type = 'incremental'                
+    elif snapshot_type_full:
+        snapshot_type = 'full'
+                          
+    snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type})
+    
 @require_context
 def snapshot_delete(context, snapshot_id):
     session = get_session()
@@ -1254,13 +1277,11 @@ def snapshot_vm_resource_get(context, id):
     return _snapshot_vm_resource_get(context, id, session)
 
 @require_context
-def snapshot_vm_resource_delete(context, id, vm_id, snapshot_id):
+def snapshot_vm_resource_delete(context, id):
     session = get_session()
     with session.begin():
         session.query(models.SnapshotVMResources).\
             filter_by(id=id).\
-            filter_by(vm_id=vm_id).\
-            filter_by(snapshot_id=snapshot_id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
@@ -1415,16 +1436,16 @@ def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id):
 
 
 @require_context
-def vm_disk_resource_snaps_delete(context, snapshot_vm_resource_id):
+def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
     session = get_session()
     with session.begin():
         session.query(models.VMDiskResourceSnaps).\
-            filter_by(snapshot_vm_resource_id=snapshot_vm_resource_id).\
+            filter_by(id=vm_disk_resource_snap_id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-    
+            
 """ network resource snapshot functions """
 def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap_ref, metadata,
                                                purge_metadata, session):
@@ -1549,11 +1570,11 @@ def vm_network_resource_snap_get(context, vm_network_resource_snap_id):
 
 
 @require_context
-def vm_network_resource_snaps_delete(context, snapshot_vm_network_resource_id):
+def vm_network_resource_snap_delete(context, vm_network_resource_snap_id):
     session = get_session()
     with session.begin():
         session.query(models.VMNetworkResourceSnaps).\
-            filter_by(snapshot_vm_network_resource_id=snapshot_vm_network_resource_id).\
+            filter_by(id=vm_network_resource_snap_id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
@@ -1682,12 +1703,12 @@ def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
     return vm_security_group_rule_snap
 
 @require_context
-def vm_security_group_rule_snaps_delete(context, id, vm_security_group_snap_id):
+def vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_id):
     session = get_session()
     with session.begin():
         session.query(models.VMSecurityGroupRuleSnaps).\
             filter_by(id=id).\
-            filter_by(vm_security_group_snap_id=vm_security_group_snap_id).\
+            filter_by(id=vm_security_group_rule_snap_id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),

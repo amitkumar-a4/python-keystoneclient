@@ -32,6 +32,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
+from workloadmgr import exception
 
 import vmtasks
 import workflow
@@ -65,7 +66,7 @@ class Workflow(object):
         self._snapshotvms = None
         self._postsnapshot = None
 
-    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None):
+    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None, applyretentionpolicy = None):
 
         if snapshotvms is None:
             raise exception.UndefinedSnapshotVMsWorkflow("snapshotvms is None")
@@ -104,9 +105,13 @@ class Workflow(object):
             
             # block commit any changes back to the snapshot
             self._postsnapshot.add(vmtasks.LinearPostSnapshot(self._store['instances']))
+            
+            #apply retention policy
+            self._postsnapshot.add(vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))
         else:
             self._postsnapshot = postsnapshot
-      
+
+                       
         self._flow = lf.Flow(self.name)
 
         self._flow.add(self._presnapshot, self._snapshotmetadata, self._snapshotvms, self._postsnapshot)

@@ -587,7 +587,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                   'resource_name':  disk_info['dev'],
                                   'snapshot_vm_id': instance['vm_id'],
-                                  'snapshot_id': snapshot_obj.id,}
+                                  'snapshot_id': snapshot_obj.id,
+                                  'workload_id': snapshot_obj.workload_id,}
                 vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path'],
                                                                                 'urls': base_backing_path['urls'],})
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
@@ -670,6 +671,7 @@ class LibvirtDriver(driver.ComputeDriver):
                               'resource_name':  snapshot_vm_resource.resource_name,
                               'snapshot_vm_id': snapshot_vm_resource.vm_id,
                               'snapshot_id': snapshot_vm_resource.snapshot_id,
+                              'workload_id': snapshot_obj.workload_id,
                               'restore_id': restore_obj.id}
             LOG.debug('Restoring ' + vm_disk_resource_snap.vault_service_url)
             vault_service.restore(vault_metadata, restored_file_path)
@@ -700,6 +702,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                   'resource_name':  snapshot_vm_resource_backing.resource_name,
                                   'snapshot_vm_id': snapshot_vm_resource_backing.vm_id,
                                   'snapshot_id': snapshot_vm_resource_backing.snapshot_id,
+                                  'workload_id': snapshot_obj.workload_id,
                                   'restore_id': restore_obj.id}
                 LOG.debug('Restoring ' + vm_disk_resource_snap_backing.vault_service_url)
                 vault_service.restore(vault_metadata, restored_file_path_backing)

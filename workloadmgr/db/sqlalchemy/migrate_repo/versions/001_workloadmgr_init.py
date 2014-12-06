@@ -152,6 +152,7 @@ def upgrade(migrate_engine):
     snapshots = Table(
         'snapshots', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
@@ -176,6 +177,7 @@ def upgrade(migrate_engine):
     snapshot_vms = Table(
         'snapshot_vms', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
@@ -217,6 +219,7 @@ def upgrade(migrate_engine):
     snapshot_vm_resources = Table(
         'snapshot_vm_resources', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
@@ -250,6 +253,7 @@ def upgrade(migrate_engine):
     vm_disk_resource_snaps = Table(
         'vm_disk_resource_snaps', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
@@ -285,7 +289,7 @@ def upgrade(migrate_engine):
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
         Column('vm_network_resource_snap_id', String(length=255), ForeignKey('snapshot_vm_resources.id'), primary_key=True),
-        Column('pickle',String(length=4096)),
+        Column('pickle',String(length=65535)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )        
@@ -312,7 +316,7 @@ def upgrade(migrate_engine):
         Column('deleted', Boolean),
         Column('id', String(length=255), primary_key=True, nullable= False),
         Column('vm_security_group_snap_id', String(length=255), ForeignKey('snapshot_vm_resources.id'), primary_key=True),
-        Column('pickle',String(length=4096)),
+        Column('pickle',String(length=65535)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )        
@@ -334,6 +338,7 @@ def upgrade(migrate_engine):
     restores = Table(
         'restores', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
@@ -344,7 +349,7 @@ def upgrade(migrate_engine):
         Column('restore_type', String(length=32), primary_key=False, nullable= False),
         Column('display_name', String(length=255)),
         Column('display_description', String(length=255)),
-        Column('pickle',String(length=4096)),        
+        Column('pickle',String(length=65535)),        
         Column('size', BigInteger, nullable=False),             
         Column('uploaded_size', BigInteger, nullable=False),          
         Column('progress_percent', Integer, nullable=False),   
@@ -359,6 +364,7 @@ def upgrade(migrate_engine):
     restored_vms = Table(
         'restored_vms', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),
@@ -374,6 +380,7 @@ def upgrade(migrate_engine):
     restored_vm_resources = Table(
         'restored_vm_resources', meta,
         Column('created_at', DateTime),
+        Column('finished_at', DateTime),
         Column('updated_at', DateTime),
         Column('deleted_at', DateTime),
         Column('deleted', Boolean),

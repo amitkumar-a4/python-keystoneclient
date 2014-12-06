@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import time
 import uuid
 import cPickle as pickle
+from threading import Lock
 
 from oslo.config import cfg
 
@@ -43,7 +44,7 @@ from workloadmgr.workflows import vmtasks_vcloud
 from workloadmgr.workflows import vmtasks
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception as wlm_exceptions
-from threading import Lock
+from workloadmgr.openstack.common import timeutils
 
 from workloadmgr import autolog
 
@@ -82,7 +83,7 @@ def get_workflow_class(context, workload_type_id):
     for comp in parts[1:]:
         workflow_class = getattr(workflow_class, comp)            
     return workflow_class        
-    
+
 workloadlock = Lock()
 def synchronized(lock):
     '''Synchronization decorator.'''
@@ -96,6 +97,7 @@ def synchronized(lock):
         return new_function
     return wrap
   
+    
 class WorkloadMgrManager(manager.SchedulerDependentManager):
     """Manages WorkloadMgr """
 
@@ -280,38 +282,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                        'fail_reason': unicode(err)})
         
     @autolog.log_method(logger=Logger)
-    @synchronized(workloadlock)    
+    @synchronized(workloadlock)
     def workload_snapshot(self, context, snapshot_id):
         """
         Take a snapshot of the workload
         """
         try:
-            self.db.snapshot_update(context, 
-                                    snapshot_id,
-                                     {'host': self.host,
-                                      'progress_percent': 0, 
-                                      'progress_msg': 'Snapshot of workload is starting',
-                                      'status': 'starting'
-                                      })
-            
-            snapshot = self.db.snapshot_get(context, snapshot_id)
-            snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, snapshot.workload_id)
-            full_snapshot_exists = False
-            for snapshot in snapshots:
-                if snapshot.snapshot_type == 'full' and snapshot.status == 'available':
-                    full_snapshot_exists = True
-                    break
-    
+            snapshot = self.db.snapshot_update( context, 
+                                                snapshot_id,
+                                                {'host': self.host,
+                                                  'progress_percent': 0, 
+                                                  'progress_msg': 'Snapshot of workload is starting',
+                                                  'status': 'starting'})
             workload = self.db.workload_get(context, snapshot.workload_id)
 
-            snapshot = self.db.snapshot_get(context, snapshot_id)
-            if snapshot.snapshot_type != 'full' and full_snapshot_exists == True:
-                snapshot.snapshot_type = 'incremental'
-            else:
-                snapshot.snapshot_type = 'full'
-
-            self.db.snapshot_update(context, snapshot.id, {'snapshot_type': snapshot.snapshot_type})
-           
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
             context_dict['conf'] =  None # RpcContext object looks for this during init
@@ -340,10 +324,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'executing'
                                     })            
             workflow.execute()
+            self.db.snapshot_type_update(context, snapshot_id)               
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
                                      'progress_msg': 'Snapshot of workload is complete',
+                                     'finished_at' : timeutils.utcnow(),
                                      'status': 'available'
                                     })             
 
@@ -371,6 +357,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'progress_percent': 100, 
                                      'progress_msg': '',
                                      'error_msg': msg,
+                                     'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })
         
@@ -389,6 +376,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.db.workload_delete(context, workload_id)
 
     @autolog.log_method(logger=Logger)
+    @synchronized(workloadlock)
     def snapshot_restore(self, context, restore_id):
         """
         Restore VMs and all its LUNs from a snapshot
@@ -464,6 +452,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             restore_id, 
                             {'progress_percent': 100, 
                              'progress_msg': 'Restore from snapshot is complete',
+                             'finished_at' : timeutils.utcnow(),
                              'status': 'available'
                             })                         
 
@@ -481,6 +470,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'progress_percent': 100, 
                                      'progress_msg': '',
                                      'error_msg': msg,
+                                     'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })             
             return;                  

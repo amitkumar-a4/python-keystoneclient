@@ -99,7 +99,7 @@ class RestoreSecurityGroups(task.Task):
         else:
             return vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
 
-    @autolog.log_method(Logger, 'RestoreVMNetworks.revert') 
+    @autolog.log_method(Logger, 'RestoreSecurityGroups.revert') 
     def revert_with_log(self, *args, **kwargs):
         pass   
 
@@ -198,7 +198,7 @@ class PostRestore(task.Task):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
         db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
-              
+
 class SnapshotVMNetworks(task.Task):
         
     def execute(self, context, source_platform, instances, snapshot):
@@ -616,6 +616,28 @@ class PostSnapshot(task.Task):
         db = WorkloadMgrDB().db
         db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
 
+class ApplyRetentionPolicy(task.Task):
+
+    def execute(self, context, source_platform, instances, snapshot):
+        return self.execute_with_log(context, source_platform, instances, snapshot)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs) 
+      
+    @autolog.log_method(Logger, 'ApplyRetentionPolicy.execute')
+    def execute_with_log(self, context, source_platform, instances, snapshot):
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+
+        if source_platform == 'openstack':
+            return vmtasks_openstack.apply_retention_policy(cntx, db, instances, snapshot)
+        else:
+            return vmtasks_vcloud.apply_retention_policy(cntx, db, instances, snapshot)
+          
+    @autolog.log_method(Logger, 'ApplyRetentionPolicy.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass    
+    
 def UnorderedPreSnapshot(instances):
     flow = uf.Flow("presnapshotuf")
     for index,item in enumerate(instances):

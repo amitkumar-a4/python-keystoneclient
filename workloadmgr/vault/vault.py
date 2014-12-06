@@ -51,19 +51,23 @@ FLAGS.register_opts(wlm_vault_opts)
 class VaultBackupService(base.Base):
     def __init__(self, context):
         self.context = context
-        
-    def get_snapshot_file_path(self, snapshot_metadata):
+
+    def get_snapshot_path(self, snapshot_metadata):                 
         snapshot_file_path = '/snapshots'
         if FLAGS.wlm_vault_service == 'local':  
             snapshot_file_path = FLAGS.wlm_vault_local_directory + snapshot_file_path 
-            
+        
+        snapshot_file_path = snapshot_file_path + '/workload_%s' % (snapshot_metadata['workload_id'])
         snapshot_file_path = snapshot_file_path + '/snapshot_%s' % (snapshot_metadata['snapshot_id'])
+        return snapshot_file_path   
+                
+    def get_snapshot_file_path(self, snapshot_metadata):
+        snapshot_file_path = self.get_snapshot_path(snapshot_metadata)
         snapshot_file_path = snapshot_file_path + '/vm_id_%s' % (snapshot_metadata['snapshot_vm_id'])
         snapshot_file_path = snapshot_file_path + '/vm_res_id_%s_%s' % (snapshot_metadata['snapshot_vm_resource_id'], 
                                                                       snapshot_metadata['resource_name'].replace(' ',''))
         snapshot_file_path = snapshot_file_path + '/' + snapshot_metadata['vm_disk_resource_snap_id']
         return snapshot_file_path
-                 
 
     def store(self, snapshot_metadata, iterator, size):
         """Backup from the given iterator to trilioFS using the given snapshot metadata."""

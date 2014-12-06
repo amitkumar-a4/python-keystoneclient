@@ -144,15 +144,15 @@ class WorkloadMgrsController(wsgi.Controller):
 
         LOG.audit(_('snapshot workload: %s'), id, context=context)
         try:
-            snapshot_type = 'none'
+            snapshot_type = 'incremental'
             if (full and full == '1'):
                 snapshot_type = 'full'
             name = ''
             description = ''
             if (body and 'snapshot' in body):
-                name = body['snapshot'].get('name', None)
-                description = body['snapshot'].get('description', None)                
-                snapshot_type = body['snapshot'].get('snapshot_type', None)                
+                name = body['snapshot'].get('name', '')
+                description = body['snapshot'].get('description', '')
+                snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)                
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))

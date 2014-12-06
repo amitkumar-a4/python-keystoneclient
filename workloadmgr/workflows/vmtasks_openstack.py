@@ -42,6 +42,10 @@ def _get_pit_resource(snapshot_vm_common_resources, pit_id):
         if snapshot_vm_resource.resource_pit_id == pit_id:
             return snapshot_vm_resource 
             
+
+@autolog.log_method(Logger, 'vmtasks_openstack.apply_retention_policy')
+def apply_retention_policy(cntx, db, instances, snapshot):
+    pass
              
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):

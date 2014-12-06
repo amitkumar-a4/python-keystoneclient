@@ -28,6 +28,10 @@ def get_virtdriver():
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
     return virtdriver
 
+@autolog.log_method(Logger, 'vmtasks_openstack.apply_retention_policy')
+def apply_retention_policy(cntx, db, instances, snapshot):
+    return get_virtdriver().apply_retention_policy(cntx, db, instances, snapshot)
+
 @autolog.log_method(Logger, 'vmtasks_vcloud.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
     return None
