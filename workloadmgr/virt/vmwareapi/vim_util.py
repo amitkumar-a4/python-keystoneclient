@@ -8,6 +8,8 @@ The VMware API utility module.
 
 from oslo.config import cfg
 
+from workloadmgr.virt.vmwareapi import error_util
+
 
 vmware_opts = cfg.IntOpt('maximum_objects', default=100,
                          help='The maximum number of ObjectContent data '
@@ -153,8 +155,10 @@ def get_object_properties(vim, collector, mobj, type, properties):
     property_filter_spec.objectSet = [object_spec]
     options = client_factory.create('ns0:RetrieveOptions')
     options.maxObjects = CONF.vmware.maximum_objects
-    return vim.RetrievePropertiesEx(usecoll, specSet=[property_filter_spec],
+    obj_content = vim.RetrievePropertiesEx(usecoll, specSet=[property_filter_spec],
                                     options=options)
+    error_util.FaultCheckers.retrievepropertiesex_fault_checker(obj_content)
+    return obj_content
 
 
 def get_dynamic_property(vim, mobj, type, property_name):
@@ -194,9 +198,11 @@ def get_objects(vim, type, properties_to_collect=None, all=False):
                                 [object_spec])
     options = client_factory.create('ns0:RetrieveOptions')
     options.maxObjects = CONF.vmware.maximum_objects
-    return vim.RetrievePropertiesEx(
+    obj_content = vim.RetrievePropertiesEx(
             vim.get_service_content().propertyCollector,
             specSet=[property_filter_spec], options=options)
+    error_util.FaultCheckers.retrievepropertiesex_fault_checker(obj_content)
+    return obj_content
 
 
 def cancel_retrieve(vim, token):
@@ -256,9 +262,11 @@ def get_properties_for_a_collection_of_objects(vim, type,
                                             lst_obj_specs, [prop_spec])
     options = client_factory.create('ns0:RetrieveOptions')
     options.maxObjects = CONF.vmware.maximum_objects
-    return vim.RetrievePropertiesEx(
+    obj_content = vim.RetrievePropertiesEx(
             vim.get_service_content().propertyCollector,
             specSet=[prop_filter_spec], options=options)
+    error_util.FaultCheckers.retrievepropertiesex_fault_checker(obj_content)
+    return obj_content
 
 
 def get_about_info(vim):
