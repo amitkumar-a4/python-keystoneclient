@@ -888,7 +888,7 @@ def snapshot_type_update(context, snapshot_id):
     elif snapshot_type_full:
         snapshot_type = 'full'
                           
-    snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type})
+    return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type})
     
 @require_context
 def snapshot_delete(context, snapshot_id):
