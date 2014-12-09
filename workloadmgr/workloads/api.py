@@ -77,7 +77,6 @@ def _snapshot_create_callback(*args, **kwargs):
     # determine if the workload need to be full snapshot or incremental
     # the last full snapshot
     # if the last full snapshot is over policy based number of days, do a full backup
-    import pdb;pdb.set_trace()
     snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
                                 project_id, workload_id)
     jobscheduler = workload['jobschedule']
