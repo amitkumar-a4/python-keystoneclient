@@ -232,6 +232,7 @@ class Snapshots(BASE, WorkloadsBase):
     error_msg =  Column(String(4096))   
     host = Column(String(255))    
     finished_at = Column(DateTime)
+    data_deleted = Column(Boolean, default=False)
     status =  Column(String(32), nullable=False)
 
 class SnapshotVMs(BASE, WorkloadsBase):
@@ -290,6 +291,7 @@ class SnapshotVMResources(BASE, WorkloadsBase):
     size = Column(BigInteger)       
     snapshot_type = Column(String(32))       
     finished_at = Column(DateTime)
+    data_deleted = Column(Boolean, default=False)
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
@@ -319,6 +321,7 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     vault_service_metadata = Column(String(4096))
     size = Column(BigInteger)    
     finished_at = Column(DateTime)
+    data_deleted = Column(Boolean, default=False)
     status = Column(String(32), nullable=False)    
     
 class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):

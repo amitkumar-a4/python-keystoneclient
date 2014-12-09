@@ -170,6 +170,7 @@ def upgrade(migrate_engine):
         Column('warning_msg', String(length=4096)),
         Column('error_msg', String(length=4096)),
         Column('host', String(length=255)),
+        Column('data_deleted', Boolean, default=False),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -231,6 +232,7 @@ def upgrade(migrate_engine):
         Column('resource_pit_id', String(length=255)),
         Column('size', BigInteger, nullable=False),                
         Column('snapshot_type', String(length=32)),        
+        Column('data_deleted', Boolean, default=False),
         Column('status', String(length=32), nullable=False),
         UniqueConstraint('vm_id', 'snapshot_id', 'resource_name', 'resource_pit_id'),
         mysql_engine='InnoDB'
@@ -264,6 +266,7 @@ def upgrade(migrate_engine):
         Column('vault_service_url', String(4096)),    
         Column('vault_service_metadata', String(4096)),
         Column('size', BigInteger, nullable=False),         
+        Column('data_deleted', Boolean, default=False),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )        
