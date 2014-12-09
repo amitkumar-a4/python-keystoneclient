@@ -887,6 +887,8 @@ def snapshot_type_update(context, snapshot_id):
         snapshot_type = 'incremental'                
     elif snapshot_type_full:
         snapshot_type = 'full'
+    else:
+        snapshot_type = 'full'
                           
     return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type})
     

@@ -61,6 +61,7 @@ class ViewBuilder(common.ViewBuilder):
         d['id'] = snapshot['id']
         d['created_at'] = snapshot['created_at']
         d['updated_at'] = snapshot['created_at']
+        d['finished_at'] = snapshot['finished_at']
         d['user_id'] = snapshot['user_id']
         d['project_id'] = snapshot['project_id']
         d['status'] = snapshot['status']
