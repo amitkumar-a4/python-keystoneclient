@@ -13,6 +13,7 @@ import json
 from eventlet import greenthread
 
 from datetime import datetime
+from datetime import timedelta
 import time
 import threading
 
@@ -73,8 +74,26 @@ def _snapshot_create_callback(*args, **kwargs):
         LOG.info(msg, {'workload_id': workload_id})
         return
 
+    # determine if the workload need to be full snapshot or incremental
+    # the last full snapshot
+    # if the last full snapshot is over policy based number of days, do a full backup
+    import pdb;pdb.set_trace()
+    snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
+                                project_id, workload_id)
+    jobscheduler = workload['jobschedule']
+
+    snapshot_type = "incremental"
+    if int(jobscheduler['fullbackup_interval']) > 0:
+        # check full backup policy here
+        for snap in sorted(snapshots, key=lambda x: x.created_at, reverse=True):
+            if snap.snapshot_type == "full":
+                delta = datetime.now() - snap.created_at
+                if delta.days >= int(jobscheduler['fullbackup_interval']):
+                    snapshot_type = "full"
+                break
+
     try:
-        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, "incremental", "jobscheduler", None)
+        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
 
         # Wait for snapshot to complete
         while True:
