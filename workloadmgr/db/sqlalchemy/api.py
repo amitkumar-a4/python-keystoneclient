@@ -859,7 +859,7 @@ def snapshot_update(context, snapshot_id, values):
                 if values.get('uploaded_size_incremental'):
                     values['uploaded_size'] =  snapshot.uploaded_size + values.get('uploaded_size_incremental') 
                     if not values.get('progress_percent') and snapshot.size > 0:
-                        values['progress_percent'] = min( 100, (100 * values.get('uploaded_size'))/snapshot.size )
+                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/snapshot.size )
     
     
             snapshot.update(values)
@@ -1818,7 +1818,7 @@ def restore_update(context, restore_id, values):
                 if values.get('uploaded_size_incremental'):
                     values['uploaded_size'] =  restore.uploaded_size + values.get('uploaded_size_incremental') 
                     if not values.get('progress_percent'):
-                        values['progress_percent'] = min( 100, (100 * values.get('uploaded_size'))/restore.size)
+                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/restore.size)
     
             restore.update(values)
             restore.save(session=session)
