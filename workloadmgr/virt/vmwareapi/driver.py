@@ -1055,6 +1055,7 @@ class VMwareVCDriver(VMwareESXDriver):
             
                         
         try:
+            db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})             
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
             snapshots_to_keep = pickle.loads(str(workload_obj.jobschedule))['snapshots_to_keep']
@@ -1456,6 +1457,7 @@ class VMwareVCDriver(VMwareESXDriver):
                'state' in instance_options['power'] and \
                instance_options['power']['state'] and \
                instance_options['power']['state'] =='on':
+                db.restore_update(cntx,restore_obj.id, {'progress_msg': 'Powering on VM ' + instance['vm_name'],'status': 'executing'})        
                 self.power_on(vm_ref, instance)
             
             
@@ -1477,7 +1479,7 @@ class VMwareVCDriver(VMwareESXDriver):
                               {'progress_msg': 'Created VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
                                'status': 'executing'
                               })        
-            db.restore_update( cntx, restore_obj.id, {'progress_msg': 'Created VM:' + restored_vm['vm_id'], 'status': 'executing'})
+
             return restored_vm
         except Exception as ex:
             LOG.exception(ex)      
