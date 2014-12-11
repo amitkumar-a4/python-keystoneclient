@@ -838,7 +838,7 @@ def UploadSnapshotDBEntry(cntx, snapshot):
         if res.resource_type == "network":
             path = "workload_" + snapshot['workload_id'] + \
                    "/snapshot_" + snapshot['id'] + \
-                   "/snapshot_" + res.vm_id + vm_res_id +\
+                   "/network" + vm_res_id +\
                    "/network_db"
 
             network = db.vm_network_resource_snaps_get(cntx, res.id)
@@ -847,7 +847,7 @@ def UploadSnapshotDBEntry(cntx, snapshot):
         elif res.resource_type == "disk":
             path = "workload_" + snapshot['workload_id'] + \
                    "/snapshot_" + snapshot['id'] + \
-                   "/vm_id_" + res.vm_id + vm_res_id + \
+                   "/vm_id_" + res.vm_id + vm_res_id.replace(' ','') + \
                    "/disk_db"
             disk = db.vm_disk_resource_snaps_get(cntx, res.id)
             disk_json = jsonutils.dumps(disk)
@@ -855,7 +855,7 @@ def UploadSnapshotDBEntry(cntx, snapshot):
         elif res.resource_type == "securty_group":
             path = "workload_" + snapshot['workload_id'] + \
                    "/snapshot_" + snapshot['id'] + \
-                   "/snapshot_" + res.vm_id + vm_res_id +\
+                   "/securty_group" + vm_res_id +\
                    "/security_group_db"
             security_group = db.vm_security_group_rule_snaps_get(cntx, res.id)
             security_group_json = jsonutils.dumps(security_group)

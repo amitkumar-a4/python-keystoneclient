@@ -38,7 +38,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         LOG.debug("create queue topic=%s", topic)
         instances = self.call(ctxt,
                               self.make_msg('workload_type_discover_instances', workload_type_id=workload_type_id, metadata=metadata),
-                              topic=topic)
+                              topic=topic,
+                              timeout=300)
         return instances
 
     def workload_discover_instances(self, ctxt, host, workload_id):
@@ -47,7 +48,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         LOG.debug("create queue topic=%s", topic)
         instances = self.call(ctxt,
                               self.make_msg('workload_discover_instances', workload_id=workload_id),
-                              topic=topic)
+                              topic=topic,
+                              timeout=300)
         return instances
 
     def workload_get_topology(self, ctxt, host, workload_id):
@@ -56,7 +58,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         LOG.debug("create queue topic=%s", topic)
         topology = self.call(ctxt,
                               self.make_msg('workload_get_topology', workload_id=workload_id),
-                              topic=topic)
+                              topic=topic,
+                              timeout=300)
         return topology
         
     def workload_get_workflow_details(self, ctxt, host, workload_id):
@@ -65,7 +68,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         LOG.debug("create queue topic=%s", topic)
         workflow = self.call(ctxt,
                               self.make_msg('workload_get_workflow_details', workload_id=workload_id),
-                              topic=topic)
+                              topic=topic,
+                              timeout=300)
         return workflow      
                   
     def workload_create(self, ctxt, host, workload_id):

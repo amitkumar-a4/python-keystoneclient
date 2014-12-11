@@ -109,8 +109,13 @@ class VaultBackupService(base.Base):
                 
         return copy_to_file_path   
     
-    def put_object(self, parent, path, workload_json):
+    def put_object(self, parent, path, json_data):
         #place holder for now
+        path = FLAGS.wlm_vault_local_directory + '/snapshots/' + path
+        head, tail = os.path.split(path)
+        fileutils.ensure_tree(head)
+        with open(path, 'w') as json_file:
+            json_file.write(json_data)
         return    
         
          

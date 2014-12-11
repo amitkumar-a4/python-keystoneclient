@@ -45,6 +45,16 @@ sys.path.insert(0, top_dir)
 def InitFlow(store):
     pass
 
+def _exec_command(connection, command):
+    stdin, stdout, stderr = connection.exec_command("/usr/share/dse/bin/" + command)
+    err_msg = stderr.read()
+    if err_msg != '':
+        stdin, stdout, stderr = connection.exec_command(command)
+        err_msg = stderr.read()
+        if err_msg != '':
+            raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
+    return stdin, stdout, stderr
+    
 def connect_server(host, port, user, password):
     try:
         client = paramiko.SSHClient()
@@ -52,21 +62,18 @@ def connect_server(host, port, user, password):
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
         client.connect(host, port, user, password)
         LOG.debug(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
-        stdin, stdout, stderr = client.exec_command("nodetool status")
-        if stderr.read() != '':
-            raise Exception(_("Cassandra service is not running on %s"), host)
-
-    except Exception, e:
-        LOG.error(_( 'There was an error connecting to cassandra node. Error %s. Try again...'), str(e))
-        raise e
+        stdin, stdout, stderr = _exec_command(client, "nodetool status")
+    except Exception as ex:
+        LOG.error(_( 'There was an error connecting to cassandra node. Error %s. Try again...'), str(ex))
+        raise ex
     return client
 
 def getnodeinfo(host, port, user, password):
 
-    connection = connect_server(host, port, username, password)
+    connection = connect_server(host, port, user, password)
     LOG.debug(_( 'Connected to cassandra node: ' + host))
 
-    stdin, stdout, stderr = connection.exec_command("nodetool info")
+    stdin, stdout, stderr = _exec_command(connection, "nodetool info")
     cassout = stdout.read(),
 
     cassout = cassout[0].split("\n")
@@ -82,7 +89,7 @@ def getnodeinfo(host, port, user, password):
     nodeinput.append(['Thrift', str(nodehash['Thrift active'])])
 
 def getcassandranodes(connection):
-    stdin, stdout, stderr = connection.exec_command("nodetool status")
+    stdin, stdout, stderr = _exec_command(connection, "nodetool status")
     cassout = stdout.read(),
 
     cassout = cassout[0].replace(" KB", "KB")
@@ -102,7 +109,7 @@ def getcassandranodes(connection):
     cassout = cassout.split("\n")
     for idx, val in enumerate(cassout):
         if val.startswith("Datacenter"):
-           break
+            break
 
     cassout = cassout[idx:]
     casskeys = cassout[4].split()
@@ -133,7 +140,7 @@ def getcassandranodes(connection):
         # Key Cache        : size 1400 (bytes), capacity 51380224 (bytes), 96 hits, 114 requests, 0.842 recent hit rate, 14400 save period in seconds
         # Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds
 
-        stdin, stdout, stderr = connection.exec_command("nodetool -h " + node['Address'] + " info")
+        stdin, stdout, stderr = _exec_command(connection, "nodetool -h " + node['Address'] + " info")
         output = stdout.read()
         output = output.split("\n")
         for l in output:
@@ -235,7 +242,7 @@ class SnapshotNode(task.Task):
         try:
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
             LOG.debug(_('SnapshotNode:'))
-            stdin, stdout, stderr = self.client.exec_command("nodetool snapshot")
+            stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
             out = stdout.read(),
             LOG.debug(_("nodetool snapshot output:" + str(out)))
         except:
@@ -247,7 +254,7 @@ class SnapshotNode(task.Task):
     def revert(self, *args, **kwargs):
         if not isinstance(kwargs['result'], misc.Failure):
             LOG.debug(_("Reverting SnapshotNode"))
-            stdin, stdout, stderr = self.client.exec_command("nodetool clearsnapshot")
+            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
             out = stdout.read(),
             LOG.debug(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
 
@@ -257,7 +264,7 @@ class ClearSnapshot(task.Task):
         try:
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
             LOG.debug(_('ClearSnapshot:'))
-            stdin, stdout, stderr = self.client.exec_command("nodetool clearsnapshot")
+            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
             out = stdout.read(),
 
             LOG.debug(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
