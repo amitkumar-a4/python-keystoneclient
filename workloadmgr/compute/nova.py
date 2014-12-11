@@ -372,7 +372,7 @@ class API(base.Base):
         :param id to query.
         :rtype: :class:`Server`
         """   
-        retries = 1
+        retries = 2
         while retries:
             try:
                 if search_opts == None:
@@ -380,6 +380,7 @@ class API(base.Base):
                     for server in servers:
                         if server.id == id:
                             return server 
+                    return None
                 else:
                     qparams = {}
 
@@ -397,10 +398,12 @@ class API(base.Base):
             except nova_exception.Unauthorized as unauth_ex:
                 client.client.unauthenticate()
                 retries -= 1
+                if not retries:
+                    raise
             except Exception as ex:
                 LOG.exception(ex)
                 #TODO(gbasava): Handle the exception 
-                return       
+                raise
     
     @synchronized(novalock)     
     def stop(self, context, server):
