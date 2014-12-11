@@ -62,6 +62,7 @@ class ViewBuilder(common.ViewBuilder):
         d['id'] = restore['id']
         d['created_at'] = restore['created_at']
         d['updated_at'] = restore['created_at']
+        d['finished_at'] = restore['finished_at']
         d['user_id'] = restore['user_id']
         d['project_id'] = restore['project_id']
         d['status'] = restore['status']
