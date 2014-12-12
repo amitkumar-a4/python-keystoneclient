@@ -942,3 +942,7 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.post_restore_vm')
     def post_restore_vm(self, cntx, db, instance, restore):
         pass    
+    
+    @autolog.log_method(Logger, 'libvirt.driver.snapshot_delete')
+    def snapshot_delete(self, cntx, db, snapshot): 
+        db.snapshot_delete(cntx, snapshot.id)    

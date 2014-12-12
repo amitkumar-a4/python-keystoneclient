@@ -592,6 +592,34 @@ class VMwareVCDriver(VMwareESXDriver):
     def thaw_vm(self, cntx, db, instance, snapshot):
         pass      
     
+    @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_delete')
+    def snapshot_delete(self, cntx, db, snapshot): 
+        
+        def _remove_data():
+            db.snapshot_update(cntx, snapshot.id, {'data_deleted':True})
+            try:
+                shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snapshot.workload_id,
+                                                                               'snapshot_id': snapshot.id}))
+            except Exception as ex:
+                LOG.exception(ex)            
+            
+        db.snapshot_delete(cntx, snapshot.id)
+        if snapshot.status == 'error':
+            return _remove_data()
+        try:
+            snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot.id)
+            for snapshot_vm_resource in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type != 'disk':
+                    continue
+                if snapshot_vm_resource.status != 'deleted':
+                    return
+        except exception.SnapshotVMResourcesNotFound as ex:
+            LOG.Exception(ex)
+            return 
+                   
+        return _remove_data()
+  
+    
     @autolog.log_method(Logger, 'vmwareapi.driver.enable_cbt')
     def enable_cbt(self, cntx, db, instance):
         vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
@@ -1067,29 +1095,38 @@ class VMwareVCDriver(VMwareESXDriver):
             #must retain at least one day snapshots
             if snapshots_to_keep['days'] <= 0:
                 snapshots_to_keep['days'] = 1
-                    
+            
             snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
+            snapshots_valid = []
+            snapshots_valid.append(snapshot_obj)
+            for snap in snapshots_all:
+                if snapshots_valid[0].id == snap.id:
+                    continue
+                if snap.status == 'available':
+                    snapshots_valid.append(snap)
+                elif snap.status == 'deleted' and snap.data_deleted == False:
+                    snapshots_valid.append(snap)
+ 
             snapshot_to_commit = None
             snapshots_to_delete = []
             retained_snap_count = 0
-            for idx, snap in enumerate(snapshots_all):
-                
-                if snap.status == 'available' or snap.status == 'uploading' or snap.status == 'deleted':
-                    if snap.status == 'deleted' and snap.data_deleted == True:
-                        continue
+            for idx, snap in enumerate(snapshots_valid):
                     if snapshots_to_keep['number'] == -1:
                         if (timeutils.utcnow() - snap.created_at).days <  snapshots_to_keep['days']:    
                             retained_snap_count = retained_snap_count + 1
                         else:
                             if snapshot_to_commit == None:
-                                snapshot_to_commit = snapshots_all[idx-1]
+                                snapshot_to_commit = snapshots_valid[idx-1]
                             snapshots_to_delete.append(snap)
                     else:
                         if retained_snap_count < snapshots_to_keep['number']:
-                            retained_snap_count = retained_snap_count + 1
+                            if snap.status == 'deleted':
+                                continue                            
+                            else:
+                                retained_snap_count = retained_snap_count + 1
                         else:
                             if snapshot_to_commit == None:
-                                snapshot_to_commit = snapshots_all[idx-1]
+                                snapshot_to_commit = snapshots_valid[idx-1]
                             snapshots_to_delete.append(snap)
 
             if snapshot_to_commit == None:
@@ -1098,7 +1135,7 @@ class VMwareVCDriver(VMwareESXDriver):
             vix_disk_lib_env = os.environ.copy()
             vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
             for snap in snapshots_to_delete:
-                snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id)
+                snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id, read_deleted='yes')
                 if snapshot_to_commit.snapshot_type == 'full':
                     db.snapshot_delete(cntx, snap.id)
                     db.snapshot_update(cntx, snap.id, {'data_deleted':True})

@@ -194,6 +194,9 @@ def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
     
 def restore_vm(self, cntx, db, instance, restore, restored_net_resources, 
                restored_compute_flavor, restored_nics, instance_options):
-    raise NotImplementedError()        
+    raise NotImplementedError() 
+
+def snapshot_delete(self, cntx, db, snapshot): 
+    raise NotImplementedError()      
     
 

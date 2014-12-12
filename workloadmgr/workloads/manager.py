@@ -259,9 +259,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                          metadatahash,
                                          workload_id=workload_id)
 
-            for inst in instances['instances']:
-                self.driver.enable_cbt(context, self.db, inst)
-
             hostnames = ""
             for inst in instances['instances']:
                 hostnames += inst['hostname']
@@ -313,8 +310,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow = workflow_class(workload.display_name, store)
             instances = workflow.discover()
 
-            for inst in instances['instances']:
-                self.driver.enable_cbt(context, self.db, inst)
 
             workflow.initflow()
             self.db.snapshot_update(context, 
@@ -479,7 +474,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing snapshot
         """
-        self.db.snapshot_delete(context, snapshot_id)
+        snapshot = self.db.snapshot_get(context, snapshot_id)
+        self.driver.snapshot_delete(context, self.db, snapshot)
+
 
     @autolog.log_method(logger=Logger)        
     def restore_delete(self, context, restore_id):

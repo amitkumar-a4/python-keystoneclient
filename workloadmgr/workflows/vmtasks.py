@@ -798,6 +798,9 @@ def UploadSnapshotDBEntry(cntx, snapshot):
     db = WorkloadMgrDB().db
 
     workload_db = db.workload_get(cntx, snapshot['workload_id'])
+    for kvpair in workload_db.metadata:
+        if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
+            kvpair['value'] = '******'
     workload_json = jsonutils.dumps(workload_db)
     path = parent + "/workload_db"
     vault_service.put_object(parent, path, workload_json)

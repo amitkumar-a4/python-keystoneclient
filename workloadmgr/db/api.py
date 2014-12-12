@@ -173,8 +173,8 @@ def snapshot_delete(context, snapshot_id):
     """Destroy the snapshot or raise if it does not exist."""
     return IMPL.snapshot_delete(context, snapshot_id)
 
-def snapshot_get(context, snapshot_id):
-    return IMPL.snapshot_get(context, snapshot_id)
+def snapshot_get(context, snapshot_id, **kwargs):
+    return IMPL.snapshot_get(context, snapshot_id, **kwargs)
     
 def snapshot_get_all(context, workload_id=None):
     return IMPL.snapshot_get_all(context, workload_id)    

@@ -782,9 +782,9 @@ def snapshot_mark_incomplete_as_error(context, host):
             snapshot.save(session=session)
         
 @require_context
-def snapshot_get(context, snapshot_id):
+def snapshot_get(context, snapshot_id, **kwargs):
     session = get_session()
-    result = model_query(   context, models.Snapshots, session=session).\
+    result = model_query(   context, models.Snapshots, session=session, **kwargs).\
                             filter_by(id=snapshot_id).\
                             first()
 

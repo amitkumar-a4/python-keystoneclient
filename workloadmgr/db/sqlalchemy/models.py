@@ -32,6 +32,7 @@ class WorkloadsBase(object):
     updated_at = Column(DateTime, onupdate=timeutils.utcnow)
     deleted_at = Column(DateTime)
     deleted = Column(Boolean, default=False)
+    version = Column(String(255), default='1.0.13')
     metadata = None
 
     def save(self, session=None):
