@@ -1519,7 +1519,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 vix_disk_lib_env = os.environ.copy()
                 vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                 vmxspec = 'moref=' + vm_ref.value                
-                import pdb;pdb.set_trace()
                 for vdr_snap in vm_disk_resource_snap_chain:
                     cmdspec = ["trilio-vix-disk-cli", "-uploadextents",
                                vdr_snap.vault_service_url,
