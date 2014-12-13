@@ -886,6 +886,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     LOG.exception(ex)
                     raise
             
+                totalBytesToTransfer = 0
                 with open(copy_to_file_path + "-ctk", 'w') as ctkfile:
                     position = 0
                     while position < dev.capacityInBytes:
@@ -902,6 +903,10 @@ class VMwareVCDriver(VMwareESXDriver):
                                 start = extent.start
                                 length = extent.length
                                 
+                                ctkfile.write(str(start) + "," + str(length)+"\n")
+                                totalBytesToTransfer += length
+                        position = changes.startOffset + changes.length;
+                """
                                 chunksize = 64 * 1024 * 1024 
                                 for chunkstart in xrange(start, start+length, chunksize):
                                     if chunkstart + chunksize > start + length:
@@ -928,11 +933,89 @@ class VMwareVCDriver(VMwareESXDriver):
                                         LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
                                         LOG.exception(ex)
                                         raise                            
-                                ctkfile.write(str(start) + "," + str(length)+"\n")
                             
-                        position = changes.startOffset + changes.length;
+                """
+                cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
+                           str(dev.backing.fileName),
+                           "-extentfile", copy_to_file_path + "-ctk",
+                           "-host", self._session._host_ip,
+                           "-user", self._session._host_username,
+                           "-password", "***********",
+                           "-vm", vmxspec,
+                           copy_to_file_path]
+                cmd = " ".join(cmdspec)
+                for idx, opt in enumerate(cmdspec):
+                    if opt == "-password":
+                        cmdspec[idx+1] = self._session._host_password
+                        break
 
-                snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+                process = subprocess.Popen(cmdspec,
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       bufsize= -1,
+                                       env=vix_disk_lib_env,
+                                       close_fds=True,
+                                       shell=False)
+                
+                queue = Queue()
+                read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                read_thread.daemon = True # thread dies with the program
+                read_thread.start()            
+                
+                uploaded_size = 0
+                uploaded_size_incremental = 0
+                previous_uploaded_size = 0
+                while process.poll() is None:
+                    try:
+                        try:
+                            output = queue.get(timeout=5)
+                        except Empty:
+                            print 'empty'
+                            continue 
+                        except Exception as ex:
+                            LOG.exception(ex)
+                        totalbytes = int(re.search(r'\d+ Done',output).group().split(" ")[0])
+                        uploaded_size_incremental = totalbytes - previous_uploaded_size
+                        uploaded_size = totalbytes
+                        snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': uploaded_size_incremental})
+                        previous_uploaded_size = uploaded_size                        
+                    except Exception as ex:
+                        LOG.exception(ex)
+                
+                process.stdin.close()
+                _returncode = process.returncode  # pylint: disable=E1101
+                if _returncode:
+                    LOG.debug(_('Result was %s') % _returncode)
+                    raise exception.ProcessExecutionError(
+                            exit_code=_returncode,
+                            stdout=output,
+                            stderr=process.stderr.read(),
+                            cmd=cmd)
+
+                snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': (totalBytesToTransfer - uploaded_size)})
+                """
+                try:            
+                    cmdline = "trilio-vix-disk-cli -downloadextents".split(" ")
+                    cmdline.append(str(dev.backing.fileName))
+                    cmdline += ("-extentfile " + copy_to_file_path + "-ctk").split(" ")
+                    cmdline += ['-host', self._session._host_ip,]
+                    cmdline += ['-user', self._session._host_username,]
+                    cmdline += ['-password', self._session._host_password,]
+                    cmdline += ['-vm', vmxspec,]
+                    cmdline.append(copy_to_file_path)
+                    check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                    snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': 100})
+                except subprocess.CalledProcessError as ex:
+                    for idx, opt in enumerate(cmdline):
+                        if opt == "-password":
+                            cmdline[idx+1] = "***********"
+                            break
+                    LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                    LOG.exception(ex)
+                    raise                            
+                """
+
                 LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
                 LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
                 LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
@@ -1436,39 +1519,66 @@ class VMwareVCDriver(VMwareESXDriver):
                 vix_disk_lib_env = os.environ.copy()
                 vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                 vmxspec = 'moref=' + vm_ref.value                
+                import pdb;pdb.set_trace()
                 for vdr_snap in vm_disk_resource_snap_chain:
-                    with open(vdr_snap.vault_service_url + "-ctk", 'r') as ctkfile:
-                        for line in ctkfile:
-                            start, length = line.split(',')
-                            start = int(start)
-                            length = int(length.rstrip('\n'))
-                            chunksize = 64 * 1024 * 1024 
-                            for chunkstart in xrange(start, start+length, chunksize):
-                                if chunkstart + chunksize > start + length:
-                                    chunk = start + length - chunkstart
-                                else:
-                                    chunk = chunksize 
-                                try:            
-                                    cmdline = "trilio-vix-disk-cli -upload".split(" ")
-                                    cmdline.append(vdr_snap.vault_service_url)
-                                    cmdline += ("-start " + str(chunkstart/512)).split(" ")
-                                    cmdline += ("-count " + str(chunk/512)).split(" ")
-                                    cmdline += ['-host', self._session._host_ip,]
-                                    cmdline += ['-user', self._session._host_username,]
-                                    cmdline += ['-password', self._session._host_password,]
-                                    cmdline += ['-vm', vmxspec,]
-                                    restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': chunk})
-                                    cmdline.append(vmdk_path)
-                                    check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                                except subprocess.CalledProcessError as ex:
-                                    for idx, opt in enumerate(cmdline):
-                                        if opt == "-password":
-                                            cmdline[idx+1] = "***********"
-                                            break
-                                    LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
-                                    LOG.exception(ex)
-                                    raise                            
-                            
+                    cmdspec = ["trilio-vix-disk-cli", "-uploadextents",
+                               vdr_snap.vault_service_url,
+                               "-extentfile", vdr_snap.vault_service_url + "-ctk",
+                               "-host", self._session._host_ip,
+                               "-user", self._session._host_username,
+                               "-password", "***********",
+                               "-vm", vmxspec,
+                               vmdk_path, ]
+                    cmd = " ".join(cmdspec)
+                    for idx, opt in enumerate(cmdspec):
+                        if opt == "-password":
+                            cmdspec[idx+1] = self._session._host_password
+                            break
+
+                    process = subprocess.Popen(cmdspec,
+                                           stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           bufsize= -1,
+                                           env=vix_disk_lib_env,
+                                           close_fds=True,
+                                           shell=False)
+                
+                    queue = Queue()
+                    read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                    read_thread.daemon = True # thread dies with the program
+                    read_thread.start()            
+                
+                    uploaded_size = 0
+                    uploaded_size_incremental = 0
+                    previous_uploaded_size = 0
+                    while process.poll() is None:
+                        try:
+                            try:
+                                output = queue.get(timeout=5)
+                            except Empty:
+                                print 'empty'
+                                continue 
+                            except Exception as ex:
+                                LOG.exception(ex)
+                            totalbytes = int(re.search(r'\d+ Done',output).group().split(" ")[0])
+                            uploaded_size_incremental = totalbytes - previous_uploaded_size
+                            uploaded_size = totalbytes
+                            restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': uploaded_size_incremental})
+                            previous_uploaded_size = uploaded_size                        
+                        except Exception as ex:
+                            LOG.exception(ex)
+                
+                    process.stdin.close()
+                    _returncode = process.returncode  # pylint: disable=E1101
+                    if _returncode:
+                        LOG.debug(_('Result was %s') % _returncode)
+                        raise exception.ProcessExecutionError(
+                                exit_code=_returncode,
+                                stdout=output,
+                                stderr=process.stderr.read(),
+                                cmd=cmd)
+    
                 restore_obj = db.restore_get(cntx, restore['id'])
                 progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
                     'message_color': autolog.BROWN,

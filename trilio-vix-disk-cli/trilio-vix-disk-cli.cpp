@@ -26,6 +26,14 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include <fstream>
+#include <algorithm>
+
+using namespace std;
+
+typedef int64_t int64;
+typedef uint64_t uint64;
+typedef bool Bool;
 
 #include "vixDiskLib.h"
 
@@ -33,6 +41,8 @@ using std::cout;
 using std::string;
 using std::endl;
 using std::vector;
+using std::stoul;
+
 
 #define COMMAND_CREATE          (1 << 0)
 #define COMMAND_DUMP            (1 << 1)
@@ -52,6 +62,8 @@ using std::vector;
 #define COMMAND_COMPARE         (1 << 15)
 #define COMMAND_COPY         	(1 << 16)
 #define COMMAND_ATTACH         	(1 << 17)
+#define COMMAND_UPLOADEXTENTS   (1 << 18)
+#define COMMAND_DOWNLOADEXTENTS (1 << 19)
 
 #define VIXDISKLIB_VERSION_MAJOR 5
 #define VIXDISKLIB_VERSION_MINOR 5
@@ -78,11 +90,13 @@ struct ThreadData {
 static struct {
     int command;
     VixDiskLibAdapterType adapterType;
-    char *transportModes;
     char *diskPath;
     char *parentPath;
     char *remotePath;
     char *localPath;
+    char *extentfile;
+
+    char *transportModes;
     char *metaKey;
     char *metaVal;
     int filler;
@@ -108,7 +122,7 @@ static struct {
     char *libdir;
     char *ssMoRef;
     int repair;
-    char *source;       
+    char const *source;       
 } appGlobals;
 
 static int ParseArguments(int argc, char* argv[]);
@@ -128,6 +142,8 @@ static void DoRWBench(bool read);
 static void DoCheckRepair(Bool repair);
 static void DoDownload(void);
 static void DoUpload(void);
+static void DoDownloadExtents(void);
+static void DoUploadExtents(void);
 static void DoCompare(void);
 static void DoCopy(void);
 static void DoAttach(void);
@@ -675,6 +691,10 @@ PrintUsage(void)
            "  with the extent specified by -start -count parameters\n");
     printf(" -upload localPath: uploads the data from the local disk to remote disk\n"
            "  with the extent specified by -start -count parameters\n");
+    printf(" -downloadextents remotePath: downloads the data from remote disk to local disk\n"
+           "  with the extents specified by -extentfile parameter\n");
+    printf(" -uploadextents localPath: uploads the data from the local disk to remote disk\n"
+           "  with the extents specified by -extentfile parameter\n");
     printf(" -compare localPath: Compares contents of the local disk to remote disk\n");
     printf(" -copy sourcePath: Copies contents of the source disk to another local disk\n");    
     printf(" -attach parentPath: Attaches the child disk to parent disk\n");    
@@ -693,6 +713,7 @@ PrintUsage(void)
     printf(" -start n : start sector for 'dump/fill' options (default=0)\n");
     printf(" -count n : number of sectors for 'dump/fill' options (default=1)\n");
     printf(" -val byte : byte value to fill with for 'write' option (default=255)\n");
+    printf(" -extentfile filename: file name that has all the extents the format (start, length)\n");
     printf(" -cap megabytes : capacity in MB for -create option (default=100)\n");
     printf(" -single : open file as single disk link (default=open entire chain)\n");
     printf(" -multithread n: start n threads and copy the file to n new files\n");
@@ -813,6 +834,16 @@ main(int argc, char* argv[])
             vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
             CHECK_AND_THROW(vixError);
             DoUpload();
+        } else if (appGlobals.command & COMMAND_DOWNLOADEXTENTS) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoDownloadExtents();
+        } else if (appGlobals.command & COMMAND_UPLOADEXTENTS) {
+            VixDiskLibConnectParams cnxParams = {0};
+            vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
+            CHECK_AND_THROW(vixError);
+            DoUploadExtents();
         } else if (appGlobals.command & COMMAND_COMPARE) {
             VixDiskLibConnectParams cnxParams = {0};
             vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
@@ -953,6 +984,19 @@ ParseArguments(int argc, char* argv[])
             }
             appGlobals.command |= COMMAND_UPLOAD;
             appGlobals.localPath = argv[++i];
+        } else if (!strcmp(argv[i], "-downloadextents")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_DOWNLOADEXTENTS;
+            appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
+            appGlobals.remotePath = argv[++i];
+        } else if (!strcmp(argv[i], "-uploadextents")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_UPLOADEXTENTS;
+            appGlobals.localPath = argv[++i];
         } else if (!strcmp(argv[i], "-compare")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -976,6 +1020,11 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.startSector = strtol(argv[++i], NULL, 0);
+        } else if (!strcmp(argv[i], "-extentfile")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.extentfile = argv[++i];
         } else if (!strcmp(argv[i], "-count")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -1450,6 +1499,164 @@ DoUpload(void)
 /*
  *--------------------------------------------------------------------------
  *
+ * DoUploadExtents --
+ *
+ *      UploadExtents list of extents identified in the extents file
+ *      from local path to remote path
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoUploadExtents(void)
+{
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.localPath, appGlobals.openFlags);
+    VixDisk remoteDisk(appGlobals.connection, appGlobals.diskPath, appGlobals.openFlags);
+    uint8 buf[VIXDISKLIB_BUF_SIZE];
+    VixDiskLibSectorType totalBytesTransferred = 0;
+    VixDiskLibSectorType numSectors;
+    VixDiskLibSectorType startSector;
+    VixDiskLibSectorType i;
+    VixError vixError;
+    
+    std::string delimiter = ",";
+    string line;
+    ifstream myfile(appGlobals.extentfile);
+    size_t pos = 0;
+    std::string token;
+    unsigned long num;
+
+    if (myfile.is_open())
+    {
+        while ( getline (myfile, line) )
+        {
+            line.erase(line.begin(), std::find_if(line.begin(), line.end(),
+                       std::bind1st(std::not_equal_to<char>(), ' ')));
+            while ((pos = line.find(delimiter)) != std::string::npos) 
+            {
+                token = line.substr(0, pos);
+                startSector = std::stoul (token,nullptr,0)/512;
+                line.erase(0, pos + delimiter.length());
+                line.erase(line.begin(), std::find_if(line.begin(), line.end(),
+                           std::bind1st(std::not_equal_to<char>(), ' ')));
+            }
+            numSectors = std::stoul (line,nullptr,0)/512;
+
+            while (numSectors)
+            {
+        
+                VixDiskLibSectorType nsec = (numSectors >= VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE) ?
+                                             VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE : numSectors;
+    
+                // Read from remote disk and copy it to local disk
+                vixError = VixDiskLib_Read(localDisk.Handle(),
+                                           startSector, nsec, buf);
+                CHECK_AND_THROW(vixError);
+    
+                vixError = VixDiskLib_Write(remoteDisk.Handle(),
+                                            startSector, nsec, buf);
+                CHECK_AND_THROW(vixError);
+                numSectors -= nsec;
+                startSector += nsec;
+                totalBytesTransferred += nsec * VIXDISKLIB_SECTOR_SIZE;
+                if (totalBytesTransferred % (64 * 1024 * 1024) == 0)
+                {
+                    cout << "" << totalBytesTransferred << " Done" << endl;
+                }
+            }
+        }
+        cout << "" << totalBytesTransferred << " Done" << endl;
+        myfile.close();
+    }
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * DoDownloadExtents --
+ *
+ *      DownloadExtents list of extents identified in the extents file
+ *      from remote path to local path
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void
+DoDownloadExtents(void)
+{
+    uint32 localFlags = appGlobals.openFlags & ~VIXDISKLIB_FLAG_OPEN_READ_ONLY;
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, localFlags);
+    VixDisk remoteDisk(appGlobals.connection, appGlobals.remotePath, appGlobals.openFlags);
+    uint8 buf[VIXDISKLIB_BUF_SIZE];
+    VixDiskLibSectorType numSectors;
+    VixDiskLibSectorType startSector;
+    VixDiskLibSectorType totalBytesTransferred = 0;
+    VixDiskLibSectorType i;
+    VixError vixError;
+    
+    std::string delimiter = ",";
+    string line;
+    ifstream myfile(appGlobals.extentfile);
+    size_t pos = 0;
+    std::string token;
+    unsigned long num;
+
+    if (myfile.is_open())
+    {
+        while ( getline (myfile, line) )
+        {
+            line.erase(line.begin(), std::find_if(line.begin(), line.end(),
+                       std::bind1st(std::not_equal_to<char>(), ' ')));
+            while ((pos = line.find(delimiter)) != std::string::npos) 
+            {
+                token = line.substr(0, pos);
+                startSector = std::stoul (token,nullptr,0)/512;
+                line.erase(0, pos + delimiter.length());
+                line.erase(line.begin(), std::find_if(line.begin(), line.end(),
+                           std::bind1st(std::not_equal_to<char>(), ' ')));
+            }
+            numSectors = std::stoul (line,nullptr,0)/512;
+
+            while (numSectors)
+            {
+                VixDiskLibSectorType nsec = (numSectors >= VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE) ?
+                                              VIXDISKLIB_BUF_SIZE/VIXDISKLIB_SECTOR_SIZE : numSectors;
+
+                // Read from remote disk and copy it to local disk
+                vixError = VixDiskLib_Read(remoteDisk.Handle(),
+                                           startSector, nsec, buf);
+                CHECK_AND_THROW(vixError);
+
+                vixError = VixDiskLib_Write(localDisk.Handle(),
+                                            startSector, nsec, buf);
+                CHECK_AND_THROW(vixError);
+                startSector += nsec;
+                numSectors -= nsec;
+                totalBytesTransferred += nsec * VIXDISKLIB_SECTOR_SIZE;
+                if (totalBytesTransferred % (64 * 1024 * 1024) == 0)
+                {
+                    cout << "" << totalBytesTransferred << " Done" << endl;
+                }
+            }
+        }
+        cout << "" << totalBytesTransferred << " Done" << endl;
+        myfile.close();
+    }
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
  * DoCopy --
  *
  *      Copies an extent from a local disk to another local disk
@@ -1727,7 +1934,7 @@ DumpBytes(const unsigned char *buf,     // IN
 
    for (i = 0; i < lines; i++) {
       int k, last;
-      printf("%04"FMTSZ"x : ", i * step);
+      printf("%04" FMTSZ "x : ", i * step);
       for (k = 0; n != 0 && k < step; k++, n--) {
          printf("%02x ", buf[i * step + k]);
       }
