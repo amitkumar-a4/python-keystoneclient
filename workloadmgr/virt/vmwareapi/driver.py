@@ -971,7 +971,6 @@ class VMwareVCDriver(VMwareESXDriver):
                         try:
                             output = queue.get(timeout=5)
                         except Empty:
-                            print 'empty'
                             continue 
                         except Exception as ex:
                             LOG.exception(ex)
@@ -1556,7 +1555,6 @@ class VMwareVCDriver(VMwareESXDriver):
                             try:
                                 output = queue.get(timeout=5)
                             except Empty:
-                                print 'empty'
                                 continue 
                             except Exception as ex:
                                 LOG.exception(ex)
