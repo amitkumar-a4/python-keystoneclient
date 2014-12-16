@@ -174,9 +174,20 @@ def send_gz(filename):
 def send_sh(filename):
     return static_file(filename, root='views', mimetype='application/x-sh')
 
+@bottle.route('/upstart/<filename:re:.*\.log>')
+@authorize()
+def send_upstart_logs(filename):
+    return static_file(filename, root='/var/log/upstart', mimetype='text/plain', download=True)
+
+
 @bottle.route('/workloadmgr/<filename:re:.*\.log>')
 @authorize()
 def send_wlm_logs(filename):
+    return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain', download=True)
+
+@bottle.route('/workloadmgr/<filename:re:.*\.log.1>')
+@authorize()
+def send_wlm_logs1(filename):
     return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain', download=True)
 
 @bottle.route('/tvault-gui/<filename:re:.*\.log>')
@@ -188,6 +199,32 @@ def send_tvault_gui_logs(filename):
 @authorize()
 def send_tvault_gui_logs1(filename):
     return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain', download=True)
+
+@bottle.route('/nova/<filename:re:.*\.log>')
+@authorize()
+def send_nova_logs(filename):
+    return static_file(filename, root='/var/log/nova', mimetype='text/plain', download=True)
+
+@bottle.route('/nova/<filename:re:.*\.log.1>')
+@authorize()
+def send_nova_logs1(filename):
+    return static_file(filename, root='/var/log/nova', mimetype='text/plain', download=True)
+
+@bottle.route('/neutron/<filename:re:.*\.log>')
+@authorize()
+def send_neutron_logs(filename):
+    return static_file(filename, root='/var/log/neutron', mimetype='text/plain', download=True)
+
+@bottle.route('/neutron/<filename:re:.*\.log.1>')
+@authorize()
+def send_neutron_logs1(filename):
+    return static_file(filename, root='/var/log/neutron', mimetype='text/plain', download=True)
+
+@bottle.route('/keystone/<filename:re:.*\.log>')
+@authorize()
+def send_keystone_logs(filename):
+    return static_file(filename, root='/var/log/keystone', mimetype='text/plain', download=True)
+
 
 """############################ tvault config API's ########################"""
 
