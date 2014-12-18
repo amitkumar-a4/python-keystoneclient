@@ -70,7 +70,7 @@ class WorkloadMgrTrigger(object):
 
 """
 #Unit Tests
-import pdb;pdb.set_trace()
+#import pdb;pdb.set_trace()
 trigger = WorkloadMgrTrigger(u'{"start_date":"Now","end_date":"No End","start_time":"12:00am","interval":"1 hr","snapshots_to_keep":"10"}')
 print trigger
 print trigger.get_next_fire_time(datetime.now())

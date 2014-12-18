@@ -12,10 +12,12 @@
 #include <tchar.h>
 #include <process.h>
 #else
-#include<stdio.h>
-#include<string.h>
+#include <stdio.h>
+#include <string.h>
 #include <dlfcn.h>
 #include <sys/time.h>
+#include <signal.h>
+#include <unistd.h>
 #endif
 
 #include <time.h>
@@ -36,6 +38,7 @@ typedef uint64_t uint64;
 typedef bool Bool;
 
 #include "vixDiskLib.h"
+#include "vixMntapi.h"
 
 using std::cout;
 using std::string;
@@ -64,6 +67,8 @@ using std::stoul;
 #define COMMAND_ATTACH         	(1 << 17)
 #define COMMAND_UPLOADEXTENTS   (1 << 18)
 #define COMMAND_DOWNLOADEXTENTS (1 << 19)
+#define COMMAND_MOUNT           (1 << 20)
+#define COMMAND_UNMOUNT         (1 << 21)
 
 #define VIXDISKLIB_VERSION_MAJOR 5
 #define VIXDISKLIB_VERSION_MINOR 5
@@ -147,6 +152,8 @@ static void DoUploadExtents(void);
 static void DoCompare(void);
 static void DoCopy(void);
 static void DoAttach(void);
+static void DoMount(void);
+static void DoUnmount(void);
 
 #define THROW_ERROR(vixError) \
    throw VixDiskLibErrWrapper((vixError), __FILE__, __LINE__)
@@ -320,6 +327,64 @@ static VixError
                               const char *filename,
                               Bool repair);
 
+static VixError
+(*VixMntapi_Init)(uint32 majorVersion,
+                  uint32 minorVersion,
+                  VixDiskLibGenericLogFunc *log,
+                  VixDiskLibGenericLogFunc *warn,
+                  VixDiskLibGenericLogFunc *panic,
+                  const char *libDir,
+                  const char *configFile);
+
+static void
+(*VixMntapi_Exit)(void);
+
+static VixError
+(*VixMntapi_OpenDisks)(VixDiskLibConnection connection,
+                       const char *diskNames[],
+                       size_t numberOfDisks,
+                       uint32 openFlags,
+                       VixDiskSetHandle *handle);
+
+static VixError
+(*VixMntapi_GetDiskSetInfo)(VixDiskSetHandle handle,
+                            VixDiskSetInfo **diskSetInfo);
+
+static void
+(*VixMntapi_FreeDiskSetInfo)(VixDiskSetInfo *diskSetInfo);
+
+
+static VixError
+(*VixMntapi_CloseDiskSet)(VixDiskSetHandle diskSet);
+
+static VixError
+(*VixMntapi_GetVolumeHandles)(VixDiskSetHandle diskSet,
+                              size_t *numberOfVolumes,
+                              VixVolumeHandle *volumeHandles[]);
+
+static void
+(*VixMntapi_FreeVolumeHandles)(VixVolumeHandle *volumeHandles);
+
+static VixError
+(*VixMntapi_GetOsInfo)(VixDiskSetHandle diskSet, VixOsInfo **info);
+
+static void
+(*VixMntapi_FreeOsInfo)(VixOsInfo *info);
+
+static VixError
+(*VixMntapi_MountVolume)(VixVolumeHandle volumeHandle,
+                         Bool readOnly);
+
+static VixError
+(*VixMntapi_DismountVolume)(VixVolumeHandle volumeHandle,
+                            Bool force);
+
+static VixError
+(*VixMntapi_GetVolumeInfo)(VixVolumeHandle volumeHandle,
+                           VixVolumeInfo **info);
+
+static void
+(*VixMntapi_FreeVolumeInfo)(VixVolumeInfo *info);
 
 /*
  *----------------------------------------------------------------------
@@ -397,6 +462,7 @@ DynLoadDiskLib(void)
    HINSTANCE hInstLib = LoadLibrary("vixDiskLib.dll");
 #else
    void* hInstLib = dlopen("libvixDiskLib.so", RTLD_LAZY);
+   void* hMntInstLib = dlopen("libvixMntapi.so", RTLD_LAZY);
 #endif
 
    // If the handle is valid, try to get the function address.
@@ -411,6 +477,18 @@ DynLoadDiskLib(void)
 
       exit(EXIT_FAILURE);
    }
+   if (IS_HANDLE_INVALID(hMntInstLib)) {
+      cout << "Can't load vixMntapi shared library / DLL : lasterror = " <<
+#ifdef _WIN32
+         GetLastError() <<
+#else
+         dlerror() <<
+#endif
+         "\n";
+
+      exit(EXIT_FAILURE);
+   }
+
    try {
       LOAD_ONE_FUNC(hInstLib, VixDiskLib_InitEx);
       LOAD_ONE_FUNC(hInstLib, VixDiskLib_Init);
@@ -443,6 +521,22 @@ DynLoadDiskLib(void)
       LOAD_ONE_FUNC(hInstLib, VixDiskLib_Attach);
       LOAD_ONE_FUNC(hInstLib, VixDiskLib_SpaceNeededForClone);
       LOAD_ONE_FUNC(hInstLib, VixDiskLib_CheckRepair);
+
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_Init);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_Exit);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_OpenDiskSet);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_OpenDisks);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_GetDiskSetInfo);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_FreeDiskSetInfo);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_CloseDiskSet);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_GetVolumeHandles);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_FreeVolumeHandles);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_GetOsInfo);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_FreeOsInfo);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_MountVolume);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_DismountVolume);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_GetVolumeInfo);
+      LOAD_ONE_FUNC(hMntInstLib, VixMntapi_FreeVolumeInfo);
    } catch (const std::runtime_error& exc) {
       cout << "Error while dynamically loading : " << exc.what() << "\n";
       exit(EXIT_FAILURE);
@@ -481,6 +575,22 @@ DynLoadDiskLib(void)
 #define VixDiskLib_Attach           (*VixDiskLib_Attach_Ptr)
 #define VixDiskLib_SpaceNeededForClone   (*VixDiskLib_SpaceNeededForClone_Ptr)
 #define VixDiskLib_CheckRepair      (*VixDiskLib_CheckRepair_Ptr)
+
+#define VixMntapi_Init,             (*VixMntapi_Init_Ptr)
+#define VixMntapi_Exit,             (*VixMntapi_Exit_Ptr)
+#define VixMntapi_OpenDiskSet,      (*VixMntapi_OpenDiskSet_Ptr)
+#define VixMntapi_OpenDisks,        (*VixMntapi_OpenDisks_Ptr)
+#define VixMntapi_GetDiskSetInfo,   (*VixMntapi_GetDiskSetInfo_Ptr)
+#define VixMntapi_FreeDiskSetInfo,  (*VixMntapi_FreeDiskSetInfo_Ptr)
+#define VixMntapi_CloseDiskSet,     (*VixMntapi_CloseDiskSet_Ptr)
+#define VixMntapi_GetVolumeHandles, (*VixMntapi_GetVolumeHandles_Ptr)
+#define VixMntapi_FreeVolumeHandles,(*VixMntapi_FreeVolumeHandles_Ptr)
+#define VixMntapi_GetOsInfo,        (*VixMntapi_GetOsInfo_Ptr)
+#define VixMntapi_FreeOsInfo,       (*VixMntapi_FreeOsInfo_Ptr)
+#define VixMntapi_MountVolume,      (*VixMntapi_MountVolume_Ptr)
+#define VixMntapi_DismountVolume,   (*VixMntapi_DismountVolume_Ptr)
+#define VixMntapi_GetVolumeInfo,    (*VixMntapi_GetVolumeInfo_Ptr)
+#define VixMntapi_FreeVolumeInfo,   (*VixMntapi_FreeVolumeInfo_Ptr)
 
 #endif // DYNAMIC_LOADING
 
@@ -656,6 +766,31 @@ private:
     VixDiskLibHandle _handle;
 };
 
+class VixDisks
+{
+public:
+
+    VixDiskSetHandle Handle() { return _handle; }
+    VixDisks(VixDiskLibConnection connection, const char *paths[], size_t numberOfDisks, uint32 flags)
+    {
+       _handle = NULL;
+       VixError vixError = VixMntapi_OpenDisks(connection, paths, numberOfDisks, flags, &_handle);
+       CHECK_AND_THROW(vixError);
+    }
+
+    ~VixDisks()
+    {
+        if (_handle) 
+        {
+           VixMntapi_CloseDiskSet(_handle);
+        }
+        _handle = NULL;
+    }
+
+private:
+    VixDiskSetHandle _handle;
+};
+
 
 /*
  *--------------------------------------------------------------------------
@@ -703,13 +838,17 @@ PrintUsage(void)
     printf(" -meta : dumps all entries of the disk's metadata\n");
     printf(" -clone sourcePath : clone source vmdk possibly to a remote site\n");
     printf(" -readbench blocksize: Does a read benchmark on a disk using the \n");
-    printf("specified I/O block size (in sectors).\n");
+    printf("\tspecified I/O block size (in sectors).\n");
     printf(" -writebench blocksize: Does a write benchmark on a disk using the\n");
-    printf("specified I/O block size (in sectors). WARNING: This will\n");
-    printf("overwrite the contents of the disk specified.\n");
+    printf("\tspecified I/O block size (in sectors). WARNING: This will\n");
+    printf("\toverwrite the contents of the disk specified.\n");
+    printf(" -mount mounts a virtual disk.\n");
+    printf(" -unmount unmounts a virtual disk that was previously mounted using -mount option.\n");
+
+    printf("\n\n");
     printf("options:\n");
     printf(" -adapter [ide|scsi] : bus adapter type for 'create' option "
-           "(default='scsi')\n");
+           "\t(default='scsi')\n");
     printf(" -start n : start sector for 'dump/fill' options (default=0)\n");
     printf(" -count n : number of sectors for 'dump/fill' options (default=1)\n");
     printf(" -val byte : byte value to fill with for 'write' option (default=255)\n");
@@ -799,6 +938,11 @@ main(int argc, char* argv[])
                                      VIXDISKLIB_VERSION_MINOR,
                                      NULL, NULL, NULL, // Log, warn, panic
                                      appGlobals.libdir);
+          CHECK_AND_THROW(vixError);
+          vixError = VixMntapi_Init(VIXMNTAPI_MAJOR_VERSION,
+                                    VIXMNTAPI_MINOR_VERSION,
+                                    NULL, NULL, NULL, // Log, warn, panic
+                                    appGlobals.libdir, NULL);
        }
        CHECK_AND_THROW(vixError);
        bVixInit = true;
@@ -867,6 +1011,10 @@ main(int argc, char* argv[])
             DoRWBench(false);
         } else if (appGlobals.command & COMMAND_CHECKREPAIR) {
             DoCheckRepair(appGlobals.repair);
+        } else if (appGlobals.command & COMMAND_MOUNT) {
+            DoMount();
+        } else if (appGlobals.command & COMMAND_UNMOUNT) {
+            DoUnmount();
         } else if (appGlobals.command & COMMAND_COPY) {
             VixDiskLibConnectParams cnxParams = {0};
             vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
@@ -938,6 +1086,10 @@ ParseArguments(int argc, char* argv[])
             appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
         } else if (!strcmp(argv[i], "-fill")) {
             appGlobals.command |= COMMAND_FILL;
+        } else if (!strcmp(argv[i], "-mount")) {
+            appGlobals.command |= COMMAND_MOUNT;
+        } else if (!strcmp(argv[i], "-unmount")) {
+            appGlobals.command |= COMMAND_UNMOUNT;
         } else if (!strcmp(argv[i], "-meta")) {
             appGlobals.command |= COMMAND_DUMP_META;
             appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
@@ -2398,4 +2550,101 @@ DoCheckRepair(Bool repair)
    if (VIX_FAILED(err)) {
       throw VixDiskLibErrWrapper(err, __FILE__, __LINE__);
    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * DoMount--
+ *
+ *      Mount a virtual disk of the virtual disk of the remote host
+ *      locally
+ *
+ * Results:
+ *      None
+ *
+ * Side effects:
+ *      None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+DoMount()
+{
+   VixError err;
+   VixDiskSetHandle *handle;
+   const char *diskPaths[] = {appGlobals.diskPath, };
+   VixVolumeHandle *volumeHandles;
+   size_t numberOfVolumes;
+   VixOsInfo *info = NULL;
+
+   VixDisks disks(appGlobals.connection, diskPaths, 1, appGlobals.openFlags);
+
+   err = VixMntapi_GetVolumeHandles(disks.Handle(), &numberOfVolumes, &volumeHandles);
+   CHECK_AND_THROW(err);
+
+   for (size_t i = 0; i < numberOfVolumes; i++) 
+   {
+       VixVolumeHandle volumeHandle = volumeHandles[i];
+       VixVolumeInfo *volumeInfo;
+
+       err = VixMntapi_MountVolume(volumeHandle, FALSE);
+       CHECK_AND_THROW(err);
+
+       err = VixMntapi_GetVolumeInfo(volumeHandle, &volumeInfo);
+       CHECK_AND_THROW(err);
+
+       printf("The root partition is mounted at %s\n", volumeInfo->symbolicLink);
+
+       VixMntapi_FreeVolumeInfo(volumeInfo);
+       printf("Pausing the process until it is resumed\n");
+       raise(SIGSTOP);
+
+       err = VixMntapi_DismountVolume(volumeHandle, false);
+       CHECK_AND_THROW(err);
+   }
+   VixMntapi_FreeVolumeHandles(volumeHandles);
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * DoUnmount--
+ *
+ *      Unmount a virtual disk of the virtual disk of the remote host
+ *      locally
+ *
+ * Results:
+ *      None
+ *
+ * Side effects:
+ *      None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+DoUnmount()
+{
+   VixError err;
+   VixDiskSetHandle *handle;
+   const char *diskPaths[] = {appGlobals.diskPath, };
+   VixVolumeHandle *volumeHandles;
+   size_t numberOfVolumes;
+   VixOsInfo *info = NULL;
+
+   VixDisks disks(appGlobals.connection, diskPaths, 1, appGlobals.openFlags);
+
+   err = VixMntapi_GetVolumeHandles(disks.Handle(), &numberOfVolumes, &volumeHandles);
+   CHECK_AND_THROW(err);
+
+   for (size_t i = 0; i < numberOfVolumes; i++) 
+   {
+       VixVolumeHandle volumeHandle = volumeHandles[i];
+
+       err = VixMntapi_DismountVolume(volumeHandle, false);
+       CHECK_AND_THROW(err);
+   }
+   VixMntapi_FreeVolumeHandles(volumeHandles);
 }
