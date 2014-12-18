@@ -119,6 +119,10 @@ def getcassandranodes(connection):
         desc = n.split()
         if len(desc) == 0:
             continue
+
+        if not desc[0] in ("UN", "UL", "UJ", "UM", "DN", "DL", "DJ", "DM"):
+            continue
+
         node = {}
         for idx, k in enumerate(casskeys):
             node[k] = desc[idx]
