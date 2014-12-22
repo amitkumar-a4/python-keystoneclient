@@ -109,9 +109,6 @@ class ComputeDriver(object):
         """
         raise NotImplementedError()
 
-
-
-
     def emit_event(self, event):
         """
         Dispatches an event to the compute manager.
@@ -128,7 +125,6 @@ class ComputeDriver(object):
         Discovers the datacenters, hosts, virtual machines, datastores and networks of a vCenter
         """
         raise NotImplementedError()
-
 
 
 def load_compute_driver(virtapi, compute_driver=None):
@@ -199,4 +195,8 @@ def restore_vm(self, cntx, db, instance, restore, restored_net_resources,
 def snapshot_delete(self, cntx, db, snapshot): 
     raise NotImplementedError()      
     
+def mount_instance_root_device(self, cntx, db, instance, restore): 
+    raise NotImplementedError()
 
+def umount_instance_root_device(self, process): 
+    raise NotImplementedError()

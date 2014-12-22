@@ -11,3 +11,4 @@ chmod: CommandFilter, /bin/chmod, root
 ssh: CommandFilter, /usr/bin/ssh, root
 scp: CommandFilter, /usr/bin/scp, root
 gcp: CommandFilter, /usr/bin/gcp, root
+trilio-vix-disk-cli: CommandFilter, /usr/bin/trilio-vix-disk-cli, root

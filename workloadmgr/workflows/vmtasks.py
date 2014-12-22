@@ -160,7 +160,7 @@ class RestoreVM(task.Task):
             ret_val = vmtasks_vcloud.restore_vm(cntx, db, instance, restore, 
                                                 restored_net_resources, restored_security_groups)
         
-        return ret_val
+        return {'vm_name':ret_val.vm_name, 'vm_id': ret_val.vm_id, 'uuid': ret_val.vm_id}
     
     @autolog.log_method(Logger, 'RestoreVM.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -991,7 +991,8 @@ def UnorderedRestoreVMs(instances):
 def LinearRestoreVMs(instances):
     flow = lf.Flow("restorevmlf")
     for index,item in enumerate(instances):
-        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index)),
+                            provides='restored_instance_' + str(index)))
     
     return flow
 
