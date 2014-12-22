@@ -9,6 +9,7 @@ Handles all requests relating to the  workloadmgr service.
 import socket
 import cPickle as pickle
 import json
+import importlib
 
 from eventlet import greenthread
 
@@ -16,6 +17,7 @@ from datetime import datetime
 from datetime import timedelta
 import time
 import threading
+from distutils import version
 
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStore
@@ -34,6 +36,7 @@ from workloadmgr.network import neutron
 from workloadmgr.image import glance
 from workloadmgr import context
 from workloadmgr.workflows import vmtasks
+from workloadmgr.vault import vault
 
 workload_lock = threading.Lock()
 
@@ -162,12 +165,13 @@ class API(base.Base):
         workload_types = self.db.workload_types_get(context)
         return workload_types
     
-    def workload_type_create(self, context, name, description, is_public, metadata):
+    def workload_type_create(self, context, id, name, description, is_public, metadata):
         """
         Create a workload_type. No RPC call is made
         """
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
+                   'id': id,
                    'display_name': name,
                    'display_description': description,
                    'is_public' : is_public,
@@ -346,6 +350,11 @@ class API(base.Base):
         #                              'start_time': '2:30 PM',
         #                              'snapshots_to_keep': '2'}
         
+        self.workload_add_scheduler_job(jobschedule, workload)
+        
+        return workload
+    
+    def workload_add_scheduler_job(self, jobschedule, workload):
         if len(jobschedule):                                        
             self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                 jobschedule,
@@ -353,9 +362,6 @@ class API(base.Base):
                                                 kwargs={'workload_id':workload.id,  
                                                         'user_id': workload.user_id, 
                                                         'project_id':workload.project_id})
-        
-        
-        return workload
 
     def workload_modify(self, context, workload_id, workload):
         """
@@ -440,9 +446,28 @@ class API(base.Base):
         self.db.workload_delete(context, workload_id)
         
     def import_workloads(self, context):
-        vmtasks.import_workloads(context)
-
-        return
+        vault_service = vault.get_vault_service(context)
+        workloads = []
+        for workload_url in vault_service.get_workloads():
+            workload_values = json.loads(vault_service.get_object(workload_url['workload_url'] + '/workload_db'))
+            """
+            try:
+                jobs = self._scheduler.get_jobs()
+                for job in jobs:
+                    if job.kwargs['workload_id'] == workload_values['id']:
+                        self._scheduler._remove_job(job, 'alias', self._jobstore)
+                self.db.purge_workload(context, workload_values['id'])
+            except Exception as ex:
+                LOG.exception(ex)
+            """
+            import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
+            import_workload_method = getattr(import_workload_module, 'import_workload')
+            try:
+                workload = import_workload_method(context, workload_url, workload_values['version'])
+                workloads.append(workload)
+            except Exception as ex:
+                LOG.exception(ex)
+        return workloads
 
     def workload_get_workflow(self, context, workload_id):
         """
@@ -637,7 +662,7 @@ class API(base.Base):
 
         except Exception as ex:
             LOG.exception(ex)
-            pass
+
         snapshot_details['instances'] = snapshot_vms    
         return snapshot_details
     

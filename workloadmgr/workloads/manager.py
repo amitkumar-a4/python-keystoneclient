@@ -23,6 +23,7 @@ import uuid
 import cPickle as pickle
 from threading import Lock
 
+
 from oslo.config import cfg
 
 from workloadmgr import context
@@ -58,6 +59,7 @@ scheduler_config = {'standalone': 'True'}
 
 FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
+       
 
 def get_workflow_class(context, workload_type_id, restore=False):
     #TODO(giri): implement a driver model for the workload types
@@ -356,8 +358,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'metadata': {'hostnames': hostnames}, 
                                     })             
              
-            # Upload snapshot metadata to the swift
-            vmtasks.UploadSnapshotDBEntry(context, self.db.snapshot_get(context, snapshot_id))
+            # Upload snapshot metadata to the vault
+            vmtasks.UploadSnapshotDBEntry(context, snapshot_id)
 
         except Exception as ex:
             msg = _("Error creating workload snapshot %(snapshot_id)s with failure: %(exception)s") %{

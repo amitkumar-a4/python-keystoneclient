@@ -85,6 +85,18 @@ class WorkloadsBase(object):
                       if not k[0] == '_'])
         local.update(joined)
         return local.iteritems()
+    
+    def purge(self, session=None):
+        """Save this object."""
+        if not session:
+            session = get_session()
+        session.add(self)
+        try:
+            session.delete(self)
+            session.flush()
+        except:
+            raise
+    
 
 
 class Service(BASE, WorkloadsBase):
@@ -316,7 +328,7 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
         return FLAGS.workload_name_template % self.id
 
     snapshot_vm_resource_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'))
-    vm_disk_resource_snap_backing_id = Column(String(255), ForeignKey('vm_disk_resource_snaps.id'))
+    vm_disk_resource_snap_backing_id = Column(String(255))
     top = Column(Boolean, default=False)
     vault_service_url = Column(String(4096))    
     vault_service_metadata = Column(String(4096))

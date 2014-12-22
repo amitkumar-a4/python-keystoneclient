@@ -314,12 +314,13 @@ class WorkloadMgrsController(wsgi.Controller):
         return instances                
 
     def import_workloads(self, req):
-        LOG.debug(_('importing workloads from the backup store'), id)
+        LOG.debug(_('importing workloads from the backup store'))
         context = req.environ['workloadmgr.context']
 
         LOG.audit(_('import workloads from backup store'), context=context)
         try:
-            self.workload_api.import_workloads(context)
+            workloads = self.workload_api.import_workloads(context)
+            return self._view_builder.detail_list(req, workloads)
         except exception.WorkloadMgrNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidWorkloadMgr as error:

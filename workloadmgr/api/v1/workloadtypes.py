@@ -141,6 +141,7 @@ class WorkloadTypesController(wsgi.Controller):
         except KeyError:
             msg = _("Incorrect request body format")
             raise exc.HTTPBadRequest(explanation=msg)
+        id = workload_type.get('id', None)
         name = workload_type.get('name', None)
         description = workload_type.get('description', None)
         is_public = workload_type.get('is_public', False)
@@ -148,7 +149,8 @@ class WorkloadTypesController(wsgi.Controller):
         LOG.audit(_("Creating workload_type"), locals(), context=context)
 
         try:
-            new_workload_type = self.workload_api.workload_type_create(context, 
+            new_workload_type = self.workload_api.workload_type_create(context,
+                                                                       id, 
                                                                        name, 
                                                                        description,
                                                                        is_public, 

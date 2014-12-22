@@ -286,7 +286,8 @@ class SwiftBackupService(base.Base):
         filename = '%s/%s_metadata' % (object_prefix, swift_object_name)
         return filename
 
-    def put_object(self, container, url, json_data):
+    def put_object(self, url, json_data):
+        container = url.split('/', 1)[0]
         reader = StringIO.StringIO(json_data)
         etag = self.conn.put_object(container, url, reader)
         md5 = hashlib.md5(json_data).hexdigest()
@@ -295,6 +296,10 @@ class SwiftBackupService(base.Base):
                     ' file in swift [%(etag)s] is not the same as MD5 of '
                     'metadata file sent to swift [%(md5)s]') % locals()
             raise exception.InvalidBackup(reason=err)
+    
+    def get_workloads(self):
+        #placeholder for now
+        return []        
 
     def _write_metadata(self, snapshot_metadata, container, object_list):
         filename = self._metadata_filename(snapshot_metadata)

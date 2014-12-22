@@ -1338,7 +1338,9 @@ def register_workloadtypes():
                             'capabilities':'discover:topology',
                             'group_ordering' :'[{"ordinal": 10, "name": "Host Settings"}]'}
                 
-                wlm.workload_types.create(metadata=metadata, is_public = True, name= 'Hadoop', description = 'Hadoop workload')
+                wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                          name= 'Hadoop', description = 'Hadoop workload',
+                                          id = '09f7b42e-75da-4f77-8c34-0aef60b3d62e')
             
             if workload_type_names['MongoDB'] == False:
                 #MongoDB
@@ -1353,7 +1355,9 @@ def register_workloadtypes():
                             'RunAsRoot':'{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "group_name": "Database Settings", "ordinal":40}', 
                             'capabilities':'discover:topology',
                             'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "name": "Database Settings"}]'}         
-                wlm.workload_types.create(metadata=metadata, is_public = True, name= 'MongoDB', description = 'MongoDB workload')
+                wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                          name= 'MongoDB', description = 'MongoDB workload',
+                                          id = '11b71eeb-8b69-42e2-9862-872ae5b2afce')
                 
             if workload_type_names['Cassandra'] == False:                
                 #Cassandra
@@ -1364,23 +1368,31 @@ def register_workloadtypes():
                             'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "group_name": "Host Settings"}',
                             'capabilities':'discover:topology',
                             'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}]'}                       
-                wlm.workload_types.create(metadata=metadata, is_public = True, name= 'Cassandra', description = 'Cassandra workload')
+                wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                          name= 'Cassandra', description = 'Cassandra workload',
+                                          id = '2c1f45ec-e53b-49cd-b554-228404ece244')
                 
             if workload_type_names['Serial'] == False:
                 #Serial
                 time.sleep(2)
-                wlm.workload_types.create(metadata={}, is_public = True, name= 'Serial', description = 'Serial workload that snapshots VM in the order they are recieved')
+                wlm.workload_types.create(metadata={}, is_public = True, 
+                                          name= 'Serial', description = 'Serial workload that snapshots VM in the order they are recieved',
+                                          id = 'f82ce76f-17fe-438b-aa37-7a023058e50d')
             
             if workload_type_names['Parallel'] == False:    
                 #Parallel
                 time.sleep(2)
-                wlm.workload_types.create(metadata={}, is_public = True, name= 'Parallel', description = 'Parallel workload that snapshots all VMs in parallel')
+                wlm.workload_types.create(metadata={}, is_public = True, 
+                                          name= 'Parallel', description = 'Parallel workload that snapshots all VMs in parallel',
+                                          id = '2ddd528d-c9b4-4d7e-8722-cc395140255a')
             
             if workload_type_names['Composite'] == False:    
                 #Composite
                 time.sleep(2)
                 metadata = {'capabilities':'workloads', 'workloadgraph':'string'}
-                wlm.workload_types.create(metadata=metadata, is_public = True, name= 'Composite', description = 'A workload that consists of other workloads')
+                wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                          name= 'Composite', description = 'A workload that consists of other workloads',
+                                          id = '54947065-2a59-494a-ab64-b6501c139a82')
                  
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
