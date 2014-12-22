@@ -356,9 +356,16 @@ class VMwareVCDriver(VMwareESXDriver):
             host_name = self._session._call_method(vim_util, "get_dynamic_property", host_ref, "HostSystem", "name")
             return host_ref, host_name
         raise exception.HostNotFound()
-             
                     
 
+    def _get_root_disk_path_from_vm_ref(self, vm_ref):
+
+        # Get the vmdk file name that the VM is pointing to
+        virtual_disks = self._session._call_method(vim_util,
+                            "get_dynamic_property", vm_ref,
+                            "VirtualMachine", "layout.disk")
+        return virtual_disks[0][0].diskFile[0]
+    
     def _get_vm_ref_from_name_folder(self, vmfolder_ref, name):
         obj_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
         for obj_ref in obj_refs.ManagedObjectReference:
@@ -615,7 +622,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot_vm_resource.status != 'deleted':
                     return
         except exception.SnapshotVMResourcesNotFound as ex:
-            LOG.Exception(ex)
+            LOG.exception(ex)
             return 
                    
         return _remove_data()
@@ -794,6 +801,13 @@ class VMwareVCDriver(VMwareESXDriver):
                                                          deviceKey=dev['key'],
                                                          startOffset=position,
                                                          changeId=changeId)
+                    if changes == []:
+                        changes = self._session._call_method(self._session._get_vim(),
+                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                         snapshot=snapshot_data['snapshot_ref'],
+                                                         deviceKey=dev['key'],
+                                                         startOffset=position,
+                                                         changeId=changeId)
                
                     if 'changedArea' in changes:
                         for change in changes.changedArea:
@@ -898,6 +912,13 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         deviceKey=dev.key,
                                                         startOffset=position,
                                                         changeId=changeId)
+                        if changes == []:
+                            changes = self._session._call_method(self._session._get_vim(),
+                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                         snapshot=snapshot_data['snapshot_ref'],
+                                                         deviceKey=dev['key'],
+                                                         startOffset=position,
+                                                         changeId=changeId)
                    
                         if 'changedArea' in changes:
                             for extent in changes.changedArea:
@@ -1143,7 +1164,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         return False
                 return True                 
             except exception.SnapshotVMResourcesNotFound as ex:
-                LOG.Exception(ex)
+                LOG.exception(ex)
                 return True            
 
         def _snapshot_size_update(cntx, snap):
@@ -1162,7 +1183,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 db.snapshot_update(cntx, snap.id, {'size': snapshot_size,'uploaded_size': snapshot_size})
                 return snapshot_size
             except exception.SnapshotVMResourcesNotFound as ex:
-                LOG.Exception(ex)
+                LOG.exception(ex)
             
                         
         try:
@@ -1594,7 +1615,6 @@ class VMwareVCDriver(VMwareESXDriver):
                     }) 
                 LOG.debug( progress)    
                 # End of for loop for devices
-    
             restored_instance_id = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
                                                               "VirtualMachine", "config.instanceUuid")
             
@@ -1635,8 +1655,89 @@ class VMwareVCDriver(VMwareESXDriver):
 
             return restored_vm
         except Exception as ex:
-            LOG.exception(ex)      
-            raise                   
+            LOG.exception(ex)
+            raise
+
+    def mount_instance_root_device(self, cntx, instance, restore): 
+        vm_ref = vm_util.get_vm_ref_from_vmware_uuid(self._session, instance['uuid'])
+        db = WorkloadMgrDB().db
+        restore_obj = db.restore_get(cntx, restore['id'])
+
+        msg = 'Reconfiguring application on ' + instance['vm_name']
+        db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
+
+        root_disk_path = self._get_root_disk_path_from_vm_ref(vm_ref)
+        vix_disk_lib_env = os.environ.copy()
+        vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+        vmxspec = 'moref=' + vm_ref.value                
+
+        #cmdspec = ["sudo", "LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64/",
+        cmdspec = [ "trilio-vix-disk-cli", "-mount",
+                   "-host", self._session._host_ip,
+                   "-user", self._session._host_username,
+                   "-password", "***********",
+                   "-vm", vmxspec,
+                   root_disk_path,]
+
+        cmd = " ".join(cmdspec)
+        for idx, opt in enumerate(cmdspec):
+            if opt == "-password":
+                cmdspec[idx+1] = self._session._host_password
+                break
+
+        process = subprocess.Popen(cmdspec,
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               bufsize= -1,
+                               env=vix_disk_lib_env,
+                               close_fds=True,
+                               shell=False)
+                
+        queue = Queue()
+        read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+        read_thread.daemon = True # thread dies with the program
+        read_thread.start()            
+                
+        mountpath = None
+        while process.poll() is None:
+            try:
+                try:
+                    output = queue.get(timeout=5)
+                except Empty:
+                    continue 
+                except Exception as ex:
+                     LOG.exception(ex)
+                if output.startswith("The root partition is mounted at"):
+                    mountpath = output[len("The root partition is mounted at"):].strip()
+                    break
+            except Exception as ex:
+                LOG.exception(ex)
+                
+        if not process.poll() is None:
+            _returncode = process.returncode  # pylint: disable=E1101
+            if _returncode:
+                LOG.debug(_('Result was %s') % _returncode)
+                raise exception.ProcessExecutionError(
+                                    exit_code=_returncode,
+                                    stdout=output,
+                                    stderr=process.stderr.read(),
+                                    cmd=cmd)
+        process.stdin.close()
+        return process, mountpath
+
+    def umount_instance_root_device(self, process): 
+        process.send_signal(18)
+        process.wait()
+
+        _returncode = process.returncode  # pylint: disable=E1101
+
+        if _returncode != 0:
+            LOG.debug(_('Result was %s') % _returncode)
+            raise exception.ProcessExecutionError(
+                                    exit_code=_returncode,
+                                    stdout=output,
+                                    stderr=process.stderr.read())
 
 class VMwareAPISession(object):
     """
@@ -1746,6 +1847,7 @@ class VMwareAPISession(object):
                 # to a session gone bad. So we try re-creating a session
                 # and then proceeding ahead with the call.
                 exc = excep
+                LOG.exception(exc)
                 if error_util.FAULT_NOT_AUTHENTICATED in excep.fault_list:
                     # Because of the idle session returning an empty
                     # RetrievePropertiesResponse and also the same is returned
@@ -1769,11 +1871,13 @@ class VMwareAPISession(object):
                 # For exceptions which may come because of session overload,
                 # we retry
                 exc = excep
+                LOG.exception(exc)
             except Exception as excep:
                 # If it is a proper exception, say not having furnished
                 # proper data in the SOAP call or the retry limit having
                 # exceeded, we raise the exception
                 exc = excep
+                LOG.exception(exc)
                 break
             # If retry count has been reached then break and
             # raise the exception

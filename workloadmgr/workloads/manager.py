@@ -61,23 +61,40 @@ FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
        
 
-def get_workflow_class(context, workload_type_id):
+def get_workflow_class(context, workload_type_id, restore=False):
     #TODO(giri): implement a driver model for the workload types
-    workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
     if workload_type_id:
         workload_type = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
         if(workload_type.display_name == 'Serial'):
-            workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
+            if restore:
+                workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+            else:
+                workflow_class_name = 'workloadmgr.workflows.serialworkflow.SerialWorkflow'
         elif(workload_type.display_name == 'Parallel'):
-            workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
+            if restore:
+                workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+            else:
+                workflow_class_name = 'workloadmgr.workflows.parallelworkflow.ParallelWorkflow'
         elif(workload_type.display_name == 'MongoDB'):
-            workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
+            if restore:
+                workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+            else:
+                workflow_class_name = 'workloadmgr.workflows.mongodbflow.MongoDBWorkflow'   
         elif(workload_type.display_name == 'Hadoop'):
-            workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
+            if restore:
+                workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+            else:
+                workflow_class_name = 'workloadmgr.workflows.hadoopworkflow.HadoopWorkflow' 
         elif(workload_type.display_name == 'Cassandra'):
-            workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
+            if restore:
+                workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraRestore'             
+            else:
+                workflow_class_name = 'workloadmgr.workflows.cassandraworkflow.CassandraWorkflow'             
         elif(workload_type.display_name == 'Composite'):
-            workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
+            if restore:
+                workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+            else:
+                workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
                       
     parts = workflow_class_name.split('.')
     module = ".".join(parts[:-1])
@@ -382,9 +399,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         try:
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
+            workload = self.db.workload_get(context, snapshot.workload_id)
             
             target_platform = 'vmware'
-            if 'pickle' in restore:
+            if hasattr(restore, 'pickle'):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
                 if options and 'type' in options:
                     target_platform = options['type'] 
@@ -432,7 +450,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'restore': dict(restore.iteritems()),   # restore dictionary
             }
                 
-            workflow_class = get_workflow_class(context, None)
+            workflow_class = get_workflow_class(context, workload.workload_type_id, True)
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
             workflow.execute()                                                

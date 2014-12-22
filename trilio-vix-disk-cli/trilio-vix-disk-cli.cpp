@@ -2599,6 +2599,8 @@ DoMount()
 
        VixMntapi_FreeVolumeInfo(volumeInfo);
        printf("Pausing the process until it is resumed\n");
+       std::cout.flush();
+       //sleep(5);
        raise(SIGSTOP);
 
        err = VixMntapi_DismountVolume(volumeHandle, false);

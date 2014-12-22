@@ -183,3 +183,12 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
 def post_restore_vm(cntx, db, instance, restore):
     return None 
     
+@autolog.log_method(Logger, 'vmtasks_vcloud.mount_instance_root_device')
+def mount_instance_root_device(cntx, instance, restore):
+    with vmwaresessionpool.item() as vmsession:
+        return vmsession.mount_instance_root_device(cntx, instance, restore)
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.umount_instance_root_device')
+def umount_instance_root_device(process): 
+    with vmwaresessionpool.item() as vmsession:
+        return vmsession.umount_instance_root_device(process)

@@ -699,7 +699,7 @@ def get_vm_ref_from_name(session, vm_name):
 def get_vm_ref_from_uuid(session, instance_uuid):
     """Get reference to the VM with the uuid specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["name"])
+                "VirtualMachine", ["config.uuid"])
     return _get_object_from_results(session, vms, instance_uuid,
                                     _get_object_for_value)
 

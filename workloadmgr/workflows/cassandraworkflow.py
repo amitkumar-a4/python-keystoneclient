@@ -5,6 +5,8 @@
 
 import contextlib
 import os
+import yaml
+import glob
 import random
 import sys
 import time
@@ -12,6 +14,7 @@ import time
 import datetime 
 import paramiko
 import uuid
+import cPickle as pickle
 
 from IPy import IP
 from taskflow import engines
@@ -31,11 +34,16 @@ from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr import utils
+from workloadmgr import autolog
 
 import vmtasks
 import workflow
+import restoreworkflow
+import vmtasks_openstack
+import vmtasks_vcloud
 
 LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 top_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                        os.pardir,
@@ -443,6 +451,211 @@ class CassandraWorkflow(workflow.Workflow):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
     
+def update_cassandra_yaml(mountpath, clustername, ips):
+    # modify the cassandra.yaml
+    os.rename(mountpath + '/etc/cassandra/cassandra.yaml',
+              mountpath + '/etc/cassandra/cassandra.yaml.bak')
+
+    with open(mountpath + '/etc/cassandra/cassandra.yaml.bak', 'r') as f:
+        doc = yaml.load(f)
+
+    doc['cluster_name'] = clustername
+    doc['seed_provider'][0]['parameters'][0]['seeds'] =  ips
+    with open(mountpath + '/etc/cassandra/cassandra.yaml', 'w') as f:
+        f.write(yaml.safe_dump(doc))
+
+def update_cassandra_topology_yaml(mountpath, address, broadcast):
+
+    # modify the cassandra-topology.yaml
+    os.rename(mountpath + '/etc/cassandra/cassandra-topology.yaml',
+              mountpath + '/etc/cassandra/cassandra-topology.yaml.bak')
+    with open(mountpath + '/etc/cassandra/cassandra-topology.yaml.bak', 'r') as f:
+        doc = yaml.load(f)
+
+    doc['topology'][0]['racks'][0]['nodes'][0]['dc_local_address'] = address
+    doc['topology'][0]['racks'][0]['nodes'][0]['broadcast_address'] = broadcast
+    with open(mountpath + '/etc/cassandra/cassandra-topology.yaml', 'w') as f:
+        f.write(yaml.safe_dump(doc))
+
+def update_cassandra_env_sh(mountpath, hostname):
+    # modify the cassandra-env.sh
+    os.rename(mountpath + '/etc/cassandra/cassandra-env.sh',
+              mountpath + '/etc/cassandra/cassandra-env.sh.bak')
+    with open(mountpath + '/etc/cassandra/cassandra-env.sh.bak', 'r') as f:
+        with open(mountpath + '/etc/cassandra/cassandra-env.sh', 'w') as fout:
+            for line in f:
+                if "java.rmi.server.hostname" in line:
+                    line = 'JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname=' + hostname + '"\n'
+                fout.write(line)
+
+def update_hostname(mountpath, hostname):
+    #modify hostname
+    os.rename(mountpath + '/etc/hostname',
+              mountpath + '/etc/hostname.bak')
+    with open(mountpath + '/etc/hostname', 'w') as fout:
+        fout.write(hostname)
+
+def update_hostsfile(mountpath, hostnames, ipaddresses):
+    with open(mountpath + '/etc/hosts', 'a') as f:
+        ips = ipaddresses.split(",")
+        hosts = hostnames.split(",")
+        for index, item in enumerate(hosts):
+            f.write(ips[index] + "    " + item + "\n")
+
+def create_interface_stanza(interface, address, netmask,
+                            network, broadcast, gateway):
+    stanza = []
+    stanza.append("auto " + interface)
+    stanza.append("    iface " + interface + " inet static")
+    stanza.append("    address " + address)
+    stanza.append("    netmask " + netmask)
+    stanza.append("    network " + network)
+    stanza.append("    broadcast " + broadcast)
+    stanza.append("    gateway " + gateway)
+    stanza.append("    up ip link set $IFACE promisc on")
+    stanza.append("    down ip link set $IFACE promisc off")
+    return stanza
+
+def update_network_interfaces(mountpath, interface, address, netmask,
+                              network, broadcast, gateway):
+    # modify network interfaces 
+    # this could be specific to each linux distribution.
+    # we are doing it for ubuntu now
+    os.rename(mountpath + '/etc/network/interfaces',
+              mountpath + '/etc/network/interfaces.bak')
+    with open(mountpath + '/etc/network/interfaces.bak', 'r') as f:
+        with open(mountpath + "/etc/network/interfaces", 'w') as newinf:
+            line = f.readline()
+            while line:
+                if line.startswith("source"):
+                    # open the file that is specified by the source
+                    dirname = line.replace("source ", "")
+                    dirname = dirname.rstrip("\n")
+                    for filename in glob.glob(mountpath + dirname):
+                        os.rename(filename,
+                                  filename + ".bak")
+                        with open(filename + ".bak", 'r') as ethfile:
+                            with open(filename, 'w') as newethfile:
+                                stanza = create_interface_stanza(interface, address,
+                                                                 netmask, network,
+                                                                 broadcast, gateway)
+                                newethfile.write("\n".join(stanza))
+                                newethfile.write("\n")
+                                for l in ethfile:
+                                     skip = False
+                                     for pat in ["auto", "iface", "address", 
+                                                 "netmask", "network", "broadcast", "gateway"]:
+                                         if l.lstrip().startswith(pat):
+                                             skip = True
+                                             break
+                                     if not skip:
+                                         newethfile.write(l)
+                        break
+                    newinf.write(line)
+                    line = f.readline()
+                            
+                elif line.strip().startswith("auto"):
+                    if line.split()[1].strip().rstrip() == "lo":
+                        newinf.write(line)
+                        line = f.readline()
+                        while not line.strip().startswith("auto") and \
+                              not line.strip().startswith("source"):
+                            newinf.write(line)
+                            line = f.readline()
+                    else:
+                        stanza = create_interface_stanza(interface, address, netmask,
+                                                         network, broadcast, gateway)
+                        newinf.write("\n".join(stanza))
+                        newinf.write("\n")
+                        while not line.strip().startswith("auto"):
+                            skip = False
+                            for pat in ["auto", "iface", "address", 
+                                        "netmask", "network", "broadcast", "gateway"]:
+                                if l.lstrip().startswith(pat):
+                                    skip = True
+                                    break
+                            if not skip:
+                                newinf.write(line)
+                            line = f.readline()
+                        break 
+                else:
+                    # comments and everything else
+                    newinf.write(line)
+                    line = f.readline()
+
+class CassandraRestoreNode(task.Task):
+
+    def execute(self, context, instance, restore, restore_options, ipaddress, hostname):
+        return self.execute_with_log(context, instance, restore, restore_options, ipaddress, hostname)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'CassandraRestoreNode.execute')
+    def execute_with_log(self, context, instance, restore, restore_options, ipaddress, hostname):
+        # pre processing of snapshot
+        cntx = amqp.RpcContext.from_dict(context)
+        process, mountpath = vmtasks_vcloud.mount_instance_root_device(cntx, instance, restore)
+        try:
+            update_cassandra_yaml(mountpath, restore_options['NewClusterName'], restore_options['IPAddresses'])
+            update_cassandra_topology_yaml(mountpath, ipaddress, restore_options['Broadcast'])
+            update_cassandra_env_sh(mountpath, hostname)
+            update_hostname(mountpath, hostname)
+
+            update_hostsfile(mountpath, restore_options['Nodenames'],
+                             restore_options['IPAddresses'])
+
+            #TODO modify cassandra-topology.properties
+
+            update_network_interfaces(mountpath, "eth0", ipaddress,
+                                      restore_options['Netmask'], restore_options['Network'],
+                                      restore_options['Broadcast'], restore_options['Gateway'])
+        finally:
+            vmtasks_vcloud.umount_instance_root_device(process)
+
+    @autolog.log_method(Logger, 'CassandraRestoreNode.revert')
+    def revert_with_log(self, *args, **kwargs):
+        if not isinstance(kwargs['result'], misc.Failure):
+            process = amqp.RpcContext.from_dict(kwargs['process'])
+            vmtasks_vcloud.umount_instance_root_device(process)
+        
+def LinearCassandraRestoreNodes(workflow):
+    flow = lf.Flow("cassandrarestoreuf")
+    for index,item in enumerate(workflow._store['instances']):
+        rebind_dict = dict(instance = "restored_instance_" + str(index),\
+                           ipaddress = "ipaddress_"+str(index),\
+                           hostname = "hostname_"+str(index))
+        flow.add(CassandraRestoreNode("CassandraRestoreNode_" + item['vm_id'], rebind=rebind_dict))
+
+    return flow
+
+class CassandraRestore(restoreworkflow.RestoreWorkflow):
+
+    def initflow(self):
+        super(CassandraRestore, self).initflow()
+
+        options = pickle.loads(self._store['restore']['pickle'].encode('ascii', 'ignore'))
+        restore_options = options['restore_options']
+        self._store['restore_options'] = restore_options
+
+        for index, item in enumerate(restore_options['IPAddresses'].split(",")):
+            self._store['ipaddress_' + str(index)] = item
+
+        if 'Nodenames' in restore_options:
+            for index, item in enumerate(restore_options['Nodenames'].split(",")):
+                self._store['hostname_'+str(index)] = item
+        else:
+            restore_options['Nodenames'] = None
+            hostnames = []
+            for index, item in enumerate(self._store['instances']):
+                self._store['hostname_'+str(index)] = item['vm_name'] + "_restored"
+                hostnames.append(item['vm_name'] + "_restored")
+
+            restore_options['Nodenames'] = ",".join(hostnames)
+
+        # unordered post restore 
+        self._flow.add(LinearCassandraRestoreNodes(self))
+
 '''
 #test code
 import json
@@ -476,3 +689,4 @@ print json.dumps(cwf.details())
 
 #print cwf.execute()
 '''
+

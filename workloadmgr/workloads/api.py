@@ -433,7 +433,7 @@ class API(base.Base):
 
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
         if len(snapshots) > 0:
-            msg = _('This workload contains snapshots')
+            msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
                     
         # First unschedule the job
