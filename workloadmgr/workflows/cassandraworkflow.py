@@ -477,6 +477,17 @@ def update_cassandra_topology_yaml(mountpath, address, broadcast):
     with open(mountpath + '/etc/cassandra/cassandra-topology.yaml', 'w') as f:
         f.write(yaml.safe_dump(doc))
 
+def update_cassandra_topology_properties(mountpath, addresses):
+
+    # modify the cassandra-topology.properties
+    os.rename(mountpath + '/etc/cassandra/cassandra-topology.properties',
+              mountpath + '/etc/cassandra/cassandra-topology.properties.bak')
+
+    with open(mountpath + '/etc/cassandra/cassandra-topology.properties', 'w') as f:
+        f.write("# Updated the addresses by TrilioVault restore process\n")
+        for addr in addresses.split(","):
+            f.write(addr + "=DC1:RAC1\n")
+
 def update_cassandra_env_sh(mountpath, hostname):
     # modify the cassandra-env.sh
     os.rename(mountpath + '/etc/cassandra/cassandra-env.sh',
@@ -599,6 +610,7 @@ class CassandraRestoreNode(task.Task):
         try:
             update_cassandra_yaml(mountpath, restore_options['NewClusterName'], restore_options['IPAddresses'])
             update_cassandra_topology_yaml(mountpath, ipaddress, restore_options['Broadcast'])
+            update_cassandra_topology_properties(mountpath, restore_options['IPAddresses'])
             update_cassandra_env_sh(mountpath, hostname)
             update_hostname(mountpath, hostname)
 
