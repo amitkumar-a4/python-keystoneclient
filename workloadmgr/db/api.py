@@ -154,8 +154,8 @@ def workload_delete(context, workload_id):
 def workload_vms_create(context, values):
     return IMPL.workload_vms_create(context, values)
 
-def workload_vms_get(context, workload_id):
-    return IMPL.workload_vms_get(context, workload_id)
+def workload_vms_get(context, workload_id, **kwargs):
+    return IMPL.workload_vms_get(context, workload_id, **kwargs)
 
 def workload_vms_delete(context, vm_id, workload_id):
     return IMPL.workload_vms_delete(context, vm_id, workload_id)
@@ -176,12 +176,12 @@ def snapshot_delete(context, snapshot_id):
 def snapshot_get(context, snapshot_id, **kwargs):
     return IMPL.snapshot_get(context, snapshot_id, **kwargs)
     
-def snapshot_get_all(context, workload_id=None):
-    return IMPL.snapshot_get_all(context, workload_id)    
+def snapshot_get_all(context, workload_id=None, **kwargs):
+    return IMPL.snapshot_get_all(context, workload_id, **kwargs)    
 
-def snapshot_get_all_by_project(context, project_id):
+def snapshot_get_all_by_project(context, project_id, **kwargs):
     """Get all snapshots belonging to a project."""
-    return IMPL.snapshot_get_all_by_project(context, project_id)
+    return IMPL.snapshot_get_all_by_project(context, project_id, **kwargs)
     
 def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs):
     """Get all snapshots belonging to a project and workload"""
@@ -197,8 +197,8 @@ def snapshot_update(context, snapshot_id, values):
 def snapshot_vm_create(context, values):
     return IMPL.snapshot_vm_create(context, values)
 
-def snapshot_vms_get(context, snapshot_id):
-    return IMPL.snapshot_vms_get(context, snapshot_id)
+def snapshot_vms_get(context, snapshot_id, **kwargs):
+    return IMPL.snapshot_vms_get(context, snapshot_id, **kwargs)
 
 def snapshot_vm_get(context, vm_id, snapshot_id):
     return IMPL.snapshot_vm_get(context, vm_id, snapshot_id)
@@ -212,8 +212,8 @@ def snapshot_vm_delete(context, vm_id, snapshot_id):
 def vm_recent_snapshot_create(context, values):
     return IMPL.vm_recent_snapshot_create(context, values)
 
-def vm_recent_snapshot_get(context, vm_id):
-    return IMPL.vm_recent_snapshot_get(context, vm_id)
+def vm_recent_snapshot_get(context, vm_id, **kwargs):
+    return IMPL.vm_recent_snapshot_get(context, vm_id, **kwargs)
 
 def vm_recent_snapshot_update(context, vm_id, values):
     return IMPL.vm_recent_snapshot_update(context, vm_id, values)
@@ -230,8 +230,8 @@ def snapshot_vm_resource_update(context, id, vaules, purge_metadata=False):
 def snapshot_vm_resources_get(context, vm_id, snapshot_id):
     return IMPL.snapshot_vm_resources_get(context, vm_id, snapshot_id)
 
-def snapshot_resources_get(context, snapshot_id):
-    return IMPL.snapshot_resources_get(context, snapshot_id)
+def snapshot_resources_get(context, snapshot_id, **kwargs):
+    return IMPL.snapshot_resources_get(context, snapshot_id, **kwargs)
 
 def snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, resource_pit_id):
     return IMPL.snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, resource_pit_id)
@@ -251,8 +251,8 @@ def vm_disk_resource_snap_create(context, values):
 def vm_disk_resource_snap_update(context, id, vaules, purge_metadata=False):
     return IMPL.vm_disk_resource_snap_update(context, id, vaules, purge_metadata)
 
-def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id):
-    return IMPL.vm_disk_resource_snaps_get(context, snapshot_vm_resource_id)
+def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
+    return IMPL.vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs)
 
 def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
     return IMPL.vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id)
@@ -269,8 +269,8 @@ def vm_network_resource_snap_create(context, values):
 def vm_network_resource_snap_update(context, id, vaules, purge_metadata=False):
     return IMPL.vm_network_resource_snap_update(context, id, vaules, purge_metadata)
 
-def vm_network_resource_snaps_get(context, snapshot_vm_resource_id):
-    return IMPL.vm_network_resource_snaps_get(context, snapshot_vm_resource_id)
+def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
+    return IMPL.vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs)
 
 def vm_network_resource_snap_get(context, snapshot_vm_resource_id):
     return IMPL.vm_network_resource_snap_get(context, snapshot_vm_resource_id)
@@ -284,8 +284,8 @@ def vm_security_group_rule_snap_create(context, values):
 def vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, vaules, purge_metadata=False):
     return IMPL.vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, vaules, purge_metadata)
 
-def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id):
-    return IMPL.vm_security_group_rule_snaps_get(context, vm_security_group_snap_id)
+def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, **kwargs):
+    return IMPL.vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, **kwargs)
 
 def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
     return IMPL.vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id)
@@ -358,3 +358,9 @@ def restored_vm_resource_get(context, id):
 
 def restored_vm_resource_delete(context, id, vm_id, restore_id):
     return IMPL.restored_vm_resource_delete(context, id, vm_id, restore_id)
+
+def purge_snapshot(context, id):
+    return IMPL.purge_snapshot(context, id)
+
+def purge_workload(context, id):
+    return IMPL.purge_workload(context, id)

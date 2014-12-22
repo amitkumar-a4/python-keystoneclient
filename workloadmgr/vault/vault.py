@@ -109,8 +109,7 @@ class VaultBackupService(base.Base):
                 
         return copy_to_file_path   
     
-    def put_object(self, parent, path, json_data):
-        #place holder for now
+    def put_object(self, path, json_data):
         path = FLAGS.wlm_vault_local_directory + '/snapshots/' + path
         head, tail = os.path.split(path)
         fileutils.ensure_tree(head)
@@ -118,7 +117,26 @@ class VaultBackupService(base.Base):
             json_file.write(json_data)
         return    
         
-         
+    def get_object(self, path):
+        path = FLAGS.wlm_vault_local_directory + '/snapshots/' + path
+        with open(path, 'r') as json_file:
+            return json_file.read()
+        
+    def get_workloads(self):
+        parent_path = FLAGS.wlm_vault_local_directory + '/snapshots/'
+        workload_urls = []
+        for name in os.listdir(parent_path):
+            if os.path.isdir(os.path.join(parent_path, name)):
+                workload_url = {'workload_url': name, 'snapshot_urls': []}
+                for subname in os.listdir(os.path.join(parent_path, workload_url['workload_url'])):
+                    if os.path.isdir(os.path.join(parent_path, workload_url['workload_url'], subname)):
+                        workload_url['snapshot_urls'].append(os.path.join(workload_url['workload_url'], subname))
+                workload_urls.append(workload_url)       
+                
+        return workload_urls
+            
+           
+             
     def restore_local(self, snapshot_metadata, restore_to_file_path):
         """Restore a snapshot from the local filesystem."""
         copy_from_file_path = self.get_snapshot_file_path(snapshot_metadata)

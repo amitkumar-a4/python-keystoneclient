@@ -49,6 +49,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr import autolog
+from workloadmgr.workflows import vmtasks
 
 
 LOG = logging.getLogger(__name__)
@@ -1165,7 +1166,8 @@ class VMwareVCDriver(VMwareESXDriver):
             
                         
         try:
-            db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})             
+            db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
+            affected_snapshots = []             
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
             snapshots_to_keep = pickle.loads(str(workload_obj.jobschedule))['snapshots_to_keep']
@@ -1211,81 +1213,88 @@ class VMwareVCDriver(VMwareESXDriver):
                                 snapshot_to_commit = snapshots_valid[idx-1]
                             snapshots_to_delete.append(snap)
 
-            if snapshot_to_commit == None:
-                return
-                 
-            vix_disk_lib_env = os.environ.copy()
-            vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
-            for snap in snapshots_to_delete:
-                snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id, read_deleted='yes')
-                if snapshot_to_commit.snapshot_type == 'full':
-                    db.snapshot_delete(cntx, snap.id)
-                    db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                    try:
-                        shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
-                    except Exception as ex:
-                        LOG.exception(ex)    
-                    continue
-                
-                snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot_to_commit.id)
-                for snapshot_vm_resource in snapshot_vm_resources:
-                    if snapshot_vm_resource.resource_type != 'disk':
+            if snapshot_to_commit:
+                vix_disk_lib_env = os.environ.copy()
+                vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+                affected_snapshots.append(snapshot_to_commit.id)
+                for snap in snapshots_to_delete:
+                    affected_snapshots.append(snap.id)
+                    snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id, read_deleted='yes')
+                    if snapshot_to_commit.snapshot_type == 'full':
+                        db.snapshot_delete(cntx, snap.id)
+                        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                        try:
+                            shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
+                        except Exception as ex:
+                            LOG.exception(ex)    
                         continue
-                    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
-                    if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
-                        vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-                        with open(vm_disk_resource_snap_backing.vault_service_url + '-ctk', 'a') as backing_ctkfile:
-                            with open(vm_disk_resource_snap.vault_service_url + "-ctk", 'r') as ctkfile:
-                                for line in ctkfile:
-                                    start, length = line.split(',')
-                                    start = int(start)
-                                    length = int(length.rstrip('\n'))
-                                    try:            
-                                        cmdline = "trilio-vix-disk-cli -copy".split(" ")
-                                        cmdline.append(vm_disk_resource_snap.vault_service_url)
-                                        cmdline += ("-start " + str(start/512)).split(" ")
-                                        cmdline += ("-count " + str(length/512)).split(" ")
-                                        cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
-                                        check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                                    except subprocess.CalledProcessError as ex:
-                                        LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
-                                        raise
-                                    backing_ctkfile.write(str(start) + "," + str(length)+"\n")
-
-                        try:            
-                            cmdline = "vmware-vdiskmanager -R".split(" ")
-                            cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
-                            check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                        except subprocess.CalledProcessError as ex:
-                            LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
-                            raise
+                    
+                    snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot_to_commit.id)
+                    for snapshot_vm_resource in snapshot_vm_resources:
+                        if snapshot_vm_resource.resource_type != 'disk':
+                            continue
+                        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
+                        if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
+                            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                            with open(vm_disk_resource_snap_backing.vault_service_url + '-ctk', 'a') as backing_ctkfile:
+                                with open(vm_disk_resource_snap.vault_service_url + "-ctk", 'r') as ctkfile:
+                                    for line in ctkfile:
+                                        start, length = line.split(',')
+                                        start = int(start)
+                                        length = int(length.rstrip('\n'))
+                                        try:            
+                                            cmdline = "trilio-vix-disk-cli -copy".split(" ")
+                                            cmdline.append(vm_disk_resource_snap.vault_service_url)
+                                            cmdline += ("-start " + str(start/512)).split(" ")
+                                            cmdline += ("-count " + str(length/512)).split(" ")
+                                            cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
+                                            check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                                        except subprocess.CalledProcessError as ex:
+                                            LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                                            raise
+                                        backing_ctkfile.write(str(start) + "," + str(length)+"\n")
+    
+                            try:            
+                                cmdline = "vmware-vdiskmanager -R".split(" ")
+                                cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
+                                check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                            except subprocess.CalledProcessError as ex:
+                                LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                                raise
+                            
+                                        
+                            os.remove(vm_disk_resource_snap.vault_service_url)
+                            os.remove(vm_disk_resource_snap.vault_service_url + '-ctk')
+                            shutil.move(vm_disk_resource_snap_backing.vault_service_url, vm_disk_resource_snap.vault_service_url)
+                            shutil.move(vm_disk_resource_snap_backing.vault_service_url + '-ctk', vm_disk_resource_snap.vault_service_url + '-ctk')
+                            vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
+                                                            'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id}
+                            db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+                            
+                            snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                            snapshot_vm_resource_values = {'size' : snapshot_vm_resource_backing.size, 'snapshot_type' : snapshot_vm_resource_backing.snapshot_type }
+                            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, snapshot_vm_resource_values)
+                            db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_backing.id)
+                            db.snapshot_vm_resource_delete(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                            snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                            if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
+                                affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
+                    
+                    db.snapshot_type_update(cntx, snapshot_to_commit.id)
+                    _snapshot_size_update(cntx, snapshot_to_commit)
+    
+                    if _snapshot_disks_deleted(snap):
+                        db.snapshot_delete(cntx, snap.id)
+                        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                        try:
+                            shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id,
+                                                                                           'snapshot_id': snap.id}))
+                        except Exception as ex:
+                            LOG.exception(ex)
                         
-                                    
-                        os.remove(vm_disk_resource_snap.vault_service_url)
-                        os.remove(vm_disk_resource_snap.vault_service_url + '-ctk')
-                        shutil.move(vm_disk_resource_snap_backing.vault_service_url, vm_disk_resource_snap.vault_service_url)
-                        shutil.move(vm_disk_resource_snap_backing.vault_service_url + '-ctk', vm_disk_resource_snap.vault_service_url + '-ctk')
-                        vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
-                                                        'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id}
-                        db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
-                        
-                        snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                        snapshot_vm_resource_values = {'size' : snapshot_vm_resource_backing.size, 'snapshot_type' : snapshot_vm_resource_backing.snapshot_type }
-                        db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, snapshot_vm_resource_values)
-                        db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_backing.id)
-                        db.snapshot_vm_resource_delete(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)                                
-                
-                db.snapshot_type_update(cntx, snapshot_to_commit.id)
-                _snapshot_size_update(cntx, snapshot_to_commit)
-
-                if _snapshot_disks_deleted(snap):
-                    db.snapshot_delete(cntx, snap.id)
-                    db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                    try:
-                        shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id,
-                                                                                       'snapshot_id': snap.id}))
-                    except Exception as ex:
-                        LOG.exception(ex)            
+            # Upload snapshot metadata to the vault
+            for snapshot_id in affected_snapshots:
+                vmtasks.UploadSnapshotDBEntry(cntx, snapshot_id)                                    
             
         except Exception as ex:
             LOG.exception(ex)

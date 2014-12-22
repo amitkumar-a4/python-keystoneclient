@@ -509,7 +509,6 @@ def _workload_metadata_delete(context, metadata_ref, session):
     Used internally by workload_metadata_create and workload_metadata_update
     """
     metadata_ref.delete(session=session)
-    return metadata_ref
 
 def _workload_update(context, values, workload_id, purge_metadata, session):
     
@@ -596,7 +595,6 @@ def _workload_get(context, id, session):
         query = session.query(models.Workloads)\
                        .options(sa_orm.joinedload(models.Workloads.metadata))\
                        .filter_by(id=id)\
-                       .filter_by(project_id=context.project_id)
 
         #TODO(gbasava): filter out deleted workloads if context disallows it
         workloads = query.first()
@@ -717,8 +715,8 @@ def workload_vms_update(context, id, values, purge_metadata=False):
     return _workload_vms_update(context, values, id, purge_metadata, session)
 
 @require_context
-def workload_vms_get(context, workload_id):
-    session = get_session()
+def workload_vms_get(context, workload_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     try:
         query = session.query(models.WorkloadVMs)\
                        .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
@@ -783,8 +781,9 @@ def snapshot_mark_incomplete_as_error(context, host):
         
 @require_context
 def snapshot_get(context, snapshot_id, **kwargs):
-    session = get_session()
-    result = model_query(   context, models.Snapshots, session=session, **kwargs).\
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(   context, models.Snapshots, **kwargs).\
                             filter_by(id=snapshot_id).\
                             first()
 
@@ -794,22 +793,25 @@ def snapshot_get(context, snapshot_id, **kwargs):
     return result
 
 @require_admin_context
-def snapshot_get_all(context, workload_id=None):
-    session = get_session()
-    return model_query(context, models.Snapshots, session=session).all()
+def snapshot_get_all(context, workload_id=None, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    return model_query(context, models.Snapshots, **kwargs).all()
 
 @require_context
-def snapshot_get_all_by_project(context, project_id):
-    session = get_session()
+def snapshot_get_all_by_project(context, project_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
-    return model_query(context, models.Snapshots, session=session).\
+    return model_query(context, models.Snapshots, **kwargs).\
                             filter_by(project_id=project_id).all()
         
 @require_context
 def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs):
-    session = get_session()
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
-    return model_query(context, models.Snapshots, session=session, **kwargs).\
+    return model_query(context, models.Snapshots, **kwargs).\
                             filter_by(project_id=project_id).\
                             filter_by(workload_id=workload_id).\
                             order_by(models.Snapshots.created_at.desc()).all()
@@ -965,7 +967,6 @@ def _snapshot_vms_metadata_delete(context, metadata_ref, session):
     Used internally by snapshot_vms_metadata_create and snapshot_vms_metadata_update
     """
     metadata_ref.delete(session=session)
-    return metadata_ref
 
 def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, session):
     
@@ -980,7 +981,6 @@ def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, ses
         if not values.get('size'):
             values['size'] = 0
 
-    
     snapshot_vm_ref.update(values)
     snapshot_vm_ref.save(session)
     
@@ -1001,8 +1001,8 @@ def snapshot_vm_update(context, vm_id, snapshot_id, values, purge_metadata=False
     return _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, session)
 
 @require_context
-def snapshot_vms_get(context, snapshot_id):
-    session = get_session()
+def snapshot_vms_get(context, snapshot_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     try:
         query = session.query(models.SnapshotVMs)\
                        .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
@@ -1057,8 +1057,8 @@ def vm_recent_snapshot_create(context, values):
     return vm_recent_snapshot
 
 @require_context
-def vm_recent_snapshot_get(context, vm_id):
-    session = get_session()
+def vm_recent_snapshot_get(context, vm_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     result = model_query(context, models.VMRecentSnapshot, session=session).\
                             filter_by(vm_id=vm_id).\
                             first()
@@ -1125,7 +1125,7 @@ def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, me
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                snapshot_vm_resource_metadata_delete(context, metadata_ref, session)
+                _snapshot_vm_resource_metadata_delete(context, metadata_ref, session)
 
 @require_context
 def _snapshot_vm_resource_metadata_create(context, values, session):
@@ -1151,13 +1151,11 @@ def _snapshot_vm_resource_metadata_update(context, metadata_ref, values, session
     return metadata_ref
 
 @require_context
-def snapshot_vm_resource_metadata_delete(context, metadata_ref):
+def _snapshot_vm_resource_metadata_delete(context, metadata_ref, session):
     """
     Used internally by snapshot_vm_resource_metadata_create and snapshot_vm_resource_metadata_update
     """
-    session = get_session()
     metadata_ref.delete(session=session)
-    return metadata_ref
 
 @require_context
 def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge_metadata, session):
@@ -1207,8 +1205,8 @@ def snapshot_vm_resources_get(context, vm_id, snapshot_id):
     return snapshot_vm_resources
 
 @require_context
-def snapshot_resources_get(context, snapshot_id):
-    session = get_session()
+def snapshot_resources_get(context, snapshot_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     try:
         query = session.query(models.SnapshotVMResources)\
                        .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
@@ -1318,7 +1316,7 @@ def _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, 
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                vm_disk_resource_snap_metadata_delete(context, metadata_ref, session)
+                _vm_disk_resource_snap_metadata_delete(context, metadata_ref, session)
 
 @require_context
 def _vm_disk_resource_snap_metadata_create(context, values, session):
@@ -1345,13 +1343,11 @@ def _vm_disk_resource_snap_metadata_update(context, metadata_ref, values, sessio
     return metadata_ref
 
 
-def vm_disk_resource_snap_metadata_delete(context, metadata_ref):
+def _vm_disk_resource_snap_metadata_delete(context, metadata_ref, session):
     """
     Used internally by vm_disk_resource_snap_metadata_create and vm_disk_resource_snap_metadata_update
     """
-    session = get_session()
     metadata_ref.delete(session=session)
-    return metadata_ref
 
 def _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, purge_metadata, session):
     
@@ -1383,9 +1379,8 @@ def vm_disk_resource_snap_update(context, vm_disk_resource_snap_id, values, purg
     return _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, purge_metadata, session)
 
 @require_context
-def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id):
-
-    session = get_session()
+def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     try:
         query = session.query(models.VMDiskResourceSnaps)\
                        .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
@@ -1477,7 +1472,7 @@ def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                vm_network_resource_snap_metadata_delete(context, metadata_ref, session)
+                _vm_network_resource_snap_metadata_delete(context, metadata_ref, session)
 
 @require_context
 def _vm_network_resource_snap_metadata_create(context, values, session):
@@ -1503,11 +1498,10 @@ def _vm_network_resource_snap_metadata_update(context, metadata_ref, values, ses
     return metadata_ref
 
 @require_context
-def vm_network_resource_snap_metadata_delete(context, metadata_ref):
+def _vm_network_resource_snap_metadata_delete(context, metadata_ref, session):
     """
     Used internally by vm_network_resource_snap_metadata_create and vm_network_resource_snap_metadata_update
     """
-    session = get_session()
     metadata_ref.delete(session=session)
     return metadata_ref
 
@@ -1539,8 +1533,8 @@ def vm_network_resource_snap_update(context, vm_network_resource_snap_id, values
     return _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata, session)
 
 @require_context
-def vm_network_resource_snaps_get(context, snapshot_vm_resource_id):
-    session = get_session()
+def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     try:
         query = session.query(models.VMNetworkResourceSnaps)\
                        .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
@@ -1611,7 +1605,7 @@ def _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rul
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session)
+                _vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session)
 
 @require_context
 def _vm_security_group_rule_snap_metadata_create(context, values, session):
@@ -1637,13 +1631,11 @@ def _vm_security_group_rule_snap_metadata_update(context, metadata_ref, values, 
     return metadata_ref
 
 @require_context
-def vm_security_group_rule_snap_metadata_delete(context, metadata_ref):
+def _vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session):
     """
     Used internally by vm_security_group_rule_snap_metadata_create and vm_security_group_rule_snap_metadata_update
     """
-    session = get_session()
     metadata_ref.delete(session=session)
-    return metadata_ref
 
 def _vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata, session):
     
@@ -1672,8 +1664,8 @@ def vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, v
     return _vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata, session)
 
 @require_context
-def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id):
-    session = get_session()
+def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, **kwargs):
+    session = kwargs.get('session') or get_session()
     try:
         query = session.query(models.VMSecurityGroupRuleSnaps)\
                        .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
@@ -2041,3 +2033,77 @@ def restored_vm_resource_delete(context, id, vm_id, restore_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+
+"""
+Permanent Deletes
+"""
+@require_context
+def purge_snapshot(context, id, session=None):
+    if session == None:
+        session = get_session()
+    for snapshot_vm_resource in snapshot_resources_get(context, id, session=session):
+        if snapshot_vm_resource.resource_type == 'disk':
+            for vm_disk_resource_snap in vm_disk_resource_snaps_get(context, snapshot_vm_resource.id, session=session):
+                for metadata_ref in vm_disk_resource_snap.metadata:
+                    metadata_ref.purge(session)
+                session.refresh(vm_disk_resource_snap)
+                vm_disk_resource_snap.purge(session)
+        if snapshot_vm_resource.resource_type == 'network' or \
+            snapshot_vm_resource.resource_type == 'subnet' or \
+            snapshot_vm_resource.resource_type == 'router' or \
+            snapshot_vm_resource.resource_type == 'nic':
+            for vm_network_resource_snap in vm_network_resource_snaps_get(context, snapshot_vm_resource.id, session=session):
+                for metadata_ref in vm_network_resource_snap.metadata:
+                    metadata_ref.purge(session)
+                session.refresh(vm_network_resource_snap)
+                vm_network_resource_snap.purge(session)
+        if snapshot_vm_resource.resource_type == 'security_group':
+            for vm_security_group_rule_snap in vm_security_group_rule_snaps_get(context, snapshot_vm_resource.id, session=session):
+                for metadata_ref in vm_network_resource_snap.metadata:
+                    metadata_ref.purge(session)
+                session.refresh(vm_security_group_rule_snap)
+                vm_security_group_rule_snap.purge(session)
+        
+        for metadata_ref in snapshot_vm_resource.metadata:
+            metadata_ref.purge(session)
+        session.refresh(snapshot_vm_resource)
+        snapshot_vm_resource.purge(session)
+    
+    for snapshot_vm in snapshot_vms_get(context, id, session=session):
+        for metadata_ref in snapshot_vm.metadata:
+            metadata_ref.purge(session)
+        vm_recent_snapshot = vm_recent_snapshot_get(context, snapshot_vm.vm_id, session=session)
+        if vm_recent_snapshot:
+            vm_recent_snapshot.purge(session)
+        session.refresh(snapshot_vm)
+        snapshot_vm.purge(session)
+        
+    snapshot = snapshot_get(context, id, session=session, read_deleted='yes')
+    if snapshot:
+        snapshot.purge(session)
+    
+@require_context
+def purge_workload(context, id):
+    try:
+        session = get_session()
+        for snapshot in snapshot_get_all(context, workload_id=id, session=session, read_deleted='yes'):
+            purge_snapshot(context, snapshot.id, session)
+        for workload_vm in workload_vms_get(context, id, session=session):
+            for metadata_ref in workload_vm.metadata:
+                metadata_ref.purge(session)
+            session.refresh(workload_vm)
+            workload_vm.purge(session)
+        workload = _workload_get(context, id, session=session)
+        if workload:
+            for metadata_ref in workload.metadata:
+                metadata_ref.purge(session)
+            session.refresh(workload)
+            workload.purge(session)
+
+    except Exception as ex:
+        LOG.exception(ex)
+        
+    
+        
+            
+        

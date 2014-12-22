@@ -276,7 +276,7 @@ def upgrade(migrate_engine):
         Column('version', String(length=255)),
         Column('id', String(length=255), primary_key=True, nullable= False),
         Column('snapshot_vm_resource_id', String(length=255), ForeignKey('snapshot_vm_resources.id')),
-        Column('vm_disk_resource_snap_backing_id', String(length=255), ForeignKey('vm_disk_resource_snaps.id')),
+        Column('vm_disk_resource_snap_backing_id', String(length=255)),
         Column('top', Boolean, default=False),
         Column('vault_service_url', String(4096)),    
         Column('vault_service_metadata', String(4096)),
