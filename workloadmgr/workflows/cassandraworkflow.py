@@ -460,9 +460,9 @@ def update_cassandra_yaml(mountpath, clustername, ips):
         doc = yaml.load(f)
 
     doc['cluster_name'] = clustername
-    doc['seed_provider'][0]['parameters'][0]['seeds'] =  ",".join(ips)
+    doc['seed_provider'][0]['parameters'][0]['seeds'] =  ips
     with open(mountpath + '/etc/cassandra/cassandra.yaml', 'w') as f:
-        f.write(yaml.dump(doc))
+        f.write(yaml.safe_dump(doc))
 
 def update_cassandra_topology_yaml(mountpath, address, broadcast):
 
@@ -475,7 +475,7 @@ def update_cassandra_topology_yaml(mountpath, address, broadcast):
     doc['topology'][0]['racks'][0]['nodes'][0]['dc_local_address'] = address
     doc['topology'][0]['racks'][0]['nodes'][0]['broadcast_address'] = broadcast
     with open(mountpath + '/etc/cassandra/cassandra-topology.yaml', 'w') as f:
-        f.write(yaml.dump(doc))
+        f.write(yaml.safe_dump(doc))
 
 def update_cassandra_env_sh(mountpath, hostname):
     # modify the cassandra-env.sh
