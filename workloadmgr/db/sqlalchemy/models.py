@@ -419,7 +419,8 @@ class Restores(BASE, WorkloadsBase):
     progress_msg = Column(String(255))
     warning_msg =  Column(String(4096))     
     error_msg =  Column(String(4096))
-    host = Column(String(255))         
+    host = Column(String(255)) 
+    target_platform = Column(String(255))            
     finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
 

@@ -807,6 +807,11 @@ class API(base.Base):
         """
         restore_details = self.restore_show(context, restore_id)
         
+        if restore_details['target_platform'] == 'vmware':
+            self.db.restore_delete(context, restore_id)
+            return
+            
+        
         if restore_details['status'] not in ['available', 'error']:
             msg = _("Status of the requested resource status must be 'available' or 'error'")
             raise wlm_exceptions.InvalidState(reason=msg)

@@ -414,6 +414,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 self.db.restore_update( context, 
                             restore_id, 
                             {'host': self.host,
+                             'target_platform': target_platform,
                              'progress_percent': 0, 
                              'progress_msg': 'Create testbubble from snapshot is starting',
                              'status': 'starting'
@@ -422,6 +423,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 self.db.restore_update( context, 
                             restore_id, 
                             {'host': self.host,
+                             'target_platform': target_platform,
                              'progress_percent': 0, 
                              'progress_msg': 'Restore from snapshot is starting',
                              'status': 'starting'
