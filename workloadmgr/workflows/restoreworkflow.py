@@ -89,14 +89,13 @@ class RestoreWorkflow(object):
     def __init__(self, name, store):
         self._name = name
         self._store = store
-        
-
-    def initflow(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['restore']['id'])
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+str(index)] = item
-      
+        
+
+    def initflow(self, pre_poweron=None, post_poweron=None):
         self._flow = lf.Flow('RestoreFlow')
         
         # Check if any pre restore conditions 
@@ -111,6 +110,15 @@ class RestoreWorkflow(object):
         #linear restore VMs
         self._flow.add(vmtasks.LinearRestoreVMs(self._store['instances']))
         
+        if pre_poweron:
+            self._flow.add(pre_poweron)
+
+        #linear poweron VMs
+        self._flow.add(vmtasks.LinearPowerOnVMs(self._store['instances']))
+        
+        if post_poweron:
+            self._flow.add(post_poweron)        
+                
         # unordered post restore 
         self._flow.add(vmtasks.UnorderedPostRestore(self._store['instances'])) 
     

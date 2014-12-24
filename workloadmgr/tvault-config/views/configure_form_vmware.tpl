@@ -101,9 +101,10 @@ $(function() {
  		    	<!---   			
     			<input name="storage-type" id="storage-type-object" type="radio"  value="object" disabled> Object Store 
     			<input name="storage-object-url" id="storage-object-url" type="text" required placeholder="" class="form-control">	<br/>
-		    	-->	    	
-    		</div><br>   	      
-	      </div>
+		    	-->
+    		</div><br>
+    		<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads 
+ 	      </div>
 	    </div>
 	  </div>
 	</div>

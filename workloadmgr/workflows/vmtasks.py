@@ -166,7 +166,38 @@ class RestoreVM(task.Task):
     def revert_with_log(self, *args, **kwargs):
         cntx = amqp.RpcContext.from_dict(kwargs['context'])
         db = WorkloadMgrDB().db
-        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})        
+        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',}) 
+        
+class PowerOnVM(task.Task):
+
+    def execute(self, context, instance, restore, restored_instance):
+        return self.execute_with_log(context, instance, restore, restored_instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'PowerOnVM.execute')
+    def execute_with_log(self, context, instance, restore, restored_instance):
+        # Resume the VM
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+        target_platform = 'vmware' 
+        if 'pickle' in restore:
+            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
+            if options and 'type' in options:
+                target_platform = options['type'] 
+
+        if target_platform == 'openstack':
+            return vmtasks_openstack.poweron_vm(cntx, instance, restore, restored_instance)
+        else:
+            return vmtasks_vcloud.poweron_vm(cntx, instance, restore, restored_instance)
+
+    @autolog.log_method(Logger, 'PowerOnVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        cntx = amqp.RpcContext.from_dict(kwargs['context'])
+        db = WorkloadMgrDB().db
+        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+               
              
 class PostRestore(task.Task):
 
@@ -882,7 +913,9 @@ def UnorderedPreRestore(instances):
 def UnorderedRestoreVMs(instances):
     flow = uf.Flow("restorevmuf")
     for index,item in enumerate(instances):
-        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index))))
+        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], 
+                           rebind=dict(instance = "instance_" + str(index)),
+                           provides='restored_instance_' + str(index)))
     
     return flow
 
@@ -892,9 +925,17 @@ def UnorderedRestoreVMs(instances):
 def LinearRestoreVMs(instances):
     flow = lf.Flow("restorevmlf")
     for index,item in enumerate(instances):
-        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], rebind=dict(instance = "instance_" + str(index)),
-                            provides='restored_instance_' + str(index)))
+        flow.add(RestoreVM("RestoreVM_" + item['vm_id'], 
+                           rebind=dict(instance = "instance_" + str(index)),
+                           provides='restored_instance_' + str(index)))
     
+    return flow
+
+def LinearPowerOnVMs(instances):
+    flow = lf.Flow("poweronvmlf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(restored_instance = "restored_instance_" + str(index), instance = "instance_" + str(index))
+        flow.add(PowerOnVM("PowerOnVM_" + item['vm_id'], rebind=rebind_dict))
     return flow
 
 def UnorderedPostRestore(instances):

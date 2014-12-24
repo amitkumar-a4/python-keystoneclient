@@ -808,7 +808,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
                                   restored_compute_flavor,
                                   restored_nics,
                                   instance_options)
-    
+
+@autolog.log_method(Logger, 'vmtasks_openstack.poweron_vm')
+def poweron_vm(cntx, instance, restore, restored_instance):
+    pass
+
 @autolog.log_method(Logger, 'vmtasks_openstack.post_restore_vm')
 def post_restore_vm(cntx, db, instance, restore):
     # post processing of restore

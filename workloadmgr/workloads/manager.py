@@ -411,25 +411,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             
             if restore_type == 'test':
-                self.db.restore_update( context, 
-                            restore_id, 
-                            {'host': self.host,
-                             'target_platform': target_platform,
-                             'progress_percent': 0, 
-                             'progress_msg': 'Create testbubble from snapshot is starting',
-                             'status': 'starting'
-                            })  
+                restore = self.db.restore_update(   context, 
+                                                    restore_id, 
+                                                    {'host': self.host,
+                                                     'target_platform': target_platform,
+                                                     'progress_percent': 0, 
+                                                     'progress_msg': 'Create testbubble from snapshot is starting',
+                                                     'status': 'starting'
+                                                    })  
             else:
-                self.db.restore_update( context, 
-                            restore_id, 
-                            {'host': self.host,
-                             'target_platform': target_platform,
-                             'progress_percent': 0, 
-                             'progress_msg': 'Restore from snapshot is starting',
-                             'status': 'starting'
-                            })
+                restore = self.db.restore_update(   context, 
+                                                    restore_id, 
+                                                    {'host': self.host,
+                                                     'target_platform': target_platform,
+                                                     'progress_percent': 0, 
+                                                     'progress_msg': 'Restore from snapshot is starting',
+                                                     'status': 'starting'
+                                                    })
             
-            self.db.restore_update(context, restore.id, {'status': 'executing'})
+            restore = self.db.restore_update(context, restore.id, {'status': 'executing'})
           
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':                     
@@ -437,10 +437,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 if target_platform == 'openstack':
                     restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
-                    self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
+                    restore = self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
                 else:
                     restore_size = vmtasks_vcloud.get_restore_data_size( context, self.db, dict(restore.iteritems()))
-                    self.db.restore_update( context, restore_id, {'size': (restore_size)})
+                    restore = self.db.restore_update( context, restore_id, {'size': (restore_size)})
                     
                 
             context_dict = dict([('%s' % key, value)
