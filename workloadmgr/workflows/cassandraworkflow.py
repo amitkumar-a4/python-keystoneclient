@@ -608,16 +608,17 @@ class CassandraRestoreNode(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         process, mountpath = vmtasks_vcloud.mount_instance_root_device(cntx, instance, restore)
         try:
-            update_cassandra_yaml(mountpath, restore_options['NewClusterName'], restore_options['IPAddresses'])
-            update_cassandra_topology_yaml(mountpath, ipaddress, restore_options['Broadcast'])
-            update_cassandra_topology_properties(mountpath, restore_options['IPAddresses'])
+            update_cassandra_yaml(mountpath, restore_options['NewClusterName'],
+                                  restore_options['IPAddresses'])
+            update_cassandra_topology_yaml(mountpath, ipaddress,
+                                           restore_options['Broadcast'])
+            update_cassandra_topology_properties(mountpath,
+                                  restore_options['IPAddresses'])
             update_cassandra_env_sh(mountpath, hostname)
             update_hostname(mountpath, hostname)
 
             update_hostsfile(mountpath, restore_options['Nodenames'],
                              restore_options['IPAddresses'])
-
-            #TODO modify cassandra-topology.properties
 
             update_network_interfaces(mountpath, "eth0", ipaddress,
                                       restore_options['Netmask'], restore_options['Network'],
@@ -633,10 +634,10 @@ class CassandraRestoreNode(task.Task):
         
 def LinearCassandraRestoreNodes(workflow):
     flow = lf.Flow("cassandrarestoreuf")
-    for index,item in enumerate(workflow._store['instances']):
+    for index, item in enumerate(workflow._store['instances']):
         rebind_dict = dict(instance = "restored_instance_" + str(index),\
-                           ipaddress = "ipaddress_"+str(index),\
-                           hostname = "hostname_"+str(index))
+                           ipaddress = "ipaddress_"+str(item['vm_name']),\
+                           hostname = "hostname_"+str(item['vm_name']))
         flow.add(CassandraRestoreNode("CassandraRestoreNode_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
@@ -648,22 +649,31 @@ class CassandraRestore(restoreworkflow.RestoreWorkflow):
 
         options = pickle.loads(self._store['restore']['pickle'].encode('ascii', 'ignore'))
         restore_options = options['restore_options']
+        import pdb;pdb.set_trace()
         self._store['restore_options'] = restore_options
 
-        for index, item in enumerate(restore_options['IPAddresses'].split(",")):
-            self._store['ipaddress_' + str(index)] = item
+        addresses = []
+        for vmname, item in restore_options['IPAddress'].iteritems():
+            self._store['ipaddress_' + str(vmname)] = item
+            addresses.append(item)
 
-        if 'Nodenames' in restore_options:
-            for index, item in enumerate(restore_options['Nodenames'].split(",")):
-                self._store['hostname_'+str(index)] = item
+        self._store['restore_options']['IPAddresses'] = ",".join(addresses)
+
+        restore_options['Nodenames'] = None
+        hostnames = []
+        if 'Nodename' in restore_options:
+            for vmname, hostname in restore_options['Nodename'].iteritems():
+                if hostname == "":
+                    self._store['hostname_'+str(vmname)] = vmname+"_restored"
+                else:
+                    self._store['hostname_'+str(vmname)] = hostname
+                hostnames.append(self._store['hostname_'+str(vmname)])
         else:
-            restore_options['Nodenames'] = None
-            hostnames = []
             for index, item in enumerate(self._store['instances']):
                 self._store['hostname_'+str(index)] = item['vm_name'] + "_restored"
                 hostnames.append(item['vm_name'] + "_restored")
 
-            restore_options['Nodenames'] = ",".join(hostnames)
+        self._store['restore_options']['Nodenames'] = ",".join(hostnames)
 
         # unordered post restore 
         self._flow.add(LinearCassandraRestoreNodes(self))
