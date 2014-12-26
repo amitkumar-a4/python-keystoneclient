@@ -1185,7 +1185,6 @@ class VMwareVCDriver(VMwareESXDriver):
             except exception.SnapshotVMResourcesNotFound as ex:
                 LOG.exception(ex)
             
-                        
         try:
             db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
             affected_snapshots = []             
@@ -1625,17 +1624,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                   'status': 'available'}
             restored_vm = db.restored_vm_create(cntx,restored_vm_values)
             
-            if 'power' in instance_options and \
-               instance_options['power'] and \
-               'state' in instance_options['power'] and \
-               instance_options['power']['state'] and \
-               instance_options['power']['state'] =='on':
-                db.restore_update(cntx,restore_obj.id, {'progress_msg': 'Powering on VM ' + instance['vm_name'],'status': 'executing'})        
-                self.power_on(vm_ref, instance)
-            
-            
-            
-            LOG.debug(_("Restore Completed"))
+            LOG.debug(_("RestoreVM Completed"))
              
             #TODO(giri): Execuete the following in a finally block
             for snapshot_vm_resource in snapshot_vm_resources:
@@ -1657,6 +1646,21 @@ class VMwareVCDriver(VMwareESXDriver):
         except Exception as ex:
             LOG.exception(ex)
             raise
+
+    def poweron_vm(self, cntx, instance, restore, restored_instance): 
+        db = WorkloadMgrDB().db
+        restore_obj = db.restore_get(cntx, restore['id'])
+        restore_options = pickle.loads(str(restore_obj.pickle))
+        instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'], 'vmware')
+        vm_ref = vm_util.get_vm_ref_from_vmware_uuid(self._session, restored_instance['uuid'])
+        
+        if 'power' in instance_options and \
+           instance_options['power'] and \
+           'state' in instance_options['power'] and \
+           instance_options['power']['state'] and \
+           instance_options['power']['state'] =='on':
+            db.restore_update(cntx,restore_obj.id, {'progress_msg': 'Powering on VM ' + restored_instance['vm_name'],'status': 'executing'})        
+            self.power_on(vm_ref, instance)
 
     def mount_instance_root_device(self, cntx, instance, restore): 
         vm_ref = vm_util.get_vm_ref_from_vmware_uuid(self._session, instance['uuid'])
@@ -1707,7 +1711,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 except Empty:
                     continue 
                 except Exception as ex:
-                     LOG.exception(ex)
+                    LOG.exception(ex)
                 if output.startswith("The root partition is mounted at"):
                     mountpath = output[len("The root partition is mounted at"):].strip()
                     break
@@ -1720,7 +1724,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 LOG.debug(_('Result was %s') % _returncode)
                 raise exception.ProcessExecutionError(
                                     exit_code=_returncode,
-                                    stdout=output,
                                     stderr=process.stderr.read(),
                                     cmd=cmd)
         process.stdin.close()
@@ -1736,7 +1739,6 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.debug(_('Result was %s') % _returncode)
             raise exception.ProcessExecutionError(
                                     exit_code=_returncode,
-                                    stdout=output,
                                     stderr=process.stderr.read())
 
 class VMwareAPISession(object):

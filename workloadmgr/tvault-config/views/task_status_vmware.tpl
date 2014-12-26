@@ -196,46 +196,46 @@ function taskfunction()
 		                    }
 		                    // Call start_service
 		                    loadXMLDoc("start_service",function() {
-		   	   	               document.getElementById("start_service").children[0].classList.add("glyphicon-refresh");
-		      	               if (xmlhttp.readyState != 4) return;
-		      	               document.getElementById("start_service").children[0].classList.remove("glyphicon-refresh");
-		                       if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		                       {
-		                          document.getElementById("start_service").classList.add("list-group-item-success");
-		                          document.getElementById("start_service").children[0].classList.add("glyphicon-ok");
-		                       }
-		                       else
-		                       {
-								  $("#error_message").html(xmlhttp.responseText);
-								  $("#alert").show();		                       
-		                          document.getElementById("start_service").classList.add("list-group-item-danger");
-		                          document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
-		                          document.getElementById("final_status").classList.add("list-group-item-danger");
-		                          //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                          return;
-		                       }
-		                       loadXMLDoc("register_workloadtypes",function() {
-		   	   	                  document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
-		      	                  if (xmlhttp.readyState != 4) return;
-		      	                  document.getElementById("register_workloadtypes").children[0].classList.remove("glyphicon-refresh");
-		                          if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		                          {
-		                             document.getElementById("register_workloadtypes").classList.add("list-group-item-success");
-		                             document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-ok");
-		                          }
-		                          else
-		                          {
-			 						 $("#error_message").html(xmlhttp.responseText);
-			 						 $("#alert").show();		                          
-		                             document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
-		                             document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
-		                             document.getElementById("final_status").classList.add("list-group-item-danger");
-		                             //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                             return;
-		                          }
-		                          document.getElementById("final_status").classList.add("list-group-item-success");
-		                          //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-		                          document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
+								document.getElementById("start_service").children[0].classList.add("glyphicon-refresh");
+								if (xmlhttp.readyState != 4) return;
+								document.getElementById("start_service").children[0].classList.remove("glyphicon-refresh");
+								if (xmlhttp.readyState==4 && xmlhttp.status==200)
+								{
+									document.getElementById("start_service").classList.add("list-group-item-success");
+									document.getElementById("start_service").children[0].classList.add("glyphicon-ok");
+								}
+								else
+								{
+									$("#error_message").html(xmlhttp.responseText);
+									$("#alert").show();		                       
+									document.getElementById("start_service").classList.add("list-group-item-danger");
+									document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
+									document.getElementById("final_status").classList.add("list-group-item-danger");
+									//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+									return;
+								}
+		                       	loadXMLDoc("register_workloadtypes",function() {
+								document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
+								if (xmlhttp.readyState != 4) return;
+								document.getElementById("register_workloadtypes").children[0].classList.remove("glyphicon-refresh");
+								if (xmlhttp.readyState==4 && xmlhttp.status==200)
+								{
+									document.getElementById("register_workloadtypes").classList.add("list-group-item-success");
+									document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-ok");
+								}
+								else
+								{
+									$("#error_message").html(xmlhttp.responseText);
+									$("#alert").show();		                          
+									document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
+									document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
+									document.getElementById("final_status").classList.add("list-group-item-danger");
+									//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+									return;
+								}
+		                        document.getElementById("final_status").classList.add("list-group-item-success");
+		                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+		                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
 		                       });
 		                    });
 		                 });

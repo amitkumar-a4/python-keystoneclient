@@ -66,7 +66,7 @@ class Workflow(object):
         self._snapshotvms = None
         self._postsnapshot = None
 
-    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None, applyretentionpolicy = None):
+    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None):
 
         if snapshotvms is None:
             raise exception.UndefinedSnapshotVMsWorkflow("snapshotvms is None")

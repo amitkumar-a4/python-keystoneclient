@@ -381,6 +381,7 @@ def upgrade(migrate_engine):
         Column('warning_msg', String(length=4096)),
         Column('error_msg', String(length=4096)),
         Column('host', String(length=255)),        
+        Column('target_platform', String(length=255)),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )

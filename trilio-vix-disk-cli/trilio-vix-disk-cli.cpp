@@ -2596,7 +2596,7 @@ DoMount()
        CHECK_AND_THROW(err);
 
        printf("The root partition is mounted at %s\n", volumeInfo->symbolicLink);
-
+ 
        VixMntapi_FreeVolumeInfo(volumeInfo);
        printf("Pausing the process until it is resumed\n");
        std::cout.flush();
@@ -2605,6 +2605,8 @@ DoMount()
 
        err = VixMntapi_DismountVolume(volumeHandle, false);
        CHECK_AND_THROW(err);
+       
+       break;
    }
    VixMntapi_FreeVolumeHandles(volumeHandles);
 }

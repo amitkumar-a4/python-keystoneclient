@@ -553,14 +553,14 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                                 newethfile.write("\n".join(stanza))
                                 newethfile.write("\n")
                                 for l in ethfile:
-                                     skip = False
-                                     for pat in ["auto", "iface", "address", 
+                                    skip = False
+                                    for pat in ["auto", "iface", "address", 
                                                  "netmask", "network", "broadcast", "gateway"]:
-                                         if l.lstrip().startswith(pat):
-                                             skip = True
-                                             break
-                                     if not skip:
-                                         newethfile.write(l)
+                                        if l.lstrip().startswith(pat):
+                                            skip = True
+                                            break
+                                    if not skip:
+                                        newethfile.write(l)
                         break
                     newinf.write(line)
                     line = f.readline()
@@ -645,8 +645,6 @@ def LinearCassandraRestoreNodes(workflow):
 class CassandraRestore(restoreworkflow.RestoreWorkflow):
 
     def initflow(self):
-        super(CassandraRestore, self).initflow()
-
         options = pickle.loads(self._store['restore']['pickle'].encode('ascii', 'ignore'))
         restore_options = options['restore_options']
         import pdb;pdb.set_trace()
@@ -675,8 +673,18 @@ class CassandraRestore(restoreworkflow.RestoreWorkflow):
 
         self._store['restore_options']['Nodenames'] = ",".join(hostnames)
 
-        # unordered post restore 
-        self._flow.add(LinearCassandraRestoreNodes(self))
+        super(CassandraRestore, self).initflow(pre_poweron=LinearCassandraRestoreNodes(self))
+
+    def execute(self):
+        result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
+        restore = pickle.loads(self._store['restore']['pickle'].encode('ascii','ignore'))
+        if 'type' in restore and restore['type'] == "vmware":
+            compute_service = nova.API(production=True)
+            search_opts = {}
+            search_opts['deep_discover'] = '1'
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+            compute_service.get_servers(cntx, search_opts=search_opts)
+        
 
 '''
 #test code
