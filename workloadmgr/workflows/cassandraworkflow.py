@@ -514,13 +514,12 @@ def update_hostsfile(mountpath, hostnames, ipaddresses):
             f.write(ips[index] + "    " + item + "\n")
 
 def create_interface_stanza(interface, address, netmask,
-                            network, broadcast, gateway):
+                            broadcast, gateway):
     stanza = []
     stanza.append("auto " + interface)
     stanza.append("    iface " + interface + " inet static")
     stanza.append("    address " + address)
     stanza.append("    netmask " + netmask)
-    stanza.append("    network " + network)
     stanza.append("    broadcast " + broadcast)
     stanza.append("    gateway " + gateway)
     stanza.append("    up ip link set $IFACE promisc on")
@@ -528,7 +527,7 @@ def create_interface_stanza(interface, address, netmask,
     return stanza
 
 def update_network_interfaces(mountpath, interface, address, netmask,
-                              network, broadcast, gateway):
+                              broadcast, gateway):
     # modify network interfaces 
     # this could be specific to each linux distribution.
     # we are doing it for ubuntu now
@@ -548,8 +547,8 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                         with open(filename + ".bak", 'r') as ethfile:
                             with open(filename, 'w') as newethfile:
                                 stanza = create_interface_stanza(interface, address,
-                                                                 netmask, network,
-                                                                 broadcast, gateway)
+                                                                 netmask, broadcast,
+                                                                 gateway)
                                 newethfile.write("\n".join(stanza))
                                 newethfile.write("\n")
                                 for l in ethfile:
@@ -621,8 +620,9 @@ class CassandraRestoreNode(task.Task):
                              restore_options['IPAddresses'])
 
             update_network_interfaces(mountpath, "eth0", ipaddress,
-                                      restore_options['Netmask'], restore_options['Network'],
-                                      restore_options['Broadcast'], restore_options['Gateway'])
+                                      restore_options['Netmask'],
+                                      restore_options['Broadcast'],
+                                      restore_options['Gateway'])
         finally:
             vmtasks_vcloud.umount_instance_root_device(process)
 
