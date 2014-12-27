@@ -574,7 +574,7 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                             line = f.readline()
                     else:
                         stanza = create_interface_stanza(interface, address, netmask,
-                                                         network, broadcast, gateway)
+                                                         broadcast, gateway)
                         newinf.write("\n".join(stanza))
                         newinf.write("\n")
                         while not line.strip().startswith("auto"):
