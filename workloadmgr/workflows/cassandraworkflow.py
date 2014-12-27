@@ -647,7 +647,6 @@ class CassandraRestore(restoreworkflow.RestoreWorkflow):
     def initflow(self):
         options = pickle.loads(self._store['restore']['pickle'].encode('ascii', 'ignore'))
         restore_options = options['restore_options']
-        import pdb;pdb.set_trace()
         self._store['restore_options'] = restore_options
 
         addresses = []
