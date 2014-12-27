@@ -646,33 +646,36 @@ class CassandraRestore(restoreworkflow.RestoreWorkflow):
 
     def initflow(self):
         options = pickle.loads(self._store['restore']['pickle'].encode('ascii', 'ignore'))
-        restore_options = options['restore_options']
-        self._store['restore_options'] = restore_options
+        if 'restore_options' in options and options['restore_options'] != {}:
+            restore_options = options['restore_options']
+            self._store['restore_options'] = restore_options
 
-        addresses = []
-        for vmname, item in restore_options['IPAddress'].iteritems():
-            self._store['ipaddress_' + str(vmname)] = item
-            addresses.append(item)
+            addresses = []
+            for vmname, item in restore_options['IPAddress'].iteritems():
+                self._store['ipaddress_' + str(vmname)] = item
+                addresses.append(item)
 
-        self._store['restore_options']['IPAddresses'] = ",".join(addresses)
+            self._store['restore_options']['IPAddresses'] = ",".join(addresses)
 
-        restore_options['Nodenames'] = None
-        hostnames = []
-        if 'Nodename' in restore_options:
-            for vmname, hostname in restore_options['Nodename'].iteritems():
-                if hostname == "":
-                    self._store['hostname_'+str(vmname)] = vmname+"_restored"
-                else:
-                    self._store['hostname_'+str(vmname)] = hostname
-                hostnames.append(self._store['hostname_'+str(vmname)])
+            restore_options['Nodenames'] = None
+            hostnames = []
+            if 'Nodename' in restore_options:
+                for vmname, hostname in restore_options['Nodename'].iteritems():
+                    if hostname == "":
+                        self._store['hostname_'+str(vmname)] = vmname+"_restored"
+                    else:
+                        self._store['hostname_'+str(vmname)] = hostname
+                    hostnames.append(self._store['hostname_'+str(vmname)])
+            else:
+                for index, item in enumerate(self._store['instances']):
+                    self._store['hostname_'+str(index)] = item['vm_name'] + "_restored"
+                    hostnames.append(item['vm_name'] + "_restored")
+    
+            self._store['restore_options']['Nodenames'] = ",".join(hostnames)
+
+            super(CassandraRestore, self).initflow(pre_poweron=LinearCassandraRestoreNodes(self))
         else:
-            for index, item in enumerate(self._store['instances']):
-                self._store['hostname_'+str(index)] = item['vm_name'] + "_restored"
-                hostnames.append(item['vm_name'] + "_restored")
-
-        self._store['restore_options']['Nodenames'] = ",".join(hostnames)
-
-        super(CassandraRestore, self).initflow(pre_poweron=LinearCassandraRestoreNodes(self))
+            super(CassandraRestore, self).initflow(pre_poweron=lf.Flow("cassandrarestoreuf"))
 
     def execute(self):
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
