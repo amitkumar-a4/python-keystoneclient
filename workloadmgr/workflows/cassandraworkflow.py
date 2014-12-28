@@ -128,7 +128,7 @@ def getcassandranodes(connection):
         if len(desc) == 0:
             continue
 
-        if not desc[0] in ("UN", "UL", "UJ", "UM", "DN", "DL", "DJ", "DM"):
+        if not desc[0] in ("UN", "UL", "UJ", "UM"):
             continue
 
         node = {}
