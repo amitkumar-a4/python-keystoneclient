@@ -128,7 +128,7 @@ def getcassandranodes(connection):
         if len(desc) == 0:
             continue
 
-        if not desc[0] in ("UN", "UL", "UJ", "UM", "DN", "DL", "DJ", "DM"):
+        if not desc[0] in ("UN", "UL", "UJ", "UM"):
             continue
 
         node = {}
@@ -574,7 +574,7 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                             line = f.readline()
                     else:
                         stanza = create_interface_stanza(interface, address, netmask,
-                                                         network, broadcast, gateway)
+                                                         broadcast, gateway)
                         newinf.write("\n".join(stanza))
                         newinf.write("\n")
                         while not line.strip().startswith("auto"):
