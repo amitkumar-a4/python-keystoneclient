@@ -727,8 +727,10 @@ class API(base.Base):
         rv = self.db.restore_get(context, restore_id)
         restore_details  = dict(rv.iteritems())
         
-        snapshot = self.db.snapshot_get(context, rv.snapshot_id)
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes")
         restore_details.setdefault('workload_id', snapshot.workload_id)
+
+        restore_details['snapshot_details'] = dict(snapshot.iteritems())
                 
         instances = []
         try:
@@ -744,8 +746,10 @@ class API(base.Base):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())
         
-        snapshot = self.db.snapshot_get(context, rv.snapshot_id)
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes")
         restore_details.setdefault('workload_id', snapshot.workload_id)
+
+        restore_details['snapshot_details'] = dict(snapshot.iteritems())
         
         instances = []
         try:

@@ -68,6 +68,9 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
+
+        if 'snapshot_details' in restore:
+            d['snapshot_details'] = restore['snapshot_details']
         if 'workload_id' in restore:
             d['workload_id'] = restore['workload_id']
         if 'instances' in restore:
@@ -78,6 +81,7 @@ class ViewBuilder(common.ViewBuilder):
             d['subnets'] = restore['subnets']
         if 'routers' in restore:
             d['routers'] = restore['routers']  
+
         d['links'] = self._get_links(request, restore['id'])
         d['name'] = restore['display_name']
         d['description'] =  restore['display_description']
