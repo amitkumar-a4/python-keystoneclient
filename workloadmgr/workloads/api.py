@@ -38,6 +38,8 @@ from workloadmgr import context
 from workloadmgr.workflows import vmtasks
 from workloadmgr.vault import vault
 
+from workloadmgr.db.sqlalchemy import models
+
 workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
@@ -463,7 +465,7 @@ class API(base.Base):
             import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
             import_workload_method = getattr(import_workload_module, 'import_workload')
             try:
-                workload = import_workload_method(context, workload_url, workload_values['version'])
+                workload = import_workload_method(context, workload_url, models.DB_VERSION)
                 workloads.append(workload)
             except Exception as ex:
                 LOG.exception(ex)

@@ -1572,6 +1572,70 @@ def getPropertyMap(ovfEnv):
         propertyMap[key] = value
     dom.unlink()
     return propertyMap    
+
+def set_network_interfaces(propertyMap):
+    
+    ip1          = propertyMap["ip1"]
+    netmask1     = propertyMap["netmask1"]
+    gateway1     = propertyMap["gateway1"]
+    ip2          = propertyMap.get('ip2', '192.168.3.100')
+    netmask2     = propertyMap.get('netmask12', '255.255.255.0')
+                
+    fh, abs_path = mkstemp()
+    new_file = open(abs_path,'w')
+    new_file.write('# This file describes the network interfaces available on your system\n')
+    new_file.write('# and how to activate them. For more information, see interfaces(5).\n')
+    new_file.write('\n')
+    new_file.write('# The loopback network interface\n')
+    new_file.write('auto lo\n')
+    new_file.write('iface lo inet loopback\n')
+    new_file.write('\n')
+    new_file.write('# The primary network interface\n')
+    new_file.write('# Management Interface\n')
+    new_file.write('auto eth0\n')
+    new_file.write('        iface eth0 inet manual\n')
+    new_file.write('        up ifconfig $IFACE 0.0.0.0 up\n')
+    new_file.write('        up ip link set $IFACE promisc on\n')
+    new_file.write('        down ip link set $IFACE promisc off\n')
+    new_file.write('        down ifconfig $IFACE down\n')
+    new_file.write('\n')
+    new_file.write('auto br-eth0\n')
+    new_file.write('        iface br-eth0 inet static\n')
+    new_file.write('        address ' + ip1 + '\n')
+    new_file.write('        netmask ' + netmask1 + '\n')
+    new_file.write('        gateway ' + gateway1 + '\n')
+    new_file.write('        up ip link set $IFACE promisc on\n')
+    new_file.write('        down ip link set $IFACE promisc off\n')
+    new_file.write('\n')
+    new_file.write('# Additional Interface for application access\n')
+    new_file.write('auto eth1\n')
+    new_file.write('        iface eth1 inet static\n')
+    new_file.write('        address ' + ip2 + '\n')
+    new_file.write('        netmask ' + netmask2 + '\n')
+    new_file.write('        up ip link set $IFACE promisc on\n')
+    new_file.write('        down ip link set $IFACE promisc off\n')
+
+    #close temp file
+    new_file.close()
+    close(fh)
+        
+    #Move new file
+    command = ['sudo', 'mv', abs_path, "/etc/network/interfaces"];
+    subprocess.call(command, shell=False)
+    os.chmod('/etc/hostname', 0644)
+    command = ['sudo', 'chown', 'root:root', "/etc/network/interfaces"];
+    subprocess.call(command, shell=False)
+
+    command = ['sudo', 'ifdown', 'br-eth0']
+    subprocess.call(command, shell=False)
+    command = ['sudo', 'ifup', 'br-eth0']
+    subprocess.call(command, shell=False)  
+    
+    command = ['sudo', 'ifdown', 'eth1']
+    subprocess.call(command, shell=False)
+    command = ['sudo', 'ifup', 'eth1']
+    subprocess.call(command, shell=False)            
+
 # #  Web application main  # #
 
 def main():
@@ -1579,15 +1643,10 @@ def main():
     try:
         ovfEnv = subprocess.Popen("echo `vmtoolsd --cmd \"info-get guestinfo.ovfenv\"`", shell=True, stdout=subprocess.PIPE).stdout.read()
         propertyMap = getPropertyMap(ovfEnv)
-         
-        ip          = propertyMap["ip"]
-        netmask     = propertyMap["netmask"]
-        gateway     = propertyMap["gateway"]
-        hostname    = propertyMap["hostname"]
         
-        replace_line('/etc/network/interfaces', 'address ', '\taddress ' + ip)
-        replace_line('/etc/network/interfaces', 'netmask ', '\tnetmask ' + netmask)
-        replace_line('/etc/network/interfaces', 'gateway ', '\tgateway ' + gateway)
+        ip1 = propertyMap["ip1"]
+        ip2 = propertyMap.get('ip2', '192.168.3.100')
+        hostname    = propertyMap["hostname"]
         
         #adjust hostname       
         fh, abs_path = mkstemp()
@@ -1611,7 +1670,9 @@ def main():
         new_file = open(abs_path,'w')
         new_file.write('127.0.0.1 localhost\n')
         new_file.write('127.0.0.1 ' + hostname + '\n')
-        new_file.write(ip + ' ' + hostname + '\n')
+        new_file.write(ip1 + ' ' + hostname + '\n')
+        new_file.write(ip2 + ' ' + hostname + '\n')
+        
         #close temp file
         new_file.close()
         close(fh)
@@ -1622,11 +1683,8 @@ def main():
         command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
         subprocess.call(command, shell=False)
         
-        command = ['sudo', 'ifdown', 'br-eth0']
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'ifup', 'br-eth0']
-        subprocess.call(command, shell=False)                 
-               
+        set_network_interfaces(propertyMap)
+        
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
                 

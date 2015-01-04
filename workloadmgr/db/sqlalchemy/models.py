@@ -23,6 +23,8 @@ from workloadmgr.openstack.common import timeutils
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
+DB_VERSION = '1.0.16'
+
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
@@ -32,7 +34,7 @@ class WorkloadsBase(object):
     updated_at = Column(DateTime, onupdate=timeutils.utcnow)
     deleted_at = Column(DateTime)
     deleted = Column(Boolean, default=False)
-    version = Column(String(255), default='1.0.15')
+    version = Column(String(255), default=DB_VERSION)
     metadata = None
 
     def save(self, session=None):
