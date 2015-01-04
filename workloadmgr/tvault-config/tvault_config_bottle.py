@@ -1579,7 +1579,7 @@ def set_network_interfaces(propertyMap):
     netmask1     = propertyMap["netmask1"]
     gateway1     = propertyMap["gateway1"]
     ip2          = propertyMap.get('ip2', '192.168.3.100')
-    netmask2     = propertyMap.get('netmask12', '255.255.255.0')
+    netmask2     = propertyMap.get('netmask2', '255.255.255.0')
                 
     fh, abs_path = mkstemp()
     new_file = open(abs_path,'w')
