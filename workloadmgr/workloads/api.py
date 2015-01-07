@@ -209,6 +209,11 @@ class API(base.Base):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
         
+        workload_dict['storage_usage'] = 0
+        for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
+            if workload_snapshot.data_deleted == False:
+                workload_dict['storage_usage'] = workload_dict['storage_usage'] + workload_snapshot.size
+        
         workload_vms = []
         for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
             workload_vm = {'id': workload_vm_obj.vm_id, 'name':workload_vm_obj.vm_name}
@@ -241,6 +246,11 @@ class API(base.Base):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
 
+        workload_dict['storage_usage'] = 0
+        for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
+            if workload_snapshot.data_deleted == False:
+                workload_dict['storage_usage'] = workload_dict['storage_usage'] + workload_snapshot.size
+                
         workload_vms = []
         for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
             workload_vm = {'id': workload_vm_obj.vm_id, 'name':workload_vm_obj.vm_name}
@@ -479,6 +489,17 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return dict(nodes=nodes)
+    
+    def get_storage_usage(self, context):
+        storage_usage = 0
+        try:
+            for workload in self.db.workload_get_all(context):
+                for workload_snapshot in self.db.snapshot_get_all(context, workload.id, read_deleted='yes'):
+                    if workload_snapshot.data_deleted == False:
+                        storage_usage = storage_usage + workload_snapshot.size
+        except Exception as ex:
+            LOG.exception(ex)
+        return storage_usage
     
 
     def workload_get_workflow(self, context, workload_id):

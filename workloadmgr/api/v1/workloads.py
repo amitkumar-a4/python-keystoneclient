@@ -339,7 +339,18 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as ex:
             LOG.exception(ex)
         return nodes
-        
+    
+    def get_storage_usage(self, req):
+        LOG.debug(_('get_storage_usage called'))
+        context = req.environ['workloadmgr.context']
+
+        LOG.audit(_('get_storage_usage'), context=context)
+        storage_usage = 0
+        try:
+            storage_usage = self.workload_api.get_storage_usage(context)
+        except Exception as ex:
+            LOG.exception(ex)
+        return str(storage_usage)        
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
