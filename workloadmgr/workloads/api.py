@@ -209,15 +209,19 @@ class API(base.Base):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
         
-        workload_dict['storage_usage'] = {'total': 0, 'full': 0, 'incremental': 0}
+        workload_dict['storage_usage'] = {'usage': 0, 
+                                          'full': {'snap_count': 0, 'usage': 0}, 
+                                          'incremental': {'snap_count': 0, 'usage': 0}
+                                          }
         for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
-                    workload_dict['storage_usage']['incremental'] = workload_dict['storage_usage']['incremental'] + workload_snapshot.size
+                    workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
+                    workload_dict['storage_usage']['incremental']['usage'] = workload_dict['storage_usage']['incremental']['usage'] + workload_snapshot.size
                 else:
-                    workload_dict['storage_usage']['full'] = workload_dict['storage_usage']['full'] + workload_snapshot.size
-        workload_dict['storage_usage']['total'] =  workload_dict['storage_usage']['full'] + workload_dict['storage_usage']['incremental']
-                    
+                    workload_dict['storage_usage']['full']['snap_count'] = workload_dict['storage_usage']['full']['snap_count'] + 1
+                    workload_dict['storage_usage']['full']['usage'] = workload_dict['storage_usage']['full']['usage'] + workload_snapshot.size
+        workload_dict['storage_usage']['usage'] =  workload_dict['storage_usage']['full']['usage'] + workload_dict['storage_usage']['incremental']['usage']
         
         workload_vms = []
         for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
@@ -251,14 +255,19 @@ class API(base.Base):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
 
-        workload_dict['storage_usage'] = {'total': 0, 'full': 0, 'incremental': 0}
+        workload_dict['storage_usage'] = {'usage': 0, 
+                                          'full': {'snap_count': 0, 'usage': 0}, 
+                                          'incremental': {'snap_count': 0, 'usage': 0}
+                                          }
         for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
-                    workload_dict['storage_usage']['incremental'] = workload_dict['storage_usage']['incremental'] + workload_snapshot.size
+                    workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
+                    workload_dict['storage_usage']['incremental']['usage'] = workload_dict['storage_usage']['incremental']['usage'] + workload_snapshot.size
                 else:
-                    workload_dict['storage_usage']['full'] = workload_dict['storage_usage']['full'] + workload_snapshot.size
-        workload_dict['storage_usage']['total'] =  workload_dict['storage_usage']['full'] + workload_dict['storage_usage']['incremental']
+                    workload_dict['storage_usage']['full']['snap_count'] = workload_dict['storage_usage']['full']['snap_count'] + 1
+                    workload_dict['storage_usage']['full']['usage'] = workload_dict['storage_usage']['full']['usage'] + workload_snapshot.size
+        workload_dict['storage_usage']['usage'] =  workload_dict['storage_usage']['full']['usage'] + workload_dict['storage_usage']['incremental']['usage']
                 
         workload_vms = []
         for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
@@ -510,7 +519,7 @@ class API(base.Base):
                         else:
                             storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
             storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
-                        
+            
         except Exception as ex:
             LOG.exception(ex)
         return storage_usage
