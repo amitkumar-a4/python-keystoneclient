@@ -345,12 +345,12 @@ class WorkloadMgrsController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         LOG.audit(_('get_storage_usage'), context=context)
-        storage_usage = 0
+        storage_usage = {'total': 0, 'full': 0, 'incremental': 0}
         try:
             storage_usage = self.workload_api.get_storage_usage(context)
         except Exception as ex:
             LOG.exception(ex)
-        return str(storage_usage)        
+        return storage_usage       
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
