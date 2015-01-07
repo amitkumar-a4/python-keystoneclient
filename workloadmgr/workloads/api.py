@@ -470,6 +470,16 @@ class API(base.Base):
             except Exception as ex:
                 LOG.exception(ex)
         return workloads
+    
+    def get_nodes(self, context):
+        nodes = []
+        try:
+            for node_record in self.db.service_get_all_by_topic(context, topic='workloadmgr-workloads'):
+                nodes.append({'node':node_record.host, 'version':node_record.version})
+        except Exception as ex:
+            LOG.exception(ex)
+        return dict(nodes=nodes)
+    
 
     def workload_get_workflow(self, context, workload_id):
         """

@@ -308,8 +308,8 @@ class WorkloadMgrsController(wsgi.Controller):
         retval = None
         try:
             instances = self.workload_api.workload_discover_instances(context, id)
-        except exception:
-            pass
+        except Exception as ex:
+            LOG.exception(ex)
  
         return instances                
 
@@ -327,6 +327,19 @@ class WorkloadMgrsController(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=unicode(error))
 
         return webob.Response(status_int=202)
+    
+    def get_nodes(self, req):
+        LOG.debug(_('get_nodes called'))
+        context = req.environ['workloadmgr.context']
+
+        LOG.audit(_('get_nodes'), context=context)
+        nodes = []
+        try:
+            nodes = self.workload_api.get_nodes(context)
+        except Exception as ex:
+            LOG.exception(ex)
+        return nodes
+        
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
