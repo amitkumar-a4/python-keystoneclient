@@ -278,11 +278,27 @@ class API(base.Base):
             workload_vm['metadata'] = metadata
             workload_vms.append(workload_vm)              
         workload_dict['instances'] = workload_vms
-
         
         metadata = {}
+        metadata_type = self.db.workload_type_get(context, workload.workload_type_id).metadata
         for kvpair in workload.metadata:
-            metadata.setdefault(kvpair['key'], kvpair['value'])
+            mtype = None
+            for mtype in metadata_type:
+                try: 
+                    if mtype['key'] == kvpair['key'] and json.loads(mtype.value)['type'] == 'password':
+                        break
+                except:
+                    pass
+
+            try:
+                if mtype['key'] == kvpair['key'] and json.loads(mtype.value)['type'] == 'password':
+                    metadata.setdefault(kvpair['key'], "**********")
+                else:
+                    metadata.setdefault(kvpair['key'], kvpair['value'])
+            except:
+                metadata.setdefault(kvpair['key'], kvpair['value'])
+                pass
+
         workload_dict['metadata'] = metadata
         
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
@@ -293,6 +309,7 @@ class API(base.Base):
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 workload_dict['jobschedule']['enabled'] = True
+                workload_dict['jobschedule']['nextrun'] = job.compute_next_run_time(datetime.now())
                 break
 
                 
