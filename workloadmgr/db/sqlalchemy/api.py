@@ -796,7 +796,8 @@ def snapshot_get(context, snapshot_id, **kwargs):
 def snapshot_get_all(context, workload_id=None, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    return model_query(context, models.Snapshots, **kwargs).all()
+    return model_query(context, models.Snapshots, **kwargs).\
+                        filter_by(workload_id=workload_id).all()
 
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
