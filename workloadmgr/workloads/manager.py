@@ -358,6 +358,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'metadata': {'hostnames': hostnames}, 
                                     })             
              
+            # Update vms
+            for inst in instances['instances']:
+                self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
+                                           {'metadata':{'root_partition_type':inst['root_partition_type']}})
+
             # Upload snapshot metadata to the vault
             vmtasks.UploadSnapshotDBEntry(context, snapshot_id)
 

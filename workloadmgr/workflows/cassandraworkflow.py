@@ -10,6 +10,7 @@ import glob
 import random
 import sys
 import time
+import re
 
 import datetime 
 import paramiko
@@ -52,6 +53,13 @@ sys.path.insert(0, top_dir)
 
 def InitFlow(store):
     pass
+
+def _exec_shell_command(connection, command):
+    stdin, stdout, stderr = connection.exec_command(command)
+    err_msg = stderr.read()
+    if err_msg != '':
+        raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
+    return stdin, stdout, stderr
 
 def _exec_command(connection, command):
     stdin, stdout, stderr = connection.exec_command("/usr/share/dse/bin/" + command)
@@ -196,6 +204,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
             ips[socket.gethostbyname(name['Address'])] = 1
 
     interfaces = {}
+    rootpartition_type = {}
     for ip in ips:
         try:
             client = paramiko.SSHClient()
@@ -208,6 +217,16 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                 client.connect(ip, port=int(port), username=username, password=password)
                 stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr')
                 interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
+
+                # find the type of the root partition
+                rootpartition_type[ip] = "Linux"
+                stdin, stdout, stderr = client.exec_command('df /')
+                m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
+                if m:
+                    mp= m.group(1)
+                    stdin, stdout, stderr = client.exec_command('lvdisplay ' + mp)
+                    if stderr.read() == '':
+                        rootpartition_type[ip] = "lvm"
             except:
                 pass
         finally:
@@ -242,6 +261,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                                               'vm_metadata' : instance.metadata,                                                
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
+                                              'root_partition_type' : rootpartition_type[interfaces[_if['OS-EXT-IPS-MAC:mac_addr']]],
                                               'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                               'hypervisor_hostname' : hypervisor_hostname,
                                               'hypervisor_type' :  hypervisor_type}, 
