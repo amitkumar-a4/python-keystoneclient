@@ -224,7 +224,7 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                 m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
                 if m:
                     mp= m.group(1)
-                    stdin, stdout, stderr = client.exec_command('lvdisplay ' + mp)
+                    stdin, stdout, stderr = client.exec_command('sudo lvdisplay ' + mp)
                     if stderr.read() == '':
                         rootpartition_type[ip] = "lvm"
             except:
