@@ -109,24 +109,24 @@ class APIRouter(workloadmgr.api.APIRouter):
         
         #get workloadmanager nodes
         mapper.connect("workloads_nodes",
-                       "/{project_id}/workloads/get_nodes",
+                       "/{project_id}/workloads/metrics/nodes",
                        controller=self.resources['workloads'],
                        action='get_nodes',
-                       conditions={"method": ['POST']})             
+                       conditions={"method": ['GET']})             
 
         #get total storage used
         mapper.connect("workloads_storage_usage",
-                       "/{project_id}/workloads/get_storage_usage",
+                       "/{project_id}/workloads/metrics/storage_usage",
                        controller=self.resources['workloads'],
                        action='get_storage_usage',
-                       conditions={"method": ['POST']})  
+                       conditions={"method": ['GET']})  
         
         #get recent activities
-        mapper.connect("workloads_get_recentactivities",
-                       "/{project_id}/workloads/get_recentactivities",
+        mapper.connect("workloads_recentactivities",
+                       "/{project_id}/workloads/metrics/recentactivities",
                        controller=self.resources['workloads'],
                        action='get_recentactivities',
-                       conditions={"method": ['POST']})          
+                       conditions={"method": ['GET']})          
         
         #get the specified workload
         mapper.connect("workloads_4",
