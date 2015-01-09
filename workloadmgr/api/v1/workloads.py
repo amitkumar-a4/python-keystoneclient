@@ -333,7 +333,7 @@ class WorkloadMgrsController(wsgi.Controller):
         context = req.environ['workloadmgr.context']
 
         LOG.audit(_('get_nodes'), context=context)
-        nodes = []
+        nodes = {'nodes':[]}
         try:
             nodes = self.workload_api.get_nodes(context)
         except Exception as ex:
@@ -350,7 +350,27 @@ class WorkloadMgrsController(wsgi.Controller):
             storage_usage = self.workload_api.get_storage_usage(context)
         except Exception as ex:
             LOG.exception(ex)
-        return storage_usage       
+        return storage_usage 
+    
+    def get_recentactivities(self, req):
+        LOG.debug(_('get_recentactivities called'))
+        context = req.environ['workloadmgr.context']
+
+        LOG.audit(_('get_recentactivities'), context=context)
+        
+        time_in_minutes = 600
+        if ('QUERY_STRING' in req.environ) :
+            qs=parse_qs(req.environ['QUERY_STRING'])
+            var = parse_qs(req.environ['QUERY_STRING'])
+            time_in_minutes = var.get('time_in_minutes',[''])[0]
+            time_in_minutes = int(escape(time_in_minutes))
+        
+        recentactivities = {'recentactivities':[]}
+        try:
+            recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
+        except Exception as ex:
+            LOG.exception(ex)
+        return recentactivities          
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

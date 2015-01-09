@@ -37,6 +37,7 @@ from workloadmgr.image import glance
 from workloadmgr import context
 from workloadmgr.workflows import vmtasks
 from workloadmgr.vault import vault
+from workloadmgr.openstack.common import timeutils
 
 from workloadmgr.db.sqlalchemy import models
 
@@ -540,7 +541,90 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return storage_usage
-    
+
+    def get_recentactivities(self, context, time_in_minutes):
+        recentactivites = []
+        now = timeutils.utcnow()
+        try:
+            for workload in self.db.workload_get_all(context, read_deleted='yes'):
+                if workload.deleted:
+                    if now - workload.deleted_at < timedelta(minutes=time_in_minutes):
+                        recentactivity = {'activity_type': 'delete',
+                                          'activity_time': workload.deleted_at,
+                                          'activity_result': workload.status,
+                                          'activity_description': '',
+                                          'object_type': 'workload',
+                                          'object_name': workload.display_name,
+                                          'object_id': workload.id,
+                                          }
+                        recentactivites.append(recentactivity)
+                        continue
+                elif now - workload.created_at < timedelta(minutes=time_in_minutes):
+                    recentactivity = {'activity_type': 'create',
+                                      'activity_time': workload.created_at,
+                                      'activity_result': workload.status,
+                                      'activity_description': '',
+                                      'object_type': 'workload',
+                                      'object_name': workload.display_name,
+                                      'object_id': workload.id,
+                                      }
+                    recentactivites.append(recentactivity)
+                    continue
+            
+            for snapshot in self.db.snapshot_get_all(context, read_deleted='yes'):
+                if snapshot.deleted:
+                    if now - snapshot.deleted_at < timedelta(minutes=time_in_minutes):
+                        recentactivity = {'activity_type': 'delete',
+                                          'activity_time': snapshot.deleted_at,
+                                          'activity_result': snapshot.status,
+                                          'activity_description': '',
+                                          'object_type': 'snapshot',
+                                          'object_name': snapshot.display_name,
+                                          'object_id': snapshot.id,
+                                          }
+                        recentactivites.append(recentactivity)
+                        continue
+                elif now - snapshot.created_at < timedelta(minutes=time_in_minutes):
+                    recentactivity = {'activity_type': 'create',
+                                      'activity_time': snapshot.created_at,
+                                      'activity_result': snapshot.status,
+                                      'activity_description': '',
+                                      'object_type': 'snapshot',
+                                      'object_name': snapshot.display_name,
+                                      'object_id': snapshot.id,
+                                      }
+                    recentactivites.append(recentactivity)
+                    continue
+
+            for restore in self.db.restore_get_all(context, read_deleted='yes'):
+                if restore.deleted:
+                    if now - restore.deleted_at < timedelta(minutes=time_in_minutes):
+                        recentactivity = {'activity_type': 'delete',
+                                          'activity_time': restore.deleted_at,
+                                          'activity_result': restore.status,
+                                          'activity_description': '',
+                                          'object_type': 'restore',
+                                          'object_name': restore.display_name,
+                                          'object_id': restore.id,
+                                          }
+                        recentactivites.append(recentactivity)
+                        continue
+                elif now - restore.created_at < timedelta(minutes=time_in_minutes):
+                    recentactivity = {'activity_type': 'create',
+                                      'activity_time': restore.created_at,
+                                      'activity_result': restore.status,
+                                      'activity_description': '',
+                                      'object_type': 'restore',
+                                      'object_name': restore.display_name,
+                                      'object_id': restore.id,
+                                      }
+                    recentactivites.append(recentactivity)
+                    continue
+                
+                
+        except Exception as ex:
+            LOG.exception(ex)
+        return dict(recentactivites=recentactivites)    
 
     def workload_get_workflow(self, context, workload_id):
         """

@@ -121,6 +121,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='get_storage_usage',
                        conditions={"method": ['POST']})  
         
+        #get recent activities
+        mapper.connect("workloads_get_recentactivities",
+                       "/{project_id}/workloads/get_recentactivities",
+                       controller=self.resources['workloads'],
+                       action='get_recentactivities',
+                       conditions={"method": ['POST']})          
+        
         #get the specified workload
         mapper.connect("workloads_4",
                        "/{project_id}/workloads/{id}",

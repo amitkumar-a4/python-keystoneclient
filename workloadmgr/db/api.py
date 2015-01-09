@@ -124,9 +124,9 @@ def workload_show(context, workload_id):
     """Get more details of the  workload or raise if it does not exist."""
     return IMPL.workload_show(context, workload_id)
 
-def workload_get_all(context):
+def workload_get_all(context, **kwargs):
     """Get all workloads."""
-    return IMPL.workload_get_all(context)
+    return IMPL.workload_get_all(context, **kwargs)
 
 def workload_get_all_by_host(context, host):
     """Get all workloads belonging to a host."""
@@ -302,8 +302,8 @@ def restore_mark_incomplete_as_error(context, host):
 def restore_get(context, restore_id):
     return IMPL.restore_get(context, restore_id)
 
-def restore_get_all(context):
-    return IMPL.restore_get_all(context)
+def restore_get_all(context, **kwargs):
+    return IMPL.restore_get_all(context, **kwargs)
 
 def restore_get_all_by_project(context, project_id):
     return IMPL.restore_get_all_by_project(context, project_id)

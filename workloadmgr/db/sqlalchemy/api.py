@@ -541,20 +541,12 @@ def workload_update(context, id, values, purge_metadata=False):
     return _workload_update(context, values, id, purge_metadata, session)
 
 @require_context
-def workload_get_all(context):
-    session = get_session()
-    try:
-        query = session.query(models.Workloads)\
-                       .options(sa_orm.joinedload(models.Workloads.metadata))\
-                       .filter_by(project_id=context.project_id)
-
-        #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query.all()
-
-    except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsNotFound()
-    
-    return workloads
+def workload_get_all(context, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    return model_query( context, models.Workloads, **kwargs).\
+                        options(sa_orm.joinedload(models.Workloads.metadata)).\
+                        order_by(models.Workloads.created_at.desc()).all()
 
 @require_admin_context
 def workload_get_all_by_host(context, host):
@@ -796,9 +788,13 @@ def snapshot_get(context, snapshot_id, **kwargs):
 def snapshot_get_all(context, workload_id=None, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    return model_query(context, models.Snapshots, **kwargs).\
-                        filter_by(workload_id=workload_id).all()
-
+    if workload_id == None:
+        return model_query(context, models.Snapshots, **kwargs).\
+                            order_by(models.Snapshots.created_at.desc()).all()        
+    else:
+        return model_query(context, models.Snapshots, **kwargs).\
+                            filter_by(workload_id=workload_id).\
+                            order_by(models.Snapshots.created_at.desc()).all()
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
@@ -1746,9 +1742,12 @@ def restore_get(context, restore_id):
     return result
 
 @require_admin_context
-def restore_get_all(context):
-    session = get_session()
-    return model_query(context, models.Restores, session=session).all()
+def restore_get_all(context, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    return model_query( context, models.Restores, **kwargs).\
+                        order_by(models.Restores.created_at.desc()).all()
+
 
 @require_context
 def restore_get_all_by_project(context, project_id):
