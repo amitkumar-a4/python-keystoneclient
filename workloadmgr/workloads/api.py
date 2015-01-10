@@ -38,6 +38,7 @@ from workloadmgr import context
 from workloadmgr.workflows import vmtasks
 from workloadmgr.vault import vault
 from workloadmgr.openstack.common import timeutils
+from workloadmgr import auditlog
 
 from workloadmgr.db.sqlalchemy import models
 
@@ -46,6 +47,7 @@ workload_lock = threading.Lock()
 FLAGS = flags.FLAGS
 
 LOG = logging.getLogger(__name__)
+AUDITLOG = auditlog.getAuditLogger()
 
 def _snapshot_create_callback(*args, **kwargs):
     from workloadmgr.workloads import API
@@ -253,6 +255,7 @@ class API(base.Base):
         return workload_dict
 
     def workload_show(self, context, workload_id):
+        import pdb; pdb.set_trace()
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
 
@@ -331,7 +334,8 @@ class API(base.Base):
         """
         Make the RPC call to create a workload.
         """
-        
+        import pdb; pdb.set_trace()
+        AUDITLOG.log(context, "Workload Create Requested", None)
         compute_service = nova.API(production=True)
         instances_with_name = compute_service.get_servers(context,admin=True)
 
@@ -400,6 +404,7 @@ class API(base.Base):
         
         self.workload_add_scheduler_job(jobschedule, workload)
         
+        AUDITLOG.log(context, "Workload Created", workload)        
         return workload
     
     def workload_add_scheduler_job(self, jobschedule, workload):
@@ -549,10 +554,11 @@ class API(base.Base):
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
                 if workload.deleted:
                     if now - workload.deleted_at < timedelta(minutes=time_in_minutes):
+                        activity_description = 'Workload ' + workload.display_name + ' deleted'
                         recentactivity = {'activity_type': 'delete',
                                           'activity_time': workload.deleted_at,
                                           'activity_result': workload.status,
-                                          'activity_description': '',
+                                          'activity_description': activity_description,
                                           'object_type': 'workload',
                                           'object_name': workload.display_name,
                                           'object_id': workload.id,
@@ -560,10 +566,11 @@ class API(base.Base):
                         recentactivites.append(recentactivity)
                         continue
                 elif now - workload.created_at < timedelta(minutes=time_in_minutes):
+                    activity_description = 'Workload ' + workload.display_name + ' created'
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': workload.created_at,
                                       'activity_result': workload.status,
-                                      'activity_description': '',
+                                      'activity_description': activity_description,
                                       'object_type': 'workload',
                                       'object_name': workload.display_name,
                                       'object_id': workload.id,
@@ -574,10 +581,14 @@ class API(base.Base):
             for snapshot in self.db.snapshot_get_all(context, read_deleted='yes'):
                 if snapshot.deleted:
                     if now - snapshot.deleted_at < timedelta(minutes=time_in_minutes):
+                        workload = self.db.workload_get(context, snapshot.workload_id)
+                        activity_description =  "Snapshot '%s' of Workload '%s' deleted" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)
                         recentactivity = {'activity_type': 'delete',
                                           'activity_time': snapshot.deleted_at,
                                           'activity_result': snapshot.status,
-                                          'activity_description': '',
+                                          'activity_description': activity_description,
                                           'object_type': 'snapshot',
                                           'object_name': snapshot.display_name,
                                           'object_id': snapshot.id,
@@ -585,10 +596,14 @@ class API(base.Base):
                         recentactivites.append(recentactivity)
                         continue
                 elif now - snapshot.created_at < timedelta(minutes=time_in_minutes):
+                    workload = self.db.workload_get(context, snapshot.workload_id)
+                    activity_description =  "Snapshot '%s' of Workload '%s' created" %\
+                                            (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                             workload.display_name)                  
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': snapshot.created_at,
                                       'activity_result': snapshot.status,
-                                      'activity_description': '',
+                                      'activity_description': activity_description,
                                       'object_type': 'snapshot',
                                       'object_name': snapshot.display_name,
                                       'object_id': snapshot.id,
@@ -599,21 +614,31 @@ class API(base.Base):
             for restore in self.db.restore_get_all(context, read_deleted='yes'):
                 if restore.deleted:
                     if now - restore.deleted_at < timedelta(minutes=time_in_minutes):
+                        snapshot = self.db.snapshot_get(context, restore.snapshot_id)
+                        workload = self.db.workload_get(context, snapshot.workload_id)
+                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' deleted" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)                  
                         recentactivity = {'activity_type': 'delete',
-                                          'activity_time': restore.deleted_at,
-                                          'activity_result': restore.status,
-                                          'activity_description': '',
-                                          'object_type': 'restore',
-                                          'object_name': restore.display_name,
-                                          'object_id': restore.id,
-                                          }
+                                         'activity_time': restore.deleted_at,
+                                         'activity_result': restore.status,
+                                         'activity_description': activity_description,
+                                         'object_type': 'restore',
+                                         'object_name': restore.display_name,
+                                         'object_id': restore.id,
+                                         }
                         recentactivites.append(recentactivity)
                         continue
                 elif now - restore.created_at < timedelta(minutes=time_in_minutes):
+                    snapshot = self.db.snapshot_get(context, restore.snapshot_id)
+                    workload = self.db.workload_get(context, snapshot.workload_id)
+                    activity_description =  "Snapshot '%s' of Workload '%s' restored" %\
+                                            (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                             workload.display_name)                          
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': restore.created_at,
                                       'activity_result': restore.status,
-                                      'activity_description': '',
+                                      'activity_description': activity_description,
                                       'object_type': 'restore',
                                       'object_name': restore.display_name,
                                       'object_id': restore.id,
