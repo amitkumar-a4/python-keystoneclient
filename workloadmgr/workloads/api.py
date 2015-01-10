@@ -255,7 +255,6 @@ class API(base.Base):
         return workload_dict
 
     def workload_show(self, context, workload_id):
-        import pdb; pdb.set_trace()
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
 
@@ -334,8 +333,6 @@ class API(base.Base):
         """
         Make the RPC call to create a workload.
         """
-        import pdb; pdb.set_trace()
-        AUDITLOG.log(context, "Workload Create Requested", None)
         compute_service = nova.API(production=True)
         instances_with_name = compute_service.get_servers(context,admin=True)
 
