@@ -126,7 +126,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workloads/metrics/recentactivities",
                        controller=self.resources['workloads'],
                        action='get_recentactivities',
-                       conditions={"method": ['GET']})          
+                       conditions={"method": ['GET']})
+        
+        #get recent activities
+        mapper.connect("workloads_auditlog",
+                       "/{project_id}/workloads/audit/auditlog",
+                       controller=self.resources['workloads'],
+                       action='get_auditlog',
+                       conditions={"method": ['GET']})                    
         
         #get the specified workload
         mapper.connect("workloads_4",

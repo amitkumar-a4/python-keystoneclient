@@ -370,7 +370,27 @@ class WorkloadMgrsController(wsgi.Controller):
             recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
         except Exception as ex:
             LOG.exception(ex)
-        return recentactivities          
+        return recentactivities 
+    
+    def get_auditlog(self, req):
+        LOG.debug(_('get_auditlog called'))
+        context = req.environ['workloadmgr.context']
+
+        LOG.audit(_('get_auditlog'), context=context)
+        
+        time_in_minutes = 1440
+        if ('QUERY_STRING' in req.environ) :
+            qs=parse_qs(req.environ['QUERY_STRING'])
+            var = parse_qs(req.environ['QUERY_STRING'])
+            time_in_minutes = var.get('time_in_minutes',[''])[0]
+            time_in_minutes = int(escape(time_in_minutes))
+        
+        auditlog = {'auditlog':[]}
+        try:
+            auditlog = self.workload_api.get_auditlog(context, time_in_minutes)
+        except Exception as ex:
+            LOG.exception(ex)
+        return auditlog              
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

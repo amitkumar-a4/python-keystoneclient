@@ -174,6 +174,7 @@ class API(base.Base):
         """
         Create a workload_type. No RPC call is made
         """
+        AUDITLOG.log(context,'WorkloadType Create Requested', None)
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'id': id,
@@ -184,6 +185,7 @@ class API(base.Base):
                    'metadata': metadata,}
 
         workload_type = self.db.workload_type_create(context, options)
+        AUDITLOG.log(context,'WorkloadType Created', workload_type)
         return workload_type
     
     def workload_type_delete(self, context, workload_type_id):
@@ -191,6 +193,7 @@ class API(base.Base):
         Delete a workload_type. No RPC call is made
         """
         workload_type = self.workload_type_get(context, workload_type_id)
+        AUDITLOG.log(context,'WorkloadType Delete Requested', workload_type)
         if workload_type['status'] not in ['available', 'error']:
             msg = _('WorkloadType status must be available or error')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
@@ -198,7 +201,8 @@ class API(base.Base):
         #TODO(giri): check if this workload_type is referenced by other workloads
                     
         self.db.workload_type_delete(context, workload_type_id)
-        
+        AUDITLOG.log(context,'WorkloadType Deleted', workload_type)
+       
     def workload_type_discover_instances(self, context, workload_type_id, metadata):
         """
         Discover Instances of a workload_type. RPC call is made
@@ -333,6 +337,7 @@ class API(base.Base):
         """
         Make the RPC call to create a workload.
         """
+        AUDITLOG.log(context,'Workload Create Requested', None)
         compute_service = nova.API(production=True)
         instances_with_name = compute_service.get_servers(context,admin=True)
 
@@ -417,6 +422,7 @@ class API(base.Base):
         """
         Make the RPC call to modify a workload.
         """
+        AUDITLOG.log(context,'Workload Modify Requested', None)
         workload_paused = self._is_workload_paused(context, workload_id)
         if workload_paused == False:
             self.workload_pause(context, workload_id)
@@ -452,15 +458,18 @@ class API(base.Base):
                           'vm_name': instance['instance-name']}
                 vm = self.db.workload_vms_create(context, values)                                       
 
-        self.db.workload_update(context, workload_id, options, purge_metadata)
+        workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
         if workload_paused == False:
             self.workload_resume(context, workload_id)
+        AUDITLOG.log(context,'Workload Modified', workload_obj)
+            
     
     def workload_delete(self, context, workload_id):
         """
         Delete a workload. No RPC call is made
         """
         workload = self.workload_get(context, workload_id)
+        AUDITLOG.log(context,'Workload Delete Requested', workload)
         if workload['status'] not in ['available', 'error']:
             msg = _('Workload status must be available or error')
             raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
@@ -494,8 +503,10 @@ class API(base.Base):
                 break
 
         self.db.workload_delete(context, workload_id)
+        AUDITLOG.log(context,'Workload Deleted', workload)
         
     def import_workloads(self, context):
+        AUDITLOG.log(context,'Import Workloads Requested', None)
         vault_service = vault.get_vault_service(context)
         workloads = []
         for workload_url in vault_service.get_workloads():
@@ -518,6 +529,7 @@ class API(base.Base):
             except Exception as ex:
                 LOG.exception(ex)
         return workloads
+        AUDITLOG.log(context,'Import Workloads Completed', None)
     
     def get_nodes(self, context):
         nodes = []
@@ -563,7 +575,10 @@ class API(base.Base):
                         recentactivites.append(recentactivity)
                         continue
                 elif now - workload.created_at < timedelta(minutes=time_in_minutes):
-                    activity_description = 'Workload ' + workload.display_name + ' created'
+                    if workload.status == 'error':
+                        activity_description = 'Workload ' + workload.display_name + ' created'
+                    else:
+                        activity_description = 'Workload ' + workload.display_name + ' failed'
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': workload.created_at,
                                       'activity_result': workload.status,
@@ -594,9 +609,18 @@ class API(base.Base):
                         continue
                 elif now - snapshot.created_at < timedelta(minutes=time_in_minutes):
                     workload = self.db.workload_get(context, snapshot.workload_id)
-                    activity_description =  "Snapshot '%s' of Workload '%s' created" %\
-                                            (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
-                                             workload.display_name)                  
+                    if snapshot.status == 'error':
+                        activity_description =  "Snapshot '%s' of Workload '%s' failed" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)                     
+                    elif snapshot.status == 'available':
+                        activity_description =  "Snapshot '%s' of Workload '%s' created" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name) 
+                    else:
+                        activity_description =  "Snapshot '%s' of Workload '%s' is in progress" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)                                                                  
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': snapshot.created_at,
                                       'activity_result': snapshot.status,
@@ -613,6 +637,7 @@ class API(base.Base):
                     if now - restore.deleted_at < timedelta(minutes=time_in_minutes):
                         snapshot = self.db.snapshot_get(context, restore.snapshot_id)
                         workload = self.db.workload_get(context, snapshot.workload_id)
+                        
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' deleted" %\
                                                 (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
                                                  workload.display_name)                  
@@ -629,9 +654,19 @@ class API(base.Base):
                 elif now - restore.created_at < timedelta(minutes=time_in_minutes):
                     snapshot = self.db.snapshot_get(context, restore.snapshot_id)
                     workload = self.db.workload_get(context, snapshot.workload_id)
-                    activity_description =  "Snapshot '%s' of Workload '%s' restored" %\
-                                            (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
-                                             workload.display_name)                          
+                    if snapshot.status == 'error':
+                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)      
+                    elif snapshot.status == 'available':
+                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)   
+                    else:
+                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' is in progress" %\
+                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                 workload.display_name)   
+                          
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': restore.created_at,
                                       'activity_result': restore.status,
@@ -647,6 +682,14 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return dict(recentactivites=recentactivites)    
+    
+    def get_auditlog(self, context, time_in_minutes):
+        auditlog = []
+        try:
+            auditlog = AUDITLOG.get_records(time_in_minutes)
+        except Exception as ex:
+            LOG.exception(ex)
+        return dict(auditlog=auditlog)        
 
     def workload_get_workflow(self, context, workload_id):
         """
@@ -684,14 +727,18 @@ class API(base.Base):
         Pause workload job schedule. No RPC call is made
         """
         workload = self.workload_get(context, workload_id)
+        AUDITLOG.log(context,'Workload Pause Requested', workload)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 self._scheduler.unschedule_job(job)
                 break
+        AUDITLOG.log(context,'Workload Paused', workload)
+            
 
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
+        AUDITLOG.log(context,'Workload Resume Requested', workload)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
@@ -708,21 +755,26 @@ class API(base.Base):
                                             kwargs={'workload_id':workload_id,  
                                                     'user_id': workload['user_id'],
                                                     'project_id':workload['project_id']})
+        AUDITLOG.log(context,'Workload Resumed', workload)
 
     def workload_unlock(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
+        AUDITLOG.log(context,'Workload Unlock Requested', workload)
         if not workload['deleted']:
             self.db.workload_update(context, workload_id, {'status': 'available'})         
+        AUDITLOG.log(context,'Workload Unlocked', workload)
 
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """
         Make the RPC call to snapshot a workload.
         """
+        workload = self.workload_get(context, workload_id)
+        AUDITLOG.log(context,'Workload Snapshot Requested', workload)
+        
         workloads = self.db.workload_get_all(context)
         for workload in workloads:
             if workload.deleted:
                 continue
-            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
             if (workload_type.display_name == 'Composite'):
                 for kvpair in workload.metadata:
                     if kvpair['key'] == 'workloadgraph':
@@ -760,6 +812,7 @@ class API(base.Base):
                                  'status': 'executing'
                                 })
         self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
+        AUDITLOG.log(context,'Workload(' + workload.display_name + ') ' + 'Snapshot Taken', snapshot)
         return snapshot
 
     def snapshot_get(self, context, snapshot_id):
@@ -861,6 +914,7 @@ class API(base.Base):
         Delete a workload snapshot. No RPC call required
         """
         snapshot = self.snapshot_get(context, snapshot_id)
+        AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
         workload = self.workload_get(context, snapshot['workload_id'])
 
         if snapshot['status'] not in ['available', 'error']:
@@ -874,13 +928,14 @@ class API(base.Base):
                 raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)      
         
         self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
-
+        AUDITLOG.log(context,'Snapshot Deleted', snapshot)
         
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
         """
         Make the RPC call to restore a snapshot.
         """
         snapshot = self.snapshot_get(context, snapshot_id)
+        AUDITLOG.log(context,'Snapshot Restore Requested', snapshot)
         workload = self.workload_get(context, snapshot['workload_id'])
         if snapshot['status'] != 'available':
             msg = _('Snapshot status must be available')
@@ -900,6 +955,7 @@ class API(base.Base):
                    'status': 'restoring',}
         restore = self.db.restore_create(context, values)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
+        AUDITLOG.log(context,'Workload(' + workload.display_name + ') ' + 'Snapshot Restored', restore)
         return restore
 
     def restore_get(self, context, restore_id):
@@ -989,9 +1045,11 @@ class API(base.Base):
         Delete a workload restore. RPC call may be required
         """
         restore_details = self.restore_show(context, restore_id)
+        AUDITLOG.log(context,'Restore Delete Requested', restore_details)
         
         if restore_details['target_platform'] == 'vmware':
             self.db.restore_delete(context, restore_id)
+            AUDITLOG.log(context,'Restore Deleted', restore_details)
             return
             
         
@@ -1068,4 +1126,5 @@ class API(base.Base):
                 LOG.exception(exception)
 
         self.db.restore_delete(context, restore_id)
+        AUDITLOG.log(context,'Restore Deleted', restore_details)
         
