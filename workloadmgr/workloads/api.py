@@ -775,6 +775,7 @@ class API(base.Base):
         for workload in workloads:
             if workload.deleted:
                 continue
+            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
             if (workload_type.display_name == 'Composite'):
                 for kvpair in workload.metadata:
                     if kvpair['key'] == 'workloadgraph':
@@ -812,7 +813,7 @@ class API(base.Base):
                                  'status': 'executing'
                                 })
         self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
-        AUDITLOG.log(context,'Workload(' + workload.display_name + ') ' + 'Snapshot Taken', snapshot)
+        AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Taken', snapshot)
         return snapshot
 
     def snapshot_get(self, context, snapshot_id):

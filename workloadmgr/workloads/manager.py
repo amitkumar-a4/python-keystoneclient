@@ -360,6 +360,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
              
             # Update vms
             for inst in instances['instances']:
+                if not 'root_partition_type' in inst:
+                    inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
                                            {'metadata':{'root_partition_type':inst['root_partition_type']}})
 
