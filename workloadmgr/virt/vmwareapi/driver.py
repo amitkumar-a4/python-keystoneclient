@@ -325,6 +325,8 @@ class VMwareVCDriver(VMwareESXDriver):
         while datacenters:
             token = vm_util._get_token(datacenters)
             for obj_content in datacenters.objects:
+                if obj_content.propSet[0].val == "":
+                    continue
                 for datastore in obj_content.propSet[0].val[0]:
                     if datastore.value == datastore_ref.value and \
                        datastore._type == datastore_ref._type:
