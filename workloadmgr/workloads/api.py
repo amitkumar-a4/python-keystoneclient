@@ -24,6 +24,7 @@ from workloadmgr.apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStor
 from sqlalchemy import create_engine
 
 from novaclient import client
+from workloadmgr import utils
 from workloadmgr.workloads import rpcapi as workloads_rpcapi
 from workloadmgr.scheduler import rpcapi as scheduler_rpcapi
 from workloadmgr.db import base
@@ -259,13 +260,14 @@ class API(base.Base):
         return workload_dict
 
     def workload_show(self, context, workload_id):
+
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
 
         workload_dict['storage_usage'] = {'usage': 0, 
                                           'full': {'snap_count': 0, 'usage': 0}, 
                                           'incremental': {'snap_count': 0, 'usage': 0}
-                                          }
+                                         }
         for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
@@ -541,7 +543,22 @@ class API(base.Base):
         return dict(nodes=nodes)
     
     def get_storage_usage(self, context):
-        storage_usage = {'total': 0, 'full': 0, 'incremental': 0}
+        def get_total_capacity():
+            stdout, stderr = utils.execute('df', FLAGS.wlm_vault_local_directory)
+            if stderr != '':
+                msg = _('Could not execute df command successfully. Error %s'), (stderr)
+                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+
+            # Filesystem     1K-blocks      Used Available Use% Mounted on
+            # /dev/sda1      464076568 248065008 192431096  57% /
+
+            fields = stdout.split('\n')[0].split()
+            values = stdout.split('\n')[1].split()
+
+            return int(values[1]) * 1024, int(values[2]) * 1024
+
+        total_capacity, total_utilization = get_total_capacity()
+        storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}
         try:
             for workload in self.db.workload_get_all(context):
                 for workload_snapshot in self.db.snapshot_get_all(context, workload.id, read_deleted='yes'):
