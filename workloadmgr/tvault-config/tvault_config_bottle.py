@@ -869,8 +869,9 @@ def configure_host():
             command = ['sudo', 'rescan-scsi-bus']
             subprocess.call(command, shell=False)
             
-            command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
-            subprocess.call(command, shell=False) 
+            if config_data['create-file-system'] == 'on':
+                command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
+                subprocess.call(command, shell=False) 
             
             command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
             subprocess.call(command, shell=False)
@@ -1400,7 +1401,7 @@ def register_workloadtypes():
                                           name= 'Composite', description = 'A workload that consists of other workloads',
                                           id = '54947065-2a59-494a-ab64-b6501c139a82')
             
-            if config_data['import_workloads'] == True:
+            if config_data['import_workloads'] == 'on':
                 wlm.workloads.importworkloads()
                  
     except Exception as exception:
@@ -1432,7 +1433,8 @@ def configure_vmware():
         config_data['vcenter_password'] = config_inputs['vcenter-password']
         
         config_data['storage_type'] = config_inputs['storage-type']
-        config_data['storage_local_device'] = config_inputs['storage-local-device']       
+        config_data['storage_local_device'] = config_inputs['storage-local-device']
+        config_data['create-file-system'] = config_inputs['create-file-system']       
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']

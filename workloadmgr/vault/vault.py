@@ -125,14 +125,16 @@ class VaultBackupService(base.Base):
     def get_workloads(self):
         parent_path = FLAGS.wlm_vault_local_directory + '/snapshots/'
         workload_urls = []
-        for name in os.listdir(parent_path):
-            if os.path.isdir(os.path.join(parent_path, name)):
-                workload_url = {'workload_url': name, 'snapshot_urls': []}
-                for subname in os.listdir(os.path.join(parent_path, workload_url['workload_url'])):
-                    if os.path.isdir(os.path.join(parent_path, workload_url['workload_url'], subname)):
-                        workload_url['snapshot_urls'].append(os.path.join(workload_url['workload_url'], subname))
-                workload_urls.append(workload_url)       
-                
+        try:
+            for name in os.listdir(parent_path):
+                if os.path.isdir(os.path.join(parent_path, name)):
+                    workload_url = {'workload_url': name, 'snapshot_urls': []}
+                    for subname in os.listdir(os.path.join(parent_path, workload_url['workload_url'])):
+                        if os.path.isdir(os.path.join(parent_path, workload_url['workload_url'], subname)):
+                            workload_url['snapshot_urls'].append(os.path.join(workload_url['workload_url'], subname))
+                    workload_urls.append(workload_url)
+        except Exception as ex:
+            LOG.exception(ex)
         return workload_urls
             
            
