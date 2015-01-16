@@ -537,7 +537,8 @@ class API(base.Base):
         nodes = []
         try:
             for node_record in self.db.service_get_all_by_topic(context, topic='workloadmgr-workloads'):
-                nodes.append({'node':node_record.host, 'version':node_record.version})
+                nodes.append({'node':node_record.host, 'version':node_record.version, 
+                              'ipaddress': socket.gethostbyname(node_record.host)})
         except Exception as ex:
             LOG.exception(ex)
         return dict(nodes=nodes)
