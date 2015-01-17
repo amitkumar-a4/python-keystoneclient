@@ -1434,7 +1434,11 @@ def configure_vmware():
         
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']
-        config_data['create-file-system'] = config_inputs['create-file-system']       
+        if 'create-file-system' in config_inputs:
+            config_data['create-file-system'] = config_inputs['create-file-system']
+        else:
+            config_data['create-file-system'] = 'off'
+        
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']
@@ -1490,7 +1494,10 @@ def configure_vmware():
         config_data['workloadmgr_user'] = config_data['vcenter_username']
         config_data['workloadmgr_user_password'] = config_data['vcenter_password']
         
-        config_data['import_workloads'] = config_inputs['import-workloads']
+        if 'import-workloads' in config_inputs:
+            config_data['import_workloads'] = config_inputs['import-workloads']
+        else:
+            config_data['import_workloads'] = 'off'
         
         bottle.redirect("/task_status_vmware")
     except Exception as exception:
