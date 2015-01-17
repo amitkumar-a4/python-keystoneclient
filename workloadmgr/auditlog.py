@@ -59,6 +59,4 @@ class AuditLog(object):
                               'Details':values[5],
                               }
                     records.append(record)
-                else:
-                    break;
         return records

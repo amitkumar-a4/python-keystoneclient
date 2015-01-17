@@ -569,6 +569,11 @@ class API(base.Base):
                         else:
                             storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
             storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
+            if storage_usage['total'] == 0:
+                storage_usage['full'] = 1
+                storage_usage['incremental'] = 1
+                storage_usage['total'] = 2
+                
             
         except Exception as ex:
             LOG.exception(ex)
@@ -831,7 +836,6 @@ class API(base.Base):
                                  'status': 'executing'
                                 })
         self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
-        AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Taken', snapshot)
         return snapshot
 
     def snapshot_get(self, context, snapshot_id):
@@ -974,7 +978,6 @@ class API(base.Base):
                    'status': 'restoring',}
         restore = self.db.restore_create(context, values)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
-        AUDITLOG.log(context,'Workload(' + workload.display_name + ') ' + 'Snapshot Restored', restore)
         return restore
 
     def restore_get(self, context, restore_id):

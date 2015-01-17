@@ -3,6 +3,7 @@
 # Copyright (c) 2014 TrilioData, Inc.
 # All Rights Reserved.
 
+import socket
 import json
 from operator import itemgetter
 import cPickle as pickle
@@ -27,7 +28,10 @@ def import_workload(cntx, workload_url, new_version):
             metadata = {}
             for meta in values['metadata']:
                 metadata[meta['key']] = meta['value']
-            values['metadata'] = metadata   
+            values['metadata'] = metadata  
+        if 'host' in values: 
+            values['host'] = socket.gethostname()
+         
         return values
                
     vault_service = vault.get_vault_service(cntx)
