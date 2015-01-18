@@ -224,12 +224,32 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                 m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
                 if m:
                     mp= m.group(1)
-                    stdin, stdout, stderr = client.exec_command('sudo lvdisplay ' + mp)
-                    if stderr.read() == '':
-                        rootpartition_type[ip] = "lvm"
+                    transport = client.get_transport()
+                    session = transport.open_session()
+                    session.get_pty()
+                    session.set_combine_stderr(True)
+                    session.exec_command('sudo -k lvdisplay ' + mp)
+                    stdin = session.makefile('wb', 8192)
+                    stdout = session.makefile('rb', 8192)
+                    stderr = session.makefile_stderr('rb', 8192)
+                    if stdout.channel.closed is False: # If stdout is still open then sudo is asking us for a password
+                       stdin.write('%s\n' % password)
+                       stdin.flush()
+                    retcode = session.recv_exit_status()
+                    LOG.debug(_('lvdisplay: return value %d'), retcode)
+                    error = stderr.read()
+                    if error == '':
+                       output = stdout.read()
+                       # remove password from the stdout
+                       output = "\n".join(output.split("\n")[1:])
+                       LOG.info(_('lvdisplay: output\n %s'), output)
+                       rootpartition_type[ip] = "lvm"
+                    else:
+                       LOG.debug(_('lvdisplay: error %s'), error)
             except:
                 pass
         finally:
+            LOG.info(_('%s: root partition is on %s'), ip, rootpartition_type[ip])
             client.close()
 
     # call nova list
