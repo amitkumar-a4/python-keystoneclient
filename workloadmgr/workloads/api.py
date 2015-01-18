@@ -974,7 +974,7 @@ class API(base.Base):
                    'status': 'restoring',}
         restore = self.db.restore_create(context, values)
         self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
-        AUDITLOG.log(context,'Workload(' + workload.display_name + ') ' + 'Snapshot Restored', restore)
+        AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
         return restore
 
     def restore_get(self, context, restore_id):
