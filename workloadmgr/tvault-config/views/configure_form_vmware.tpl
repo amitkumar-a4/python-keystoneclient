@@ -27,6 +27,21 @@ $(function() {
 </script>  
 -->   
 
+
+<script>
+function warnCreateFileSystem(cb) {
+  if(cb.checked == true){
+   var r = confirm("Creating a new file system will erase the previous contents permanently.\nDo you want to create a new file system?");
+   if (r == true) {
+	   cb.checked = true;
+   } else {
+     cb.checked = false;
+   }
+  }
+}
+</script>  
+ 
+
 </head>
 
 <body>
@@ -81,6 +96,13 @@ $(function() {
     	<label class="input-group-addon">vCenter Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
     	<input name="vcenter-password" type="password" required placeholder="" class="form-control"> <br>
     </div><br>
+	<div class="input-group" >
+    	<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<input name="name-server" type="text" placeholder="192.168.2.1" class="form-control">
+    	
+    	<label class="input-group-addon">Domain Search Order</label>
+    	<input name="domain-search-order" type="text" placeholder="example.com example.net" class="form-control">
+	</div><br>   	      
     
 	<div class="panel-group" id="accordion">
 	  <div class="panel panel-default" id="panel3">
@@ -94,20 +116,43 @@ $(function() {
 	    <div id="collapseThree" class="panel-collapse collapse in">
 	      <div class="panel-body">
     		<div class="input-group" >
-    			<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device 
-    			<input name="storage-local-device" id="storage-local-device" type="text" required placeholder="/dev/sdb" value="/dev/sdb" class="form-control" /> <br/>
+    			<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device
+    			<div class="row"> 
+    				<div class="col-md-12"> 
+    					<input name="storage-local-device" id="storage-local-device" type="text" required placeholder="/dev/sdb" value="/dev/sdb" class="form-control" />
+    					<input name="create-file-system" id="create-file-system" type="checkbox" onclick='warnCreateFileSystem(this)';> Create File System
+    				</div>
+    			</div>
+    			<br/>
     			<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs"> NFS Export 
     			<input name="storage-nfs-export" id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" value="server:/var/nfs" class="form-control" /> <br/>
  		    	<!---   			
     			<input name="storage-type" id="storage-type-object" type="radio"  value="object" disabled> Object Store 
     			<input name="storage-object-url" id="storage-object-url" type="text" required placeholder="" class="form-control">	<br/>
 		    	-->
-    		</div><br>
-    		<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads 
+    		</div>
  	      </div>
 	    </div>
 	  </div>
 	</div>
+	
+	<div class="panel-group" id="accordion">
+	  <div class="panel panel-default" id="panel4">
+	    <div class="panel-heading">
+	      <h4 class="panel-title">
+	        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour">
+	          Imports
+	        </a>
+	      </h4>
+	    </div>
+	    <div id="collapseFour" class="panel-collapse collapse in">
+	      <div class="panel-body">
+			<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads 
+ 	      </div>
+	    </div>
+	  </div>
+	</div>
+	
     
     
 	<div class="panel-group" id="accordion">
@@ -142,28 +187,6 @@ $(function() {
 	  </div>
 	</div>    
     
-	<div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel2">
-	    <div class="panel-heading">
-	      <h4 class="panel-title">
-	        <a data-toggle="collapse" data-target="#collapseTwo" href="#collapseTwo">
-	          NameServer (Optional)
-	        </a>
-	      </h4>
-	    </div>
-	    <div id="collapseTwo" class="panel-collapse collapse">
-	      <div class="panel-body">
-    		<div class="input-group" >
-		    	<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-		    	<input name="name-server" type="text" placeholder="192.168.2.1" class="form-control">
-		    	
-		    	<label class="input-group-addon">Domain Search Order</label>
-		    	<input name="domain-search-order" type="text" placeholder="example.com example.net" class="form-control">
-    		</div><br>   	      
-	      </div>
-	    </div>
-	  </div>
-	</div>
     
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
   </form>
