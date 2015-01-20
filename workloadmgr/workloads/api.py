@@ -677,11 +677,11 @@ class API(base.Base):
                 elif now - restore.created_at < timedelta(minutes=time_in_minutes):
                     snapshot = self.db.snapshot_get(context, restore.snapshot_id)
                     workload = self.db.workload_get(context, snapshot.workload_id)
-                    if snapshot.status == 'error':
+                    if restore.status == 'error':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
                                                 (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
                                                  workload.display_name)      
-                    elif snapshot.status == 'available':
+                    elif restore.status == 'available':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
                                                 (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
                                                  workload.display_name)   
