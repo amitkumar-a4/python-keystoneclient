@@ -599,9 +599,9 @@ class API(base.Base):
                         continue
                 elif now - workload.created_at < timedelta(minutes=time_in_minutes):
                     if workload.status == 'error':
-                        activity_description = 'Workload ' + workload.display_name + ' created'
-                    else:
                         activity_description = 'Workload ' + workload.display_name + ' failed'
+                    else:
+                        activity_description = 'Workload ' + workload.display_name + ' created'
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': workload.created_at,
                                       'activity_result': workload.status,
