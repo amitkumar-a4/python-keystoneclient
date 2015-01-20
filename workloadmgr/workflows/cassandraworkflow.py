@@ -237,14 +237,14 @@ def get_cassandra_nodes(cntx, host, port, username, password):
                        stdin.flush()
                     retcode = session.recv_exit_status()
                     LOG.debug(_('lvdisplay: return value %d'), retcode)
-                    error = stderr.read()
-                    if error == '':
+                    if retcode == 0:
                        output = stdout.read()
                        # remove password from the stdout
                        output = "\n".join(output.split("\n")[1:])
                        LOG.info(_('lvdisplay: output\n %s'), output)
                        rootpartition_type[ip] = "lvm"
                     else:
+                       error = stderr.read()
                        LOG.debug(_('lvdisplay: error %s'), error)
             except:
                 pass
