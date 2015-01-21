@@ -569,11 +569,6 @@ class API(base.Base):
                         else:
                             storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
             storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
-            if storage_usage['total'] == 0:
-                storage_usage['full'] = 1
-                storage_usage['incremental'] = 1
-                storage_usage['total'] = 2
-                
             
         except Exception as ex:
             LOG.exception(ex)
