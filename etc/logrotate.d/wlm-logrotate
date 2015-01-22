@@ -1,8 +1,0 @@
-/var/log/workloadmgr/wlm-api.log /var/log/workloadmgr/wlm-scheduler.log /var/log/workloadmgr/wlm-workloads.log /opt/stack/data/wlm/auditlogs/auditlog.log {
-    missingok
-    compress
-    delaycompress
-    notifempty
-    size=25M
-    rotate 3
-}
