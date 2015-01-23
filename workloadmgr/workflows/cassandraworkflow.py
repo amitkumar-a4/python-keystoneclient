@@ -11,6 +11,7 @@ import random
 import sys
 import time
 import re
+import shutil
 
 import datetime 
 import paramiko
@@ -498,6 +499,17 @@ def update_cassandra_yaml(mountpath, clustername, ips):
 
     with open(mountpath + '/etc/cassandra/cassandra.yaml.bak', 'r') as f:
         doc = yaml.load(f)
+
+    if doc['cluster_name'] != clustername:
+        # User chose a new cluster name
+        # clean up the system directory
+        for path in doc['data_file_directories']:
+            if os.path.isabs(path):
+                path = path[1:]
+            syspath = os.path.join(path, 'system')
+            syspath = os.path.join(mountpath, syspath)
+            for subdir in os.listdir(syspath):
+                shutil.rmtree(os.path.join(syspath, subdir))
 
     doc['cluster_name'] = clustername
     doc['seed_provider'][0]['parameters'][0]['seeds'] =  ips
