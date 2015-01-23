@@ -1,0 +1,21 @@
+/var/log/workloadmgr/*.log {
+  daily
+  missingok
+  compress
+  delaycompress
+  notifempty
+  copytruncate
+  size=25M
+  rotate 3
+}
+
+/opt/stack/data/wlm/auditlogs/*.log {
+  monthly
+  missingok
+  compress
+  delaycompress
+  notifempty
+  copytruncate
+  size=25M
+  rotate 12
+}

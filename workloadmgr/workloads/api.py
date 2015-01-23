@@ -569,11 +569,6 @@ class API(base.Base):
                         else:
                             storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
             storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
-            if storage_usage['total'] == 0:
-                storage_usage['full'] = 1
-                storage_usage['incremental'] = 1
-                storage_usage['total'] = 2
-                
             
         except Exception as ex:
             LOG.exception(ex)
@@ -677,11 +672,11 @@ class API(base.Base):
                 elif now - restore.created_at < timedelta(minutes=time_in_minutes):
                     snapshot = self.db.snapshot_get(context, restore.snapshot_id)
                     workload = self.db.workload_get(context, snapshot.workload_id)
-                    if snapshot.status == 'error':
+                    if restore.status == 'error':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
                                                 (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
                                                  workload.display_name)      
-                    elif snapshot.status == 'available':
+                    elif restore.status == 'available':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
                                                 (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
                                                  workload.display_name)   

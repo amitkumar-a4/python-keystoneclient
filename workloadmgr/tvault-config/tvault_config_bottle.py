@@ -1118,57 +1118,57 @@ def configure_api():
             #shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
             
-            #configure tvault-gui
-            command = ['sudo', 'rm', "/etc/init/tvault-gui.override"];
-            subprocess.call(command, shell=False) 
-            #command = ['sudo', 'rm', "/etc/init/tvault-gui-worker.override"];
-            #subprocess.call(command, shell=False)         
-            #command = ['sudo', 'rm', "/etc/init/tvault-gui-worker-1.override"];
-            #subprocess.call(command, shell=False)        
-            command = ['sudo', 'rm', "/etc/init/tvault-gui-web.override"];
-            subprocess.call(command, shell=False)         
-            command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
-            subprocess.call(command, shell=False)
-                                    
-            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])
-            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
-            
-            if 'vcenter' in config_data and config_data['vcenter']:
-                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    name: ', '    name: vCenter')
-                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    value: ', '    value: ' + config_data['vcenter'])                 
-            else:
-                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    name: ', '    name: Region')
-                replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    value: ', '    value: ' + config_data['region_name'])                 
         else:
             command = ['sudo', 'service', 'wlm-api', 'stop'];
             subprocess.call(command, shell=False)
             
             command = ['sudo', 'sh', '-c', "echo manual > /etc/init/wlm-api.override"]
             subprocess.call(command, shell=False)
-            
-            #configure tvault-gui
-            command = ['sudo', 'service', 'tvault-gui', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-worker', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-worker-1', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-web', 'stop'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-web-1', 'stop'];
-            subprocess.call(command, shell=False)                                                
-            
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui.override"];
-            subprocess.call(command, shell=False) 
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-worker.override"];
-            subprocess.call(command, shell=False)         
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-worker-1.override"];
-            subprocess.call(command, shell=False)        
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web.override"];
-            subprocess.call(command, shell=False)         
-            command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
-            subprocess.call(command, shell=False)
 
+        #configure tvault-gui
+        command = ['sudo', 'rm', "/etc/init/tvault-gui.override"];
+        subprocess.call(command, shell=False) 
+        #command = ['sudo', 'rm', "/etc/init/tvault-gui-worker.override"];
+        #subprocess.call(command, shell=False)         
+        #command = ['sudo', 'rm', "/etc/init/tvault-gui-worker-1.override"];
+        #subprocess.call(command, shell=False)        
+        command = ['sudo', 'rm', "/etc/init/tvault-gui-web.override"];
+        subprocess.call(command, shell=False)         
+        command = ['sudo', 'rm', "/etc/init/tvault-gui-web-1.override"];
+        subprocess.call(command, shell=False)
+                                
+        replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    ip: ', '    ip: ' + config_data['keystone_host'])
+        replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    port: ', '    port: ' + str(config_data['keystone_public_port']))
+        if 'vcenter' in config_data and config_data['vcenter']:
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    name: ', '    name: vCenter')
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    value: ', '    value: ' + config_data['vcenter'])                 
+        else:
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    name: ', '    name: Region')
+            replace_line('/opt/tvault-gui/config/tvault-gui.yml', '    value: ', '    value: ' + config_data['region_name'])                 
+        
+        #configure tvault-gui
+        #command = ['sudo', 'service', 'tvault-gui', 'stop'];
+        #subprocess.call(command, shell=False)
+        #command = ['sudo', 'service', 'tvault-gui-worker', 'stop'];
+        #subprocess.call(command, shell=False)
+        #command = ['sudo', 'service', 'tvault-gui-worker-1', 'stop'];
+        #subprocess.call(command, shell=False)
+        #command = ['sudo', 'service', 'tvault-gui-web', 'stop'];
+        #subprocess.call(command, shell=False)
+        #command = ['sudo', 'service', 'tvault-gui-web-1', 'stop'];
+        #subprocess.call(command, shell=False)   
+                                                     
+        #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui.override"];
+        #subprocess.call(command, shell=False) 
+        #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-worker.override"];
+        #subprocess.call(command, shell=False)         
+        #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-worker-1.override"];
+        #subprocess.call(command, shell=False)        
+        #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web.override"];
+        #subprocess.call(command, shell=False)         
+        #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
+        #subprocess.call(command, shell=False)        
+            
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception       
@@ -1259,18 +1259,19 @@ def start_api():
         if config_data['nodetype'] == 'controller':
             command = ['sudo', 'service', 'wlm-api', 'restart'];
             subprocess.call(command, shell=False)
+
+        #configure tvault-gui
+        command = ['sudo', 'service', 'tvault-gui', 'restart'];
+        subprocess.call(command, shell=False)
+        #command = ['sudo', 'service', 'tvault-gui-worker', 'restart'];
+        #subprocess.call(command, shell=False)
+        #command = ['sudo', 'service', 'tvault-gui-worker-1', 'restart'];
+        #subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'tvault-gui-web', 'restart'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'tvault-gui-web-1', 'restart'];
+        subprocess.call(command, shell=False) 
             
-            #configure tvault-gui
-            command = ['sudo', 'service', 'tvault-gui', 'restart'];
-            subprocess.call(command, shell=False)
-            #command = ['sudo', 'service', 'tvault-gui-worker', 'restart'];
-            #subprocess.call(command, shell=False)
-            #command = ['sudo', 'service', 'tvault-gui-worker-1', 'restart'];
-            #subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-web', 'restart'];
-            subprocess.call(command, shell=False)
-            command = ['sudo', 'service', 'tvault-gui-web-1', 'restart'];
-            subprocess.call(command, shell=False) 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception         
