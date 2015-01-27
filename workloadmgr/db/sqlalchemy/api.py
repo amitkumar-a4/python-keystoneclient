@@ -770,6 +770,17 @@ def snapshot_mark_incomplete_as_error(context, host):
                        'status': 'error' }
             snapshot.update(values)
             snapshot.save(session=session)
+            
+    snapshots =  model_query(context, models.Snapshots, session=session).all()
+    for snapshot in snapshots:
+        if snapshot.status != 'available' and snapshot.status != 'error':
+            if snapshot.host and snapshot.host == '':
+                values =  {'progress_percent': 100, 'progress_msg': '',
+                           'error_msg': 'Snapshot did not finish successfully',
+                           'status': 'error' }
+                snapshot.update(values)
+                snapshot.save(session=session)
+            
         
 @require_context
 def snapshot_get(context, snapshot_id, **kwargs):

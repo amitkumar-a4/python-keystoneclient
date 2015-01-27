@@ -463,7 +463,9 @@ class SwiftBackupService(base.Base):
        
         self._restore_v1(snapshot_metadata, restore_to_file_path)
         
- 
+    def mount(self):
+        pass
+    
     def delete(self, snapshot):
         """Delete the given snapshot from swift."""
         container = snapshot['container']
