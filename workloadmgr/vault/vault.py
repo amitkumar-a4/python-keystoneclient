@@ -12,6 +12,7 @@ import StringIO
 import types
 import time
 from ctypes import *
+import subprocess
 
 import eventlet
 from oslo.config import cfg
@@ -41,12 +42,20 @@ wlm_vault_opts = [
                help='Write size in KB'),
     cfg.StrOpt('wlm_vault_local_directory',
                default='/opt/stack/data/wlm',
-               help='Location where snapshots will be stored'),        
+               help='Location where snapshots will be stored'),
+    cfg.StrOpt('wlm_vault_storage_type',
+               default='none',
+               help='Storage type: none, das or nfs'), 
+    cfg.StrOpt('wlm_vault_storage_nfs_export',
+               default='none',
+               help='NFS Export'),
+    cfg.StrOpt('wlm_vault_storage_das_device',
+               default='none',
+               help='NFS Export'),                                                              
 ]
 
 FLAGS = flags.FLAGS
 FLAGS.register_opts(wlm_vault_opts)
-
 
 class VaultBackupService(base.Base):
     def __init__(self, context):
@@ -180,7 +189,35 @@ class VaultBackupService(base.Base):
             restore_to_file_path_handle.write(rbuf[:rc])
             rc = copy_from_file_path_handle.read_buffer(rbuf, FLAGS.wlm_vault_read_chunk_size_kb*1024)
         restore_to_file_path_handle.close()
-        return    
+        return
+    
+    def mount(self):
+        """ mounts storage """
+        try:
+            command = ['sudo', 'umount', FLAGS.wlm_vault_local_directory]
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass
+        
+        try:
+            command = ['sudo', 'umount', FLAGS.wlm_vault_local_directory]
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass           
+        
+        try:
+            command = ['sudo', 'umount', FLAGS.wlm_vault_local_directory]
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass                
+        
+        if FLAGS.wlm_vault_storage_type == 'nfs':        
+            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', FLAGS.wlm_vault_storage_nfs_export, FLAGS.wlm_vault_local_directory]
+            subprocess.check_call(command, shell=False) 
+        elif FLAGS.wlm_vault_storage_type == 'das':       
+            command = ['sudo', 'mount', FLAGS.wlm_vault_storage_das_device, FLAGS.wlm_vault_local_directory]
+            subprocess.check_call(command, shell=False) 
+        
 
 def get_vault_service(context):
     if FLAGS.wlm_vault_service == 'swift':

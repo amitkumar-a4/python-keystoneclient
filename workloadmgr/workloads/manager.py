@@ -138,8 +138,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         LOG.info(_("Cleaning up incomplete operations"))
         
-        self.db.snapshot_mark_incomplete_as_error(ctxt, self.host)
-        self.db.restore_mark_incomplete_as_error(ctxt, self.host)        
+        try:
+            self.db.snapshot_mark_incomplete_as_error(ctxt, self.host)
+            self.db.restore_mark_incomplete_as_error(ctxt, self.host)
+        except Exception as ex:
+            LOG.exception(ex)
+            
+        vault_service = vault.get_vault_service(None)
+        vault_service.mount()
         
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):
         """

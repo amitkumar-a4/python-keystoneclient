@@ -861,10 +861,11 @@ def configure_host():
              
 
         if config_data['storage_type'] == 'nfs': 
-            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', config_data['storage_nfs_export'], '/opt/stack/data/wlm']
-            subprocess.check_call(command, shell=False) 
-            replace_line('/etc/fstab', '/opt/stack/data/wlm', config_data['storage_nfs_export'] + " /opt/stack/data/wlm nfs rw,hard,intr,bg 0 0")
             replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
+            command = ['sudo', 'service', 'rpcbind', 'restart']
+            subprocess.call(command, shell=False)            
+            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/opt/stack/data/wlm']
+            subprocess.check_call(command, shell=False) 
         else:       
             command = ['sudo', 'rescan-scsi-bus']
             subprocess.call(command, shell=False)
@@ -878,8 +879,6 @@ def configure_host():
             
             command = ['sudo', 'mount', config_data['storage_local_device'], '/opt/stack/data/wlm']
             subprocess.check_call(command, shell=False) 
-
-            replace_line('/etc/fstab', '/opt/stack/data/wlm', config_data['storage_local_device'] + " /opt/stack/data/wlm ext4 defaults,nobootwait,nofail 0")
 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -1226,6 +1225,14 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_service = ', 'wlm_vault_service = ' + config_data['wlm_vault_service'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['wlm_vault_swift_url'])
+        
+        if config_data['storage_type'] == 'nfs': 
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = nfs')
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_nfs_export = ', 'wlm_vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
+        else:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = das')
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_das_device = ', 'wlm_vault_storage_das_device = ' + config_data['storage_local_device'])
+            
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
