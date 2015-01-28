@@ -91,9 +91,9 @@ def getnodeinfo(host, port, user, password):
     LOG.debug(_( 'Connected to cassandra node: ' + host))
 
     stdin, stdout, stderr = _exec_command(connection, "nodetool info")
-    cassout = stdout.read(),
+    cassout = stdout.read()
 
-    cassout = cassout[0].split("\n")
+    cassout = cassout.split("\n")
     nodehash = {}
    
     for c in cassout:
@@ -105,11 +105,26 @@ def getnodeinfo(host, port, user, password):
     nodeinput.append(['Gossip', str(nodehash['Gossip active'])])
     nodeinput.append(['Thrift', str(nodehash['Thrift active'])])
 
+def getclusterinfo(connection):
+    stdin, stdout, stderr = _exec_command(connection, "nodetool describecluster")
+    cassout = stdout.read()
+    cassout = cassout.strip("\t")
+    cassout = cassout.split("\n")
+    clusterinfo = {}
+    for c in cassout:
+        if len(c.split(":")) < 2:
+            continue;
+        clusterinfo[c.split(":")[0].strip()] = c.split(":")[1].strip()
+
+    return clusterinfo
+
 def getcassandranodes(connection):
     stdin, stdout, stderr = _exec_command(connection, "nodetool status")
-    cassout = stdout.read(),
+    cassout = stdout.read()
 
-    cassout = cassout[0].replace(" KB", "KB")
+    cassout = cassout.replace(" KB", "KB")
+    cassout = cassout.replace(" MB", "MB")
+    cassout = cassout.replace(" GB", "GB")
     cassout = cassout.replace(" (", "(")
     cassout = cassout.replace(" ID", "ID")
  
@@ -405,7 +420,8 @@ class CassandraWorkflow(workflow.Workflow):
 
         connection = connect_server(self._store['CassandraNode'], int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
         cassnodes = getcassandranodes(connection)
-        dcs = {'name': "Cassandra Cluster", "datacenters":{}, "input":[]}
+        clusterinfo = getclusterinfo(connection)
+        dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
         for n in cassnodes:
             # We discovered this datacenter for the first time, add it
             if not n['Data Center'] in dcs["datacenters"]:
