@@ -857,8 +857,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 else:
                     vm_disk_resource_snap_backing_id = None
 					
-				if snapshot_obj.snapshot_type == 'full':
-					vm_disk_resource_snap_backing_id = None
+		if snapshot_obj.snapshot_type == 'full':
+		    vm_disk_resource_snap_backing_id = None
                 
                 # create an entry in the vm_disk_resource_snaps table
                 vm_disk_resource_snap_id = str(uuid.uuid4())
