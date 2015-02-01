@@ -251,7 +251,7 @@ class SnapshotVMNetworks(task.Task):
             search_opts['vmref'] = '1'
             for instance in instances:
                 newinst = compute_service.get_server_by_id(cntx,
-                                           instance['vm_metadata']['vmware_moid'],
+                                           instance['vm_metadata']['vmware_uuid'],
                                            search_opts=search_opts)
 
         return vmtasks_openstack.snapshot_vm_networks(cntx, db, instances, snapshot)
