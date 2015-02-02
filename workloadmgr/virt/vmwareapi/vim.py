@@ -78,6 +78,7 @@ class Vim:
         self.url = Vim.get_soap_url(protocol, host)
         self.client = suds.client.Client(self.wsdl_url, location=self.url,
                                          plugins=[VIMMessagePlugin()])
+	self.client.set_options(cache=None)
         self._service_content = self.RetrieveServiceContent(
                                         "ServiceInstance")
 
