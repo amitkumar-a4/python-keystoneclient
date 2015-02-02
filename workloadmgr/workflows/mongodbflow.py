@@ -195,7 +195,7 @@ class ResumeBalancer(task.Task):
         # Resume DB
     
         db = self.client.config
-        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}});
+        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
 
 class ShutdownConfigServer(task.Task):
 
