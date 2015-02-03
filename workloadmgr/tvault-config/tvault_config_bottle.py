@@ -31,6 +31,7 @@ import keystoneclient
 import keystoneclient.v2_0.client as ksclient
 import workloadmgrclient
 import workloadmgrclient.v1.client as wlmclient
+from workloadmgr.compute import nova 
 
 
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
@@ -1412,6 +1413,24 @@ def register_workloadtypes():
             if config_data['import_workloads'] == 'on':
                 wlm.workloads.importworkloads()
                  
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        raise exception                    
+    time.sleep(1)
+    return {'status':'Success'}
+
+@bottle.route('/discover_vcenter')
+@authorize()
+def discover_vcenter():
+    # Python code here to configure workloadmgr
+    try:    
+        if config_data['nodetype'] == 'controller':
+            time.sleep(5)
+            compute_service = nova.API(production=True)
+            search_opts = {}
+            search_opts['deep_discover'] = '1'
+            compute_service.get_servers(None, search_opts=search_opts, admin=True)
+
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception                    
