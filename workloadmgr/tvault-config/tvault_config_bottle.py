@@ -368,7 +368,7 @@ def configure_keystone():
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'keystone', 'restart'];
         subprocess.call(command, shell=False)
-        time.sleep(3) 
+        time.sleep(8) 
         try:
             keystone = ksclient.Client(endpoint=config_data['keystone_admin_url'], token='52T8FVYZJse')
                                        #username=config_data['admin_username'], 
@@ -1425,12 +1425,15 @@ def discover_vcenter():
     # Python code here to configure workloadmgr
     try:    
         if config_data['nodetype'] == 'controller':
-            time.sleep(5)
-            compute_service = nova.API(production=True)
-            search_opts = {}
-            search_opts['deep_discover'] = '1'
-            compute_service.get_servers(None, search_opts=search_opts, admin=True)
-
+                time.sleep(5)
+                client = nova.novaclient2(config_data['keystone_public_url'], 
+                                          config_data['admin_username'], 
+                                          config_data['admin_password'], 
+                                          config_data['admin_tenant_name'],
+                                          config_data['nova_production_endpoint_template'])
+                search_opts = {}
+                search_opts['deep_discover'] = '1'
+                client.servers.list(True, search_opts)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception                    
