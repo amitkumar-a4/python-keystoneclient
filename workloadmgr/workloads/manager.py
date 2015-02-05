@@ -220,23 +220,31 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def workload_get_topology(self, context, workload_id):
         """
         Return workload topology
-        """        
-        context_dict = dict([('%s' % key, value)
-                          for (key, value) in context.to_dict().iteritems()])            
-        context_dict['conf'] =  None # RpcContext object looks for this during init
-        workload = self.db.workload_get(context, workload_id)
-        store = {
-                'context': context_dict,                # context dictionary
-                'workload_id': workload_id,             # workload_id
-                'source_platform': workload.source_platform,
-        }
-        for kvpair in workload.metadata:
-            store[kvpair['key']] = kvpair['value']
-            
-        workflow_class = get_workflow_class(context, workload.workload_type_id)
-        workflow = workflow_class("workload_topology", store)
-        topology = workflow.topology()
-        return topology
+        """
+        try:
+            context_dict = dict([('%s' % key, value)
+                              for (key, value) in context.to_dict().iteritems()])            
+            context_dict['conf'] =  None # RpcContext object looks for this during init
+            workload = self.db.workload_get(context, workload_id)
+            store = {
+                    'context': context_dict,                # context dictionary
+                    'workload_id': workload_id,             # workload_id
+                    'source_platform': workload.source_platform,
+            }
+            for kvpair in workload.metadata:
+                store[kvpair['key']] = kvpair['value']
+
+            workflow_class = get_workflow_class(context, workload.workload_type_id)
+            workflow = workflow_class("workload_topology", store)
+            topology = workflow.topology()
+            return topology
+        except Exception as err:
+            with excutils.save_and_reraise_exception():
+                msg = _("Error getting workload topology %(workload_id)s with failure: %(exception)s") %{
+                        'workload_id': workload_id, 'exception': err,}
+                LOG.debug(msg)
+                LOG.exception(err)
+                pass
     
     @autolog.log_method(logger=Logger)    
     def workload_get_workflow_details(self, context, workload_id):
@@ -335,7 +343,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow = workflow_class(workload.display_name, store)
             instances = workflow.discover()
 
-
             workflow.initflow()
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -365,7 +372,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })             
              
             # Update vms
-            for inst in instances['instances']:
+            for inst in workflow._store['instances']:
                 if not 'root_partition_type' in inst:
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,

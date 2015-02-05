@@ -13,6 +13,7 @@ import random
 import sys
 import time
 
+import json
 import datetime 
 import paramiko
 import uuid
@@ -336,7 +337,7 @@ def ResumeDBInstances(hosts_list):
 
     return flow
 
-def secondaryhosts_to_backup(cntx, host, port, username, password):
+def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgroup):
     #
     # Creating connection to mongos server
     #
@@ -348,6 +349,10 @@ def secondaryhosts_to_backup(cntx, host, port, username, password):
     #
     LOG.debug(_('Getting sharding configuration'))
     shards = getShards(connection)
+
+    pgroup = []
+    if preferredgroup:
+        pgroup = json.loads(preferredgroup)
 
     #
     # Getting the secondaries list
@@ -363,7 +368,14 @@ def secondaryhosts_to_backup(cntx, host, port, username, password):
                     read_preference=ReadPreference.SECONDARY)
         status = c.admin.command('replSetGetStatus')
         hosts_list = []
+        preferredreplica = None
+        for member in pgroup:
+            if member['replica'] == status['set']:
+                preferredreplica = member['name']
+
         for m in status['members']:
+            if preferredreplica and m['name'] != preferredreplica:
+                continue
             if m['stateStr'] == 'SECONDARY':
                 hosts_to_backup.append({'replicaSetName': status['set'],
                                         'secondaryReplica': m['name']})
@@ -515,7 +527,8 @@ class MongoDBWorkflow(workflow.Workflow):
                                                    self._store['DBHost'],
                                                    self._store['DBPort'],
                                                    self._store['DBUser'],
-                                                   self._store['DBPassword'])
+                                                   self._store['DBPassword'],
+                                                   self._store['preferredgroup'])
         for index,item in enumerate(self._store['instances']):
             #self._store['instance_'+str(index)] = item
             self._store['instance_'+item['vm_id']] = item

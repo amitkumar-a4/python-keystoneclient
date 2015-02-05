@@ -14,6 +14,7 @@ import re
 import shutil
 
 import datetime 
+import json
 import paramiko
 import uuid
 import cPickle as pickle
@@ -182,25 +183,36 @@ def getcassandranodes(connection):
         for l in output:
             fields = l.split(":")
             if len(fields) > 1:
-                node[fields[0].strip()] = fields[1]
+                node[fields[0].strip()] = fields[1].strip()
 
         cassnodes.append(node)
 
     return cassnodes
 
-def get_cassandra_nodes(cntx, host, port, username, password):
+def get_cassandra_nodes(cntx, host, port, username, password, preferredgroup=None):
     #
     # Creating connection to cassandra namenode 
     #
     connection = connect_server(host, port, username, password)
     LOG.debug(_( 'Connected to cassandra node: ' + host))
 
+
     #
     # Getting sharding information
     #
-    nodenames = getcassandranodes(connection)
+    totalnodes = getcassandranodes(connection)
     
-    LOG.debug(_('Discovered cassandra nodes: ' + str(nodenames)))
+    LOG.debug(_('Discovered cassandra nodes: ' + str(totalnodes)))
+
+    # filter out vms that are not in preferred datacenter
+    if preferredgroup and len(preferredgroup):
+        nodenames = []
+        for dc in preferredgroup:
+            for node in totalnodes:
+                if dc['datacenter'] == node['Data Center']:
+                     nodenames.append(node)
+    else:
+        nodenames = totalnodes
 
     #
     # Resolve the node name to VMs
@@ -385,7 +397,10 @@ class CassandraWorkflow(workflow.Workflow):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
 
         self._store['instances'] =  get_cassandra_nodes(cntx, self._store['CassandraNode'], 
-                 int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
+                                                        int(self._store['SSHPort']),
+                                                        self._store['Username'],
+                                                        self._store['Password'],
+                                                        json.loads(self._store['preferredgroup']))
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+item['vm_id']] = item
             self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
