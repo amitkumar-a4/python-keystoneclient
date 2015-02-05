@@ -19,3 +19,13 @@
   size=25M
   rotate 12
 }
+
+/tmp/vmware-root/*.log {
+  daily
+  missingok
+  compress
+  delaycompress
+  notifempty
+  copytruncate
+  rotate 1
+}
