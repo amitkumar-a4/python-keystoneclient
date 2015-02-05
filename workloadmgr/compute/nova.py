@@ -234,6 +234,32 @@ def novaclient(context, production, admin=False, extensions = None):
         c.client.management_url = url
     return c
 
+def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_template):
+    httpclient = client.HTTPClient(
+        user=username,
+        password=password,
+        projectid=tenant_name,
+        service_name='nova',
+        service_type='compute',
+        endpoint_type='adminURL',
+        region_name=CONF.nova_production_region_name,
+        auth_url=auth_url,
+        timeout=CONF.nova_url_timeout,
+        auth_system=CONF.nova_auth_system,
+        insecure=CONF.nova_api_insecure)
+    httpclient.authenticate()
+    url = nova_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
+    c = nova_client.Client(username,
+                           password,
+                           project_id=httpclient.tenant_id,
+                           auth_url=url,
+                           insecure=CONF.nova_api_insecure,
+                           extensions = None)            
+    LOG.debug(_('Novaclient connection created using URL: %s') % url)
+    c.client.auth_token = httpclient.auth_token
+    c.client.management_url = url
+    return c
+
 
 class API(base.Base):
     """API for interacting with the volume manager."""

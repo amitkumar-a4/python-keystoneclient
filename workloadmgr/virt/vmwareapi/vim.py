@@ -80,7 +80,8 @@ class Vim:
                                          plugins=[VIMMessagePlugin()])
         self._service_content = self.RetrieveServiceContent(
                                         "ServiceInstance")
-
+        self.client.options.cache.clear()
+        
     @staticmethod
     def get_wsdl_url(protocol, host_name):
         """
