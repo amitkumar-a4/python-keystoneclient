@@ -362,7 +362,9 @@ class API(base.Base):
         if workload_type_id_valid == False:
             msg = _('Invalid workload type')
             raise wlm_exceptions.InvalidState(reason=msg)                
-                   
+
+        if not 'preferredgroup' in metadata:
+            metadata['preferredgroup'] = json.dumps([])
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'display_name': name,
