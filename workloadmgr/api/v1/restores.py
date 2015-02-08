@@ -76,39 +76,69 @@ class RestoresController(wsgi.Controller):
     @wsgi.serializers(xml=RestoreTemplate)
     def show(self, req, id, workload_id=None, snapshot_id=None):
         """Return data about the given Restore."""
-        context = req.environ['workloadmgr.context']
-
         try:
-            restore = self.workload_api.restore_show(context, id)
-        except wlm_exceptions.NotFound:
-            raise exc.HTTPNotFound()
-
-        return self._view_builder.detail(req, restore)
+            context = req.environ['workloadmgr.context']
+            try:
+                restore = self.workload_api.restore_show(context, id)
+            except wlm_exceptions.NotFound:
+                raise exc.HTTPNotFound()
+            return self._view_builder.detail(req, restore)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))       
 
     def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a restore."""
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_("Delete restore with id: %s"), id, context=context)
-
         try:
-            self.workload_api.restore_delete(context, id)
-        except wlm_exceptions.NotFound:
-            raise exc.HTTPNotFound()
-        except wlm_exceptions.InvalidState as error:
-            raise exc.HTTPBadRequest(explanation= unicode(error))
-
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.restore_delete(context, id)
+            except wlm_exceptions.NotFound:
+                raise exc.HTTPNotFound()
+            except wlm_exceptions.InvalidState as error:
+                raise exc.HTTPBadRequest(explanation= unicode(error))
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
 
     @wsgi.serializers(xml=RestoresTemplate)
     def index(self, req, workload_id=None, snapshot_id=None):
         """Returns a summary list of restores."""
-        return self._get_restores(req, snapshot_id, is_detail=False)
-
+        try:
+            return self._get_restores(req, snapshot_id, is_detail=False)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     @wsgi.serializers(xml=RestoresTemplate)
     def detail(self, req, workload_id=None, snapshot_id=None):
         """Returns a detailed list of restores."""
-        return self._get_restores(req, snapshot_id, is_detail=True)
-
+        try:
+            return self._get_restores(req, snapshot_id, is_detail=True)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     def _get_restores(self, req, snapshot_id, is_detail):
         """Returns a list of restores, transformed through view builder."""
         context = req.environ['workloadmgr.context']

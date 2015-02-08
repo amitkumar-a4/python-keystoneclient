@@ -3,7 +3,8 @@
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Text
+from datetime import datetime, timedelta
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Text 
 from sqlalchemy import Integer, BigInteger, MetaData, String, Table, UniqueConstraint
 import sqlalchemy
 
@@ -180,9 +181,26 @@ def upgrade(migrate_engine):
         Column('error_msg', String(length=4096)),
         Column('host', String(length=255)),
         Column('data_deleted', Boolean, default=False),
+        Column('pinned', Boolean, default=False),
+        Column('time_taken', BigInteger, default=0),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
+    
+    snapshot_metadata = Table(
+        'snapshot_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('version', String(length=255)),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('snapshot_id', String(length=255), ForeignKey('snapshots.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('snapshot_id', 'key'),
+        mysql_engine='InnoDB'
+    )        
     
     snapshot_vms = Table(
         'snapshot_vms', meta,
@@ -246,6 +264,7 @@ def upgrade(migrate_engine):
         Column('size', BigInteger, nullable=False),                
         Column('snapshot_type', String(length=32)),        
         Column('data_deleted', Boolean, default=False),
+        Column('time_taken', BigInteger, default=0),
         Column('status', String(length=32), nullable=False),
         UniqueConstraint('vm_id', 'snapshot_id', 'resource_name', 'resource_pit_id'),
         mysql_engine='InnoDB'
@@ -282,6 +301,7 @@ def upgrade(migrate_engine):
         Column('vault_service_metadata', String(4096)),
         Column('size', BigInteger, nullable=False),         
         Column('data_deleted', Boolean, default=False),
+        Column('time_taken', BigInteger, default=0),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )        
@@ -382,6 +402,7 @@ def upgrade(migrate_engine):
         Column('error_msg', String(length=4096)),
         Column('host', String(length=255)),        
         Column('target_platform', String(length=255)),
+        Column('time_taken', BigInteger, default=0),
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
@@ -447,6 +468,7 @@ def upgrade(migrate_engine):
               workload_vm_metadata,
               scheduled_jobs,
               snapshots,
+              snapshot_metadata,
               snapshot_vms,
               snapshot_vm_metadata,
               vm_recent_snapshot,
@@ -481,6 +503,7 @@ def upgrade(migrate_engine):
                   "workload_vm_metadata",
                   "scheduled_jobs",
                   "snapshots",
+                  "snapshot_metadata",
                   "snapshot_vms",
                   "snapshot_vm_metadata",
                   "vm_recent_snapshot",

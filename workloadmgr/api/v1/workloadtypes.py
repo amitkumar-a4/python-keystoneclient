@@ -75,37 +75,68 @@ class WorkloadTypesController(wsgi.Controller):
     @wsgi.serializers(xml=WorkloadTypeTemplate)
     def show(self, req, id):
         """Return data about the given WorkloadType."""
-        context = req.environ['workloadmgr.context']
-
         try:
-            workload_type = self.workload_api.workload_type_show(context, id)
-        except exception.NotFound:
-            raise exc.HTTPNotFound()
-
-        return self._view_builder.detail(req, workload_type)
+            context = req.environ['workloadmgr.context']
+            try:
+                workload_type = self.workload_api.workload_type_show(context, id)
+            except exception.NotFound:
+                raise exc.HTTPNotFound()
+            return self._view_builder.detail(req, workload_type)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))          
 
     def delete(self, req, id):
         """Delete a workload_types."""
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_("Delete workload_types with id: %s"), id, context=context)
-
         try:
-            self.workload_api.workload_type_delete(context, id)
-        except exception.NotFound:
-            raise exc.HTTPNotFound()
-        return webob.Response(status_int=202)
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.workload_type_delete(context, id)
+            except exception.NotFound:
+                raise exc.HTTPNotFound()
+            return webob.Response(status_int=202)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))          
 
     @wsgi.serializers(xml=WorkloadTypesTemplate)
     def index(self, req):
         """Returns a summary list of workload_types."""
-        return self._get_workload_types(req, is_detail=False)
-
+        try:
+            return self._get_workload_types(req, is_detail=False)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     @wsgi.serializers(xml=WorkloadTypesTemplate)
     def detail(self, req):
         """Returns a detailed list of workload_types."""
-        return self._get_workload_types(req, is_detail=True)
-
+        try:
+            return self._get_workload_types(req, is_detail=True)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     def _get_workload_types(self, req, is_detail):
         """Returns a list of workload_types, transformed through view builder."""
         context = req.environ['workloadmgr.context']
@@ -129,59 +160,69 @@ class WorkloadTypesController(wsgi.Controller):
     @wsgi.deserializers(xml=CreateDeserializer)
     def create(self, req, body):
         """Create a new workload_type."""
-        LOG.debug(_('Creating new workload_type %s'), body)
-        if not self.is_valid_body(body, 'workload_type'):
-            raise exc.HTTPBadRequest()
-
-        context = req.environ['workloadmgr.context']
-
         try:
-            workload_type = body['workload_type']
-            metadata = workload_type.get('metadata')
-        except KeyError:
-            msg = _("Incorrect request body format")
-            raise exc.HTTPBadRequest(explanation=msg)
-        id = workload_type.get('id', None)
-        name = workload_type.get('name', None)
-        description = workload_type.get('description', None)
-        is_public = workload_type.get('is_public', False)
-
-        LOG.audit(_("Creating workload_type"), locals(), context=context)
-
-        try:
-            new_workload_type = self.workload_api.workload_type_create(context,
-                                                                       id, 
-                                                                       name, 
-                                                                       description,
-                                                                       is_public, 
-                                                                       metadata)
-            new_workload_type_dict = self.workload_api.workload_type_show(context, new_workload_type.id)
-        except exception:
-            pass
- 
-        retval = self._view_builder.summary(req, new_workload_type_dict)
-        return retval    
+            if not self.is_valid_body(body, 'workload_type'):
+                raise exc.HTTPBadRequest()
+    
+            context = req.environ['workloadmgr.context']
+    
+            try:
+                workload_type = body['workload_type']
+                metadata = workload_type.get('metadata')
+            except KeyError:
+                msg = _("Incorrect request body format")
+                raise exc.HTTPBadRequest(explanation=msg)
+            id = workload_type.get('id', None)
+            name = workload_type.get('name', None)
+            description = workload_type.get('description', None)
+            is_public = workload_type.get('is_public', False)
+    
+            try:
+                new_workload_type = self.workload_api.workload_type_create(context,
+                                                                           id, 
+                                                                           name, 
+                                                                           description,
+                                                                           is_public, 
+                                                                           metadata)
+                new_workload_type_dict = self.workload_api.workload_type_show(context, new_workload_type.id)
+            except exception:
+                pass
+     
+            retval = self._view_builder.summary(req, new_workload_type_dict)
+            return retval
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))              
     
     def discover_instances(self, req, id, body):
         """discover_instances of a workload_type using the metadata"""
-        LOG.debug(_('discover_instances of a workload_type %s'), id)
-
-        context = req.environ['workloadmgr.context']
         try:
-            metadata = body['metadata']
-        except KeyError:
-            msg = _("Incorrect request body format. Missing metadata")
-            raise exc.HTTPBadRequest(explanation=msg)
-
-        LOG.audit(_("discover_instances of a workload_type %s"), locals(), context=context)
-
-        retval = None
-        try:
-            instances = self.workload_api.workload_type_discover_instances(context, id, metadata)
-        except exception:
-            pass
- 
-        return instances                
+            context = req.environ['workloadmgr.context']
+            try:
+                metadata = body['metadata']
+            except KeyError:
+                msg = _("Incorrect request body format. Missing metadata")
+                raise exc.HTTPBadRequest(explanation=msg)
+            retval = None
+            try:
+                instances = self.workload_api.workload_type_discover_instances(context, id, metadata)
+            except exception:
+                pass
+     
+            return instances 
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))                         
     
 def create_resource(ext_mgr):
     return wsgi.Resource(WorkloadTypesController(ext_mgr))

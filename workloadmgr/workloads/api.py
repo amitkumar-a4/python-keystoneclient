@@ -64,8 +64,7 @@ def _snapshot_create_callback(*args, **kwargs):
 
     #TODO: Make sure workload is in a created state
     if workload['status'] == 'error':
-        msg = _("Workload is in error state. Cannot schedule snapshot operation")
-        LOG.info(msg, {'workload_id': workload_id})
+        LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
         return
 
     # wait for 5 minutes until the workload changes state to available
@@ -79,8 +78,7 @@ def _snapshot_create_callback(*args, **kwargs):
 
     # if workload hasn't changed the status to available
     if workload['status'] != 'available':
-        msg = _("Workload is not in available state. Cannot schedule snapshot operation")
-        LOG.info(msg, {'workload_id': workload_id})
+        LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
         return
 
     # determine if the workload need to be full snapshot or incremental
@@ -197,7 +195,7 @@ class API(base.Base):
         AUDITLOG.log(context,'WorkloadType Delete Requested', workload_type)
         if workload_type['status'] not in ['available', 'error']:
             msg = _('WorkloadType status must be available or error')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidState(reason=msg)
 
         #TODO(giri): check if this workload_type is referenced by other workloads
                     
@@ -363,7 +361,7 @@ class API(base.Base):
                 break 
         if workload_type_id_valid == False:
             msg = _('Invalid workload type')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                
+            raise wlm_exceptions.InvalidState(reason=msg)                
                    
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
@@ -474,7 +472,7 @@ class API(base.Base):
         AUDITLOG.log(context,'Workload Delete Requested', workload)
         if workload['status'] not in ['available', 'error']:
             msg = _('Workload status must be available or error')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidState(reason=msg)
         
         workloads = self.db.workload_get_all(context)
         for workload in workloads:
@@ -490,12 +488,12 @@ class API(base.Base):
                                 if 'type' in member:
                                     if member['data']['id'] == workload_id:
                                         msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                        raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                    
+                                        raise wlm_exceptions.InvalidState(reason=msg)                    
 
         snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
         if len(snapshots) > 0:
             msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidState(reason=msg)
                     
         # First unschedule the job
         jobs = self._scheduler.get_jobs()
@@ -548,7 +546,7 @@ class API(base.Base):
             stdout, stderr = utils.execute('df', FLAGS.wlm_vault_local_directory)
             if stderr != '':
                 msg = _('Could not execute df command successfully. Error %s'), (stderr)
-                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+                raise wlm_exceptions.InvalidState(reason=msg)
 
             # Filesystem     1K-blocks      Used Available Use% Mounted on
             # /dev/sda1      464076568 248065008 192431096  57% /
@@ -761,11 +759,11 @@ class API(base.Base):
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 msg = _('Workload job scheduler is not paused')
-                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+                raise wlm_exceptions.InvalidState(reason=msg)
         jobschedule = workload['jobschedule']
         if len(jobschedule) < 5:
                 msg = _('Job scheduler settings are not available')
-                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)            
+                raise wlm_exceptions.InvalidState(reason=msg)            
    
         self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                             jobschedule,
@@ -803,14 +801,14 @@ class API(base.Base):
                                 if 'type' in member:
                                     if member['data']['id'] == workload_id:
                                         msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                        raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)                                    
+                                        raise wlm_exceptions.InvalidState(reason=msg)                                    
 
         try:
             workload_lock.acquire()
             workload = self.workload_get(context, workload_id)
             if workload['status'].lower() != 'available':
                 msg = _("Workload must be in the 'available' state to take a snapshot")
-                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+                raise wlm_exceptions.InvalidState(reason=msg)
             self.db.workload_update(context, workload_id, {'status': 'locked'})
         finally:
             workload_lock.release()                    
@@ -937,13 +935,13 @@ class API(base.Base):
 
         if snapshot['status'] not in ['available', 'error']:
             msg = _('Snapshot status must be available or error')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidState(reason=msg)
 
         restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
         for restore in restores:
             if restore.restore_type == 'test':
                 msg = _('This workload snapshot contains testbubbles')
-                raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)      
+                raise wlm_exceptions.InvalidState(reason=msg)      
         
         self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
         AUDITLOG.log(context,'Snapshot Deleted', snapshot)
@@ -957,7 +955,7 @@ class API(base.Base):
         workload = self.workload_get(context, snapshot['workload_id'])
         if snapshot['status'] != 'available':
             msg = _('Snapshot status must be available')
-            raise wlm_exceptions.InvalidWorkloadMgr(reason=msg)
+            raise wlm_exceptions.InvalidState(reason=msg)
         
         restore_type = "restore"
         if test:

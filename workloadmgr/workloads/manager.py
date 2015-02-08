@@ -242,7 +242,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             with excutils.save_and_reraise_exception():
                 msg = _("Error getting workload topology %(workload_id)s with failure: %(exception)s") %{
                         'workload_id': workload_id, 'exception': err,}
-                LOG.debug(msg)
+                LOG.error(msg)
                 LOG.exception(err)
                 pass
     
@@ -351,7 +351,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'executing'
                                     })            
             workflow.execute()
-            self.db.snapshot_type_update(context, snapshot_id)               
+            self.db.snapshot_type_time_update(context, snapshot_id)               
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -384,7 +384,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             msg = _("Error creating workload snapshot %(snapshot_id)s with failure: %(exception)s") %{
                     'snapshot_id': snapshot_id, 'exception': ex,}
-            LOG.debug(msg)
+            LOG.error(msg)
             LOG.exception(ex)
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -490,6 +490,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             {'progress_percent': 100, 
                              'progress_msg': 'Restore from snapshot is complete',
                              'finished_at' : timeutils.utcnow(),
+                             'time_taken' : int((timeutils.utcnow() - restore.created_at).total_seconds()),
                              'status': 'available'
                             })                         
 
@@ -500,7 +501,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 msg = _("Error restoring %(restore_id)s with failure: %(exception)s") %{
                         'restore_id': restore_id, 'exception': ex,}
-            LOG.debug(msg)
+            LOG.error(msg)
             LOG.exception(ex)
             self.db.restore_update( context, 
                                     restore_id, 

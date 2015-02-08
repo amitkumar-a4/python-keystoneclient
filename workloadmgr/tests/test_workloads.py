@@ -76,7 +76,7 @@ class BaseWorkloadTestCase(test.TestCase):
     def test_create_workload_with_invalid_workload_type(self):
         """Test workload can be created and deleted."""
 
-        self.assertRaises(exception.InvalidWorkloadMgr,
+        self.assertRaises(exception.InvalidState,
                           self.workloadAPI.workload_create,
                           self.context, 'test_workload',
                           'this is a test_workload', "invalid_type",

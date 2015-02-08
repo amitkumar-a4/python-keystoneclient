@@ -75,37 +75,68 @@ class TestbubblesController(wsgi.Controller):
     @wsgi.serializers(xml=TestbubbleTemplate)
     def show(self, req, id, workload_id=None, snapshot_id=None):
         """Return data about the given Testbubble."""
-        context = req.environ['workloadmgr.context']
-
         try:
-            testbubble = self.workload_api.restore_show(context, id)
-        except exception.NotFound:
-            raise exc.HTTPNotFound()
-
-        return self._view_builder.detail(req, testbubble)
-
+            context = req.environ['workloadmgr.context']
+            try:
+                testbubble = self.workload_api.restore_show(context, id)
+            except exception.NotFound:
+                raise exc.HTTPNotFound()
+            return self._view_builder.detail(req, testbubble)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a testbubble."""
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_("Delete testbubble with id: %s"), id, context=context)
-
         try:
-            self.workload_api.restore_delete(context, id)
-        except exception.NotFound:
-            raise exc.HTTPNotFound()
-        return webob.Response(status_int=202)
-
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.restore_delete(context, id)
+            except exception.NotFound:
+                raise exc.HTTPNotFound()
+            return webob.Response(status_int=202)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     @wsgi.serializers(xml=TestbubblesTemplate)
     def index(self, req, workload_id=None, snapshot_id=None):
         """Returns a summary list of testbubbles."""
-        return self._get_testbubbles(req, snapshot_id, is_detail=False)
-
+        try:
+            return self._get_testbubbles(req, snapshot_id, is_detail=False)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     @wsgi.serializers(xml=TestbubblesTemplate)
     def detail(self, req, workload_id=None, snapshot_id=None):
         """Returns a detailed list of testbubbles."""
-        return self._get_testbubbles(req, snapshot_id, is_detail=True)
-
+        try:
+            return self._get_testbubbles(req, snapshot_id, is_detail=True)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))  
+        
     def _get_testbubbles(self, req, snapshot_id, is_detail):
         """Returns a list of testbubbles, transformed through view builder."""
         context = req.environ['workloadmgr.context']

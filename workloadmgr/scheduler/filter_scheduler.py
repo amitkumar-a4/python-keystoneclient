@@ -172,12 +172,12 @@ class FilterScheduler(driver.Scheduler):
         if not hosts:
             return None
 
-        LOG.debug(_("Filtered %(hosts)s") % locals())
+        LOG.info(_("Filtered %(hosts)s") % locals())
         # weighted_host = WeightedHost() ... the best
         # host for the job.
         weighed_hosts = self.host_manager.get_weighed_hosts(hosts,
                                                             filter_properties)
         best_host = weighed_hosts[0]
-        LOG.debug(_("Choosing %(best_host)s") % locals())
+        LOG.info(_("Choosing %(best_host)s") % locals())
         best_host.obj.consume_from_snapshot(snapshot_properties)
         return best_host

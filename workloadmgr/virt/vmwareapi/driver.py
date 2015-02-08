@@ -160,18 +160,18 @@ class VMwareESXDriver(driver.ComputeDriver):
                     "VirtualMachine", "runtime.powerState")
         # Only PoweredOn VMs can be suspended.
         if pwr_state == "poweredOn":
-            LOG.debug(_("Suspending the VM"), instance=instance)
+            LOG.info(_("Suspending the VM %s") % instance['vm_name'])
             suspend_task = self._session._call_method(self._session._get_vim(),
                     "SuspendVM_Task", vm_ref)
             self._session._wait_for_task(instance['uuid'], suspend_task)
-            LOG.debug(_("Suspended the VM"), instance=instance)
+            LOG.info(_("Suspended the VM %s") % instance['vm_name'])
         # Raise Exception if VM is poweredOff
         elif pwr_state == "poweredOff":
-            LOG.debug(_("instance is powered off and cannot be suspended. So returning "
-                      "without doing anything"), instance=instance)
+            LOG.info(_("%s is powered off and cannot be suspended. So returning "
+                      "without doing anything") % instance['vm_name'])
         else:
-            LOG.debug(_("VM was already in suspended state. So returning "
-                      "without doing anything"), instance=instance)
+            LOG.info(_("%s is already in suspended state. So returning "
+                      "without doing anything") % instance['vm_name'])
 
     def resume(self, cntx, db, instance):
         """Resume the specified instance."""
@@ -185,15 +185,15 @@ class VMwareESXDriver(driver.ComputeDriver):
                                      "get_dynamic_property", vm_ref,
                                      "VirtualMachine", "runtime.powerState")
         if pwr_state.lower() == "suspended":
-            LOG.debug(_("Resuming the VM"), instance=instance)
+            LOG.info(_("Resuming the VM %s") % instance['vm_name'])
             suspend_task = self._session._call_method(
                                         self._session._get_vim(),
                                        "PowerOnVM_Task", vm_ref)
             self._session._wait_for_task(instance['uuid'], suspend_task)
-            LOG.debug(_("Resumed the VM"), instance=instance)
+            LOG.info(_("Resumed the VM %s") % instance['vm_name'])
         else:
-            LOG.debug(_("instance is not in suspended state. So returning "
-                      "without doing anything"), instance=instance)
+            LOG.info(_("%s is not in suspended state. So returning "
+                      "without doing anything") % instance['vm_name'])
 
 
     def power_off(self, vm_ref, instance):
@@ -203,19 +203,19 @@ class VMwareESXDriver(driver.ComputeDriver):
                     "VirtualMachine", "runtime.powerState")
         # Only PoweredOn VMs can be powered off.
         if pwr_state == "poweredOn":
-            LOG.debug(_("Powering off the VM"), instance=instance)
+            LOG.info(_("Powering off the VM %s") % instance['vm_name'])
             poweroff_task = self._session._call_method(
                                         self._session._get_vim(),
                                         "PowerOffVM_Task", vm_ref)
             self._session._wait_for_task(instance['uuid'], poweroff_task)
-            LOG.debug(_("Powered off the VM"), instance=instance)
+            LOG.info(_("Powered off the VM %s") % instance['vm_name'])
         # Raise Exception if VM is suspended
         elif pwr_state == "suspended":
-            reason = _("instance is suspended and cannot be powered off.")
+            reason = _(instance['vm_name'] + " is suspended and cannot be powered off.")
             raise exception.InstancePowerOffFailure(reason=reason)
         else:
-            LOG.debug(_("VM was already in powered off state. So returning "
-                        "without doing anything"), instance=instance)
+            LOG.info(_("%s is already in powered off state. So returning "
+                        "without doing anything") % instance['vm_name'])
 
     def power_on(self, vm_ref, instance):
         """Power on the specified instance."""
@@ -223,11 +223,11 @@ class VMwareESXDriver(driver.ComputeDriver):
                                      "get_dynamic_property", vm_ref,
                                      "VirtualMachine", "runtime.powerState")
         if pwr_state == "poweredOn":
-            LOG.debug(_("VM was already in powered on state. So returning "
-                      "without doing anything"), instance=instance)
+            LOG.info(_("%s is already in powered on state. So returning "
+                      "without doing anything") % instance['vm_name'])
         # Only PoweredOff and Suspended VMs can be powered on.
         else:
-            LOG.debug(_("Powering on the VM"), instance=instance)
+            LOG.info(_("Powering on the VM %s") % instance['vm_name'])
             poweron_task = self._session._call_method(
                                         self._session._get_vim(),
                                         "PowerOnVM_Task", vm_ref)
@@ -257,7 +257,7 @@ class VMwareESXDriver(driver.ComputeDriver):
                 time.sleep(delay if delay > 0 else 0)
                        
             self._session._wait_for_task(instance['uuid'], poweron_task)
-            LOG.debug(_("Powered on the VM"), instance=instance)
+            LOG.info(_("Powered on the VM %s") % instance['vm_name'])
 
     def get_host_ip_addr(self):
         """Retrieves the IP address of the ESX host."""
@@ -357,7 +357,7 @@ class VMwareVCDriver(VMwareESXDriver):
             host_ref =  datastore_host_mount[1][0].key
             host_name = self._session._call_method(vim_util, "get_dynamic_property", host_ref, "HostSystem", "name")
             return host_ref, host_name
-        raise exception.HostNotFound()
+        raise exception.HostNotFound(host='none')
                     
 
     def _get_root_disk_path_from_vm_ref(self, vm_ref):
@@ -504,17 +504,15 @@ class VMwareVCDriver(VMwareESXDriver):
         vmdk_detach_config_spec = vm_util.get_vmdk_detach_config_spec(
                                     client_factory, device, destroy_disk)
         disk_key = device.key
-        LOG.debug(_("Reconfiguring VM instance %(instance_name)s to detach "
-                    "disk %(disk_key)s"),
-                  {'instance_name': instance_name, 'disk_key': disk_key})
+        LOG.info(_("Reconfiguring VM instance %(instance_name)s to detach "
+                   "disk %(disk_key)s"), {'instance_name': instance_name, 'disk_key': disk_key})
         reconfig_task = self._session._call_method(
                                         self._session._get_vim(),
                                         "ReconfigVM_Task", vm_ref,
                                         spec=vmdk_detach_config_spec)
         self._session._wait_for_task(instance_uuid, reconfig_task)
-        LOG.debug(_("Reconfigured VM instance %(instance_name)s to detach "
-                    "disk %(disk_key)s"),
-                  {'instance_name': instance_name, 'disk_key': disk_key})
+        LOG.info(_("Reconfigured VM instance %(instance_name)s to detach "
+                   "disk %(disk_key)s"), {'instance_name': instance_name, 'disk_key': disk_key})
 
     def _rebase_vmdk(self, base, orig_base, base_descriptor, base_monolithicsparse,
                             top, orig_top, top_descriptor, top_monolithicsparse):
@@ -577,8 +575,7 @@ class VMwareVCDriver(VMwareESXDriver):
         """     
 
     def _delete_datastore_file(self, instance, datastore_path, dc_ref):
-        LOG.debug(_("Deleting the datastore file %s") % datastore_path,
-                  instance=instance)
+        LOG.debug(_("Deleting the datastore file %s") % datastore_path)
         vim = self._session._get_vim()
         file_delete_task = self._session._call_method(
                 self._session._get_vim(),
@@ -588,7 +585,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 datacenter=dc_ref)
         self._session._wait_for_task(instance['uuid'],
                                      file_delete_task)
-        LOG.debug(_("Deleted the datastore file"), instance=instance)
+        LOG.debug(_("Deleted the datastore file %s") % datastore_path)
         
     @autolog.log_method(Logger, 'vmwareapi.driver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
@@ -856,9 +853,9 @@ class VMwareVCDriver(VMwareESXDriver):
                     vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.id
                 else:
                     vm_disk_resource_snap_backing_id = None
-					
-		if snapshot_obj.snapshot_type == 'full':
-		    vm_disk_resource_snap_backing_id = None
+
+                if snapshot_obj.snapshot_type == 'full':
+                    vm_disk_resource_snap_backing_id = None
                 
                 # create an entry in the vm_disk_resource_snaps table
                 vm_disk_resource_snap_id = str(uuid.uuid4())
@@ -902,7 +899,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     cmdline += " " + copy_to_file_path
                     check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
                 except subprocess.CalledProcessError as ex:
-                    LOG.debug(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
+                    LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
                     LOG.exception(ex)
                     raise
             
@@ -933,35 +930,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                 ctkfile.write(str(start) + "," + str(length)+"\n")
                                 totalBytesToTransfer += length
                         position = changes.startOffset + changes.length;
-                """
-                                chunksize = 64 * 1024 * 1024 
-                                for chunkstart in xrange(start, start+length, chunksize):
-                                    if chunkstart + chunksize > start + length:
-                                        chunk = start + length - chunkstart
-                                    else:
-                                        chunk = chunksize 
-                                    try:            
-                                        cmdline = "trilio-vix-disk-cli -download".split(" ")
-                                        cmdline.append(str(dev.backing.fileName))
-                                        cmdline += ("-start " + str(chunkstart/512)).split(" ")
-                                        cmdline += ("-count " + str(chunk/512)).split(" ")
-                                        cmdline += ['-host', self._session._host_ip,]
-                                        cmdline += ['-user', self._session._host_username,]
-                                        cmdline += ['-password', self._session._host_password,]
-                                        cmdline += ['-vm', vmxspec,]
-                                        cmdline.append(copy_to_file_path)
-                                        check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                                        snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': chunk})
-                                    except subprocess.CalledProcessError as ex:
-                                        for idx, opt in enumerate(cmdline):
-                                            if opt == "-password":
-                                                cmdline[idx+1] = "***********"
-                                                break
-                                        LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
-                                        LOG.exception(ex)
-                                        raise                            
-                            
-                """
+                        
                 cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
                            str(dev.backing.fileName),
                            "-extentfile", copy_to_file_path + "-ctk",
@@ -1020,27 +989,6 @@ class VMwareVCDriver(VMwareESXDriver):
                             cmd=cmd)
 
                 snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': (totalBytesToTransfer - uploaded_size)})
-                """
-                try:            
-                    cmdline = "trilio-vix-disk-cli -downloadextents".split(" ")
-                    cmdline.append(str(dev.backing.fileName))
-                    cmdline += ("-extentfile " + copy_to_file_path + "-ctk").split(" ")
-                    cmdline += ['-host', self._session._host_ip,]
-                    cmdline += ['-user', self._session._host_username,]
-                    cmdline += ['-password', self._session._host_password,]
-                    cmdline += ['-vm', vmxspec,]
-                    cmdline.append(copy_to_file_path)
-                    check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                    snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': 100})
-                except subprocess.CalledProcessError as ex:
-                    for idx, opt in enumerate(cmdline):
-                        if opt == "-password":
-                            cmdline[idx+1] = "***********"
-                            break
-                    LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
-                    LOG.exception(ex)
-                    raise                            
-                """
 
                 LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
                 LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
@@ -1055,6 +1003,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 vm_disk_resource_snap_values = {'vault_service_url' : copy_to_file_path,
                                                 'vault_service_metadata' : 'None',
                                                 'finished_at' : timeutils.utcnow(),
+                                                'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()), 
                                                 'status': 'available'}
                 vm_disk_resource_snap = db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 snapshot_type = 'full' if changeId == '*' else 'incremental'
@@ -1116,10 +1065,14 @@ class VMwareVCDriver(VMwareESXDriver):
         
                 snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
                 vmdk_size, snapshot_type = _upload_vmdk(dev)
-                snapshot_vm_resource = db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 
-                                                                                                      'size': vmdk_size,
-                                                                                                      'snapshot_type': snapshot_type,
-                                                                                                      'finished_at' : timeutils.utcnow()})
+                snapshot_vm_resource = db.snapshot_vm_resource_update(cntx, 
+                                                                      snapshot_vm_resource.id, 
+                                                                      {'status': 'available', 
+                                                                       'size': vmdk_size,
+                                                                       'snapshot_type': snapshot_type,
+                                                                       'finished_at' : timeutils.utcnow(),
+                                                                       'time_taken' : int((timeutils.utcnow() - snapshot_vm_resource.created_at).total_seconds()),
+                                                                       })
 
         except Exception as ex:
             LOG.exception(ex)      
@@ -1275,7 +1228,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                             cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
                                             check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
                                         except subprocess.CalledProcessError as ex:
-                                            LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                                            LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
                                             raise
                                         backing_ctkfile.write(str(start) + "," + str(length)+"\n")
     
@@ -1284,7 +1237,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                 cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
                                 check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
                             except subprocess.CalledProcessError as ex:
-                                LOG.debug(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                                LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
                                 raise
                             
                                         
@@ -1297,7 +1250,10 @@ class VMwareVCDriver(VMwareESXDriver):
                             db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                             
                             snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                            snapshot_vm_resource_values = {'size' : snapshot_vm_resource_backing.size, 'snapshot_type' : snapshot_vm_resource_backing.snapshot_type }
+                            snapshot_vm_resource_values = {'size' : snapshot_vm_resource_backing.size, 
+                                                           'snapshot_type' : snapshot_vm_resource_backing.snapshot_type,
+                                                           'time_taken': snapshot_vm_resource_backing.time_taken}
+                            
                             db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, snapshot_vm_resource_values)
                             db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_backing.id)
                             db.snapshot_vm_resource_delete(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
@@ -1305,7 +1261,7 @@ class VMwareVCDriver(VMwareESXDriver):
                             if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
                                 affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
                     
-                    db.snapshot_type_update(cntx, snapshot_to_commit.id)
+                    db.snapshot_type_time_update(cntx, snapshot_to_commit.id)
                     _snapshot_size_update(cntx, snapshot_to_commit)
     
                     if _snapshot_disks_deleted(snap):
@@ -1387,7 +1343,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     vmdk_write_file_handle.close()    
                     
             """Register VM on ESX host."""
-            LOG.debug(_("Registering VM on the ESX host"))
+            LOG.info(_("Registering VM %s") % instance_name)
             # Create the VM on the ESX host
             vm_folder_ref = None
             if 'vmfolder' in instance_options:
@@ -1435,7 +1391,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                         host=host_ref)
                 self._session._wait_for_task(instance['uuid'], vm_register_task)
     
-            LOG.debug(_("Registered VM on the ESX host"))
+            LOG.info(_("Registered VM %s") % instance_name)
             vm_ref = self._get_vm_ref_from_name_folder(vm_folder_ref, instance_options['name'])            
             hardware_devices = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
                                                           "VirtualMachine", "config.hardware.device")
@@ -1487,12 +1443,12 @@ class VMwareVCDriver(VMwareESXDriver):
                     virtual_device_config_spec.operation = "edit"
                     vm_config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
                     vm_config_spec.deviceChange = [virtual_device_config_spec]
-                    LOG.debug(_("Reconfiguring VM instance %(instance_name)s for nic %(nic_label)s"),{'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
+                    LOG.info(_("Reconfiguring VM instance %(instance_name)s for nic %(nic_label)s"),{'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
                     reconfig_task = self._session._call_method( self._session._get_vim(),
                                                                 "ReconfigVM_Task", vm_ref,
                                                                 spec=vm_config_spec)
                     self._session._wait_for_task(instance_uuid, reconfig_task)
-                    LOG.debug(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
+                    LOG.info(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
                                 {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
                             
             #restore, rebase, commit & upload
@@ -1534,7 +1490,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                    capacityInKB, linked_clone,
                                                    vmdk_controler_key, unit_number, device_name)            
     
-                LOG.debug('Uploading image and volumes of instance ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id)        
+                LOG.info('Uploading disks of ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id)        
                 db.restore_update(cntx,  restore['id'], 
                                   {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
                                    'status': 'uploading' 
@@ -1629,7 +1585,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                   'status': 'available'}
             restored_vm = db.restored_vm_create(cntx,restored_vm_values)
             
-            LOG.debug(_("RestoreVM Completed"))
+            LOG.info(_("RestoreVM %s Completed") % instance_name)
              
             #TODO(giri): Execuete the following in a finally block
             for snapshot_vm_resource in snapshot_vm_resources:

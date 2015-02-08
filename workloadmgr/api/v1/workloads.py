@@ -92,58 +92,52 @@ class WorkloadMgrsController(wsgi.Controller):
     @wsgi.serializers(xml=WorkloadTemplate)
     def show(self, req, id):
         """Return data about the given workload."""
-        LOG.debug(_('show called for member %s'), id)
-        context = req.environ['workloadmgr.context']
-
         try:
+            context = req.environ['workloadmgr.context']
             workload = self.workload_api.workload_show(context, workload_id=id)
-        except exception.WorkloadMgrNotFound as error:
+            return self._view_builder.detail(req, workload)
+        except exception.WorkloadNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
-
-        return self._view_builder.detail(req, workload)
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
+            
 
     def delete(self, req, id):
         """Delete a workload."""
-        LOG.debug(_('delete called for member %s'), id)
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('Delete workload with id: %s'), id, context=context)
         try:
+            context = req.environ['workloadmgr.context']
             self.workload_api.workload_delete(context, id)
-        except exception.WorkloadMgrNotFound as error:
+            return webob.Response(status_int=202)
+        except exception.WorkloadNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
-        except exception.InvalidWorkloadMgr as error:
+        except exception.InvalidState as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
-
-        return webob.Response(status_int=202)
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
     
     def unlock(self, req, id):
-        LOG.debug(_('workload unlock called for workload %s'), id)
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('Unlock workload with id: %s'), id, context=context)
         try:
+            context = req.environ['workloadmgr.context']
             self.workload_api.workload_unlock(context, id)
-        except exception.WorkloadMgrNotFound as error:
+            return webob.Response(status_int=202)
+        except exception.WorkloadNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
-        except exception.InvalidWorkloadMgr as error:
+        except exception.InvalidState as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
-
-        return webob.Response(status_int=202)
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
     
     def snapshot(self, req, id, body=None):
         """snapshot a workload."""
-        LOG.debug(_('snapshot called for workload %s'), id)
-        context = req.environ['workloadmgr.context']
-        full = None
-        if ('QUERY_STRING' in req.environ) :
-            qs=parse_qs(req.environ['QUERY_STRING'])
-            var = parse_qs(req.environ['QUERY_STRING'])
-            full = var.get('full',[''])[0]
-            full = escape(full)
-
-        LOG.audit(_('snapshot workload: %s'), id, context=context)
         try:
+            context = req.environ['workloadmgr.context']
+            full = None
+            if ('QUERY_STRING' in req.environ) :
+                qs=parse_qs(req.environ['QUERY_STRING'])
+                var = parse_qs(req.environ['QUERY_STRING'])
+                full = var.get('full',[''])[0]
+                full = escape(full)
+                
             snapshot_type = 'incremental'
             if (full and full == '1'):
                 snapshot_type = 'full'
@@ -154,24 +148,39 @@ class WorkloadMgrsController(wsgi.Controller):
                 description = body['snapshot'].get('description', '')
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)                
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
-        except exception.WorkloadMgrNotFound as error:
+            return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
+        except exception.WorkloadNotFound as error:
             raise exc.HTTPNotFound(explanation=unicode(error))
-        except exception.InvalidWorkloadMgr as error:
+        except exception.InvalidState as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
-        
-        return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
-        #return {'snapshot': _translate_snapshot_detail_view(context, dict(new_snapshot.iteritems()))}
-    
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
+                
     @wsgi.serializers(xml=WorkloadsTemplate)
     def index(self, req):
         """Returns a summary list of workloads."""
-        return self._get_workloads(req, is_detail=False)
+        try:
+            return self._get_workloads(req, is_detail=False)
+        except exception.WorkloadNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     @wsgi.serializers(xml=WorkloadsTemplate)
     def detail(self, req):
         """Returns a detailed list of workloads."""
-        return self._get_workloads(req, is_detail=True)
+        try:
+            return self._get_workloads(req, is_detail=True)
+        except exception.WorkloadNotFound as error:
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
 
+        
     def _get_workloads(self, req, is_detail):
         """Returns a list of workloadmgr, transformed through view builder."""
         context = req.environ['workloadmgr.context']
@@ -190,207 +199,280 @@ class WorkloadMgrsController(wsgi.Controller):
             workloads = self._view_builder.summary_list(req, workloads)
         return workloads
 
+        
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)
     @wsgi.deserializers(xml=CreateDeserializer)
     def create(self, req, body):
         """Create a new workload."""
-        LOG.debug(_('Creating new workload %s'), body)
-        if not self.is_valid_body(body, 'workload'):
-            raise exc.HTTPBadRequest()
-
-        context = req.environ['workloadmgr.context']
-
         try:
-            workload = body['workload']
-        except KeyError:
-            msg = _("Incorrect request body format")
-            raise exc.HTTPBadRequest(explanation=msg)
-        name = workload.get('name', None)
-        description = workload.get('description', None)
-        workload_type_id = workload.get('workload_type_id', None)
-        source_platform = workload.get('source_platform', "openstack")
-        jobschedule = workload.get('jobschedule', {})
-        if not jobschedule:
-            jobschedule = {}
-        instances = workload.get('instances', {})
-        if not instances:
-            instances = {}        
-        metadata = workload.get('metadata', {}) 
-        if not metadata:
-            metadata = {}    
-
-        LOG.audit(_("Creating workload"), locals(), context=context)
-
-        try:
-            new_workload = self.workload_api.workload_create(context, 
-                                                             name, 
-                                                             description,
-                                                             workload_type_id, 
-                                                             source_platform,
-                                                             instances,
-                                                             jobschedule,
-                                                             metadata)
-            new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
+            if not self.is_valid_body(body, 'workload'):
+                raise exc.HTTPBadRequest()
+    
+            context = req.environ['workloadmgr.context']
+    
+            try:
+                workload = body['workload']
+            except KeyError:
+                msg = _("Incorrect request body format")
+                raise exc.HTTPBadRequest(explanation=msg)
+            name = workload.get('name', None)
+            description = workload.get('description', None)
+            workload_type_id = workload.get('workload_type_id', None)
+            source_platform = workload.get('source_platform', "openstack")
+            jobschedule = workload.get('jobschedule', {})
+            if not jobschedule:
+                jobschedule = {}
+            instances = workload.get('instances', {})
+            if not instances:
+                instances = {}        
+            metadata = workload.get('metadata', {}) 
+            if not metadata:
+                metadata = {}    
+    
+            try:
+                new_workload = self.workload_api.workload_create(context, 
+                                                                 name, 
+                                                                 description,
+                                                                 workload_type_id, 
+                                                                 source_platform,
+                                                                 instances,
+                                                                 jobschedule,
+                                                                 metadata)
+                new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
+            except Exception as error:
+                raise exc.HTTPServerError(explanation=unicode(error))
+     
+            retval = self._view_builder.summary(req, new_workload_dict)
+            return retval
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
         except Exception as error:
-            raise exc.HTTPInternalServerError(explanation=unicode(error))
- 
-        retval = self._view_builder.summary(req, new_workload_dict)
-        return retval
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)
     @wsgi.deserializers(xml=UpdateDeserializer)
     def update(self, req, id, body):
         """Update workload."""
-        LOG.debug(_('Updating workload %s'), id)
-        if not self.is_valid_body(body, 'workload'):
-            raise exc.HTTPBadRequest()
-
-        context = req.environ['workloadmgr.context']
         try:
-            self.workload_api.workload_modify(context, id, body['workload'])
-        except exception.WorkloadMgrNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
+            if not self.is_valid_body(body, 'workload'):
+                raise exc.HTTPBadRequest()
+    
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.workload_modify(context, id, body['workload'])
+            except exception.WorkloadNotFound as error:
+                raise exc.HTTPNotFound(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
+            
 
     def get_workflow(self, req, id):
         """Return workflow details of a given workload."""
-        LOG.debug(_('get_workflow called for member %s'), id)
-        context = req.environ['workloadmgr.context']
-
         try:
-            workload_workflow = self.workload_api.workload_get_workflow(context, workload_id=id)
-        except exception.WorkloadMgrNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
-
-        return workload_workflow
+            context = req.environ['workloadmgr.context']
+            try:
+                workload_workflow = self.workload_api.workload_get_workflow(context, workload_id=id)
+            except exception.WorkloadNotFound as error:
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            return workload_workflow
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))        
     
     def pause(self, req, id):
         """pause a given workload."""
-        LOG.debug(_('pause called for member %s'), id)
-        context = req.environ['workloadmgr.context']
-
         try:
-            self.workload_api.workload_pause(context, workload_id=id)
-        except exception.WorkloadMgrNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.workload_pause(context, workload_id=id)
+            except exception.WorkloadNotFound as error:
+                raise exc.HTTPNotFound(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))        
+        
 
     def resume(self, req, id):
         """resume a given workload."""
-        LOG.debug(_('resume called for member %s'), id)
-        context = req.environ['workloadmgr.context']
-
         try:
-            self.workload_api.workload_resume(context, workload_id=id)
-        except exception.WorkloadMgrNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error)) 
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.workload_resume(context, workload_id=id)
+            except exception.NotFound as error:
+                raise exc.HTTPNotFound(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))             
     
     def get_topology(self, req, id):
         """Return topology of a given workload."""
-        LOG.debug(_('get_topology called for member %s'), id)
-        context = req.environ['workloadmgr.context']
-
         try:
-            workload_topology = self.workload_api.workload_get_topology(context, workload_id=id)
-        except exception.WorkloadMgrNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
-
-        return workload_topology    
+            context = req.environ['workloadmgr.context']
+            try:
+                workload_topology = self.workload_api.workload_get_topology(context, workload_id=id)
+            except exception.NotFound as error:
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            return workload_topology
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))            
 
     def discover_instances(self, req, id):
         """discover_instances of a workload_type using the metadata"""
-        LOG.debug(_('discover_instances of a workload %s'), id)
-
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_("discover_instances of a workload %s"), locals(), context=context)
-
-        retval = None
         try:
-            instances = self.workload_api.workload_discover_instances(context, id)
-        except Exception as ex:
-            LOG.exception(ex)
- 
-        return instances                
+            context = req.environ['workloadmgr.context']
+            retval = None
+            try:
+                instances = self.workload_api.workload_discover_instances(context, id)
+            except Exception as ex:
+                LOG.exception(ex)
+            return instances
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))                       
 
     def import_workloads(self, req):
-        LOG.debug(_('importing workloads from the backup store'))
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('import workloads from backup store'), context=context)
         try:
-            workloads = self.workload_api.import_workloads(context)
-            return self._view_builder.detail_list(req, workloads)
-        except exception.WorkloadMgrNotFound as error:
-            raise exc.HTTPNotFound(explanation=unicode(error))
-        except exception.InvalidWorkloadMgr as error:
-            raise exc.HTTPBadRequest(explanation=unicode(error))
-
-        return webob.Response(status_int=202)
+            context = req.environ['workloadmgr.context']
+            try:
+                workloads = self.workload_api.import_workloads(context)
+                return self._view_builder.detail_list(req, workloads)
+            except exception.WorkloadNotFound as error:
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            except exception.InvalidState as error:
+                raise exc.HTTPBadRequest(explanation=unicode(error))
+            return webob.Response(status_int=202)
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))       
     
     def get_nodes(self, req):
-        LOG.debug(_('get_nodes called'))
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('get_nodes'), context=context)
-        nodes = {'nodes':[]}
         try:
-            nodes = self.workload_api.get_nodes(context)
-        except Exception as ex:
-            LOG.exception(ex)
-        return nodes
+            context = req.environ['workloadmgr.context']
+            nodes = {'nodes':[]}
+            try:
+                nodes = self.workload_api.get_nodes(context)
+            except Exception as ex:
+                LOG.exception(ex)
+            return nodes
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))       
     
     def get_storage_usage(self, req):
-        LOG.debug(_('get_storage_usage called'))
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('get_storage_usage'), context=context)
-        storage_usage = {'total': 0, 'full': 0, 'incremental': 0}
         try:
-            storage_usage = self.workload_api.get_storage_usage(context)
-        except Exception as ex:
-            LOG.exception(ex)
-        return storage_usage 
+            context = req.environ['workloadmgr.context']
+            storage_usage = {'total': 0, 'full': 0, 'incremental': 0}
+            try:
+                storage_usage = self.workload_api.get_storage_usage(context)
+            except Exception as ex:
+                LOG.exception(ex)
+            return storage_usage
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))        
     
     def get_recentactivities(self, req):
-        LOG.debug(_('get_recentactivities called'))
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('get_recentactivities'), context=context)
-        
-        time_in_minutes = 600
-        if ('QUERY_STRING' in req.environ) :
-            qs=parse_qs(req.environ['QUERY_STRING'])
-            var = parse_qs(req.environ['QUERY_STRING'])
-            time_in_minutes = var.get('time_in_minutes',[''])[0]
-            time_in_minutes = int(escape(time_in_minutes))
-        
-        recentactivities = {'recentactivities':[]}
         try:
-            recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
-        except Exception as ex:
-            LOG.exception(ex)
-        return recentactivities 
+            context = req.environ['workloadmgr.context']
+            time_in_minutes = 600
+            if ('QUERY_STRING' in req.environ) :
+                qs=parse_qs(req.environ['QUERY_STRING'])
+                var = parse_qs(req.environ['QUERY_STRING'])
+                time_in_minutes = var.get('time_in_minutes',[''])[0]
+                time_in_minutes = int(escape(time_in_minutes))
+            
+            recentactivities = {'recentactivities':[]}
+            try:
+                recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
+            except Exception as ex:
+                LOG.exception(ex)
+            return recentactivities
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))        
     
     def get_auditlog(self, req):
-        LOG.debug(_('get_auditlog called'))
-        context = req.environ['workloadmgr.context']
-
-        LOG.audit(_('get_auditlog'), context=context)
-        
-        time_in_minutes = 1440
-        if ('QUERY_STRING' in req.environ) :
-            qs=parse_qs(req.environ['QUERY_STRING'])
-            var = parse_qs(req.environ['QUERY_STRING'])
-            time_in_minutes = var.get('time_in_minutes',[''])[0]
-            time_in_minutes = int(escape(time_in_minutes))
-        
-        auditlog = {'auditlog':[]}
         try:
-            auditlog = self.workload_api.get_auditlog(context, time_in_minutes)
-        except Exception as ex:
-            LOG.exception(ex)
-        return auditlog              
+            context = req.environ['workloadmgr.context']
+            time_in_minutes = 1440
+            if ('QUERY_STRING' in req.environ) :
+                qs=parse_qs(req.environ['QUERY_STRING'])
+                var = parse_qs(req.environ['QUERY_STRING'])
+                time_in_minutes = var.get('time_in_minutes',[''])[0]
+                time_in_minutes = int(escape(time_in_minutes))
+            
+            auditlog = {'auditlog':[]}
+            try:
+                auditlog = self.workload_api.get_auditlog(context, time_in_minutes)
+            except Exception as ex:
+                LOG.exception(ex)
+            return auditlog
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))                     
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

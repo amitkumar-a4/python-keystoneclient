@@ -396,11 +396,14 @@ class CassandraWorkflow(workflow.Workflow):
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
 
+        preferredgroup = self._store.get('preferredgroup', None)
+        if preferredgroup:
+            preferredgroup = json.loads(self._store['preferredgroup'])
         self._store['instances'] =  get_cassandra_nodes(cntx, self._store['CassandraNode'], 
                                                         int(self._store['SSHPort']),
                                                         self._store['Username'],
                                                         self._store['Password'],
-                                                        json.loads(self._store['preferredgroup']))
+                                                        preferredgroup)
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+item['vm_id']] = item
             self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']

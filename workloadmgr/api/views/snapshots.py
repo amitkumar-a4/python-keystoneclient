@@ -48,7 +48,7 @@ class ViewBuilder(common.ViewBuilder):
                     instance['nics'] = vm['nics']
                 instances.append(instance)   
             d['instances'] = instances
-        d['links'] = self._get_links(request, snapshot['id'])
+        #d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
         d['description'] =  snapshot['display_description']   
         d['host'] = snapshot['host']       
@@ -82,7 +82,7 @@ class ViewBuilder(common.ViewBuilder):
                 instances.append(instance)    
                 
             d['instances'] = instances
-        d['links'] = self._get_links(request, snapshot['id'])
+        #d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
         d['description'] =  snapshot['display_description']
         d['host'] = snapshot['host']       
@@ -91,18 +91,20 @@ class ViewBuilder(common.ViewBuilder):
         d['progress_msg'] =  snapshot['progress_msg'] 
         d['warning_msg'] =  snapshot['warning_msg']
         d['error_msg'] =  snapshot['error_msg'] 
-
+        d['time_taken'] = snapshot['time_taken']
+        d['pinned'] = snapshot['pinned']
+        d['metadata'] = snapshot['metadata']
         return {'snapshot': d}      
 
     def _list_view(self, func, request, snapshots):
         """Provide a view for a list of snapshots."""
         snapshots_list = [func(request, snapshot)['snapshot'] for snapshot in snapshots]
-        snapshots_links = self._get_collection_links(request,
-                                                   snapshots,
-                                                   self._collection_name)
+        #snapshots_links = self._get_collection_links(request,
+        #                                           snapshots,
+        #                                           self._collection_name)
         snapshots_dict = dict(snapshots=snapshots_list)
 
-        if snapshots_links:
-            snapshots_dict['snapshots_links'] = snapshots_links
+        #if snapshots_links:
+        #    snapshots_dict['snapshots_links'] = snapshots_links
 
         return snapshots_dict

@@ -5,7 +5,7 @@
 
 """Implementation of SQLAlchemy backend."""
 
-import datetime
+from datetime import datetime, timedelta
 import uuid
 import warnings
 import threading
@@ -139,8 +139,7 @@ def model_query(context, *args, **kwargs):
     elif read_deleted == 'only':
         query = query.filter_by(deleted=True)
     else:
-        raise Exception(
-            _("Unrecognized read_deleted value '%s'") % read_deleted)
+        raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
 
     if project_only and is_user_context(context):
         query = query.filter_by(project_id=context.project_id)
@@ -432,7 +431,7 @@ def workload_type_get(context, id):
         workload_types = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadTypesWithIdNotFound(id = id)
+        raise exception.WorkloadTypeNotFound(workload_type_id = id)
 
     return workload_types
 
@@ -718,7 +717,7 @@ def workload_vms_get(context, workload_id, **kwargs):
         workload_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadVMsNotFound()
+        raise exception.WorkloadVMsNotFound(workload_id = workload_id)
     
     return workload_vms
 
@@ -734,7 +733,7 @@ def _workload_vm_get(context, id, session):
         workload_vm = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadVMsNotFound()
+        raise exception.WorkloadVMNotFound(workload_vm_id = id)
 
     return workload_vm
 
@@ -771,22 +770,125 @@ def snapshot_mark_incomplete_as_error(context, host):
             snapshot.update(values)
             snapshot.save(session=session)
             
-    snapshots =  model_query(context, models.Snapshots, session=session).all()
+    snapshots =  model_query(context, models.Snapshots, session=session).\
+                            all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error':
-            if snapshot.host and snapshot.host == '':
+            if (snapshot.host is not None) and snapshot.host == '':
                 values =  {'progress_percent': 100, 'progress_msg': '',
                            'error_msg': 'Snapshot did not finish successfully',
                            'status': 'error' }
                 snapshot.update(values)
                 snapshot.save(session=session)
-            
+
+#### Snapshot ################################################################
+""" snapshot functions """
+def _set_metadata_for_snapshot(context, snapshot_ref, metadata,
+                                    purge_metadata, session):
+    """
+    Create or update a set of snapshot_metadata for a given snapshot
+
+    :param context: Request context
+    :param snapshot_ref: A snapshot object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in snapshot_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'snapshot_id': snapshot_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _snapshot_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _snapshot_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _snapshot_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def _snapshot_metadata_create(context, values, session):
+    """Create a SnapshotMetadata object"""
+    metadata_ref = models.SnapshotMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _snapshot_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def snapshot_metadata_create(context, values, session):
+    """Create an SnapshotMetadata object"""
+    session = get_session()
+    return _snapshot_metadata_create(context, values, session)
+
+@require_context
+def _snapshot_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by snapshot_metadata_create and snapshot_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _snapshot_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by snapshot_metadata_create and snapshot_metadata_update
+    """
+    metadata_ref.delete(session=session)
+
+def _snapshot_update(context, values, snapshot_id, purge_metadata, session):
+    try:
+        lock.acquire()    
+        metadata = values.pop('metadata', {})
+        
+        if snapshot_id:
+            snapshot_ref = model_query(context, models.Snapshots, session=session, read_deleted="yes").\
+                                        filter_by(id=snapshot_id).first()
+            if not snapshot_ref:
+                lock.release()
+                raise exception.SnapshotNotFound(snapshot_id = snapshot_id)
+                                                        
+            if not values.get('uploaded_size'):
+                if values.get('uploaded_size_incremental'):
+                    values['uploaded_size'] =  snapshot_ref.uploaded_size + values.get('uploaded_size_incremental') 
+                    if not values.get('progress_percent') and snapshot_ref.size > 0:
+                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/snapshot_ref.size )
+        else:
+            snapshot_ref = models.Snapshots()
+            if not values.get('id'):
+                values['id'] = str(uuid.uuid4())
+            if not values.get('size'):
+                values['size'] = 0
+            if not values.get('uploaded_size'):
+                values['uploaded_size'] = 0
+            if not values.get('progress_percent'):
+                values['progress_percent'] = 0 
+                
+        snapshot_ref.update(values)
+        snapshot_ref.save(session)
+        
+        if metadata:
+            _set_metadata_for_snapshot(context, snapshot_ref, metadata, purge_metadata, session=session)  
+          
+        return snapshot_ref
+    finally:
+        lock.release()
+    return snapshot_ref               
         
 @require_context
-def snapshot_get(context, snapshot_id, **kwargs):
+def _snapshot_get(context, snapshot_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
     result = model_query(   context, models.Snapshots, **kwargs).\
+                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(id=snapshot_id).\
                             first()
 
@@ -795,15 +897,23 @@ def snapshot_get(context, snapshot_id, **kwargs):
 
     return result
 
+@require_context
+def snapshot_get(context, snapshot_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()    
+    return _snapshot_get(context, snapshot_id, **kwargs) 
+
 @require_admin_context
 def snapshot_get_all(context, workload_id=None, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
     if workload_id == None:
         return model_query(context, models.Snapshots, **kwargs).\
+                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             order_by(models.Snapshots.created_at.desc()).all()        
     else:
         return model_query(context, models.Snapshots, **kwargs).\
+                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(workload_id=workload_id).\
                             order_by(models.Snapshots.created_at.desc()).all()
 @require_context
@@ -812,6 +922,7 @@ def snapshot_get_all_by_project(context, project_id, **kwargs):
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, **kwargs).\
+                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(project_id=project_id).all()
         
 @require_context
@@ -820,6 +931,7 @@ def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwa
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, **kwargs).\
+                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(project_id=project_id).\
                             filter_by(workload_id=workload_id).\
                             order_by(models.Snapshots.created_at.desc()).all()
@@ -828,6 +940,7 @@ def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwa
 def snapshot_show(context, snapshot_id):
     session = get_session()
     result = model_query(context, models.Snapshots, session=session).\
+                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(id=snapshot_id).\
                             first()
 
@@ -838,51 +951,20 @@ def snapshot_show(context, snapshot_id):
 
 @require_context
 def snapshot_create(context, values):
-    snapshot = models.Snapshots()
-    if not values.get('id'):
-        values['id'] = str(uuid.uuid4())
-    if not values.get('size'):
-        values['size'] = 0
-    if not values.get('uploaded_size'):
-        values['uploaded_size'] = 0
-    if not values.get('progress_percent'):
-        values['progress_percent'] = 0    
-    snapshot.update(values)
-    snapshot.save()
-    return snapshot
+    session = get_session()
+    return _snapshot_update(context, values, None, False, session)
 
 @require_context
-def snapshot_update(context, snapshot_id, values):
-    try:
-        lock.acquire()
-        session = get_session()
-        with session.begin():
-            snapshot = model_query(context, models.Snapshots, session=session, read_deleted="yes").\
-                                    filter_by(id=snapshot_id).first()
-    
-            if not snapshot:
-                lock.release()
-                raise exception.SnapshotNotFound(
-                    _("No snapshot with id %(snapshot_id)s") % locals())
-    
-            if not values.get('uploaded_size'):
-                if values.get('uploaded_size_incremental'):
-                    values['uploaded_size'] =  snapshot.uploaded_size + values.get('uploaded_size_incremental') 
-                    if not values.get('progress_percent') and snapshot.size > 0:
-                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/snapshot.size )
-    
-    
-            snapshot.update(values)
-            snapshot.save(session=session)
-    finally:
-        lock.release()
-    return snapshot
+def snapshot_update(context, snapshot_id, values, purge_metadata=False):
+    session = get_session()
+    return _snapshot_update(context, values, snapshot_id, purge_metadata, session)
 
 @require_context
-def snapshot_type_update(context, snapshot_id):
+def snapshot_type_time_update(context, snapshot_id):
     snapshot_type_full = False
     snapshot_type_incremental = False
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
+    time_taken = 0
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
@@ -890,6 +972,7 @@ def snapshot_type_update(context, snapshot_id):
             snapshot_type_full = True
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
+        time_taken = time_taken + snapshot_vm_resource.time_taken
         
     if snapshot_type_full and snapshot_type_incremental:
         snapshot_type = 'mixed'
@@ -900,7 +983,7 @@ def snapshot_type_update(context, snapshot_id):
     else:
         snapshot_type = 'full'
                           
-    return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type})
+    return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type, 'time_taken' : time_taken})
     
 @require_context
 def snapshot_delete(context, snapshot_id):
@@ -1019,7 +1102,7 @@ def snapshot_vms_get(context, snapshot_id, **kwargs):
         snapshot_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMsOfSnapshotNotFound(snapshot_id=snapshot_id)
+        raise exception.SnapshotVMsNotFound(snapshot_id=snapshot_id)
     
     return snapshot_vms    
    
@@ -1082,8 +1165,6 @@ def vm_recent_snapshot_update(context, vm_id, values):
             filter_by(vm_id = vm_id).first()
 
         if not vm_recent_snapshot:
-            #raise exception.VMRecentSnapshotNotFound(
-            #    _("Recent snapshot for VM %(vm_id)s is not found") % locals())
             values['vm_id'] = vm_id
             vm_recent_snapshot = models.VMRecentSnapshot()
             
@@ -1171,7 +1252,7 @@ def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge
     metadata = values.pop('metadata', {})
     
     if snapshot_vm_resource_id:
-        snapshot_vm_resource_ref = _snapshot_vm_resource_get(context, snapshot_vm_resource_id, session)
+        snapshot_vm_resource_ref = _snapshot_vm_resource_get(context, snapshot_vm_resource_id, session=session)
     else:
         snapshot_vm_resource_ref = models.SnapshotVMResources()
         if not values.get('size'):
@@ -1208,7 +1289,7 @@ def snapshot_vm_resources_get(context, vm_id, snapshot_id):
         snapshot_vm_resources = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourcesNotFound(vm_id = vm_id, snapshot_id = snapshot_id)
+        raise exception.SnapshotVMResourcesNotFound(snapshot_vm_id = vm_id, snapshot_id = snapshot_id)
     
     return snapshot_vm_resources
 
@@ -1224,7 +1305,7 @@ def snapshot_resources_get(context, snapshot_id, **kwargs):
         snapshot_resources = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourcesNotFound(snapshot_id = snapshot_id)
+        raise exception.SnapshotResourcesNotFound(snapshot_id = snapshot_id)
     
     return snapshot_resources
 
@@ -1275,7 +1356,7 @@ def _snapshot_vm_resource_get(context, id, session):
         snapshot_vm_resources = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourcesWithIdNotFound(id = id)
+        raise exception.SnapshotVMResourceNotFound(snapshot_vm_resource_id = id)
 
     return snapshot_vm_resources
 
@@ -1430,7 +1511,7 @@ def _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session):
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapsNotFound(vm_disk_resource_snap_id = vm_disk_resource_snap_id)
+        raise exception.VMDiskResourceSnapNotFound(vm_disk_resource_snap_id = vm_disk_resource_snap_id)
     
     return vm_disk_resource_snap
 
@@ -1552,7 +1633,7 @@ def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
         vm_network_resource_snaps = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapsNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
+        raise exception.VMNetworkResourceSnapsNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
     
     return vm_network_resource_snaps
 
@@ -1568,7 +1649,7 @@ def vm_network_resource_snap_get(context, vm_network_resource_snap_id):
         vm_network_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise 
+        raise exception.VMNetworkResourceSnapNotFound(vm_network_resource_snap_id = vm_network_resource_snap_id)
     
     return vm_network_resource_snap
 
@@ -1683,7 +1764,7 @@ def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, **kwarg
         vm_security_group_rule_snaps = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapsNotFound(vm_security_group_snap_id = vm_security_group_snap_id)
+        raise exception.VMSecurityGroupRuleSnapsNotFound(vm_security_group_snap_id = vm_security_group_snap_id)
     
     return vm_security_group_rule_snaps
 
@@ -1700,7 +1781,7 @@ def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
         vm_security_group_rule_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise 
+        raise exception.VMSecurityGroupRuleSnapNotFound(vm_security_group_rule_snap_id = id, vm_security_group_snap_id = vm_security_group_snap_id)
     
     return vm_security_group_rule_snap
 
@@ -1858,8 +1939,7 @@ def restored_vm_update(context, vm_id, restore_id, values):
                                .filter_by(restore_id=restore_id).first()
 
         if not restore_vm:
-            raise exception.RestoreNotFound(
-                _("No restored VM with id %(vm_id)s") % locals())
+            raise exception.RestoreNotFound(restore_id = restore_id)
 
         restore_vm.update(values)
         restore_vm.save(session=session)
@@ -1873,7 +1953,7 @@ def restored_vm_get(context, restore_id):
                             all()
 
     if not result:
-        raise exception.VMsOfRestoreNotFound(restore_id=restore_id)
+        raise exception.RestoredVMsNotFound(restore_id=restore_id)
 
     return result
 
@@ -1992,7 +2072,7 @@ def restored_vm_resources_get(context, vm_id, restore_id):
         restored_vm_resources = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.RestoredVMResourcesNotFound(vm_id = vm_id, restore_id = restore_id)
+        raise exception.RestoredVMResourcesNotFound(restore_vm_id = vm_id, restore_id = restore_id)
     
     return restored_vm_resources
 
@@ -2010,9 +2090,9 @@ def restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resour
         restored_vm_resources = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.RestoredVMResourcesWithNameNotFound(vm_id = vm_id, 
-                                                        restore_id = restore_id,
-                                                        resource_name = resource_name)
+        raise exception.RestoredVMResourceWithNameNotFound(resource_name = resource_name,
+                                                           restore_vm_id = vm_id, 
+                                                           restore_id = restore_id)
 
     return restored_vm_resources
 

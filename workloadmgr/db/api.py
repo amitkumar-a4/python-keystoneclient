@@ -166,8 +166,8 @@ def snapshot_mark_incomplete_as_error(context, host):
 def snapshot_create(context, values):
     return IMPL.snapshot_create(context, values)
 
-def snapshot_type_update(context, snapshot_id):
-    return IMPL.snapshot_type_update(context, snapshot_id)
+def snapshot_type_time_update(context, snapshot_id):
+    return IMPL.snapshot_type_time_update(context, snapshot_id)
 
 def snapshot_delete(context, snapshot_id):
     """Destroy the snapshot or raise if it does not exist."""

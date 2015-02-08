@@ -334,107 +334,113 @@ class MalformedResponse(Invalid):
 class BadHTTPResponseStatus(WorkloadMgrException):
     message = _("Bad HTTP response status %(status)s")
 
-
-class FailedCmdWithDump(WorkloadMgrException):
-    message = _("Operation failed with status=%(status)s. Full dump: %(data)s")
-
-
 class InstanceNotFound(NotFound):
     message = _("Instance %(instance_id)s could not be found.")
 
-
-class NfsException(WorkloadMgrException):
-    message = _("Unknown NFS exception")
-
-
-class NfsNoSharesMounted(NotFound):
-    message = _("No mounted NFS shares found")
-
-
-class NfsNoSuitableShareFound(NotFound):
-    message = _("There is no share which can host %(volume_size)sG")
-
-
-class GlusterfsException(WorkloadMgrException):
-    message = _("Unknown Gluster exception")
-
-
-class GlusterfsNoSharesMounted(NotFound):
-    message = _("No mounted Gluster shares found")
-
-
-class GlusterfsNoSuitableShareFound(NotFound):
-    message = _("There is no share which can host %(volume_size)sG")
-
-
 class ImageCopyFailure(Invalid):
     message = _("Failed to copy image to volume")
-
-
-class WorkloadMgrNotFound(NotFound):
-    message = _("WorkloadMgr %(workload_id)s could not be found.")
-
-   
-class SnapshotNotFound(NotFound):
-    message = _("Snapshot %(snapshot_id)s could not be found.")    
-
-class SwiftObjectNotFound(NotFound):
-    message = _("SwiftObject %(object_id)s could not be found.")
-
-class InvalidWorkloadMgr(Invalid):
-    message = _("Invalid workload: %(reason)s")
-
-class SwiftConnectionFailed(WorkloadMgrException):
-    message = _("Connection to swift failed") + ": %(reason)s"
-
-class VMsofWorkloadMgrNotFound(NotFound):
-    message = _("VMs for WorkloadMgr %(workload_id)s could not be found.")    
     
-class VMsOfSnapshotNotFound(NotFound):
-    message = _("VMs for Snapshot %(snapshot_id)s could not be found.")  
-
-class VMRecentSnapshotNotFound(NotFound):
-    message = _("Recent successful Snapshot for VM %(vm_id)s could not be found.") 
+class WorkloadTypesNotFound(NotFound):
+    message = _("WorkloadTypes could not be found.")
     
-class SnapshotVMResourcesNotFound(NotFound):
-    message = _("SnapshotVMResources of VM  %(vm_id)s Snapshot %(snapshot_id)s could not be found.")
-
-class SnapshotVMResourcesWithNameNotFound(NotFound):
-    message = _("SnapshotVMResource of VM  %(vm_id)s Snapshot %(snapshot_id)s Resource %(resource_name)s could not be found.")
-
-class SnapshotVMResourcesWithIdNotFound(NotFound):
-    message = _("SnapshotVMResource with Id  %(id)s could not be found.")
-
-class VMDiskResourceSnapsNotFound(NotFound):
-    message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")
-    
-class VMNetworkResourceSnapsNotFound(NotFound):
-    message = _("VM Resource snapshots for snapshot_vm_resource_id %(snapshot_vm_resource_id)s could not be found.")  
-    
-class RestoreNotFound(NotFound):
-    message = _("Restore %(restore_id)s could not be found.")       
-    
-class WorkloadNotFound(NotFound):
-    message = _("Workload %(workload_id)s could not be found.") 
+class WorkloadTypeNotFound(NotFound):
+    message = _("WorkloadType %(workload_type_id)s could not be found.")
     
 class WorkloadsNotFound(NotFound):
     message = _("Workloads could not be found.")
+
     
-class WorkloadVMNotFound(NotFound):
-    message = _("WorkloadVM %(workload_vm_id)s could not be found.") 
+class WorkloadNotFound(NotFound):
+    message = _("Workload %(workload_id)s could not be found.")
     
 class WorkloadVMsNotFound(NotFound):
-    message = _("WorkloadVMs could not be found.")        
-    
-class SnapshotVMNotFound(NotFound):
-    message = _("SnapshotVM %(snapshot_id)s could not be found.") 
-    
+    message = _("WorkloadVMs of %(workload_id)s could not be found.")
+        
+class WorkloadVMNotFound(NotFound):
+    message = _("WorkloadVM %(workload_vm_id)s could not be found.")            
+
+
+class SnapshotsNotFound(NotFound):
+    message = _("Snapshots could not be found.") 
+
+class SnapshotsOfWorkloadNotFound(NotFound):
+    message = _("Snapshots of %(workload_id)s could not be found.") 
+        
+class SnapshotNotFound(NotFound):
+    message = _("Snapshot %(snapshot_id)s could not be found.") 
+
 class SnapshotVMsNotFound(NotFound):
-    message = _("SnapshotVMs could not be found.")    
+    message = _("SnapshotVMs of %(snapshot_id)s could not be found.")
+        
+class SnapshotVMNotFound(NotFound):
+    message = _("SnapshotVM %(snapshot_vm_id)s could not be found.")        
+
+class SnapshotResourcesNotFound(NotFound):
+    message = _("Snapshot Resources of %(snapshot_id)s could not be found.")  
     
-class InvalidWorkloadState(WorkloadMgrException):
-    message = _("Invalid workload state: %(state)s") 
+class SnapshotVMResourcesNotFound(NotFound):
+    message = _("SnapshotVMResources of VM %(snapshot_vm_id)s Snapshot %(snapshot_id)s could not be found.")
+
+class SnapshotVMResourceNotFound(NotFound):
+    message = _("SnapshotVMResource %(snapshot_vm_resource_id)s could not be found.")
     
+class SnapshotVMResourceWithNameNotFound(NotFound):
+    message = _("SnapshotVMResource %(resource_name)s of VM %(snapshot_vm_id)s Snapshot %(snapshot_id)s could not be found.")
+
+
+class VMDiskResourceSnapsNotFound(NotFound):
+    message = _("VMDiskResourceSnaps of SnapshotVMResource %(snapshot_vm_resource_id)s could not be found.")
+
+class VMDiskResourceSnapNotFound(NotFound):
+    message = _("VMDiskResourceSnap %(vm_disk_resource_snap_id)s could not be found.")
+
+
+class VMNetworkResourceSnapsNotFound(NotFound):
+    message = _("VMNetworkResourceSnaps of SnapshotVMResource %(snapshot_vm_resource_id)s could not be found.")
+
+class VMNetworkResourceSnapNotFound(NotFound):
+    message = _("VMNetworkResourceSnap %(vm_network_resource_snap_id)s could not be found.")
+
+
+class VMSecurityGroupRuleSnapsNotFound(NotFound):
+    message = _("VMSecurityGroupRuleSnaps of VMSecurityGroupSnap %(vm_security_group_snap_id)s could not be found.")
+
+class VMSecurityGroupRuleSnapNotFound(NotFound):
+    message = _("VMSecurityGroupRuleSnap %(vm_security_group_rule_snap_id)s of VMSecurityGroup %(vm_security_group_snap_id)could not be found.")
+
+
+class RestoresNotFound(NotFound):
+    message = _("Restores could not be found.") 
+
+class RestoresOfSnapshotNotFound(NotFound):
+    message = _("Restores of %(snapshot_id)s could not be found.") 
+        
+class RestoreNotFound(NotFound):
+    message = _("Restore %(restore_id)s could not be found.") 
+
+class RestoredVMsNotFound(NotFound):
+    message = _("RestoredVMs of %(restore_id)s could not be found.")
+        
+class RestoredVMNotFound(NotFound):
+    message = _("RestoredVM %(restored_vm_id)s could not be found.")
+
+class RestoredResourcesNotFound(NotFound):
+    message = _("Restored Resources of %(restore_id)s could not be found.")  
+    
+class RestoredVMResourcesNotFound(NotFound):
+    message = _("RestoredVMResources of VM %(restore_vm_id)s Restore %(restore_id)s could not be found.")
+
+class RestoredVMResourceNotFound(NotFound):
+    message = _("RestoredVMResource %(restore_vm_resource_id)s could not be found.")
+
+class RestoredVMResourceWithNameNotFound(NotFound):
+    message = _("RestoredVMResource %(resource_name)s of VM %(restore_vm_id)s Restore %(restore_id)s could not be found.")
+
+
+    
+class SwiftConnectionFailed(WorkloadMgrException):
+    message = _("Connection to swift failed") + ": %(reason)s"
+
 class DatastoreNotFound(NotFound):
     message = _("Could not find the datastore.")
     
@@ -461,6 +467,3 @@ class InstancePowerOffFailure(Invalid):
     
 class DatacenterNotFound(NotFound):
     message = _("Could not find the Datacenter.")       
-    
-class HostNotFound(NotFound):
-    message = _("Could not find the Host.")                          

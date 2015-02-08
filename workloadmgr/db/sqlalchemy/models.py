@@ -6,8 +6,8 @@
 """
 SQLAlchemy models for workloadmgr data.
 """
-
-from sqlalchemy import Column, Integer, BigInteger, String, Text, schema, UniqueConstraint
+from datetime import datetime, timedelta
+from sqlalchemy import Column, Integer, BigInteger, String, Text, schema, UniqueConstraint, Interval
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import ForeignKey, DateTime, Boolean
@@ -248,7 +248,20 @@ class Snapshots(BASE, WorkloadsBase):
     host = Column(String(255))    
     finished_at = Column(DateTime)
     data_deleted = Column(Boolean, default=False)
+    pinned = Column(Boolean, default=False) 
+    time_taken = Column(BigInteger, default=0)   
     status =  Column(String(32), nullable=False)
+    
+class SnapshotMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the snapshot"""
+    __tablename__ = 'snapshot_metadata'
+    __table_args__ = (UniqueConstraint('snapshot_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(String(36), ForeignKey('snapshots.id'), nullable=False)
+    snapshot = relationship(Snapshots, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)      
 
 class SnapshotVMs(BASE, WorkloadsBase):
     """Represents vms of a workload snapshot"""
@@ -307,6 +320,7 @@ class SnapshotVMResources(BASE, WorkloadsBase):
     snapshot_type = Column(String(32))       
     finished_at = Column(DateTime)
     data_deleted = Column(Boolean, default=False)
+    time_taken = Column(BigInteger, default=0)   
     status =  Column(String(32), nullable=False)
     
 class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
@@ -337,6 +351,7 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     size = Column(BigInteger)    
     finished_at = Column(DateTime)
     data_deleted = Column(Boolean, default=False)
+    time_taken = Column(BigInteger, default=0)   
     status = Column(String(32), nullable=False)    
     
 class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):
@@ -424,6 +439,7 @@ class Restores(BASE, WorkloadsBase):
     host = Column(String(255)) 
     target_platform = Column(String(255))            
     finished_at = Column(DateTime)
+    time_taken = Column(BigInteger, default=0)   
     status =  Column(String(32), nullable=False)
 
 class RestoredVMs(BASE, WorkloadsBase):

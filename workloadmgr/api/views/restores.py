@@ -89,7 +89,8 @@ class ViewBuilder(common.ViewBuilder):
         d['progress_percent'] =  restore['progress_percent']          
         d['progress_msg'] =  restore['progress_msg'] 
         d['warning_msg'] =  restore['warning_msg']
-        d['error_msg'] =  restore['error_msg']                   
+        d['error_msg'] =  restore['error_msg']
+        d['time_taken'] = restore['time_taken']
         return {'restore': d}        
 
     def _list_view(self, func, request, restores):

@@ -47,9 +47,9 @@ class Logger(object):
         if not self.__log:
             FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
             self.__log = logging.getLogger(__name__)
-            self.__log.setLevel(logging.DEBUG)
+            self.__log.setLevel(logging.INFO)
             handler = logging.StreamHandler()
-            handler.setLevel(logging.DEBUG)
+            handler.setLevel(logging.INFO)
             handler.setFormatter(logging.Formatter(FORMAT))
             self.__log.addHandler(handler)
         return self.__log
