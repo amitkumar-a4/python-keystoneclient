@@ -254,7 +254,7 @@ class HadoopWorkflow(workflow.Workflow):
     # : port - ssh port of hadoop
     # : usename/password - username and password to authenticate to the namenode
     #
-    def initflow(self):
+    def initflow(self, composite=False):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_hadoop_nodes(cntx, self._store['Namenode'], 
                  int(self._store['NamenodeSSHPort']), self._store['Username'], self._store['Password'])
@@ -282,7 +282,7 @@ class HadoopWorkflow(workflow.Workflow):
         # enable profiling to the level before the flow started
         snapshotvms.add(DisableSafemode('DisableSafemode'))
 
-        super(HadoopWorkflow, self).initflow(snapshotvms)
+        super(HadoopWorkflow, self).initflow(snapshotvms, composite=composite)
 
 
     def topology(self):

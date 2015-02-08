@@ -513,7 +513,7 @@ class MongoDBWorkflow(workflow.Workflow):
     # : port - port at which mongos service is running
     # : usename/password - username and password to authenticate to the database
     #
-    def initflow(self):
+    def initflow(self, composite=False):
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['DBHost'],
@@ -572,7 +572,7 @@ class MongoDBWorkflow(workflow.Workflow):
         # enable profiling to the level before the flow started
         snapshotvms.add(EnableProfiling('EnableProfiling'))
 
-        super(MongoDBWorkflow, self).initflow(snapshotvms)
+        super(MongoDBWorkflow, self).initflow(snapshotvms, composite=composite)
 
     def topology(self):
         # Discover the shards

@@ -104,7 +104,7 @@ class CompositeWorkflow(workflow.Workflow):
 
             workflow_class = workloadmgr.get_workflow_class(cntx, workload.workload_type_id)
             workflow = workflow_class("composite_workflow_initflow_" + workload_id, store)
-            workflow.initflow()
+            workflow.initflow(composite=True)
             workflows[workload_id] = workflow
         
             # Populate the keys the the child workload produced
@@ -135,10 +135,12 @@ class CompositeWorkflow(workflow.Workflow):
         # Aggregate snapshotvms workflows from all workloads
         snapshotvms = self._create_composite_snapshotvm_flow(graph)
 
-        # Aggregate snapshotmetadata workflows from all workloads
-        postsnapshot = uf.Flow(self.name + "#PostSnapshot")
+        # Aggregate postsnapshot workflows from all workloads
+        postsnapshot = lf.Flow(self.name + "#PostSnapshot")
         for workflowid, workflow in workflows.iteritems():
             postsnapshot.add(workflow.postsnapshot)
+        #apply retention policy
+        postsnapshot.add(vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))
 
         super(CompositeWorkflow, self).initflow(snapshotvms=snapshotvms, presnapshot=presnapshot, 
                                                 snapshotmetadata=snapshotmetadata, postsnapshot=postsnapshot)
