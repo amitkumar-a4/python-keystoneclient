@@ -5,9 +5,11 @@
 
 """The workloads api."""
 
+import json
 import webob
 from webob import exc
 from xml.dom import minidom
+from datetime import datetime
 
 from cgi import parse_qs, escape
 from workloadmgr.api import extensions
@@ -453,15 +455,25 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             time_in_minutes = 1440
+            time_from = None
+            time_to = None
             if ('QUERY_STRING' in req.environ) :
                 qs=parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
-                time_in_minutes = var.get('time_in_minutes',[''])[0]
-                time_in_minutes = int(escape(time_in_minutes))
-            
+                time_in_minutes = var.get('time_in_minutes', None)
+                if time_in_minutes:
+                    time_in_minutes = time_in_minutes[0]
+                    time_in_minutes = int(escape(time_in_minutes))
+                
+                time_range = var.get('time_range',None)
+                if time_range:
+                    time_range = json.loads(time_range[0])
+                    time_from = datetime.strptime(time_range['time_from'], "%d-%m-%Y %H:%M:%S")
+                    time_to = datetime.strptime(time_range['time_to'], "%d-%m-%Y %H:%M:%S")
+                    
             auditlog = {'auditlog':[]}
             try:
-                auditlog = self.workload_api.get_auditlog(context, time_in_minutes)
+                auditlog = self.workload_api.get_auditlog(context, time_in_minutes, time_from, time_to)
             except Exception as ex:
                 LOG.exception(ex)
             return auditlog

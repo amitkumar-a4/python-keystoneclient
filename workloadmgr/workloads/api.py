@@ -701,10 +701,10 @@ class API(base.Base):
             LOG.exception(ex)
         return dict(recentactivites=recentactivites)    
     
-    def get_auditlog(self, context, time_in_minutes):
+    def get_auditlog(self, context, time_in_minutes, time_from, time_to):
         auditlog = []
         try:
-            auditlog = AUDITLOG.get_records(time_in_minutes)
+            auditlog = AUDITLOG.get_records(time_in_minutes, time_from, time_to)
         except Exception as ex:
             LOG.exception(ex)
         return dict(auditlog=auditlog)        
