@@ -405,8 +405,8 @@ class API(base.Base):
         #                              'interval': '1 hr',
         #                              'start_time': '2:30 PM',
         #                              'snapshots_to_keep': '2'}
-        
-        self.workload_add_scheduler_job(jobschedule, workload)
+        if not 'enabled' in jobschedule or jobschedule['enabled']:
+            self.workload_add_scheduler_job(jobschedule, workload)
         
         AUDITLOG.log(context, "Workload Created", workload)        
         return workload
@@ -429,7 +429,6 @@ class API(base.Base):
         if workload_paused == False:
             self.workload_pause(context, workload_id)
         
-     
         purge_metadata = False
         options = {}
         if 'name' in workload and workload['name']:
