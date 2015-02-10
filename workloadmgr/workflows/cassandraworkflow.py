@@ -57,17 +57,17 @@ def InitFlow(store):
     pass
 
 def _exec_shell_command(connection, command):
-    stdin, stdout, stderr = connection.exec_command(command, timeout=60)
+    stdin, stdout, stderr = connection.exec_command(command, timeout=120)
     err_msg = stderr.read()
     if err_msg != '':
         raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
     return stdin, stdout, stderr
 
 def _exec_command(connection, command):
-    stdin, stdout, stderr = connection.exec_command("/usr/share/dse/bin/" + command, timeout=60)
+    stdin, stdout, stderr = connection.exec_command("/usr/share/dse/bin/" + command, timeout=120)
     err_msg = stderr.read()
     if err_msg != '':
-        stdin, stdout, stderr = connection.exec_command(command, timeout=60)
+        stdin, stdout, stderr = connection.exec_command(command, timeout=120)
         err_msg = stderr.read()
         if err_msg != '':
             raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
@@ -78,7 +78,7 @@ def connect_server(host, port, user, password):
         client = paramiko.SSHClient()
         client.load_system_host_keys()
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
-        client.connect(host, port, user, password, timeout=60)
+        client.connect(host, port, user, password, timeout=120)
         LOG.debug(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
         stdin, stdout, stderr = _exec_command(client, "nodetool status")
     except Exception as ex:
@@ -243,12 +243,12 @@ def get_cassandra_nodes(cntx, host, port, username, password, preferredgroup=Non
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             try:
                 client.connect(ip, port=int(port), username=username, password=password)
-                stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=60)
+                stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
                 interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
 
                 # find the type of the root partition
                 rootpartition_type[ip] = "Linux"
-                stdin, stdout, stderr = client.exec_command('df /', timeout=60)
+                stdin, stdout, stderr = client.exec_command('df /', timeout=120)
                 m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
                 if m:
                     mp= m.group(1)
@@ -256,7 +256,7 @@ def get_cassandra_nodes(cntx, host, port, username, password, preferredgroup=Non
                     session = transport.open_session()
                     session.get_pty()
                     session.set_combine_stderr(True)
-                    session.exec_command('sudo -k lvdisplay ' + mp, timeout=60)
+                    session.exec_command('sudo -k lvdisplay ' + mp, timeout=120)
                     stdin = session.makefile('wb', 8192)
                     stdout = session.makefile('rb', 8192)
                     stderr = session.makefile_stderr('rb', 8192)

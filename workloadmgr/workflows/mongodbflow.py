@@ -248,9 +248,9 @@ class ShutdownConfigServer(task.Task):
                 client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=60)
+            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
             
-            stdin, stdout, stderr = client.exec_command(command, timeout=60)
+            stdin, stdout, stderr = client.exec_command(command, timeout=120)
             LOG.debug(_(stdout.read()))
         finally:
             client.close()
@@ -277,9 +277,9 @@ class ShutdownConfigServer(task.Task):
                         client.set_missing_host_key_policy(paramiko.WarningPolicy())
                     else:
                         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    client.connect(cfghost, port=kwargs['HostSSHPort'], username=kwargs['HostUsername'], password=kwargs['HostPassword'], timeout=60)
+                    client.connect(cfghost, port=kwargs['HostSSHPort'], username=kwargs['HostUsername'], password=kwargs['HostPassword'], timeout=120)
                 
-                    stdin, stdout, stderr = client.exec_command(command, timeout=60)
+                    stdin, stdout, stderr = client.exec_command(command, timeout=120)
                     LOG.debug(_(stdout.read()))
                 finally:
                     client.close()
@@ -307,9 +307,9 @@ class ResumeConfigServer(task.Task):
                 client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=60)
+            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
     
-            stdin, stdout, stderr = client.exec_command(command, timeout=60)
+            stdin, stdout, stderr = client.exec_command(command, timeout=120)
             LOG.debug(_(stdout.read()))
         finally:
             client.close()
@@ -420,8 +420,8 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                 client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(hostname, port=int(sshport), username=hostusername, password=hostpassword, timeout=60)
-            stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=60)
+            client.connect(hostname, port=int(sshport), username=hostusername, password=hostpassword, timeout=120)
+            stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
             interfaces[stdout.read().split('HWaddr')[1].strip()] = hostname
         finally:
             client.close()

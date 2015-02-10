@@ -60,7 +60,7 @@ def connect_server(host, port, user, password):
         client = paramiko.SSHClient()
         client.load_system_host_keys()
         client.set_missing_host_key_policy(paramiko.WarningPolicy)
-        client.connect(host, port, user, password, timeout=60)
+        client.connect(host, port, user, password, timeout=120)
         LOG.debug(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
 
     except Exception, e:
