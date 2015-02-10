@@ -206,10 +206,26 @@ class API(base.Base):
         """
         Discover Instances of a workload_type. RPC call is made
         """
+        if not metadata:
+            msg = _('metadata field is null. Pass valid metadata to connect to the workload')
+            raise wlm_exceptions.Invalid(reason=msg)
         return self.workloads_rpcapi.workload_type_discover_instances(context,
                                                                       socket.gethostname(),
                                                                       workload_type_id,
                                                                       metadata) 
+
+    def workload_type_topology(self, context, workload_type_id, metadata):
+        """
+        Topology  of a workload_type. RPC call is made
+        """
+        if not metadata:
+            msg = _('metadata field is null. Pass valid metadata to connect to the workload')
+            raise wlm_exceptions.Invalid(reason=msg)
+
+        return self.workloads_rpcapi.workload_type_topology(context,
+                                                            socket.gethostname(),
+                                                            workload_type_id,
+                                                            metadata) 
 
     def workload_get(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)

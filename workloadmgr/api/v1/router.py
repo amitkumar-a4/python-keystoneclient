@@ -77,6 +77,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workload_types'],
                        action='discover_instances',
                        conditions={"method": ['POST']})
+
+        #discover workload_type instances
+        mapper.connect("workload_types_topology",
+                       "/{project_id}/workload_types/{id}/topology",
+                       controller=self.resources['workload_types'],
+                       action='topology',
+                       conditions={"method": ['POST']})
                 
         ###################################################################################################
         self.resources['workloads'] = workloads.create_resource()

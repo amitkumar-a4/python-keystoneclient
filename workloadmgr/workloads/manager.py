@@ -27,7 +27,6 @@ from threading import Lock
 from oslo.config import cfg
 
 from workloadmgr import context
-from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr import manager
 from workloadmgr.virt import driver
@@ -192,6 +191,29 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workflow = workflow_class("discover_instances", store)
         instances = workflow.discover()
         return instances   
+
+    @autolog.log_method(logger=Logger)        
+    def workload_type_topology(self, context, workload_type_id,
+                               metadata, workload_id=None):
+        """
+        Topology of a workload_type
+        """        
+        context_dict = dict([('%s' % key, value)
+                          for (key, value) in context.to_dict().iteritems()])            
+        context_dict['conf'] =  None # RpcContext object looks for this during init
+        store = {
+            'context': context_dict,                # context dictionary
+            'source_platform': 'openstack',
+            'workload_id': workload_id,
+        }
+
+        for key in metadata:
+            store[key] = metadata[key]
+        
+        workflow_class = get_workflow_class(context, workload_type_id)
+        workflow = workflow_class("workload_topology", store)
+        topology = workflow.topology()
+        return topology   
 
     @autolog.log_method(logger=Logger)        
     def workload_discover_instances(self, context, workload_id):

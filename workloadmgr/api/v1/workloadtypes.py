@@ -223,6 +223,31 @@ class WorkloadTypesController(wsgi.Controller):
             raise error
         except Exception as error:
             raise exc.HTTPServerError(explanation=unicode(error))                         
+
+    def topology(self, req, id, body):
+        """topology of a workload_type using the metadata"""
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                metadata = body['metadata']
+            except KeyError:
+                msg = _("Incorrect request body format. Missing metadata")
+                raise exc.HTTPBadRequest(explanation=msg)
+            retval = None
+            try:
+                instances = self.workload_api.workload_type_topology(context, id, metadata)
+            except exception:
+                pass
+     
+            return instances 
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))                         
     
 def create_resource(ext_mgr):
     return wsgi.Resource(WorkloadTypesController(ext_mgr))

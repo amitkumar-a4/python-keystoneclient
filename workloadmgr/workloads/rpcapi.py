@@ -42,6 +42,16 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                               timeout=300)
         return instances
 
+    def workload_type_topology(self, ctxt, host, workload_type_id, metadata):
+        LOG.debug("workload_type_topology in rpcapi workload_type_id %s", workload_type_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        topology = self.call(ctxt,
+                              self.make_msg('workload_type_topology', workload_type_id=workload_type_id, metadata=metadata),
+                              topic=topic,
+                              timeout=300)
+        return topology
+
     def workload_discover_instances(self, ctxt, host, workload_id):
         LOG.debug("workload_discover_instances in rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
