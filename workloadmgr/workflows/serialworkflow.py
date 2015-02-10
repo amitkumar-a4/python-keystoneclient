@@ -90,7 +90,7 @@ class SerialWorkflow(workflow.Workflow):
         self._store = store
         
 
-    def initflow(self):
+    def initflow(self, composite=False):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['workload_id'])
         for index,item in enumerate(self._store['instances']):
@@ -111,7 +111,7 @@ class SerialWorkflow(workflow.Workflow):
         
         _snapshotvms.add(vmtasks.LinearThawVMs(self._store['instances']))        
 
-        super(SerialWorkflow, self).initflow(_snapshotvms)
+        super(SerialWorkflow, self).initflow(_snapshotvms, composite=composite)
 
     def discover(self):
         cntx = amqp.RpcContext.from_dict(self._store['context'])

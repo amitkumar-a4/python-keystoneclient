@@ -392,7 +392,7 @@ class CassandraWorkflow(workflow.Workflow):
                     pass
         LOG.warning(_( 'Cassandra cluster appears to be offline'))
 
-    def initflow(self):
+    def initflow(self, composite=False):
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
 
@@ -429,7 +429,7 @@ class CassandraWorkflow(workflow.Workflow):
         # enable profiling to the level before the flow started
         snapshotvms.add(UnorderedClearSnapshot(self._store['instances']))
 
-        super(CassandraWorkflow, self).initflow(snapshotvms)
+        super(CassandraWorkflow, self).initflow(snapshotvms, composite=composite)
 
 
     def topology(self):

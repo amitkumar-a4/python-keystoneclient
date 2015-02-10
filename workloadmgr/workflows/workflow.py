@@ -66,7 +66,7 @@ class Workflow(object):
         self._snapshotvms = None
         self._postsnapshot = None
 
-    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None):
+    def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None, composite=False):
 
         if snapshotvms is None:
             raise exception.UndefinedSnapshotVMsWorkflow("snapshotvms is None")
@@ -106,8 +106,9 @@ class Workflow(object):
             # block commit any changes back to the snapshot
             self._postsnapshot.add(vmtasks.LinearPostSnapshot(self._store['instances']))
             
-            #apply retention policy
-            self._postsnapshot.add(vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))
+            if composite == False:
+                #apply retention policy
+                self._postsnapshot.add(vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))
         else:
             self._postsnapshot = postsnapshot
 

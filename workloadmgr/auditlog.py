@@ -44,19 +44,36 @@ class AuditLog(object):
         finally:
             lock.release()
             
-    def get_records(self, time_in_minutes):
+    def get_records(self, time_in_minutes, time_from, time_to):
         records = []
-        now = timeutils.utcnow()
-        with open(self._filepath) as auditlogfile: 
-            for line in auditlogfile:
-                values = line.split(",") 
-                if (now - datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f")) < timedelta(minutes=time_in_minutes):
-                    record = {'Timestamp' : values[0],
-                              'UserName': values[1],
-                              'UserId': values[2],
-                              'ObjectName': values[3],
-                              'ObjectId': values[4],
-                              'Details':values[5],
-                              }
-                    records.append(record)
+        
+        if time_in_minutes:
+            now = timeutils.utcnow()
+            with open(self._filepath) as auditlogfile: 
+                for line in auditlogfile:
+                    values = line.split(",") 
+                    record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
+                    if (now - record_time) < timedelta(minutes=time_in_minutes):
+                        record = {'Timestamp' : values[0],
+                                  'UserName': values[1],
+                                  'UserId': values[2],
+                                  'ObjectName': values[3],
+                                  'ObjectId': values[4],
+                                  'Details':values[5],
+                                  }
+                        records.append(record)
+        else:
+            with open(self._filepath) as auditlogfile: 
+                for line in auditlogfile:
+                    values = line.split(",")
+                    record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
+                    if record_time >= time_from and record_time <= time_to:
+                        record = {'Timestamp' : values[0],
+                                  'UserName': values[1],
+                                  'UserId': values[2],
+                                  'ObjectName': values[3],
+                                  'ObjectId': values[4],
+                                  'Details':values[5],
+                                  }
+                        records.append(record)           
         return records
