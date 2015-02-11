@@ -373,14 +373,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'executing'
                                     })            
             workflow.execute()
-            self.db.snapshot_type_time_update(context, snapshot_id)               
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'available'
-                                    })             
+                                    }) 
+            self.db.snapshot_type_time_update(context, snapshot_id)               
 
             # update metadata hostnames
             hostnames = ""

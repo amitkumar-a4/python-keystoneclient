@@ -1267,6 +1267,9 @@ class VMwareVCDriver(VMwareESXDriver):
                     if _snapshot_disks_deleted(snap):
                         db.snapshot_delete(cntx, snap.id)
                         db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                        LOG.info(_("Deleted Snapshot %s %s %s") %(snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                  snap.display_name,
+                                                                  snap.id))
                         try:
                             shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id,
                                                                                            'snapshot_id': snap.id}))

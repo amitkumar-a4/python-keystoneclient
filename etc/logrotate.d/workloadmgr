@@ -21,11 +21,11 @@
 }
 
 /tmp/vmware-root/*.log {
-  daily
+  hourly
   missingok
-  compress
-  delaycompress
-  notifempty
-  copytruncate
   rotate 1
+  lastaction
+    sudo rm -rf /tmp/vmware-root/*.log
+    sudo rm -rf /tmp/vmware-root/*.log.1    
+  endscript  
 }

@@ -961,6 +961,7 @@ def snapshot_update(context, snapshot_id, values, purge_metadata=False):
 
 @require_context
 def snapshot_type_time_update(context, snapshot_id):
+    snapshot = snapshot_get(context, snapshot_id, read_deleted='yes')
     snapshot_type_full = False
     snapshot_type_incremental = False
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
@@ -973,6 +974,8 @@ def snapshot_type_time_update(context, snapshot_id):
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
         time_taken = time_taken + snapshot_vm_resource.time_taken
+    
+    time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
         
     if snapshot_type_full and snapshot_type_incremental:
         snapshot_type = 'mixed'
