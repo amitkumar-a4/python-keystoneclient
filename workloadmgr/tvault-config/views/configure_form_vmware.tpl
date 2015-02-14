@@ -181,7 +181,15 @@ function warnCreateFileSystem(cb) {
 			<div class="input-group">
 				<label class="input-group-addon">Username(DN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 				<input name="ldap-user-dn" type="text" placeholder="cn=triliovault,cn=users,dc=example,dc=com" class="form-control"> <br>
-			</div><br>						
+			</div><br>
+			<div class="input-group">
+				<label class="input-group-addon">User Object Class&nbsp;&nbsp;&nbsp;</label>
+				<input name="ldap-user-objectclass" type="text" placeholder="inetOrgPerson OR Person" class="form-control"> <br>
+			</div><br>	
+			<div class="input-group">
+				<label class="input-group-addon">Username Attribute&nbsp;</label>
+				<input name="ldap-user-name-attribute" type="text" placeholder="sn OR cn" class="form-control"> <br>
+			</div><br>													
 	      </div>
 	    </div>
 	  </div>

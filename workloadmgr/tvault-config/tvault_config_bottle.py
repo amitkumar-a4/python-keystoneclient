@@ -331,8 +331,12 @@ def configure_rabbitmq():
 def configure_keystone():
     def _get_user_id_from_name(name):
         for user in keystone.users.list():
-            if user.name == name:
-                return user.id
+            if hasattr(user,'name'):
+                if user.name == name:
+                    return user.id
+            else:
+                if user.id == name:
+                    return user.id   
         
     if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
         #configure keystone
@@ -360,7 +364,10 @@ def configure_keystone():
         Config.set('ldap','tenant_allow_delete', config_data['ldap_tenant_allow_delete'])
         Config.set('ldap','role_allow_create', config_data['ldap_role_allow_create'])
         Config.set('ldap','role_allow_update', config_data['ldap_role_allow_update'])
-        Config.set('ldap','role_allow_delete', config_data['ldap_role_allow_delete']) 
+        Config.set('ldap','role_allow_delete', config_data['ldap_role_allow_delete'])
+        Config.set('ldap','user_objectclass', config_data['ldap_user_objectclass'])
+        Config.set('ldap','user_name_attribute', config_data['ldap_user_name_attribute'])
+
         with open('/etc/keystone/keystone.conf', 'wb') as configfile:
             Config.write(configfile)         
 
@@ -1244,7 +1251,11 @@ def configure_service():
         if 'vcenter_username' in config_data:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_username = ', 'host_username = ' + config_data['vcenter_username'])
         if 'vcenter' in config_data:               
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_ip = ', 'host_ip = ' + config_data['vcenter'])        
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'host_ip = ', 'host_ip = ' + config_data['vcenter']) 
+            
+        if 'vcenter_username' in config_data:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'auditlog_admin_user = ', 'auditlog_admin_user = ' + config_data['vcenter_username'])
+               
         
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
@@ -1486,7 +1497,9 @@ def configure_vmware():
             config_data['ldap_tenant_allow_delete'] = False
             config_data['ldap_role_allow_create'] = False
             config_data['ldap_role_allow_update'] = False
-            config_data['ldap_role_allow_delete'] = False            
+            config_data['ldap_role_allow_delete'] = False
+            config_data['ldap_user_objectclass'] = config_inputs['ldap-user-objectclass']
+            config_data['ldap_user_name_attribute'] = config_inputs['ldap-user-name-attribute']
                       
         else:
             config_data['ldap_server_url'] = "ldap://localhost"
@@ -1504,6 +1517,8 @@ def configure_vmware():
             config_data['ldap_role_allow_create'] = True
             config_data['ldap_role_allow_update'] = True
             config_data['ldap_role_allow_delete'] = True
+            config_data['ldap_user_objectclass'] = "inetOrgPerson" 
+            config_data['ldap_user_name_attribute'] = "sn"            
 
         config_data['keystone_admin_url'] = "http://" + config_data['tvault_primary_node'] + ":35357/v2.0"
         config_data['keystone_public_url'] = "http://" + config_data['tvault_primary_node'] + ":5000/v2.0"

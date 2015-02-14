@@ -659,12 +659,12 @@ class VMwareVCDriver(VMwareESXDriver):
                         raise Exception(_("VM '%s(%s)' changeTracking is not enabled") %
                                           (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
                 else:
-                    raise Exception(_("VM '%s(%s)' already has snapshots and "
-                                      "enable change block tracking feature. "
-                                      "Remove snapshots and create workload again") %
+                    raise Exception(_("Since VM '%s(%s)' has existing snapshots, "
+                                      "changed block tracking feature can't be enabled. "
+                                      "Remove snapshots and try again") %
                                       (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
         else:
-            raise Exception(_("VM '%s(%s)' does not support changeTracking") %
+            raise Exception(_("VM '%s(%s)' does not support changed block tracking") %
                              (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
 
     @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_vm')
@@ -1288,7 +1288,8 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'vmwareapi.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
         try:
-            self.remove_snapshot_vm(cntx, db, instance, snapshot, snapshot_data['snapshot_ref'])
+            if 'snapshot_ref' in snapshot_data:
+                self.remove_snapshot_vm(cntx, db, instance, snapshot, snapshot_data['snapshot_ref'])
         except Exception as ex:
             LOG.exception(ex)      
             raise                     
