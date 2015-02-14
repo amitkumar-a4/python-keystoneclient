@@ -993,7 +993,15 @@ class VMwareVCDriver(VMwareESXDriver):
                 LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
                 LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
                 LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
-                    
+
+                try:
+                    cmdline = "vmware-vdiskmanager -R".split(" ")
+                    cmdline.append(copy_to_file_path)
+                    check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                except subprocess.CalledProcessError as ex:
+                    LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                    raise
+                                                
                 db.snapshot_update( cntx, snapshot['id'], 
                                     {'progress_msg': 'Uploaded '+ dev.deviceInfo.label + ' of VM:' + instance['vm_name'],
                                      'status': 'uploading'
@@ -1569,7 +1577,29 @@ class VMwareVCDriver(VMwareESXDriver):
                                 stdout=output,
                                 stderr=process.stderr.read(),
                                 cmd=cmd)
-    
+                """
+                Repair is not working for remote disks
+                try:
+                    import pdb; pdb.set_trace()
+                    cmdspec = [ "trilio-vix-disk-cli", "-check", "1",
+                               "-host", self._session._host_ip,
+                               "-user", self._session._host_username,
+                               "-password", "***********",
+                               "-vm", vmxspec,
+                               vmdk_path,]      
+                    cmd = " ".join(cmdspec)
+                    for idx, opt in enumerate(cmdspec):
+                        if opt == "-password":
+                            cmdspec[idx+1] = self._session._host_password
+                            break
+                                  
+                    check_output(cmdspec, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                except subprocess.CalledProcessError as ex:
+                    LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
+                    LOG.exception(ex)
+                    raise
+                """
+            
                 restore_obj = db.restore_get(cntx, restore['id'])
                 progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
                     'message_color': autolog.BROWN,
