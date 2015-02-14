@@ -5,6 +5,7 @@
 
 import contextlib
 import os
+import os.path
 import yaml
 import glob
 import random
@@ -12,6 +13,7 @@ import sys
 import time
 import re
 import shutil
+import socket
 
 import datetime 
 import json
@@ -185,6 +187,10 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                 for node in totalnodes:
                     if dc['datacenter'] == node['Data Center']:
                          nodenames.append(node)
+                # tempoarily we only consider the first group
+                # we will figure out how to support second group
+                # incase the first one is unavailable
+                break
         else:
             nodenames = totalnodes
 
@@ -517,12 +523,20 @@ class CassandraWorkflow(workflow.Workflow):
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
     
-def update_cassandra_yaml(mountpath, clustername, ips):
+def update_cassandra_yaml(mountpath, clustername, nodeip, ips):
     # modify the cassandra.yaml
-    os.rename(mountpath + '/etc/cassandra/cassandra.yaml',
-              mountpath + '/etc/cassandra/cassandra.yaml.bak')
+    configpath = ""
+    if os.path.exists(os.path.join(mountpath, 'usr/share/dse/resources/cassandra/conf/')):
+        # This one appears to be DSE installation
+        configpath = 'usr/share/dse/resources/cassandra/conf/'
+    else:
+        configpath = 'etc/cassandra'
 
-    with open(mountpath + '/etc/cassandra/cassandra.yaml.bak', 'r') as f:
+    yamlpath = os.path.join(mountpath, configpath, 'cassandra.yaml')
+    yamlbakpath = os.path.join(mountpath, configpath, 'cassandra.yaml.bak')
+
+    os.rename(yamlpath, yamlbakpath)
+    with open(yamlbakpath, 'r') as f:
         doc = yaml.load(f)
 
     if doc['cluster_name'] != clustername:
@@ -537,40 +551,76 @@ def update_cassandra_yaml(mountpath, clustername, ips):
                 shutil.rmtree(os.path.join(syspath, subdir))
 
     doc['cluster_name'] = clustername
+    if 'listen_address' in doc and doc['listen_address'] != None \
+       and doc['listen_address'] != "0.0.0.0":
+        doc['listen_address'] = nodeip
+
+    if 'rpc_address' in doc and doc['rpc_address'] != None \
+       and doc['rpc_address'] != "0.0.0.0":
+        doc['rpc_address'] = nodeip
+
     doc['seed_provider'][0]['parameters'][0]['seeds'] =  ips
-    with open(mountpath + '/etc/cassandra/cassandra.yaml', 'w') as f:
+    with open(yamlpath, 'w') as f:
         f.write(yaml.safe_dump(doc))
 
 def update_cassandra_topology_yaml(mountpath, address, broadcast):
 
+    configpath = ""
+    if os.path.exists(os.path.join(mountpath, 'usr/share/dse/resources/cassandra/conf/')):
+        # This one appears to be DSE installation
+        configpath = 'usr/share/dse/resources/cassandra/conf/'
+    else:
+        configpath = 'etc/cassandra'
+
+    yamlpath = os.path.join(mountpath, configpath, 'cassandra-topology.yaml')
+    yamlbakpath = os.path.join(mountpath, configpath, 'cassandra-topology.yaml.bak')
+
     # modify the cassandra-topology.yaml
-    os.rename(mountpath + '/etc/cassandra/cassandra-topology.yaml',
-              mountpath + '/etc/cassandra/cassandra-topology.yaml.bak')
-    with open(mountpath + '/etc/cassandra/cassandra-topology.yaml.bak', 'r') as f:
+    os.rename(yamlpath, yamlbakpath)
+    with open(yamlbakpath, 'r') as f:
         doc = yaml.load(f)
 
     doc['topology'][0]['racks'][0]['nodes'][0]['dc_local_address'] = address
     doc['topology'][0]['racks'][0]['nodes'][0]['broadcast_address'] = broadcast
-    with open(mountpath + '/etc/cassandra/cassandra-topology.yaml', 'w') as f:
+    with open(yamlpath, 'w') as f:
         f.write(yaml.safe_dump(doc))
 
 def update_cassandra_topology_properties(mountpath, addresses):
 
     # modify the cassandra-topology.properties
-    os.rename(mountpath + '/etc/cassandra/cassandra-topology.properties',
-              mountpath + '/etc/cassandra/cassandra-topology.properties.bak')
+    configpath = ""
+    if os.path.exists(os.path.join(mountpath, 'usr/share/dse/resources/cassandra/conf/')):
+        # This one appears to be DSE installation
+        configpath = 'usr/share/dse/resources/cassandra/conf/'
+    else:
+        configpath = 'etc/cassandra'
 
-    with open(mountpath + '/etc/cassandra/cassandra-topology.properties', 'w') as f:
+    topopath = os.path.join(mountpath, configpath, 'cassandra-topology.properties')
+    topobakpath = os.path.join(mountpath, configpath, 'cassandra-topology.properties.bak')
+
+    os.rename(topopath, topobakpath)
+
+    with open(topopath, 'w') as f:
         f.write("# Updated the addresses by TrilioVault restore process\n")
         for addr in addresses.split(","):
             f.write(addr + "=DC1:RAC1\n")
 
 def update_cassandra_env_sh(mountpath, hostname):
     # modify the cassandra-env.sh
-    os.rename(mountpath + '/etc/cassandra/cassandra-env.sh',
-              mountpath + '/etc/cassandra/cassandra-env.sh.bak')
-    with open(mountpath + '/etc/cassandra/cassandra-env.sh.bak', 'r') as f:
-        with open(mountpath + '/etc/cassandra/cassandra-env.sh', 'w') as fout:
+    configpath = ""
+    if os.path.exists(os.path.join(mountpath, 'usr/share/dse/resources/cassandra/conf/')):
+        # This one appears to be DSE installation
+        configpath = 'usr/share/dse/resources/cassandra/conf/'
+    else:
+        configpath = 'etc/cassandra'
+
+    envpath = os.path.join(mountpath, configpath, 'cassandra-env.sh')
+    envbakpath = os.path.join(mountpath, configpath, 'cassandra-env.sh.bak')
+
+    os.rename(envpath, envbakpath)
+
+    with open(envbakpath, 'r') as f:
+        with open(envpath, 'w') as fout:
             for line in f:
                 if "java.rmi.server.hostname" in line:
                     line = 'JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname=' + hostname + '"\n'
@@ -685,6 +735,7 @@ class CassandraRestoreNode(task.Task):
         process, mountpath = vmtasks_vcloud.mount_instance_root_device(cntx, instance, restore)
         try:
             update_cassandra_yaml(mountpath, restore_options['NewClusterName'],
+                                  ipaddress,
                                   restore_options['IPAddresses'])
             update_cassandra_topology_yaml(mountpath, ipaddress,
                                            restore_options['Broadcast'])
