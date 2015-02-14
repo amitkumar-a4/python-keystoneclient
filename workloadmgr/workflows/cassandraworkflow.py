@@ -86,26 +86,6 @@ def connect_server(host, port, user, password):
         raise ex
     return client
 
-def getnodeinfo(host, port, user, password):
-
-    connection = connect_server(host, port, user, password)
-    LOG.debug(_( 'Connected to cassandra node: ' + host))
-
-    stdin, stdout, stderr = _exec_command(connection, "nodetool info")
-    cassout = stdout.read()
-
-    cassout = cassout.split("\n")
-    nodehash = {}
-   
-    for c in cassout:
-        if len(c.split(":")) == 0:
-            continue;
-        nodehash[c.split(":")[0].strip()] = c.split(":")[1].strip()
-
-    nodeinput = []
-    nodeinput.append(['Gossip', str(nodehash['Gossip active'])])
-    nodeinput.append(['Thrift', str(nodehash['Thrift active'])])
-
 def getclusterinfo(connection):
     stdin, stdout, stderr = _exec_command(connection, "nodetool describecluster")
     cassout = stdout.read()
@@ -189,133 +169,128 @@ def getcassandranodes(connection):
 
     return cassnodes
 
-def get_cassandra_nodes(cntx, host, port, username, password, preferredgroup=None):
-    #
-    # Creating connection to cassandra namenode 
-    #
-    connection = connect_server(host, port, username, password)
-    LOG.debug(_( 'Connected to cassandra node: ' + host))
-
-
-    #
-    # Getting sharding information
-    #
-    totalnodes = getcassandranodes(connection)
+def get_cassandra_nodes(cntx, connection, host, port, username, password, preferredgroup=None):
+    try:
+        #
+        # Getting sharding information
+        #
+        totalnodes = getcassandranodes(connection)
     
-    LOG.debug(_('Discovered cassandra nodes: ' + str(totalnodes)))
+        LOG.debug(_('Discovered cassandra nodes: ' + str(totalnodes)))
 
-    # filter out vms that are not in preferred datacenter
-    if preferredgroup and len(preferredgroup):
-        nodenames = []
-        for dc in preferredgroup:
-            for node in totalnodes:
-                if dc['datacenter'] == node['Data Center']:
-                     nodenames.append(node)
-    else:
-        nodenames = totalnodes
+        # filter out vms that are not in preferred datacenter
+        if preferredgroup and len(preferredgroup):
+            nodenames = []
+            for dc in preferredgroup:
+                for node in totalnodes:
+                    if dc['datacenter'] == node['Data Center']:
+                         nodenames.append(node)
+        else:
+            nodenames = totalnodes
 
-    #
-    # Resolve the node name to VMs
-    # Usually Hadoop spits out nodes IP addresses. These
-    # IP addresses need to be resolved to VM IDs by 
-    # querying the VM objects from nova
-    #
-    ips = {}
-    for name in nodenames:
-        # if the name is host name, resolve it to IP address
-        try :
-            IP(name['Address'])
-            ips[name['Address']] = 1
-        except Exception, e:
-            # we got hostnames
-            import socket
-            ips[socket.gethostbyname(name['Address'])] = 1
+        #
+        # Resolve the node name to VMs
+        # Usually Hadoop spits out nodes IP addresses. These
+        # IP addresses need to be resolved to VM IDs by 
+        # querying the VM objects from nova
+        #
+        ips = {}
+        for name in nodenames:
+            # if the name is host name, resolve it to IP address
+            try :
+                IP(name['Address'])
+                ips[name['Address']] = 1
+            except Exception, e:
+                # we got hostnames
+                ips[socket.gethostbyname(name['Address'])] = 1
 
-    interfaces = {}
-    rootpartition_type = {}
-    for ip in ips:
-        try:
-            client = paramiko.SSHClient()
-            client.load_system_host_keys()
-            if password == '':
-                client.set_missing_host_key_policy(paramiko.WarningPolicy())
-            else:
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        interfaces = {}
+        rootpartition_type = {}
+        for ip in ips:
             try:
-                client.connect(ip, port=int(port), username=username, password=password)
-                stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
-                interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
+                client = paramiko.SSHClient()
+                client.load_system_host_keys()
+                if password == '':
+                    client.set_missing_host_key_policy(paramiko.WarningPolicy())
+                else:
+                    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                try:
+                    client.connect(ip, port=int(port), username=username, password=password)
+                    stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
+                    interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
 
-                # find the type of the root partition
-                rootpartition_type[ip] = "Linux"
-                stdin, stdout, stderr = client.exec_command('df /', timeout=120)
-                m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
-                if m:
-                    mp= m.group(1)
-                    transport = client.get_transport()
-                    session = transport.open_session()
-                    session.get_pty()
-                    session.set_combine_stderr(True)
-                    session.settimeout(120)
-                    session.exec_command('sudo -k lvdisplay ' + mp)
-                    stdin = session.makefile('wb', 8192)
-                    stdout = session.makefile('rb', 8192)
-                    stderr = session.makefile_stderr('rb', 8192)
-                    if stdout.channel.closed is False: # If stdout is still open then sudo is asking us for a password
-                       stdin.write('%s\n' % password)
-                       stdin.flush()
-                    retcode = session.recv_exit_status()
-                    LOG.debug(_('lvdisplay: return value %d'), retcode)
-                    if retcode == 0:
-                       output = stdout.read()
-                       # remove password from the stdout
-                       output = "\n".join(output.split("\n")[1:])
-                       LOG.info(_('lvdisplay: output\n %s'), output)
-                       rootpartition_type[ip] = "lvm"
-                    else:
-                       error = stderr.read()
-                       LOG.debug(_('lvdisplay: error %s'), error)
-            except:
-                pass
-        finally:
-            LOG.info(_('%s: root partition is on %s'), ip, rootpartition_type[ip])
-            client.close()
+                    # find the type of the root partition
+                    rootpartition_type[ip] = "Linux"
+                    stdin, stdout, stderr = client.exec_command('df /', timeout=120)
+                    m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
+                    if m:
+                        mp= m.group(1)
+                        transport = client.get_transport()
+                        session = transport.open_session()
+                        session.get_pty()
+                        session.set_combine_stderr(True)
+                        session.settimeout(120)
+                        session.exec_command('sudo -k lvdisplay ' + mp)
+                        stdin = session.makefile('wb', 8192)
+                        stdout = session.makefile('rb', 8192)
+                        stderr = session.makefile_stderr('rb', 8192)
+                        if stdout.channel.closed is False: # If stdout is still open then sudo is asking us for a password
+                           stdin.write('%s\n' % password)
+                           stdin.flush()
+                        retcode = session.recv_exit_status()
+                        LOG.debug(_('lvdisplay: return value %d'), retcode)
+                        if retcode == 0:
+                           output = stdout.read()
+                           # remove password from the stdout
+                           output = "\n".join(output.split("\n")[1:])
+                           LOG.info(_('lvdisplay: output\n %s'), output)
+                           rootpartition_type[ip] = "lvm"
+                        else:
+                           error = stderr.read()
+                           LOG.debug(_('lvdisplay: error %s'), error)
+                except:
+                    pass
+            finally:
+                LOG.info(_('%s: root partition is on %s'), ip, rootpartition_type[ip])
+                client.close()
 
-    # call nova list
-    compute_service = nova.API(production=True)
-    instances = compute_service.get_servers(cntx, admin=True)
-    hypervisors = compute_service.get_hypervisors(cntx)
-
-    vms = []
-    # call nova interface-list <instanceid> to build the list of instances ids
-    # if node names are host names then lookup the VMid based on the 
-    for instance in instances:
-        ifs = instance.addresses
-        for addr in instance.addresses:
-            # IP Addresses
-            ifs = instance.addresses[addr]
-            for _if in ifs:
-                #this is our vm
-                hypervisor_hostname = None
-                hypervisor_type = None
-                for hypervisor in hypervisors:
-                    if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
-                        hypervisor_hostname = hypervisor.hypervisor_hostname
-                        hypervisor_type = hypervisor.hypervisor_type
-                        break
-                if _if['OS-EXT-IPS-MAC:mac_addr'] in interfaces:
-                   
-                    utils.append_unique(vms, {'vm_id' : instance.id,
-                                              'vm_name' : instance.name,
-                                              'vm_metadata' : instance.metadata,                                                
-                                              'vm_flavor_id' : instance.flavor['id'],
-                                              'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
-                                              'root_partition_type' : rootpartition_type[interfaces[_if['OS-EXT-IPS-MAC:mac_addr']]],
-                                              'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
-                                              'hypervisor_hostname' : hypervisor_hostname,
-                                              'hypervisor_type' :  hypervisor_type}, 
-                                              "vm_id")
-    return vms
+        # call nova list
+        compute_service = nova.API(production=True)
+        instances = compute_service.get_servers(cntx, admin=True)
+        hypervisors = compute_service.get_hypervisors(cntx)
+    
+        vms = []
+        # call nova interface-list <instanceid> to build the list of instances ids
+        # if node names are host names then lookup the VMid based on the 
+        for instance in instances:
+            ifs = instance.addresses
+            for addr in instance.addresses:
+                # IP Addresses
+                ifs = instance.addresses[addr]
+                for _if in ifs:
+                    #this is our vm
+                    hypervisor_hostname = None
+                    hypervisor_type = None
+                    for hypervisor in hypervisors:
+                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
+                            hypervisor_hostname = hypervisor.hypervisor_hostname
+                            hypervisor_type = hypervisor.hypervisor_type
+                            break
+                    if _if['OS-EXT-IPS-MAC:mac_addr'] in interfaces:
+                       
+                        utils.append_unique(vms, {'vm_id' : instance.id,
+                                                  'vm_name' : instance.name,
+                                                  'vm_metadata' : instance.metadata,                                                
+                                                  'vm_flavor_id' : instance.flavor['id'],
+                                                  'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
+                                                  'root_partition_type' : rootpartition_type[interfaces[_if['OS-EXT-IPS-MAC:mac_addr']]],
+                                                  'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
+                                                  'hypervisor_hostname' : hypervisor_hostname,
+                                                  'hypervisor_type' :  hypervisor_type}, 
+                                                  "vm_id")
+        return vms
+    finally:
+        pass
 
 class SnapshotNode(task.Task):
 
@@ -387,94 +362,102 @@ class CassandraWorkflow(workflow.Workflow):
                                                 self._store['Password'])
                     self._store['CassandraNode'] = host
                     LOG.debug(_( 'Chose "' + host +'" for cassandra nodetool'))
-                    return
+                    return connection
                 except:
                     LOG.debug(_( '"' + host +'" appears to be offline'))
                     pass
-        LOG.warning(_( 'Cassandra cluster appears to be offline'))
+
+        LOG.error(_( 'Cassandra cluster appears to be offline'))
+        raise Exception(_("Cassandra cluster is down."))
 
     def initflow(self, composite=False):
-        self.find_first_alive_node()
-        cntx = amqp.RpcContext.from_dict(self._store['context'])
+        try:
+            connection = self.find_first_alive_node()
 
-        preferredgroup = self._store.get('preferredgroup', None)
-        if preferredgroup:
-            preferredgroup = json.loads(self._store['preferredgroup'])
-        self._store['instances'] =  get_cassandra_nodes(cntx, self._store['CassandraNode'], 
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+
+            preferredgroup = self._store.get('preferredgroup', None)
+            if preferredgroup:
+                preferredgroup = json.loads(self._store['preferredgroup'])
+            self._store['instances'] =  get_cassandra_nodes(cntx, connection, self._store['CassandraNode'], 
                                                         int(self._store['SSHPort']),
                                                         self._store['Username'],
-                                                        self._store['Password'],
-                                                        preferredgroup)
-        for index,item in enumerate(self._store['instances']):
-            self._store['instance_'+item['vm_id']] = item
-            self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
+                                                        self._store['Password'], preferredgroup)
+            for index,item in enumerate(self._store['instances']):
+                self._store['instance_'+item['vm_id']] = item
+                self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
         
-        snapshotvms = lf.Flow('cassandrawf')
+            snapshotvms = lf.Flow('cassandrawf')
         
-        # Enable safemode on the namenode
-        snapshotvms.add(UnorderedSnapshotNode(self._store['instances']))
+            # Enable safemode on the namenode
+            snapshotvms.add(UnorderedSnapshotNode(self._store['instances']))
     
-        # This is an unordered pausing of VMs. This flow is created in
-        # common tasks library. This routine takes instance ids from 
-        # openstack. Workload manager should provide the list of 
-        # instance ids
-        snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
+            # This is an unordered pausing of VMs. This flow is created in
+            # common tasks library. This routine takes instance ids from 
+            # openstack. Workload manager should provide the list of 
+            # instance ids
+            snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
     
-        # This is again unorder snapshot of VMs. This flow is implemented in
-        # common tasks library
-        snapshotvms.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
+            # This is again unorder snapshot of VMs. This flow is implemented in
+            # common tasks library
+            snapshotvms.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
     
-        # This is an unordered pausing of VMs.
-        snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
+            # This is an unordered pausing of VMs.
+            snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
     
-        # enable profiling to the level before the flow started
-        snapshotvms.add(UnorderedClearSnapshot(self._store['instances']))
+            # enable profiling to the level before the flow started
+            snapshotvms.add(UnorderedClearSnapshot(self._store['instances']))
 
-        super(CassandraWorkflow, self).initflow(snapshotvms, composite=composite)
+            super(CassandraWorkflow, self).initflow(snapshotvms, composite=composite)
 
+        finally:
+            if connection:
+                connection.close()
 
     def topology(self):
-        LOG.debug(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
-        self.find_first_alive_node()
+        try:
+            LOG.debug(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
+            connection = self.find_first_alive_node()
 
-        connection = connect_server(self._store['CassandraNode'], int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
-        cassnodes = getcassandranodes(connection)
-        clusterinfo = getclusterinfo(connection)
-        dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
-        for n in cassnodes:
-            # We discovered this datacenter for the first time, add it
-            if not n['Data Center'] in dcs["datacenters"]:
-                dcs['datacenters'][n['Data Center']] = {'name': n['Data Center'], "racks":{}, "input":[]}
+            cassnodes = getcassandranodes(connection)
+            clusterinfo = getclusterinfo(connection)
+            dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
+            for n in cassnodes:
+                # We discovered this datacenter for the first time, add it
+                if not n['Data Center'] in dcs["datacenters"]:
+                    dcs['datacenters'][n['Data Center']] = {'name': n['Data Center'], "racks":{}, "input":[]}
 
-            # We discovered this rack for the first time, add it
-            if not n['Rack'] in dcs["datacenters"][n['Data Center']]["racks"]:
-                dcs["datacenters"][n['Data Center']]["racks"][n['Rack']] = {'name': n['Rack'], "nodes":{}, "input":[]}
+                # We discovered this rack for the first time, add it
+                if not n['Rack'] in dcs["datacenters"][n['Data Center']]["racks"]:
+                    dcs["datacenters"][n['Data Center']]["racks"][n['Rack']] = {'name': n['Rack'], "nodes":{}, "input":[]}
 
-            #if not n['Address'] in dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"]:
-            n['name'] = n['Address']
-            n['status'] = n.pop('Status', None)
-            n["input"] = []
-            n['input'].append(["Load", n['Load']])
-            #n['input'].append(["State", n['State']])
-            dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"][n['Address']] = {'name': n['Address'], "node": n}
+                #if not n['Address'] in dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"]:
+                n['name'] = n['Address']
+                n['status'] = n.pop('Status', None)
+                n["input"] = []
+                n['input'].append(["Load", n['Load']])
+                #n['input'].append(["State", n['State']])
+                dcs["datacenters"][n['Data Center']]["racks"][n['Rack']]["nodes"][n['Address']] = {'name': n['Address'], "node": n}
 
 
-        dcs["children"] = []
-        for d, dv in dcs["datacenters"].iteritems():
-            dcs["children"].append(dv)
-            dv["children"] = []
-            for r, rv in dv["racks"].iteritems():
-                dv["children"].append(rv)
-                rv["children"] = []
-                for n, nv in rv["nodes"].iteritems():
-                    rv["children"].append(nv['node'])
+            dcs["children"] = []
+            for d, dv in dcs["datacenters"].iteritems():
+                dcs["children"].append(dv)
+                dv["children"] = []
+                for r, rv in dv["racks"].iteritems():
+                    dv["children"].append(rv)
+                    rv["children"] = []
+                    for n, nv in rv["nodes"].iteritems():
+                        rv["children"].append(nv['node'])
 
-        for d, dv in dcs["datacenters"].iteritems():
-            for r, rv in dv["racks"].iteritems():
-                rv.pop("nodes", None)
-                dv.pop("racks", None)
-        dcs.pop("datacenters", None)
-        return dict(topology=dcs)
+            for d, dv in dcs["datacenters"].iteritems():
+                for r, rv in dv["racks"].iteritems():
+                    rv.pop("nodes", None)
+                    dv.pop("racks", None)
+            dcs.pop("datacenters", None)
+            return dict(topology=dcs)
+        finally:
+            connection.close()
 
     def details(self):
         # workflow details based on the
@@ -505,13 +488,20 @@ class CassandraWorkflow(workflow.Workflow):
         return dict(workflow=workflow)
 
     def discover(self):
-        self.find_first_alive_node()
-        cntx = amqp.RpcContext.from_dict(self._store['context'])
-        instances = get_cassandra_nodes(cntx, self._store['CassandraNode'], int(self._store['SSHPort']), self._store['Username'], self._store['Password'])
-        for instance in instances:
-            del instance['hypervisor_hostname']
-            del instance['hypervisor_type']
-        return dict(instances=instances)
+        try:
+            connection = self.find_first_alive_node()
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+            instances = get_cassandra_nodes(cntx, connection,
+                                            self._store['CassandraNode'], 
+                                            int(self._store['SSHPort']),
+                                            self._store['Username'],
+                                            self._store['Password'])
+            for instance in instances:
+                del instance['hypervisor_hostname']
+                del instance['hypervisor_type']
+            return dict(instances=instances)
+        finally:
+            connection.close()
     
     def execute(self):
         if self._store['source_platform'] == "vmware":
