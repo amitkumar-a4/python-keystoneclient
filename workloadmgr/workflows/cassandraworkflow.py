@@ -353,9 +353,23 @@ class CassandraWorkflow(workflow.Workflow):
         
     def find_first_alive_node(self):
         # Iterate thru all hosts and pick the one that is alive
+        if 'CassandraNode' in self._store:
+            try:
+                connection = connect_server(self._store['CassandraNode'], 
+                                            int(self._store['SSHPort']),
+                                            self._store['Username'],
+                                            self._store['Password'])
+                LOG.debug(_( 'Chose "' + self._store['CassandraNode'] +'" for cassandra nodetool'))
+                return connection
+            except:
+                LOG.debug(_( '"' + self._store['CassandraNode'] +'" appears to be offline'))
+                pass
+            
         if 'hostnames' in self._store:
             for host in self._store['hostnames'].split(";"):
                 try:
+                    if host == '':
+                        continue
                     connection = connect_server(host, 
                                                 int(self._store['SSHPort']),
                                                 self._store['Username'],
@@ -371,6 +385,7 @@ class CassandraWorkflow(workflow.Workflow):
         raise Exception(_("Cassandra cluster is down."))
 
     def initflow(self, composite=False):
+        connection = None
         try:
             connection = self.find_first_alive_node()
 
@@ -415,6 +430,7 @@ class CassandraWorkflow(workflow.Workflow):
                 connection.close()
 
     def topology(self):
+        connection = None
         try:
             LOG.debug(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
             connection = self.find_first_alive_node()
@@ -457,7 +473,8 @@ class CassandraWorkflow(workflow.Workflow):
             dcs.pop("datacenters", None)
             return dict(topology=dcs)
         finally:
-            connection.close()
+            if connection:
+                connection.close()
 
     def details(self):
         # workflow details based on the
@@ -488,7 +505,9 @@ class CassandraWorkflow(workflow.Workflow):
         return dict(workflow=workflow)
 
     def discover(self):
+        connection = None
         try:
+            
             connection = self.find_first_alive_node()
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             instances = get_cassandra_nodes(cntx, connection,
@@ -501,7 +520,8 @@ class CassandraWorkflow(workflow.Workflow):
                 del instance['hypervisor_type']
             return dict(instances=instances)
         finally:
-            connection.close()
+            if connection:            
+                connection.close()
     
     def execute(self):
         if self._store['source_platform'] == "vmware":
@@ -512,7 +532,9 @@ class CassandraWorkflow(workflow.Workflow):
             compute_service.get_servers(cntx, search_opts=search_opts)
 
         # Iterate thru all hosts and pick the one that is alive
-        self.find_first_alive_node()
+        connection = self.find_first_alive_node()
+        if connection:            
+            connection.close()        
 
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)

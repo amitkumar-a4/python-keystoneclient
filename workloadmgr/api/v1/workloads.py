@@ -99,8 +99,10 @@ class WorkloadMgrsController(wsgi.Controller):
             workload = self.workload_api.workload_show(context, workload_id=id)
             return self._view_builder.detail(req, workload)
         except exception.WorkloadNotFound as error:
+            LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
             
 
@@ -111,10 +113,13 @@ class WorkloadMgrsController(wsgi.Controller):
             self.workload_api.workload_delete(context, id)
             return webob.Response(status_int=202)
         except exception.WorkloadNotFound as error:
+            LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidState as error:
+            LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
     
     def unlock(self, req, id):
@@ -123,10 +128,13 @@ class WorkloadMgrsController(wsgi.Controller):
             self.workload_api.workload_unlock(context, id)
             return webob.Response(status_int=202)
         except exception.WorkloadNotFound as error:
+            LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidState as error:
+            LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
     
     def snapshot(self, req, id, body=None):
@@ -152,10 +160,13 @@ class WorkloadMgrsController(wsgi.Controller):
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
             return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
         except exception.WorkloadNotFound as error:
+            LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidState as error:
+            LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
                 
     @wsgi.serializers(xml=WorkloadsTemplate)
@@ -164,10 +175,13 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             return self._get_workloads(req, is_detail=False)
         except exception.WorkloadNotFound as error:
+            LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidState as error:
+            LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
     @wsgi.serializers(xml=WorkloadsTemplate)
@@ -176,10 +190,13 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             return self._get_workloads(req, is_detail=True)
         except exception.WorkloadNotFound as error:
+            LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidState as error:
+            LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
         
@@ -248,13 +265,17 @@ class WorkloadMgrsController(wsgi.Controller):
             retval = self._view_builder.summary(req, new_workload_dict)
             return retval
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))  
 
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)
@@ -271,13 +292,17 @@ class WorkloadMgrsController(wsgi.Controller):
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))  
             
 
     def get_workflow(self, req, id):
@@ -286,16 +311,20 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             try:
                 workload_workflow = self.workload_api.workload_get_workflow(context, workload_id=id)
+                return workload_workflow
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
-            return workload_workflow
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))        
     
     def pause(self, req, id):
@@ -307,13 +336,17 @@ class WorkloadMgrsController(wsgi.Controller):
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))        
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))         
         
 
     def resume(self, req, id):
@@ -325,13 +358,17 @@ class WorkloadMgrsController(wsgi.Controller):
             except exception.NotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))             
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))          
     
     def get_topology(self, req, id):
         """Return topology of a given workload."""
@@ -339,35 +376,39 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             try:
                 workload_topology = self.workload_api.workload_get_topology(context, workload_id=id)
+                return workload_topology
             except exception.NotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
-            return workload_topology
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))            
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))          
 
     def discover_instances(self, req, id):
         """discover_instances of a workload_type using the metadata"""
         try:
             context = req.environ['workloadmgr.context']
-            retval = None
-            try:
-                instances = self.workload_api.workload_discover_instances(context, id)
-            except Exception as ex:
-                LOG.exception(ex)
+            instances = self.workload_api.workload_discover_instances(context, id)
             return instances
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))                       
 
     def import_workloads(self, req):
@@ -377,18 +418,23 @@ class WorkloadMgrsController(wsgi.Controller):
                 workloads = self.workload_api.import_workloads(context)
                 return self._view_builder.detail_list(req, workloads)
             except exception.WorkloadNotFound as error:
+                LOG.exception(error)
                 raise exc.HTTPNotFound(explanation=unicode(error))
             except exception.InvalidState as error:
+                LOG.exception(error)
                 raise exc.HTTPBadRequest(explanation=unicode(error))
-            return webob.Response(status_int=202)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))       
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))           
     
     def get_nodes(self, req):
         try:
@@ -400,12 +446,16 @@ class WorkloadMgrsController(wsgi.Controller):
                 LOG.exception(ex)
             return nodes
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))       
     
     def get_storage_usage(self, req):
@@ -418,12 +468,16 @@ class WorkloadMgrsController(wsgi.Controller):
                 LOG.exception(ex)
             return storage_usage
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))        
     
     def get_recentactivities(self, req):
@@ -443,13 +497,17 @@ class WorkloadMgrsController(wsgi.Controller):
                 LOG.exception(ex)
             return recentactivities
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))        
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))          
     
     def get_auditlog(self, req):
         try:
@@ -478,13 +536,17 @@ class WorkloadMgrsController(wsgi.Controller):
                 LOG.exception(ex)
             return auditlog
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))                     
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))                      
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

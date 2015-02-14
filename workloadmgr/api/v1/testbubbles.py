@@ -83,13 +83,17 @@ class TestbubblesController(wsgi.Controller):
                 raise exc.HTTPNotFound()
             return self._view_builder.detail(req, testbubble)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error)) 
         
     def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a testbubble."""
@@ -101,13 +105,17 @@ class TestbubblesController(wsgi.Controller):
                 raise exc.HTTPNotFound()
             return webob.Response(status_int=202)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error)) 
         
     @wsgi.serializers(xml=TestbubblesTemplate)
     def index(self, req, workload_id=None, snapshot_id=None):
@@ -115,13 +123,17 @@ class TestbubblesController(wsgi.Controller):
         try:
             return self._get_testbubbles(req, snapshot_id, is_detail=False)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error)) 
         
     @wsgi.serializers(xml=TestbubblesTemplate)
     def detail(self, req, workload_id=None, snapshot_id=None):
@@ -129,13 +141,17 @@ class TestbubblesController(wsgi.Controller):
         try:
             return self._get_testbubbles(req, snapshot_id, is_detail=True)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error)) 
         
     def _get_testbubbles(self, req, snapshot_id, is_detail):
         """Returns a list of testbubbles, transformed through view builder."""
