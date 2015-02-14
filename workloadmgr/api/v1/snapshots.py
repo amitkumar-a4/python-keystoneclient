@@ -103,12 +103,16 @@ class SnapshotsController(wsgi.Controller):
                 raise exc.HTTPNotFound()
             return self._view_builder.detail(req, snapshot)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
         
     def delete(self, req, id, workload_id=None):
@@ -121,13 +125,17 @@ class SnapshotsController(wsgi.Controller):
                 raise exc.HTTPNotFound()
             return webob.Response(status_int=202)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))   
         
     @wsgi.serializers(xml=SnapshotsTemplate)
     def index(self, req, workload_id=None):
@@ -135,13 +143,17 @@ class SnapshotsController(wsgi.Controller):
         try:
             return self._get_snapshots(req, workload_id, is_detail=False)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))   
         
     @wsgi.serializers(xml=SnapshotsTemplate)
     def detail(self, req, workload_id=None):
@@ -149,12 +161,16 @@ class SnapshotsController(wsgi.Controller):
         try:
             return self._get_snapshots(req, workload_id, is_detail=True)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
         
     def _get_snapshots(self, req, workload_id, is_detail):
@@ -233,12 +249,16 @@ class SnapshotsController(wsgi.Controller):
             restore = self._restore(context, id, workload_id, body, test)
             return self.restore_view_builder.detail(req, dict(restore.iteritems()))
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
             
     @wsgi.response(202)
@@ -250,12 +270,16 @@ class SnapshotsController(wsgi.Controller):
             test_restore = self._restore(context, id, workload_id, body, test=True)
             return self.testbubble_view_builder.detail(req, dict(test_restore.iteritems()))
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))          
     
 def create_resource(ext_mgr):

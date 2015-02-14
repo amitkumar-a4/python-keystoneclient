@@ -84,12 +84,16 @@ class RestoresController(wsgi.Controller):
                 raise exc.HTTPNotFound()
             return self._view_builder.detail(req, restore)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))       
 
     def delete(self, req, id, workload_id=None, snapshot_id=None):
@@ -103,13 +107,17 @@ class RestoresController(wsgi.Controller):
             except wlm_exceptions.InvalidState as error:
                 raise exc.HTTPBadRequest(explanation= unicode(error))
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error)) 
 
     @wsgi.serializers(xml=RestoresTemplate)
     def index(self, req, workload_id=None, snapshot_id=None):
@@ -117,12 +125,16 @@ class RestoresController(wsgi.Controller):
         try:
             return self._get_restores(req, snapshot_id, is_detail=False)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
         
     @wsgi.serializers(xml=RestoresTemplate)
@@ -131,12 +143,16 @@ class RestoresController(wsgi.Controller):
         try:
             return self._get_restores(req, snapshot_id, is_detail=True)
         except exc.HTTPNotFound as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPBadRequest as error:
+            LOG.exception(error)
             raise error
         except exc.HTTPServerError as error:
+            LOG.exception(error)
             raise error
         except Exception as error:
+            LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
         
     def _get_restores(self, req, snapshot_id, is_detail):

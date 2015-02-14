@@ -174,7 +174,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                          metadata, workload_id=None):
         """
         Discover instances of a workload_type
-        """        
+        """ 
         context_dict = dict([('%s' % key, value)
                           for (key, value) in context.to_dict().iteritems()])            
         context_dict['conf'] =  None # RpcContext object looks for this during init
@@ -219,7 +219,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def workload_discover_instances(self, context, workload_id):
         """
         Discover instances of workload
-        """        
+        """   
         workload = self.db.workload_get(context, workload_id)
         context_dict = dict([('%s' % key, value)
                           for (key, value) in context.to_dict().iteritems()])            
