@@ -8,7 +8,17 @@ from datetime import datetime
 from datetime import timedelta
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
+from oslo.config import cfg
  
+auditlog_opts = [
+    cfg.StrOpt('auditlog_admin_user',
+               default='admin',
+               help='auditlog admin user'),               
+]
+
+CONF = cfg.CONF
+CONF.register_opts(auditlog_opts) 
+
 _auditloggers = {}
 lock = threading.Lock()
 
@@ -36,7 +46,7 @@ class AuditLog(object):
             if object == None:
                 object = {}
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
-            auditlogmsg = auditlogmsg + ',' + 'admin' + ',' + context.user_id
+            auditlogmsg = auditlogmsg + ',' + CONF.auditlog_admin_user + ',' + context.user_id
             auditlogmsg = auditlogmsg + ',' +  object.get('display_name', 'NA') + ',' + object.get('id', 'NA')  
             auditlogmsg = auditlogmsg + ',' + message + '\n'
             with open(self._filepath, 'a') as auditlogfile:   
