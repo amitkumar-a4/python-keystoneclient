@@ -1580,7 +1580,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 """
                 Repair is not working for remote disks
                 try:
-                    import pdb; pdb.set_trace()
                     cmdspec = [ "trilio-vix-disk-cli", "-check", "1",
                                "-host", self._session._host_ip,
                                "-user", self._session._host_username,

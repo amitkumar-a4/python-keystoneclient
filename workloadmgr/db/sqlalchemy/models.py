@@ -23,7 +23,7 @@ from workloadmgr.openstack.common import timeutils
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '1.0.23'
+DB_VERSION = '1.0.24'
 
 
 class WorkloadsBase(object):
