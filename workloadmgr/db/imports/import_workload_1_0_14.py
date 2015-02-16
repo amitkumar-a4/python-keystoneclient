@@ -53,9 +53,12 @@ def import_workload(cntx, workload_url, new_version):
 
     snapshot_values_list = []
     for snapshot_url in workload_url['snapshot_urls']:
-        snapshot_values = json.loads(vault_service.get_object(snapshot_url + '/snapshot_db'))
-        snapshot_values['snapshot_url'] = snapshot_url
-        snapshot_values_list.append(snapshot_values)
+        try:
+            snapshot_values = json.loads(vault_service.get_object(snapshot_url + '/snapshot_db'))
+            snapshot_values['snapshot_url'] = snapshot_url
+            snapshot_values_list.append(snapshot_values)
+        except Exception as ex:
+            LOG.exception(ex)
     snapshot_values_list_sorted = sorted(snapshot_values_list, key=itemgetter('created_at'))
      
     for snapshot_values in snapshot_values_list_sorted:

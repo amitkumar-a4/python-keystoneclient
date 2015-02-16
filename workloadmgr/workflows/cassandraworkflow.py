@@ -81,7 +81,7 @@ def connect_server(host, port, user, password):
         client.load_system_host_keys()
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
         client.connect(host, port, user, password, timeout=120)
-        LOG.debug(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
+        LOG.info(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
         stdin, stdout, stderr = _exec_command(client, "nodetool status")
     except Exception as ex:
         LOG.error(_( 'There was an error connecting to cassandra node. Error %s. Try again...'), str(ex))
@@ -102,6 +102,7 @@ def getclusterinfo(connection):
     return clusterinfo
 
 def getcassandranodes(connection):
+    LOG.info(_('Enter getcassandranodes'))
     stdin, stdout, stderr = _exec_command(connection, "nodetool status")
     cassout = stdout.read()
 
@@ -168,17 +169,19 @@ def getcassandranodes(connection):
                 node[fields[0].strip()] = fields[1].strip()
 
         cassnodes.append(node)
-
+    LOG.info(_('Discovered cassandra nodes: ' + str(cassnodes)))
+    LOG.info(_('Exit getcassandranodes'))
     return cassnodes
 
 def get_cassandra_nodes(cntx, connection, host, port, username, password, preferredgroup=None):
+    LOG.info(_('Enter get_cassandra_nodes'))
     try:
         #
         # Getting sharding information
         #
         totalnodes = getcassandranodes(connection)
     
-        LOG.debug(_('Discovered cassandra nodes: ' + str(totalnodes)))
+        LOG.info(_('Discovered cassandra nodes: ' + str(totalnodes)))
 
         # filter out vms that are not in preferred datacenter
         if preferredgroup and len(preferredgroup):
@@ -186,7 +189,7 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
             for dc in preferredgroup:
                 for node in totalnodes:
                     if dc['datacenter'] == node['Data Center']:
-                         nodenames.append(node)
+                        nodenames.append(node)
                 # tempoarily we only consider the first group
                 # we will figure out how to support second group
                 # incase the first one is unavailable
@@ -241,19 +244,20 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                         stdout = session.makefile('rb', 8192)
                         stderr = session.makefile_stderr('rb', 8192)
                         if stdout.channel.closed is False: # If stdout is still open then sudo is asking us for a password
-                           stdin.write('%s\n' % password)
-                           stdin.flush()
+                            stdin.write('%s\n' % password)
+                            stdin.flush()
                         retcode = session.recv_exit_status()
-                        LOG.debug(_('lvdisplay: return value %d'), retcode)
+                        LOG.info(_('lvdisplay: return value %d'), retcode)
                         if retcode == 0:
-                           output = stdout.read()
-                           # remove password from the stdout
-                           output = "\n".join(output.split("\n")[1:])
-                           LOG.info(_('lvdisplay: output\n %s'), output)
-                           rootpartition_type[ip] = "lvm"
+                            output = stdout.read()
+                            # remove password from the stdout
+                            output.replace(password, '******')
+                            output = "\n".join(output.split("\n")[1:])
+                            LOG.info(_('lvdisplay: output\n %s'), output)
+                            rootpartition_type[ip] = "lvm"
                         else:
-                           error = stderr.read()
-                           LOG.debug(_('lvdisplay: error %s'), error)
+                            error = stderr.read()
+                            LOG.info(_('lvdisplay: error %s'), error)
                 except:
                     pass
             finally:
@@ -294,19 +298,20 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                                                   'hypervisor_hostname' : hypervisor_hostname,
                                                   'hypervisor_type' :  hypervisor_type}, 
                                                   "vm_id")
+        LOG.info(_('Discovered cassandra virtual machines: ' + str(vms)))
         return vms
     finally:
-        pass
+        LOG.info(_('Exit get_cassandra_nodes'))
 
 class SnapshotNode(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
         try:
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-            LOG.debug(_('SnapshotNode:'))
+            LOG.info(_('SnapshotNode:'))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
             out = stdout.read(),
-            LOG.debug(_("nodetool snapshot output:" + str(out)))
+            LOG.info(_("nodetool snapshot output:" + str(out)))
         except:
             LOG.warning(_("Cannot run nodetool snapshot command on %s"), CassandraNode)
             LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
@@ -315,21 +320,21 @@ class SnapshotNode(task.Task):
 
     def revert(self, *args, **kwargs):
         if not isinstance(kwargs['result'], misc.Failure):
-            LOG.debug(_("Reverting SnapshotNode"))
+            LOG.info(_("Reverting SnapshotNode"))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
             out = stdout.read(),
-            LOG.debug(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
+            LOG.info(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
 
 class ClearSnapshot(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
         try:
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-            LOG.debug(_('ClearSnapshot:'))
+            LOG.info(_('ClearSnapshot:'))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
             out = stdout.read(),
 
-            LOG.debug(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
+            LOG.info(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
         except:
             LOG.warning(_("Cannot run nodetool clearsnapshot command on %s"), CassandraNode)
             LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
@@ -361,14 +366,15 @@ class CassandraWorkflow(workflow.Workflow):
         # Iterate thru all hosts and pick the one that is alive
         if 'CassandraNode' in self._store:
             try:
+                LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
                 connection = connect_server(self._store['CassandraNode'], 
                                             int(self._store['SSHPort']),
                                             self._store['Username'],
                                             self._store['Password'])
-                LOG.debug(_( 'Chose "' + self._store['CassandraNode'] +'" for cassandra nodetool'))
+                LOG.info(_( 'Chose "' + self._store['CassandraNode'] +'" for cassandra nodetool'))
                 return connection
             except:
-                LOG.debug(_( '"' + self._store['CassandraNode'] +'" appears to be offline'))
+                LOG.info(_( '"' + self._store['CassandraNode'] +'" appears to be offline'))
                 pass
             
         if 'hostnames' in self._store:
@@ -376,15 +382,16 @@ class CassandraWorkflow(workflow.Workflow):
                 try:
                     if host == '':
                         continue
+                    LOG.info(_( 'Connecting to cassandra node ' + host))
                     connection = connect_server(host, 
                                                 int(self._store['SSHPort']),
                                                 self._store['Username'],
                                                 self._store['Password'])
                     self._store['CassandraNode'] = host
-                    LOG.debug(_( 'Chose "' + host +'" for cassandra nodetool'))
+                    LOG.info(_( 'Chose "' + host +'" for cassandra nodetool'))
                     return connection
                 except:
-                    LOG.debug(_( '"' + host +'" appears to be offline'))
+                    LOG.info(_( '"' + host +'" appears to be offline'))
                     pass
 
         LOG.error(_( 'Cassandra cluster appears to be offline'))
@@ -438,7 +445,7 @@ class CassandraWorkflow(workflow.Workflow):
     def topology(self):
         connection = None
         try:
-            LOG.debug(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
+            LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
             connection = self.find_first_alive_node()
 
             cassnodes = getcassandranodes(connection)
