@@ -238,9 +238,9 @@ class VMwareESXDriver(driver.ComputeDriver):
                 question_answered = False
                 start = timeutils.utcnow()
                 if hasattr(vmSummary.runtime, 'question') and vmSummary.runtime.question:
-                    if "I copied it" in vmSummary.runtime.question.text:
+                    if "i copied it" in vmSummary.runtime.question.text.lower():
                         for choiceInfo in vmSummary.runtime.question.choice.choiceInfo:
-                            if "copied" in choiceInfo.label:
+                            if "copied" in choiceInfo.label.lower():
                                 self._session._call_method(self._session._get_vim(),"AnswerVM", vm_ref,
                                                            questionId=vmSummary.runtime.question.id, 
                                                            answerChoice=choiceInfo.key)
@@ -1580,7 +1580,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 """
                 Repair is not working for remote disks
                 try:
-                    import pdb; pdb.set_trace()
                     cmdspec = [ "trilio-vix-disk-cli", "-check", "1",
                                "-host", self._session._host_ip,
                                "-user", self._session._host_username,

@@ -20,6 +20,9 @@ from os import remove, close
 from urlparse import urlparse
 from xml.dom.minidom import parseString
 import ConfigParser
+import tarfile
+import shutil
+import datetime
     
 import bottle
 from bottle import static_file
@@ -226,6 +229,24 @@ def send_neutron_logs1(filename):
 def send_keystone_logs(filename):
     return static_file(filename, root='/var/log/keystone', mimetype='text/plain', download=True)
 
+@bottle.route('/tvault/logs')
+@authorize()
+def send_tvault_logs():
+    try:
+        try:
+            shutil.rmtree('/tmp/tvaultlogs')
+        except Exception as exception:
+            pass
+        os.mkdir('/tmp/tvaultlogs')
+        logtarfilename = '/tmp/tvaultlogs/tvaultlogs_' + datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + '.tar'
+        logtar = tarfile.open(name=logtarfilename, mode='w:gz')
+        logtar.add('/var/log/workloadmgr')
+        #logtar.add('/var/log/nova')
+        #logtar.add('/var/log/tvault-gui')
+        logtar.close()
+        return static_file(os.path.basename(logtarfilename), root='/tmp/tvaultlogs', mimetype='text/plain', download=True)
+    except Exception as exception:
+        raise exception
 
 """############################ tvault config API's ########################"""
 
