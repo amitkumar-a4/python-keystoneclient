@@ -64,55 +64,58 @@ def import_workload(cntx, workload_url, new_version):
     for snapshot_values in snapshot_values_list_sorted:
         snapshot_values = _adjust_values(snapshot_values)
         snapshot = db.snapshot_create(cntx, snapshot_values)
-        snapshot_vms = json.loads(vault_service.get_object(snapshot_values['snapshot_url'] + '/snapshot_vms_db'))
-        for snapshot_vm_values in snapshot_vms:
-            snapshot_vm_values = _adjust_values(snapshot_vm_values)
-            db.snapshot_vm_create(cntx, snapshot_vm_values)
-        snapshot_vm_resources = json.loads(vault_service.get_object(snapshot_values['snapshot_url'] + '/resources_db'))
-        for snapshot_vm_resource_values in snapshot_vm_resources:
-            snapshot_vm_resource_values = _adjust_values(snapshot_vm_resource_values)
-            db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
-            
-        resources = db.snapshot_resources_get(cntx, snapshot.id)
-        for res in resources:
-            vm_res_id = '/vm_res_id_%s' % (res['id'])
-            for meta in res.metadata:
-                if meta.key == "label":
-                    vm_res_id = '/vm_res_id_%s_%s' % (res['id'], meta.value)
-                    break
-            if res.resource_type == "network" or \
-                res.resource_type == "subnet" or \
-                res.resource_type == "router" or \
-                res.resource_type == "nic":                
-                path = "workload_" + snapshot['workload_id'] + \
-                       "/snapshot_" + snapshot['id'] + \
-                       "/network" + vm_res_id +\
-                       "/network_db"
-                vm_network_resource_snaps = json.loads(vault_service.get_object(path))
-                for vm_network_resource_snap_vaules in vm_network_resource_snaps:
-                    vm_network_resource_snap_vaules = _adjust_values(vm_network_resource_snap_vaules)
-                    db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_vaules)
+        try:
+            snapshot_vms = json.loads(vault_service.get_object(snapshot_values['snapshot_url'] + '/snapshot_vms_db'))
+            for snapshot_vm_values in snapshot_vms:
+                snapshot_vm_values = _adjust_values(snapshot_vm_values)
+                db.snapshot_vm_create(cntx, snapshot_vm_values)
+            snapshot_vm_resources = json.loads(vault_service.get_object(snapshot_values['snapshot_url'] + '/resources_db'))
+            for snapshot_vm_resource_values in snapshot_vm_resources:
+                snapshot_vm_resource_values = _adjust_values(snapshot_vm_resource_values)
+                db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
+                
+            resources = db.snapshot_resources_get(cntx, snapshot.id)
+            for res in resources:
+                vm_res_id = '/vm_res_id_%s' % (res['id'])
+                for meta in res.metadata:
+                    if meta.key == "label":
+                        vm_res_id = '/vm_res_id_%s_%s' % (res['id'], meta.value)
+                        break
+                if res.resource_type == "network" or \
+                    res.resource_type == "subnet" or \
+                    res.resource_type == "router" or \
+                    res.resource_type == "nic":                
+                    path = "workload_" + snapshot['workload_id'] + \
+                           "/snapshot_" + snapshot['id'] + \
+                           "/network" + vm_res_id +\
+                           "/network_db"
+                    vm_network_resource_snaps = json.loads(vault_service.get_object(path))
+                    for vm_network_resource_snap_vaules in vm_network_resource_snaps:
+                        vm_network_resource_snap_vaules = _adjust_values(vm_network_resource_snap_vaules)
+                        db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_vaules)
 
-            elif res.resource_type == "disk":
-                path = "workload_" + snapshot['workload_id'] + \
-                       "/snapshot_" + snapshot['id'] + \
-                       "/vm_id_" + res.vm_id + vm_res_id.replace(' ','') + \
-                       "/disk_db"
-                vm_disk_resource_snaps = json.loads(vault_service.get_object(path))
-                vm_disk_resource_snaps_sorted = sorted(vm_disk_resource_snaps, key=itemgetter('created_at'))
-                for vm_disk_resource_snap_vaules in vm_disk_resource_snaps_sorted:
-                    vm_disk_resource_snap_vaules = _adjust_values(vm_disk_resource_snap_vaules)
-                    db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_vaules)
-            elif res.resource_type == "securty_group":
-                path = "workload_" + snapshot['workload_id'] + \
-                       "/snapshot_" + snapshot['id'] + \
-                       "/securty_group" + vm_res_id +\
-                       "/security_group_db"
-                vm_security_group_rule_snaps= json.loads(vault_service.get_object(path))
-                for vm_security_group_rule_snap_vaules in vm_security_group_rule_snaps:
-                    vm_security_group_rule_snap_vaules = _adjust_values(vm_security_group_rule_snap_vaules)
-                    db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_vaules)
-     
+                elif res.resource_type == "disk":
+                    path = "workload_" + snapshot['workload_id'] + \
+                           "/snapshot_" + snapshot['id'] + \
+                           "/vm_id_" + res.vm_id + vm_res_id.replace(' ','') + \
+                           "/disk_db"
+                    vm_disk_resource_snaps = json.loads(vault_service.get_object(path))
+                    vm_disk_resource_snaps_sorted = sorted(vm_disk_resource_snaps, key=itemgetter('created_at'))
+                    for vm_disk_resource_snap_vaules in vm_disk_resource_snaps_sorted:
+                        vm_disk_resource_snap_vaules = _adjust_values(vm_disk_resource_snap_vaules)
+                        db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_vaules)
+                elif res.resource_type == "securty_group":
+                    path = "workload_" + snapshot['workload_id'] + \
+                           "/snapshot_" + snapshot['id'] + \
+                           "/securty_group" + vm_res_id +\
+                           "/security_group_db"
+                    vm_security_group_rule_snaps= json.loads(vault_service.get_object(path))
+                    for vm_security_group_rule_snap_vaules in vm_security_group_rule_snaps:
+                        vm_security_group_rule_snap_vaules = _adjust_values(vm_security_group_rule_snap_vaules)
+                        db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_vaules)            
+        except Exception as ex:
+            LOG.exception(ex)
+            db.snapshot_update(cntx,snapshot.id,{'status': 'error'})
     return workload
     
     """
