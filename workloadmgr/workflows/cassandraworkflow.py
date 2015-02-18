@@ -59,7 +59,7 @@ def InitFlow(store):
     pass
 
 def _exec_shell_command(connection, command):
-    stdin, stdout, stderr = connection.exec_command(command, timeout=120)
+    stdin, stdout, stderr = connection.exec_command('bash -c "' + command + '"', timeout=120)
     err_msg = stderr.read()
     if err_msg != '':
         raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
@@ -230,7 +230,7 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
 
                     # find the type of the root partition
                     rootpartition_type[ip] = "Linux"
-                    stdin, stdout, stderr = client.exec_command('df /', timeout=120)
+                    stdin, stdout, stderr = client.exec_command('bash -c "df /"', timeout=120)
                     m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
                     if m:
                         mp= m.group(1)
@@ -239,7 +239,7 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                         session.get_pty()
                         session.set_combine_stderr(True)
                         session.settimeout(120)
-                        session.exec_command('sudo -k lvdisplay ' + mp)
+                        session.exec_command('bash -c "sudo -k lvdisplay"' + mp)
                         stdin = session.makefile('wb', 8192)
                         stdout = session.makefile('rb', 8192)
                         stderr = session.makefile_stderr('rb', 8192)
