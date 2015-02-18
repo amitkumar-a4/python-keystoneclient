@@ -228,6 +228,11 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                     stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth0 | grep HWaddr"', timeout=120)
                     interfaces[stdout.read().split('HWaddr')[1].strip().lower()] = ip
 
+                    stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth1 | grep HWaddr"', timeout=120)
+                    err_msg = stderr.read()
+                    if err_msg == '':
+                        interfaces[stdout.read().split('HWaddr')[1].strip().lower()] = ip
+
                     # find the type of the root partition
                     rootpartition_type[ip] = "Linux"
                     stdin, stdout, stderr = client.exec_command('bash -c "df /"', timeout=120)
