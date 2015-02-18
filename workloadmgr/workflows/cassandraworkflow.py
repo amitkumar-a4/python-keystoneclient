@@ -66,7 +66,7 @@ def _exec_shell_command(connection, command):
     return stdin, stdout, stderr
 
 def _exec_command(connection, command):
-    stdin, stdout, stderr = connection.exec_command("/usr/share/dse/bin/" + command, timeout=120)
+    stdin, stdout, stderr = connection.exec_command('bash -c "' + command + '"', timeout=120)
     err_msg = stderr.read()
     if err_msg != '':
         stdin, stdout, stderr = connection.exec_command(command, timeout=120)
@@ -222,8 +222,8 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 try:
                     client.connect(ip, port=int(port), username=username, password=password)
-                    stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
-                    interfaces[stdout.read().split('HWaddr')[1].strip()] = ip
+                    stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth0 | grep HWaddr"', timeout=120)
+                    interfaces[stdout.read().split('HWaddr')[1].strip().lower()] = ip
 
                     # find the type of the root partition
                     rootpartition_type[ip] = "Linux"
@@ -282,14 +282,14 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                             hypervisor_hostname = hypervisor.hypervisor_hostname
                             hypervisor_type = hypervisor.hypervisor_type
                             break
-                    if _if['OS-EXT-IPS-MAC:mac_addr'] in interfaces:
+                    if _if['OS-EXT-IPS-MAC:mac_addr'].lower() in interfaces:
                        
                         utils.append_unique(vms, {'vm_id' : instance.id,
                                                   'vm_name' : instance.name,
                                                   'vm_metadata' : instance.metadata,                                                
                                                   'vm_flavor_id' : instance.flavor['id'],
-                                                  'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
-                                                  'root_partition_type' : rootpartition_type[interfaces[_if['OS-EXT-IPS-MAC:mac_addr']]],
+                                                  'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
+                                                  'root_partition_type' : rootpartition_type[interfaces[_if['OS-EXT-IPS-MAC:mac_addr'].lower()]],
                                                   'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                                   'hypervisor_hostname' : hypervisor_hostname,
                                                   'hypervisor_type' :  hypervisor_type}, 
