@@ -709,7 +709,8 @@ def workload_vms_update(context, id, values, purge_metadata=False):
 def workload_vms_get(context, workload_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.WorkloadVMs)\
+        query = model_query(context, models.WorkloadVMs,
+                            session=session, read_deleted="no")\
                        .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
                        .filter_by(workload_id=workload_id)\
 
@@ -743,11 +744,11 @@ def workload_vm_get(context, id):
     return _workload_vm_get(context, id, session)   
     
 @require_context
-def workload_vms_delete(context, id, workload_id):
+def workload_vms_delete(context, vm_id, workload_id):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadVMs).\
-            filter_by(id=id).\
+            filter_by(vm_id=vm_id).\
             filter_by(workload_id=workload_id).\
             update({'status': 'deleted',
                     'deleted': True,

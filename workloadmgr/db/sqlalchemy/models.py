@@ -193,6 +193,7 @@ class WorkloadVMs(BASE, WorkloadsBase):
     vm_id = Column(String(255))
     vm_name = Column(String(255))
     workload_id = Column(String(255), ForeignKey('workloads.id'))
+    status =  Column(String(255), nullable=False)
     
 class WorkloadVMMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the workload vm"""

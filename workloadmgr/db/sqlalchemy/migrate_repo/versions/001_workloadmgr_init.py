@@ -119,6 +119,7 @@ def upgrade(migrate_engine):
         Column('vm_id', String(length=255), nullable= False),
         Column('vm_name', String(length=255), nullable= False),
         Column('workload_id', String(length=255), ForeignKey('workloads.id')),
+        Column('status', String(length=255)),
         mysql_engine='InnoDB'
     )
     

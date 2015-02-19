@@ -226,6 +226,11 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                 try:
                     client.connect(ip, port=int(port), username=username, password=password)
                     stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth0 | grep HWaddr"', timeout=120)
+                    err_msg = stderr.read()
+                    if err_msg != '':
+                        LOG.error(_('ifconfig eth0 failed: Error %s'), err_msg)
+                        raise Exception(_('ifconfig eth0 failed: Error %s'), err_msg)
+                        
                     interfaces[stdout.read().split('HWaddr')[1].strip().lower()] = ip
 
                     stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth1 | grep HWaddr"', timeout=120)
@@ -266,7 +271,8 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                 except:
                     pass
             finally:
-                LOG.info(_('%s: root partition is on %s'), ip, rootpartition_type[ip])
+                if ip in rootpartition_type:
+                    LOG.info(_('%s: root partition is on %s'), ip, rootpartition_type[ip])
                 client.close()
 
         # call nova list

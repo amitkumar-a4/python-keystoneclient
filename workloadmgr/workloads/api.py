@@ -397,6 +397,7 @@ class API(base.Base):
             values = {'workload_id': workload.id,
                       'vm_id': instance['instance-id'],
                       'vm_name': instance['instance-name'],
+                      'status': 'available',
                       'metadata': instance['metadata']}
             vm = self.db.workload_vms_create(context, values)
 
@@ -469,9 +470,11 @@ class API(base.Base):
                 for instance_with_name in instances_with_name:
                     if instance['instance-id'] == instance_with_name.id:
                         instance['instance-name'] = instance_with_name.name  
+                        instance['metadata'] = instance_with_name.metadata
             for instance in instances:
                 values = {'workload_id': workload_id,
                           'vm_id': instance['instance-id'],
+                          'metadata': instance['metadata'],
                           'vm_name': instance['instance-name']}
                 vm = self.db.workload_vms_create(context, values)                                       
 
