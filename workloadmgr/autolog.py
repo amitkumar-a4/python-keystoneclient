@@ -76,46 +76,56 @@ class Logger(object):
         self.__logger.log(self._log_levels(log_level), _message)
  
  
-def format_args(args, kwargs):
+def format_args(args, kwargs, password_arg):
     """
     makes a nice string representation of all the arguments
     """
     allargs = []
-    for item in args:
-        allargs.append('%s' % str(item))
+    for idx, item in enumerate(args):
+        if password_arg and password_arg == idx + 1:
+            allargs.append('%s' % '******')
+        else:
+            allargs.append('%s' % str(item))
  
     for key, item in kwargs.items():
-        allargs.append('%s=%s' % (key, str(item)))
+        if 'password' in key.lower():
+            allargs.append('%s=%s' % (key, '******'))
+        else:
+            allargs.append('%s=%s' % (key, str(item)))
  
     formattedArgs = ', '.join(allargs)
  
     if len(formattedArgs) > 500:
         return formattedArgs[:496] + " ..."
     return formattedArgs
+
  
- 
-def log_method(logger, method_name=None):
+def log_method(logger, method_name=None, password_arg = None):
     """use this for class or instance methods, it formats with the object out front."""
     def _real_log_method(method):
         def _wrapper(*args, **kwargs):
-            arg_str = format_args(args, kwargs)
-            message_enter = "{method_color}{method_name}{message_color} ENTER {normal_color}({arg_str})".format(**{
+            arg_str = format_args(args, kwargs, password_arg)
+            message_enter = "{method_color}{method_name}{message_color} ENTER {normal_color}({arg_str}) {file_name} {line_num}".format(**{
                 'method_color': BROWN,
                 'method_name': "{}".format(method_name or method.__name__),
                 'message_color': PURPLE,
                 'normal_color': NORMAL,
                 'arg_str': arg_str,
+                'file_name': method.func_code.co_filename,
+                'line_num': method.func_code.co_firstlineno,
             })
 
             logger.log(message_enter)
             ret_val = method(*args, **kwargs)
             
-            message_exit = "{method_color}{method_name}{message_color} EXIT {normal_color}(Return Value(s):{ret_val})".format(**{
+            message_exit = "{method_color}{method_name}{message_color} EXIT {normal_color}(Return Value(s):{ret_val}) {file_name} {line_num}".format(**{
                 'method_color': BROWN,
                 'method_name': "{}".format(method_name or method.__name__),
                 'message_color': BLUE,
                 'normal_color': NORMAL,
                 'ret_val': ret_val,
+                'file_name': method.func_code.co_filename,
+                'line_num': method.func_code.co_firstlineno,
             })             
             logger.log(message_exit)
             

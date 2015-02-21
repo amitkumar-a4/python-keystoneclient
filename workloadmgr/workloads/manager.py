@@ -59,7 +59,7 @@ scheduler_config = {'standalone': 'True'}
 FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
        
-
+@autolog.log_method(logger=Logger)
 def get_workflow_class(context, workload_type_id, restore=False):
     #TODO(giri): implement a driver model for the workload types
     if workload_type_id:
@@ -120,14 +120,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     """Manages WorkloadMgr """
 
     RPC_API_VERSION = '1.0'
-
+    
+    @autolog.log_method(logger=Logger)
     def __init__(self, service_name=None, *args, **kwargs):
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
         self.scheduler.start()
         self.driver = driver.load_compute_driver(None, None)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
-        
+    
+    @autolog.log_method(logger=Logger)    
     def init_host(self):
         """
         Do any initialization that needs to be run if this is a standalone service.
@@ -145,7 +147,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
         vault_service = vault.get_vault_service(None)
         vault_service.mount()
-        
+    
+    @autolog.log_method(logger=Logger)    
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):
         """
         calculate the restore data size
@@ -163,7 +166,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 vm_disk_resource_snap  = vm_disk_resource_snap_backing                           
 
         return instance_size                  
-        
+    
+    @autolog.log_method(logger=Logger)    
     def _get_metadata_value(self, vm_network_resource_snap, key):
         for metadata in vm_network_resource_snap.metadata:
             if metadata['key'] == key:
@@ -333,8 +337,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       {'status': 'error',
                                        'fail_reason': unicode(err)})
         
-    @autolog.log_method(logger=Logger)
     @synchronized(workloadlock)
+    @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
         """
         Take a snapshot of the workload
@@ -431,8 +435,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.snapshot_delete(context, snapshot['id'])
         self.db.workload_delete(context, workload_id)
 
-    @autolog.log_method(logger=Logger)
     @synchronized(workloadlock)
+    @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, restore_id):
         """
         Restore VMs and all its LUNs from a snapshot
@@ -533,7 +537,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })             
-            return;                  
+            return; 
+                         
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """

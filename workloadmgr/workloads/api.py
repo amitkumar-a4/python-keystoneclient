@@ -40,7 +40,7 @@ from workloadmgr.workflows import vmtasks
 from workloadmgr.vault import vault
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import auditlog
-
+from workloadmgr import autolog
 from workloadmgr.db.sqlalchemy import models
 
 workload_lock = threading.Lock()
@@ -48,8 +48,10 @@ workload_lock = threading.Lock()
 FLAGS = flags.FLAGS
 
 LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
 
+@autolog.log_method(logger=Logger)
 def _snapshot_create_callback(*args, **kwargs):
     from workloadmgr.workloads import API
 
@@ -118,7 +120,8 @@ class API(base.Base):
     ## REVISIT: should the singleton be threadsafe
 
     __single = None # the one, true Singleton
-
+    
+    @autolog.log_method(logger=Logger)
     def __new__(classtype, *args, **kwargs):
         # Check to see if a __single exists already for this class
         # Compare class types instead of just looking for None so
@@ -126,7 +129,8 @@ class API(base.Base):
         if classtype != type(classtype.__single):
             classtype.__single = object.__new__(classtype, *args, **kwargs)
         return classtype.__single
-
+    
+    @autolog.log_method(logger=Logger)
     def __init__(self, db_driver=None):
         if not hasattr(self, "workloads_rpcapi"):
             self.workloads_rpcapi = workloads_rpcapi.WorkloadMgrAPI()
@@ -146,7 +150,8 @@ class API(base.Base):
             self._scheduler.start()
 
             super(API, self).__init__(db_driver)
-        
+    
+    @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
         workload_type_dict = dict(workload_type.iteritems())
@@ -155,7 +160,8 @@ class API(base.Base):
             metadata.setdefault(kvpair['key'], kvpair['value'])
         workload_type_dict['metadata'] = metadata        
         return workload_type_dict
-
+    
+    @autolog.log_method(logger=Logger)
     def workload_type_show(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
         workload_type_dict = dict(workload_type.iteritems())
@@ -165,10 +171,12 @@ class API(base.Base):
         workload_type_dict['metadata'] = metadata
         return workload_type_dict
     
+    @autolog.log_method(logger=Logger)
     def workload_type_get_all(self, context, search_opts={}):
         workload_types = self.db.workload_types_get(context)
         return workload_types
     
+    @autolog.log_method(logger=Logger)
     def workload_type_create(self, context, id, name, description, is_public, metadata):
         """
         Create a workload_type. No RPC call is made
@@ -187,6 +195,7 @@ class API(base.Base):
         AUDITLOG.log(context,'WorkloadType Created', workload_type)
         return workload_type
     
+    @autolog.log_method(logger=Logger)
     def workload_type_delete(self, context, workload_type_id):
         """
         Delete a workload_type. No RPC call is made
@@ -201,7 +210,8 @@ class API(base.Base):
                     
         self.db.workload_type_delete(context, workload_type_id)
         AUDITLOG.log(context,'WorkloadType Deleted', workload_type)
-       
+    
+    @autolog.log_method(logger=Logger)   
     def workload_type_discover_instances(self, context, workload_type_id, metadata):
         """
         Discover Instances of a workload_type. RPC call is made
@@ -213,7 +223,7 @@ class API(base.Base):
                                                                       socket.gethostname(),
                                                                       workload_type_id,
                                                                       metadata) 
-
+    @autolog.log_method(logger=Logger)
     def workload_type_topology(self, context, workload_type_id, metadata):
         """
         Topology  of a workload_type. RPC call is made
@@ -226,7 +236,7 @@ class API(base.Base):
                                                             socket.gethostname(),
                                                             workload_type_id,
                                                             metadata) 
-
+    @autolog.log_method(logger=Logger)
     def workload_get(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
@@ -272,7 +282,8 @@ class API(base.Base):
 
 
         return workload_dict
-
+    
+    @autolog.log_method(logger=Logger)
     def workload_show(self, context, workload_id):
 
         workload = self.db.workload_get(context, workload_id)
@@ -338,6 +349,7 @@ class API(base.Base):
                 
         return workload_dict
     
+    @autolog.log_method(logger=Logger)
     def workload_get_all(self, context, search_opts={}):
         if context.is_admin:
             workloads = self.db.workload_get_all(context)
@@ -347,6 +359,7 @@ class API(base.Base):
 
         return workloads
     
+    @autolog.log_method(logger=Logger)
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
@@ -428,6 +441,7 @@ class API(base.Base):
         AUDITLOG.log(context, "Workload Created", workload)        
         return workload
     
+    @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload):
         if len(jobschedule):                                        
             self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
@@ -437,6 +451,7 @@ class API(base.Base):
                                                         'user_id': workload.user_id, 
                                                         'project_id':workload.project_id})
 
+    @autolog.log_method(logger=Logger)
     def workload_modify(self, context, workload_id, workload):
         """
         Make the RPC call to modify a workload.
@@ -483,7 +498,7 @@ class API(base.Base):
             self.workload_resume(context, workload_id)
         AUDITLOG.log(context,'Workload Modified', workload_obj)
             
-    
+    @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
         """
         Delete a workload. No RPC call is made
@@ -524,7 +539,8 @@ class API(base.Base):
 
         self.db.workload_delete(context, workload_id)
         AUDITLOG.log(context,'Workload Deleted', workload)
-        
+    
+    @autolog.log_method(logger=Logger)    
     def import_workloads(self, context):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         vault_service = vault.get_vault_service(context)
@@ -551,6 +567,7 @@ class API(base.Base):
         return workloads
         AUDITLOG.log(context,'Import Workloads Completed', None)
     
+    @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
         nodes = []
         try:
@@ -561,6 +578,7 @@ class API(base.Base):
             LOG.exception(ex)
         return dict(nodes=nodes)
     
+    @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         def get_total_capacity():
             stdout, stderr = utils.execute('df', FLAGS.wlm_vault_local_directory)
@@ -591,7 +609,8 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return storage_usage
-
+    
+    @autolog.log_method(logger=Logger)
     def get_recentactivities(self, context, time_in_minutes):
         recentactivites = []
         now = timeutils.utcnow()
@@ -719,6 +738,7 @@ class API(base.Base):
             LOG.exception(ex)
         return dict(recentactivites=recentactivites)    
     
+    @autolog.log_method(logger=Logger)
     def get_auditlog(self, context, time_in_minutes, time_from, time_to):
         auditlog = []
         try:
@@ -726,7 +746,8 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return dict(auditlog=auditlog)        
-
+    
+    @autolog.log_method(logger=Logger)
     def workload_get_workflow(self, context, workload_id):
         """
         Get the workflow of the workload. RPC call is made
@@ -734,6 +755,7 @@ class API(base.Base):
         return self.workloads_rpcapi.workload_get_workflow_details(context,
                                                                    socket.gethostname(),
                                                                    workload_id)    
+    @autolog.log_method(logger=Logger)
     def workload_get_topology(self, context, workload_id):
         """
         Get the topology of the workload. RPC call is made
@@ -742,6 +764,7 @@ class API(base.Base):
                                                            socket.gethostname(),
                                                            workload_id)   
 
+    @autolog.log_method(logger=Logger)
     def workload_discover_instances(self, context, workload_id):
         """
         Discover Instances of a workload_type. RPC call is made
@@ -750,6 +773,7 @@ class API(base.Base):
                                                                  socket.gethostname(),
                                                                  workload_id)
                      
+    @autolog.log_method(logger=Logger)
     def _is_workload_paused(self, context, workload_id): 
         workload = self.workload_get(context, workload_id)
         jobs = self._scheduler.get_jobs()
@@ -758,6 +782,7 @@ class API(base.Base):
                 return False
         return True
                
+    @autolog.log_method(logger=Logger)
     def workload_pause(self, context, workload_id):
         """
         Pause workload job schedule. No RPC call is made
@@ -772,6 +797,7 @@ class API(base.Base):
         AUDITLOG.log(context,'Workload Paused', workload)
             
 
+    @autolog.log_method(logger=Logger)
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload Resume Requested', workload)
@@ -793,6 +819,7 @@ class API(base.Base):
                                                     'project_id':workload['project_id']})
         AUDITLOG.log(context,'Workload Resumed', workload)
 
+    @autolog.log_method(logger=Logger)
     def workload_unlock(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload Unlock Requested', workload)
@@ -800,6 +827,7 @@ class API(base.Base):
             self.db.workload_update(context, workload_id, {'status': 'available'})         
         AUDITLOG.log(context,'Workload Unlocked', workload)
 
+    @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
         """
         Make the RPC call to snapshot a workload.
@@ -851,6 +879,7 @@ class API(base.Base):
         self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
         return snapshot
 
+    @autolog.log_method(logger=Logger)
     def snapshot_get(self, context, snapshot_id):
         rv = self.db.snapshot_get(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
@@ -870,6 +899,7 @@ class API(base.Base):
         snapshot_details.setdefault('instances', snapshot_vms)    
         return snapshot_details
 
+    @autolog.log_method(logger=Logger)
     def snapshot_show(self, context, snapshot_id):
         def _get_pit_resource_id(metadata, key):
             for metadata_item in metadata:
@@ -934,6 +964,7 @@ class API(base.Base):
         snapshot_details['instances'] = snapshot_vms    
         return snapshot_details
     
+    @autolog.log_method(logger=Logger)
     def snapshot_get_all(self, context, workload_id=None):
         if workload_id:
             snapshots = self.db.snapshot_get_all_by_project_workload(
@@ -945,6 +976,7 @@ class API(base.Base):
                                         context,context.project_id)
         return snapshots
     
+    @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """
         Delete a workload snapshot. No RPC call required
@@ -966,6 +998,7 @@ class API(base.Base):
         self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
         AUDITLOG.log(context,'Snapshot Deleted', snapshot)
         
+    @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
         """
         Make the RPC call to restore a snapshot.
@@ -994,6 +1027,7 @@ class API(base.Base):
         AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
         return restore
 
+    @autolog.log_method(logger=Logger)
     def restore_get(self, context, restore_id):
         rv = self.db.restore_get(context, restore_id)
         restore_details  = dict(rv.iteritems())
@@ -1013,6 +1047,7 @@ class API(base.Base):
         restore_details.setdefault('instances', instances)    
         return restore_details
 
+    @autolog.log_method(logger=Logger)
     def restore_show(self, context, restore_id):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())
@@ -1063,6 +1098,7 @@ class API(base.Base):
         restore_details.setdefault('security_groups', security_groups_list)                
         return restore_details
     
+    @autolog.log_method(logger=Logger)
     def restore_get_all(self, context, snapshot_id=None):
         if snapshot_id:
             restores = self.db.restore_get_all_by_project_snapshot(
@@ -1076,6 +1112,7 @@ class API(base.Base):
                                         context,context.project_id)
         return restores
     
+    @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
         Delete a workload restore. RPC call may be required
