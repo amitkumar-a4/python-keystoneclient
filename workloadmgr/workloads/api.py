@@ -51,10 +51,12 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
 
-@autolog.log_method(logger=Logger)
+#do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
+    arg_str = autolog.format_args(args, kwargs)
+    LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
+    
     from workloadmgr.workloads import API
-
     workloadmgrapi = API()
  
     workload_id = kwargs['workload_id']
@@ -67,6 +69,7 @@ def _snapshot_create_callback(*args, **kwargs):
     #TODO: Make sure workload is in a created state
     if workload['status'] == 'error':
         LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
+        LOG.info(_("_snapshot_create_callback Exit"))
         return
 
     # wait for 5 minutes until the workload changes state to available
@@ -81,6 +84,7 @@ def _snapshot_create_callback(*args, **kwargs):
     # if workload hasn't changed the status to available
     if workload['status'] != 'available':
         LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
+        LOG.info(_("_snapshot_create_callback Exit"))
         return
 
     # determine if the workload need to be full snapshot or incremental
@@ -112,6 +116,7 @@ def _snapshot_create_callback(*args, **kwargs):
     except Exception as ex:
         LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
         pass
+    LOG.info(_("_snapshot_create_callback Exit"))
 
 class API(base.Base):
     """API for interacting with the Workload Manager."""
@@ -899,7 +904,7 @@ class API(base.Base):
         snapshot_details.setdefault('instances', snapshot_vms)    
         return snapshot_details
 
-    @autolog.log_method(logger=Logger)
+    @autolog.log_method(logger=Logger, log_args=False, log_retval=False)
     def snapshot_show(self, context, snapshot_id):
         def _get_pit_resource_id(metadata, key):
             for metadata_item in metadata:

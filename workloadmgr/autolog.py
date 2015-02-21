@@ -76,7 +76,7 @@ class Logger(object):
         self.__logger.log(self._log_levels(log_level), _message)
  
  
-def format_args(args, kwargs, password_arg):
+def format_args(args, kwargs, password_arg = None):
     """
     makes a nice string representation of all the arguments
     """
@@ -84,11 +84,15 @@ def format_args(args, kwargs, password_arg):
     for idx, item in enumerate(args):
         if password_arg and password_arg == idx + 1:
             allargs.append('%s' % '******')
+        elif 'password' in str(item).lower(): 
+            allargs.append('%s' % '******')
         else:
             allargs.append('%s' % str(item))
  
     for key, item in kwargs.items():
         if 'password' in key.lower():
+            allargs.append('%s=%s' % (key, '******'))
+        elif 'password' in str(item).lower():
             allargs.append('%s=%s' % (key, '******'))
         else:
             allargs.append('%s=%s' % (key, str(item)))
@@ -100,11 +104,14 @@ def format_args(args, kwargs, password_arg):
     return formattedArgs
 
  
-def log_method(logger, method_name=None, password_arg = None):
+def log_method(logger, method_name=None, log_args=True, log_retval=True, password_arg = None):
     """use this for class or instance methods, it formats with the object out front."""
     def _real_log_method(method):
         def _wrapper(*args, **kwargs):
-            arg_str = format_args(args, kwargs, password_arg)
+            if log_args:
+                arg_str = format_args(args, kwargs, password_arg)
+            else:
+                arg_str = ''
             message_enter = "{method_color}{method_name}{message_color} ENTER {normal_color}({arg_str}) {file_name} {line_num}".format(**{
                 'method_color': BROWN,
                 'method_name': "{}".format(method_name or method.__name__),
@@ -118,12 +125,18 @@ def log_method(logger, method_name=None, password_arg = None):
             logger.log(message_enter)
             ret_val = method(*args, **kwargs)
             
+            ret_val_to_log = None
+            if not log_retval:
+                ret_val_to_log = ' ' 
+            elif 'password' in str(ret_val).lower():
+                ret_val_to_log = "******"
+
             message_exit = "{method_color}{method_name}{message_color} EXIT {normal_color}(Return Value(s):{ret_val}) {file_name} {line_num}".format(**{
                 'method_color': BROWN,
                 'method_name': "{}".format(method_name or method.__name__),
                 'message_color': BLUE,
                 'normal_color': NORMAL,
-                'ret_val': ret_val,
+                'ret_val': ret_val_to_log or ret_val,
                 'file_name': method.func_code.co_filename,
                 'line_num': method.func_code.co_firstlineno,
             })             
