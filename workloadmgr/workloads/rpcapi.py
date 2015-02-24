@@ -11,10 +11,11 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import rpc
 import workloadmgr.openstack.common.rpc.proxy
+from workloadmgr import autolog
 
 
 LOG = logging.getLogger(__name__)
-
+Logger = autolog.Logger(LOG)
 FLAGS = flags.FLAGS
 
 
@@ -27,11 +28,13 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
 
     BASE_RPC_API_VERSION = '1.0'
 
+    @autolog.log_method(logger=Logger)
     def __init__(self):
         super(WorkloadMgrAPI, self).__init__(
             topic=FLAGS.workloads_topic,
             default_version=self.BASE_RPC_API_VERSION)
-        
+    
+    @autolog.log_method(logger=Logger, password_arg=5)    
     def workload_type_discover_instances(self, ctxt, host, workload_type_id, metadata):
         LOG.debug("workload_type_discover_instances in rpcapi workload_type_id %s", workload_type_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -41,7 +44,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                               topic=topic,
                               timeout=300)
         return instances
-
+    
+    @autolog.log_method(logger=Logger, password_arg=5)
     def workload_type_topology(self, ctxt, host, workload_type_id, metadata):
         LOG.debug("workload_type_topology in rpcapi workload_type_id %s", workload_type_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -51,7 +55,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                               topic=topic,
                               timeout=300)
         return topology
-
+    
+    @autolog.log_method(logger=Logger)
     def workload_discover_instances(self, ctxt, host, workload_id):
         LOG.debug("workload_discover_instances in rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -62,6 +67,7 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                               timeout=300)
         return instances
 
+    @autolog.log_method(logger=Logger)
     def workload_get_topology(self, ctxt, host, workload_id):
         LOG.debug("workload_get_topology in rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -71,7 +77,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                               topic=topic,
                               timeout=300)
         return topology
-        
+    
+    @autolog.log_method(logger=Logger)    
     def workload_get_workflow_details(self, ctxt, host, workload_id):
         LOG.debug("workload_get_workflow_details in rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -81,7 +88,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                               topic=topic,
                               timeout=300)
         return workflow      
-                  
+    
+    @autolog.log_method(logger=Logger)              
     def workload_create(self, ctxt, host, workload_id):
         LOG.debug("create_workload in rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -90,6 +98,7 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   self.make_msg('workload_create', workload_id=workload_id),
                   topic=topic)
 
+    @autolog.log_method(logger=Logger)
     def workload_snapshot(self, ctxt, host, snapshot_id):
         LOG.debug("snapshot workload in rpcapi snapshot_id:%s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -97,7 +106,7 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('workload_snapshot',snapshot_id=snapshot_id),
                   topic=topic)
-
+    @autolog.log_method(logger=Logger)
     def workload_delete(self, ctxt, host, workload_id):
         # this will not be called, since we delete workload in the API layer instead of making an RPC call
         LOG.debug("delete_workload  rpcapi workload_id %s", workload_id)
@@ -105,7 +114,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('workload_delete', workload_id=workload_id),
                   topic=topic)
-
+    
+    @autolog.log_method(logger=Logger)
     def snapshot_restore(self, ctxt, host, restore_id):
         LOG.debug("restore_snapshot in rpcapi restore_id %s", restore_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
@@ -113,7 +123,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('snapshot_restore', restore_id=restore_id),
                   topic=topic)
-        
+    
+    @autolog.log_method(logger=Logger)    
     def snapshot_delete(self, ctxt, host, snapshot_id):
         # this will not be called, since we delete snapshot in the API layer instead of making an RPC call
         LOG.debug("delete_snapshot  rpcapi snapshot_id %s", snapshot_id)
@@ -121,7 +132,8 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('snapshot_delete',snapshot_id=snapshot_id),
                   topic=topic)
-        
+    
+    @autolog.log_method(logger=Logger)    
     def restore_delete(self, ctxt, host, restore_id):
         LOG.debug("delete_restore  rpcapi restore_id %s", restore_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)

@@ -784,35 +784,35 @@ class VMwareVCDriver(VMwareESXDriver):
         try:
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             vmdk_snap_size = 0
-            for idx, dev in enumerate(snapshot_data['snapshot_devices']):
-                if snapshot_obj.snapshot_type == 'full':
-                    changeId = '*'  
-                else:              
-                    changeId = self.get_parent_changeId(cntx, db, 
-                                                        snapshot['workload_id'],
-                                                        instance['vm_id'], 
-                                                        dev.backing.uuid)
-                position = 0
-                while position < dev.capacityInBytes:
+
+            if snapshot_obj.snapshot_type == 'full':
+                changeId = '*'  
+            else:              
+                changeId = self.get_parent_changeId(cntx, db, 
+                                                    snapshot['workload_id'],
+                                                    instance['vm_id'], 
+                                                    dev.backing.uuid)
+            position = 0
+            while position < dev.capacityInBytes:
+                changes = self._session._call_method(self._session._get_vim(),
+                                                     "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                     snapshot=snapshot_data['snapshot_ref'],
+                                                     deviceKey=dev['key'],
+                                                     startOffset=position,
+                                                     changeId=changeId)
+                if changes == []:
                     changes = self._session._call_method(self._session._get_vim(),
-                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                         snapshot=snapshot_data['snapshot_ref'],
-                                                         deviceKey=dev['key'],
-                                                         startOffset=position,
-                                                         changeId=changeId)
-                    if changes == []:
-                        changes = self._session._call_method(self._session._get_vim(),
-                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                         snapshot=snapshot_data['snapshot_ref'],
-                                                         deviceKey=dev['key'],
-                                                         startOffset=position,
-                                                         changeId=changeId)
-               
-                    if 'changedArea' in changes:
-                        for change in changes.changedArea:
-                            vmdk_snap_size += change.length
-    
-                    position = changes.startOffset + changes.length;
+                                                     "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                     snapshot=snapshot_data['snapshot_ref'],
+                                                     deviceKey=dev['key'],
+                                                     startOffset=position,
+                                                     changeId=changeId)
+           
+                if 'changedArea' in changes:
+                    for change in changes.changedArea:
+                        vmdk_snap_size += change.length
+
+                position = changes.startOffset + changes.length;
                         
             return vmdk_snap_size 
         except Exception as ex:
