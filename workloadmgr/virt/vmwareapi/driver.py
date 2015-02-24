@@ -1320,7 +1320,7 @@ class VMwareVCDriver(VMwareESXDriver):
             msg = 'Creating VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id  
             db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
             
-            ds = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastore']['moid'])
+            ds = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastores'][0]['moid'])
             client_factory = self._session._get_vim().client.factory
             service_content = self._session._get_vim().get_service_content()
             cookies = self._session._get_vim().client.options.transport.cookiejar
@@ -1468,7 +1468,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
                 vmdk_name = "%s/%s.vmdk" % (vm_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
-                vmdk_path = vm_util.build_datastore_path(instance_options['datastore']['name'], vmdk_name)
+                vmdk_path = vm_util.build_datastore_path(instance_options['datastores'][0]['name'], vmdk_name)
                 vmdk_create_spec = vm_util.get_vmdk_create_spec(client_factory,
                                                                 db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB'),  #vmdk_file_size_in_kb, 
                                                                 db.get_metadata_value(snapshot_vm_resource.metadata,'adapter_type'),  #adapter_type,

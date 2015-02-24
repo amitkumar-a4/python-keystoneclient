@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import time
 import uuid
 import cPickle as pickle
+import json
 from threading import Lock
 
 
@@ -39,6 +40,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
+import  workloadmgr.workflows
 from workloadmgr.workflows import vmtasks_openstack
 from workloadmgr.workflows import vmtasks_vcloud
 from workloadmgr.workflows import vmtasks
@@ -185,7 +187,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         }
 
         for key in metadata:
-            store[key] = metadata[key]
+            store[key] = str(metadata[key])
         
         workflow_class = get_workflow_class(context, workload_type_id)
         workflow = workflow_class("discover_instances", store)
@@ -208,7 +210,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         }
 
         for key in metadata:
-            store[key] = metadata[key]
+            store[key] = str(metadata[key])
         
         workflow_class = get_workflow_class(context, workload_type_id)
         workflow = workflow_class("workload_topology", store)
@@ -358,12 +360,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'workload_id': snapshot.workload_id,    # workload_id                
                 'source_platform': workload.source_platform,
             }
+            snapshot_metadata = {}
             for kvpair in workload.metadata:
-                store[kvpair['key']] = kvpair['value']
+                store[kvpair['key']] = str(kvpair['value'])
+                snapshot_metadata[kvpair['key']] = str(kvpair['value']) 
 
             workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
             instances = workflow.discover()
+            topology = workflow.topology();
+            snapshot_metadata['topology'] = json.dumps(topology)
 
             workflow.initflow()
             self.db.snapshot_update(context, 
@@ -378,8 +384,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'progress_percent': 100, 
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'finished_at' : timeutils.utcnow(),
-                                     'status': 'available'
-                                    }) 
+                                     'status': 'available',
+                                     'metadata': snapshot_metadata})
             self.db.snapshot_type_time_update(context, snapshot_id)               
 
             # update metadata hostnames
@@ -390,8 +396,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             self.db.workload_update(context, 
                                     snapshot.workload_id, 
-                                    {'metadata': {'hostnames': hostnames}, 
-                                    })             
+                                    {'metadata': {'hostnames': hostnames,
+                                                  'topology': json.dumps(topology)}}, 
+                                    )
              
             # Update vms
             for inst in workflow._store['instances']:
@@ -432,6 +439,64 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.db.workload_delete(context, workload_id)
 
     @autolog.log_method(logger=Logger)
+    def _oneclick_restore_options(self, context, restore, options):
+        if options['type'] != "vmware":
+            msg= _("Platforms other than VMware are not supported for oneclick restore")
+            LOG.error(msg)
+            raise InvalidRequest(msg)
+
+        snapshot_id = restore.snapshot_id
+        snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
+        options['vmware']['instances'] = [] 
+        for inst in snapshotvms:
+            optionsinst = {
+                           'name': inst.vm_name, 'id':inst.vm_id,
+                           'power': {'state': 'on', 'sequence': 1},
+                          }
+            snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, inst.vm_id, snapshot_id)
+            for snapshot_vm_resource in snapshot_vm_resources:
+                """ flavor """
+                if snapshot_vm_resource.resource_type == 'flavor':
+                    vm_flavor = snapshot_vm_resource
+                    optionsinst['flavor'] = {'vcpus' : self.db.get_metadata_value(vm_flavor.metadata, 'vcpus'),
+                                             'ram' : self.db.get_metadata_value(vm_flavor.metadata, 'ram'),
+                                             'disk': self.db.get_metadata_value(vm_flavor.metadata, 'disk'),
+                                             'ephemeral': self.db.get_metadata_value(vm_flavor.metadata, 'ephemeral')
+                                            }
+
+            instmeta = inst.metadata
+            for meta in inst.metadata:
+                if not meta.key  in ['cluster', 'parent', 'networks',
+                                     'resourcepool', 'vdisks', 'datastores']:
+                    continue
+
+                metavalue = json.loads(meta.value)
+                if meta.key == 'cluster':
+                    optionsinst['computeresource'] = {'moid': metavalue[0]['value'], 'name': metavalue[0]['name']}
+                elif meta.key == 'parent':
+                    optionsinst['vmfolder'] = {'moid': metavalue['value'], 'name': metavalue['name']}
+                elif meta.key == 'networks':
+                    optionsinst['networks'] = []
+                    for net in metavalue:
+                        optionsinst['networks'].append({'mac_address': net['macAddress'],
+                                                        'network_moid': net['value'],
+                                                        'network_name': net['name'],
+                                                        'new_network_moid': net['value'],
+                                                        'new_network_name': net['name']})
+                elif meta.key == 'resourcepool':
+                    optionsinst['resourcepool'] = {'moid': metavalue['value'], 'name': metavalue['name']}
+                elif meta.key == 'vdisks':
+                    optionsinst['vdisks'] = metavalue
+                elif 'datastores':
+                    optionsinst['datastores'] = []
+                    for ds in metavalue:
+                        optionsinst['datastores'].append({'moid': ds['value'],
+                                                          'name': ds['name']})
+            options['vmware']['instances'].append(optionsinst)
+
+        return options
+
+    @autolog.log_method(logger=Logger)
     @synchronized(workloadlock)
     def snapshot_restore(self, context, restore_id):
         """
@@ -442,39 +507,44 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
-            
+
             target_platform = 'vmware'
             if hasattr(restore, 'pickle'):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
                 if options and 'type' in options:
-                    target_platform = options['type'] 
-            
+                    target_platform = options['type']
+
             restore_type = restore.restore_type
-            
-            
+
             if restore_type == 'test':
-                restore = self.db.restore_update(   context, 
-                                                    restore_id, 
-                                                    {'host': self.host,
-                                                     'target_platform': target_platform,
-                                                     'progress_percent': 0, 
-                                                     'progress_msg': 'Create testbubble from snapshot is starting',
-                                                     'status': 'starting'
-                                                    })  
+                restore = self.db.restore_update(context,
+                                                 restore_id,
+                                                 {'host': self.host,
+                                                  'target_platform': target_platform,
+                                                  'progress_percent': 0,
+                                                  'progress_msg': 'Create testbubble from snapshot is starting',
+                                                  'status': 'starting'
+                                                 })
             else:
-                restore = self.db.restore_update(   context, 
-                                                    restore_id, 
-                                                    {'host': self.host,
-                                                     'target_platform': target_platform,
-                                                     'progress_percent': 0, 
-                                                     'progress_msg': 'Restore from snapshot is starting',
-                                                     'status': 'starting'
-                                                    })
-            
-            restore = self.db.restore_update(context, restore.id, {'status': 'executing'})
-          
+                restore = self.db.restore_update(context,
+                                                 restore_id,
+                                                 {'host': self.host,
+                                                  'target_platform': target_platform,
+                                                  'progress_percent': 0,
+                                                  'progress_msg': 'Restore from snapshot is starting',
+                                                  'status': 'starting'
+                                                 })
+
+            values = {'status': 'executing'}
+            if 'oneclickrestore' in options and options['oneclickrestore']:
+                # Fill the restore options from the snapshot instances metadata
+                options = self._oneclick_restore_options(context, restore, options)
+                values['pickle'] = pickle.dumps(options, 0)
+
+            restore = self.db.restore_update(context, restore.id, values)
+
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
-            if restore_type == 'test':                     
+            if restore_type == 'test':
                 self.db.restore_update( context, restore_id, {'size': restore_size})
             else:
                 if target_platform == 'openstack':
@@ -483,38 +553,37 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 else:
                     restore_size = vmtasks_vcloud.get_restore_data_size( context, self.db, dict(restore.iteritems()))
                     restore = self.db.restore_update( context, restore_id, {'size': (restore_size)})
-                    
-                
+
             context_dict = dict([('%s' % key, value)
-                              for (key, value) in context.to_dict().iteritems()])            
+                              for (key, value) in context.to_dict().iteritems()])
             context_dict['conf'] =  None # RpcContext object looks for this during init
             store = {
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
                 'restore': dict(restore.iteritems()),   # restore dictionary
             }
-                
+
             workflow_class = get_workflow_class(context, workload.workload_type_id, True)
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
-            workflow.execute()                                                
-            
+            workflow.execute()
+
             if restore_type == 'test':
-                self.db.restore_update( context, 
-                            restore_id, 
-                            {'progress_percent': 100, 
+                self.db.restore_update( context,
+                            restore_id,
+                            {'progress_percent': 100,
                              'progress_msg': 'Create testbubble from snapshot is complete',
                              'status': 'available'
-                            })  
+                            })
             else:
-                self.db.restore_update( context, 
-                            restore_id, 
-                            {'progress_percent': 100, 
+                self.db.restore_update( context,
+                            restore_id,
+                            {'progress_percent': 100,
                              'progress_msg': 'Restore from snapshot is complete',
                              'finished_at' : timeutils.utcnow(),
                              'time_taken' : int((timeutils.utcnow() - restore.created_at).total_seconds()),
                              'status': 'available'
-                            })                         
+                            })
 
         except Exception as ex:
             if restore_type == 'test':
@@ -525,15 +594,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         'restore_id': restore_id, 'exception': ex,}
             LOG.error(msg)
             LOG.exception(ex)
-            self.db.restore_update( context, 
-                                    restore_id, 
-                                    {'progress_percent': 100, 
+            self.db.restore_update( context,
+                                    restore_id,
+                                    {'progress_percent': 100,
                                      'progress_msg': '',
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
-                                    })             
-            return;                  
+                                    })
+            return;
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """
@@ -543,10 +612,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.driver.snapshot_delete(context, self.db, snapshot)
 
 
-    @autolog.log_method(logger=Logger)        
+    @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
-        Delete an existing restore 
+        Delete an existing restore
         """
-        self.db.restore_delete(context, restore_id)        
- 
+        self.db.restore_delete(context, restore_id)
