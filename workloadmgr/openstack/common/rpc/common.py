@@ -254,18 +254,21 @@ class Connection(object):
 def _safe_log(log_func, msg, msg_data):
     """Sanitizes the msg_data field before logging."""
     SANITIZE = {'set_admin_password': [('args', 'new_pass')],
-                'run_instance': [('args', 'admin_password')],
+                'run_instance': [('args', 'admin_password', 'password', 'Password')],
                 'route_message': [('args', 'message', 'args', 'method_info',
-                                   'method_kwargs', 'password'),
+                                   'method_kwargs', 'password', 'Password'),
                                   ('args', 'message', 'args', 'method_info',
-                                   'method_kwargs', 'admin_password')]}
+                                   'method_kwargs', 'admin_password', 'password', 'Password')]}
 
     has_method = 'method' in msg_data and msg_data['method'] in SANITIZE
     has_context_token = '_context_auth_token' in msg_data
     has_token = 'auth_token' in msg_data
 
     if not any([has_method, has_context_token, has_token]):
-        return log_func(msg, msg_data)
+        if 'password' in str(msg_data).lower():
+            return log_func(msg, '<SANITIZED>')
+        else:
+            return log_func(msg, msg_data)
 
     msg_data = copy.deepcopy(msg_data)
 
@@ -287,7 +290,11 @@ def _safe_log(log_func, msg, msg_data):
     if has_token:
         msg_data['auth_token'] = '<SANITIZED>'
 
-    return log_func(msg, msg_data)
+    if 'password' in str(msg_data).lower():
+        return log_func(msg, '<SANITIZED>')
+    else:
+        return log_func(msg, msg_data)
+
 
 
 def serialize_remote_exception(failure_info, log_failure=True):

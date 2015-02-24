@@ -20,6 +20,8 @@ import json
 import paramiko
 import uuid
 import cPickle as pickle
+from tempfile import mkstemp
+import subprocess
 
 from IPy import IP
 from taskflow import engines
@@ -40,6 +42,7 @@ import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr import utils
 from workloadmgr import autolog
+from workloadmgr import exception
 
 import vmtasks
 import workflow
@@ -58,13 +61,6 @@ sys.path.insert(0, top_dir)
 def InitFlow(store):
     pass
 
-def _exec_shell_command(connection, command):
-    stdin, stdout, stderr = connection.exec_command('bash -c "' + command + '"', timeout=120)
-    err_msg = stderr.read()
-    if err_msg != '':
-        raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
-    return stdin, stdout, stderr
-
 def _exec_command(connection, command):
     stdin, stdout, stderr = connection.exec_command('bash -c "' + command + '"', timeout=120)
     err_msg = stderr.read()
@@ -72,7 +68,7 @@ def _exec_command(connection, command):
         stdin, stdout, stderr = connection.exec_command(command, timeout=120)
         err_msg = stderr.read()
         if err_msg != '':
-            raise Exception(_("Error connecting to Cassandra service on %s - %s"), (str(connection), err_msg))
+            raise Exception(_("Error connecting to Cassandra Service on %s - %s") % (str(connection), err_msg))
     return stdin, stdout, stderr
     
 def connect_server(host, port, user, password):
@@ -88,198 +84,127 @@ def connect_server(host, port, user, password):
         raise ex
     return client
 
-def getclusterinfo(connection):
-    stdin, stdout, stderr = _exec_command(connection, "nodetool describecluster")
-    cassout = stdout.read()
-    cassout = cassout.strip("\t")
-    cassout = cassout.split("\n")
-    clusterinfo = {}
-    for c in cassout:
-        if len(c.split(":")) < 2:
-            continue;
-        clusterinfo[c.split(":")[0].strip()] = c.split(":")[1].strip()
+class SnapshotNode(task.Task):
 
-    return clusterinfo
+    def execute(self, CassandraNode, SSHPort, Username, Password):
+        try:
+            self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
+            LOG.info(_('SnapshotNode:'))
+            stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
+            out = stdout.read(),
+            LOG.info(_("nodetool snapshot output:" + str(out)))
+            self.client.close()
+        except:
+            LOG.warning(_("Cannot run nodetool snapshot command on %s"), CassandraNode)
+            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
 
-def getcassandranodes(connection):
-    LOG.info(_('Enter getcassandranodes'))
-    stdin, stdout, stderr = _exec_command(connection, "nodetool status")
-    cassout = stdout.read()
+        return 
 
-    cassout = cassout.replace(" KB", "KB")
-    cassout = cassout.replace(" MB", "MB")
-    cassout = cassout.replace(" GB", "GB")
-    cassout = cassout.replace(" (", "(")
-    cassout = cassout.replace(" ID", "ID")
- 
-    # Sample output
-    #cassout =Datacenter: 17
-    #==============
-    #Status=Up/Down
-    #|/ State=Normal/Leaving/Joining/Moving
-    #--  Address      Load       Owns (effective)  Host ID                               Token                                    Rack
-    #UN  172.17.17.2  55.56 KB   0.2%              7d62d900-f99d-4b88-8012-f06cb639fc02  0                                        17
-    #UN  172.17.17.4  76.59 KB   100.0%            75917649-6caa-4c66-b003-71c0eb8c09e8  -9210152678340971410                     17
-    #UN  172.17.17.5  86.46 KB   99.8%             a03a1287-7d32-42ed-9018-8206fc295dd9  -9218601096928798970                     17
+    def revert(self, *args, **kwargs):
+        if not isinstance(kwargs['result'], misc.Failure):
+            LOG.info(_("Reverting SnapshotNode"))
+            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
+            out = stdout.read(),
+            LOG.info(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
+            self.client.close()
 
-    cassout = cassout.split("\n")
-    for idx, val in enumerate(cassout):
-        if val.startswith("Datacenter"):
-            break
+class ClearSnapshot(task.Task):
 
-    cassout = cassout[idx:]
-    casskeys = cassout[4].split()
+    def execute(self, CassandraNode, SSHPort, Username, Password):
+        try:
+            self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
+            LOG.info(_('ClearSnapshot:'))
+            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
+            out = stdout.read(),
+            LOG.info(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
+            self.client.close()
+        except:
+            LOG.warning(_("Cannot run nodetool clearsnapshot command on %s"), CassandraNode)
+            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
+            
 
-    cassnodes = []
-    for n in cassout[5:]:
-        desc = n.split()
-        if len(desc) == 0:
-            continue
+        return 
 
-        if not desc[0] in ("UN", "UL", "UJ", "UM"):
-            continue
+def UnorderedSnapshotNode(instances):
+    flow = uf.Flow("snapshotnodeuf")
+    for index,item in enumerate(instances):
+        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
+    return flow
 
-        node = {}
-        for idx, k in enumerate(casskeys):
-            node[k] = desc[idx]
+def UnorderedClearSnapshot(instances):
+    flow = uf.Flow("clearsnapshotuf")
+    for index,item in enumerate(instances):
+        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
+    return flow
 
-        # Sample output
-        # =============
-        # Token            : (invoke with -T/--tokens to see all 256 tokens)
-        # ID               : f64ced33-2c01-40a3-9979-cf0a0b60d7af
-        # Gossip active    : true
-        # Thrift active    : true
-        # Native Transport active: true
-        # Load             : 148.13 KB
-        # Generation No    : 1399521595
-        # Uptime (seconds) : 36394
-        # Heap Memory (MB) : 78.66 / 992.00
-        # Data Center      : 17
-        # Rack             : 17
-        # Exceptions       : 0
-        # Key Cache        : size 1400 (bytes), capacity 51380224 (bytes), 96 hits, 114 requests, 0.842 recent hit rate, 14400 save period in seconds
-        # Row Cache        : size 0 (bytes), capacity 0 (bytes), 0 hits, 0 requests, NaN recent hit rate, 0 save period in seconds
 
-        stdin, stdout, stderr = _exec_command(connection, "nodetool -h " + node['Address'] + " info")
-        output = stdout.read()
-        output = output.split("\n")
-        for l in output:
-            fields = l.split(":")
-            if len(fields) > 1:
-                node[fields[0].strip()] = fields[1].strip()
-
-        cassnodes.append(node)
-    LOG.info(_('Discovered cassandra nodes: ' + str(cassnodes)))
-    LOG.info(_('Exit getcassandranodes'))
-    return cassnodes
-
-def get_cassandra_nodes(cntx, connection, host, port, username, password, preferredgroup=None):
+def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_nodes'))
-    try:
-        #
-        # Getting sharding information
-        #
-        totalnodes = getcassandranodes(connection)
-    
-        LOG.info(_('Discovered cassandra nodes: ' + str(totalnodes)))
-
-        # filter out vms that are not in preferred datacenter
-        if preferredgroup and len(preferredgroup):
-            nodenames = []
-            for dc in preferredgroup:
-                for node in totalnodes:
-                    if dc['datacenter'] == node['Data Center']:
-                        nodenames.append(node)
-                # tempoarily we only consider the first group
-                # we will figure out how to support second group
-                # incase the first one is unavailable
+    try:    
+        fh, outfile_path = mkstemp()
+        os.close(fh)
+        fh, errfile_path = mkstemp()
+        os.close(fh)        
+        cmdspec = ["python", "/opt/stack/workloadmgr/workloadmgr/workflows/cassnodes.py",
+                   "--config-file", "/etc/workloadmgr/workloadmgr.conf",
+                   "--defaultnode", store['CassandraNode'],
+                   "--port", store['SSHPort'],
+                   "--username", store['Username'],
+                   "--password", "******",
+                   "--addlnodes", store.get('hostnames', ""),
+                   "--preferredgroups", store.get('preferredgroup', ""),
+                   "--findpartitiontype", findpartitiontype,
+                   "--outfile", outfile_path,
+                   "--errfile", errfile_path,
+                   ]
+        cmd = " ".join(cmdspec)
+        for idx, opt in enumerate(cmdspec):
+            if opt == "--password":
+                cmdspec[idx+1] = store['Password']
                 break
-        else:
-            nodenames = totalnodes
-
-        #
-        # Resolve the node name to VMs
-        # Usually Hadoop spits out nodes IP addresses. These
-        # IP addresses need to be resolved to VM IDs by 
-        # querying the VM objects from nova
-        #
-        ips = {}
-        for name in nodenames:
-            # if the name is host name, resolve it to IP address
-            try :
-                IP(name['Address'])
-                ips[name['Address']] = 1
-            except Exception, e:
-                # we got hostnames
-                ips[socket.gethostbyname(name['Address'])] = 1
-
-        interfaces = {}
-        rootpartition_type = {}
-        for ip in ips:
+        process = subprocess.Popen(cmdspec,shell=False)
+        stdoutdata, stderrdata = process.communicate()
+        if process.returncode != 0:
+            reason = 'Error discovering Cassandra nodes'
             try:
-                client = paramiko.SSHClient()
-                client.load_system_host_keys()
-                if password == '':
-                    client.set_missing_host_key_policy(paramiko.WarningPolicy())
-                else:
-                    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                try:
-                    client.connect(ip, port=int(port), username=username, password=password)
-                    stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth0 | grep HWaddr"', timeout=120)
-                    err_msg = stderr.read()
-                    if err_msg != '':
-                        LOG.error(_('ifconfig eth0 failed: Error %s'), err_msg)
-                        raise Exception(_('ifconfig eth0 failed: Error %s'), err_msg)
-                        
-                    interfaces[stdout.read().split('HWaddr')[1].strip().lower()] = ip
-
-                    stdin, stdout, stderr = client.exec_command('bash -c "ifconfig eth1 | grep HWaddr"', timeout=120)
-                    err_msg = stderr.read()
-                    if err_msg == '':
-                        interfaces[stdout.read().split('HWaddr')[1].strip().lower()] = ip
-
-                    # find the type of the root partition
-                    rootpartition_type[ip] = "Linux"
-                    stdin, stdout, stderr = client.exec_command('bash -c "df /"', timeout=120)
-                    m=re.search(r'(/[^\s]+)\s',str(stdout.read()))
-                    if m:
-                        mp= m.group(1)
-                        transport = client.get_transport()
-                        session = transport.open_session()
-                        session.get_pty()
-                        session.set_combine_stderr(True)
-                        session.settimeout(120)
-                        session.exec_command('bash -c "sudo -k lvdisplay"' + mp)
-                        stdin = session.makefile('wb', 8192)
-                        stdout = session.makefile('rb', 8192)
-                        stderr = session.makefile_stderr('rb', 8192)
-                        if stdout.channel.closed is False: # If stdout is still open then sudo is asking us for a password
-                            stdin.write('%s\n' % password)
-                            stdin.flush()
-                        retcode = session.recv_exit_status()
-                        LOG.info(_('lvdisplay: return value %d'), retcode)
-                        if retcode == 0:
-                            output = stdout.read()
-                            # remove password from the stdout
-                            output.replace(password, '******')
-                            output = "\n".join(output.split("\n")[1:])
-                            LOG.info(_('lvdisplay: output\n %s'), output)
-                            rootpartition_type[ip] = "lvm"
-                        else:
-                            error = stderr.read()
-                            LOG.info(_('lvdisplay: error %s'), error)
-                except:
-                    pass
+                with open(errfile_path, 'r') as fh:
+                    reason = fh.read()
+                    LOG.info(_('Error discovering Cassandra nodes: ' + reason))
+                os.remove(errfile_path)
             finally:
-                if ip in rootpartition_type:
-                    LOG.info(_('%s: root partition is on %s'), ip, rootpartition_type[ip])
-                client.close()
-
+                raise exception.ErrorOccured(reason=reason)
+    
+        cassandra_nodes = []
+        with open(outfile_path, 'r') as fh:
+            cassandra_nodes = json.loads(fh.read())
+            LOG.info(_('Discovered Cassandra Nodes: ' + str(cassandra_nodes)))
+        
+        if os.path.isfile(outfile_path):
+            os.remove(outfile_path)
+        if os.path.isfile(errfile_path):
+            os.remove(errfile_path)
+        
+        return cassandra_nodes
+    finally:
+        LOG.info(_('Exit get_cassandra_nodes'))    
+    
+def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
+    LOG.info(_('Enter get_cassandra_instances'))
+    try:    
+        cassandra_nodes = get_cassandra_nodes(cntx, store, findpartitiontype = findpartitiontype)
+        
+        interfaces = {}
+        root_partition_type = {}
+        for node in cassandra_nodes:
+            if 'MacAddresses' in node:
+                for macaddress in node['MacAddresses']:
+                    interfaces[macaddress.lower()] = node['IPAddress']
+                    root_partition_type[macaddress.lower()] = node.get('root_partition_type', 'lvm')
+        
         # call nova list
         compute_service = nova.API(production=True)
         instances = compute_service.get_servers(cntx, admin=True)
-        hypervisors = compute_service.get_hypervisors(cntx)
-    
+        hypervisors = compute_service.get_hypervisors(cntx)            
         vms = []
         # call nova interface-list <instanceid> to build the list of instances ids
         # if node names are host names then lookup the VMid based on the 
@@ -298,130 +223,35 @@ def get_cassandra_nodes(cntx, connection, host, port, username, password, prefer
                             hypervisor_type = hypervisor.hypervisor_type
                             break
                     if _if['OS-EXT-IPS-MAC:mac_addr'].lower() in interfaces:
-                       
                         utils.append_unique(vms, {'vm_id' : instance.id,
                                                   'vm_name' : instance.name,
                                                   'vm_metadata' : instance.metadata,                                                
                                                   'vm_flavor_id' : instance.flavor['id'],
                                                   'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
-                                                  'root_partition_type' : rootpartition_type[interfaces[_if['OS-EXT-IPS-MAC:mac_addr'].lower()]],
+                                                  'root_partition_type' : root_partition_type[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
                                                   'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                                   'hypervisor_hostname' : hypervisor_hostname,
                                                   'hypervisor_type' :  hypervisor_type}, 
                                                   "vm_id")
-        LOG.info(_('Discovered cassandra virtual machines: ' + str(vms)))
-        return vms
+        LOG.info(_('Discovered Cassandra Virtual Machines: ' + str(vms)))
+        return vms            
     finally:
-        LOG.info(_('Exit get_cassandra_nodes'))
-
-class SnapshotNode(task.Task):
-
-    def execute(self, CassandraNode, SSHPort, Username, Password):
-        try:
-            self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-            LOG.info(_('SnapshotNode:'))
-            stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
-            out = stdout.read(),
-            LOG.info(_("nodetool snapshot output:" + str(out)))
-        except:
-            LOG.warning(_("Cannot run nodetool snapshot command on %s"), CassandraNode)
-            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
-
-        return 
-
-    def revert(self, *args, **kwargs):
-        if not isinstance(kwargs['result'], misc.Failure):
-            LOG.info(_("Reverting SnapshotNode"))
-            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
-            out = stdout.read(),
-            LOG.info(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
-
-class ClearSnapshot(task.Task):
-
-    def execute(self, CassandraNode, SSHPort, Username, Password):
-        try:
-            self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-            LOG.info(_('ClearSnapshot:'))
-            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
-            out = stdout.read(),
-
-            LOG.info(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
-        except:
-            LOG.warning(_("Cannot run nodetool clearsnapshot command on %s"), CassandraNode)
-            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
-
-        return 
-
-def UnorderedSnapshotNode(instances):
-    flow = uf.Flow("snapshotnodeuf")
-    for index,item in enumerate(instances):
-        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
-    return flow
-
-def UnorderedClearSnapshot(instances):
-    flow = uf.Flow("clearsnapshotuf")
-    for index,item in enumerate(instances):
-        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
-    return flow
-
+        LOG.info(_('Exit get_cassandra_instances'))    
+            
 class CassandraWorkflow(workflow.Workflow):
     """"
-      Cassandra Workflow
+    Cassandra Workflow
     """
 
     def __init__(self, name, store):
         super(CassandraWorkflow, self).__init__(name)
         self._store = store
         
-    def find_first_alive_node(self):
-        # Iterate thru all hosts and pick the one that is alive
-        if 'CassandraNode' in self._store:
-            try:
-                LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
-                connection = connect_server(self._store['CassandraNode'], 
-                                            int(self._store['SSHPort']),
-                                            self._store['Username'],
-                                            self._store['Password'])
-                LOG.info(_( 'Chose "' + self._store['CassandraNode'] +'" for cassandra nodetool'))
-                return connection
-            except:
-                LOG.info(_( '"' + self._store['CassandraNode'] +'" appears to be offline'))
-                pass
-            
-        if 'hostnames' in self._store:
-            for host in self._store['hostnames'].split(";"):
-                try:
-                    if host == '':
-                        continue
-                    LOG.info(_( 'Connecting to cassandra node ' + host))
-                    connection = connect_server(host, 
-                                                int(self._store['SSHPort']),
-                                                self._store['Username'],
-                                                self._store['Password'])
-                    self._store['CassandraNode'] = host
-                    LOG.info(_( 'Chose "' + host +'" for cassandra nodetool'))
-                    return connection
-                except:
-                    LOG.info(_( '"' + host +'" appears to be offline'))
-                    pass
-
-        LOG.error(_( 'Cassandra cluster appears to be offline'))
-        raise Exception(_("Cassandra cluster is down."))
-
     def initflow(self, composite=False):
-        connection = None
         try:
-            connection = self.find_first_alive_node()
-
             cntx = amqp.RpcContext.from_dict(self._store['context'])
 
-            preferredgroup = self._store.get('preferredgroup', None)
-            if preferredgroup:
-                preferredgroup = json.loads(self._store['preferredgroup'])
-            self._store['instances'] =  get_cassandra_nodes(cntx, connection, self._store['CassandraNode'], 
-                                                        int(self._store['SSHPort']),
-                                                        self._store['Username'],
-                                                        self._store['Password'], preferredgroup)
+            self._store['instances'] =  get_cassandra_instances(cntx, self._store, findpartitiontype = 'True')
             for index,item in enumerate(self._store['instances']):
                 self._store['instance_'+item['vm_id']] = item
                 self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
@@ -450,17 +280,14 @@ class CassandraWorkflow(workflow.Workflow):
             super(CassandraWorkflow, self).initflow(snapshotvms, composite=composite)
 
         finally:
-            if connection:
-                connection.close()
+            pass
 
     def topology(self):
-        connection = None
         try:
             LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
-            connection = self.find_first_alive_node()
-
-            cassnodes = getcassandranodes(connection)
-            clusterinfo = getclusterinfo(connection)
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+            cassnodes = get_cassandra_nodes(cntx, self._store, findpartitiontype = 'False')
+            """
             dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
             for n in cassnodes:
                 # We discovered this datacenter for the first time, add it
@@ -496,9 +323,10 @@ class CassandraWorkflow(workflow.Workflow):
                     dv.pop("racks", None)
             dcs.pop("datacenters", None)
             return dict(topology=dcs)
+            """
+            return {}
         finally:
-            if connection:
-                connection.close()
+            pass
 
     def details(self):
         # workflow details based on the
@@ -529,23 +357,15 @@ class CassandraWorkflow(workflow.Workflow):
         return dict(workflow=workflow)
 
     def discover(self):
-        connection = None
         try:
-            
-            connection = self.find_first_alive_node()
             cntx = amqp.RpcContext.from_dict(self._store['context'])
-            instances = get_cassandra_nodes(cntx, connection,
-                                            self._store['CassandraNode'], 
-                                            int(self._store['SSHPort']),
-                                            self._store['Username'],
-                                            self._store['Password'])
+            instances = get_cassandra_instances(cntx, self._store, findpartitiontype = 'False')
             for instance in instances:
                 del instance['hypervisor_hostname']
                 del instance['hypervisor_type']
             return dict(instances=instances)
         finally:
-            if connection:            
-                connection.close()
+            pass
     
     def execute(self):
         if self._store['source_platform'] == "vmware":

@@ -33,7 +33,7 @@ from eventlet import greenio
 from eventlet import greenthread
 from eventlet import patcher
 from eventlet import tpool
-from eventlet import util as eventlet_util
+#from eventlet import util as eventlet_util
 from lxml import etree
 from oslo.config import cfg
 

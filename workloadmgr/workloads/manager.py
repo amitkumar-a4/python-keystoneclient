@@ -606,14 +606,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
-<<<<<<< HEAD
                                     })
             return;
-=======
-                                    })             
-            return; 
-                         
->>>>>>> 3e6b42019cfa6c3fb004688ce4eb27686163a40b
+        
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """
