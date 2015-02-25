@@ -386,7 +386,6 @@ class API(base.Base):
                             instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
                             source_platform = "vmware"
         
-        metadata['hostnames'] = ""
         workload_type_id_valid = False
         workload_types = self.workload_type_get_all(context)            
         for workload_type in workload_types:
@@ -397,8 +396,12 @@ class API(base.Base):
             msg = _('Invalid workload type')
             raise wlm_exceptions.InvalidState(reason=msg)                
 
+        if not 'hostnames' in metadata:
+            metadata['hostnames'] = json.dumps([])
+
         if not 'preferredgroup' in metadata:
             metadata['preferredgroup'] = json.dumps([])
+
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'display_name': name,

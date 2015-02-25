@@ -153,7 +153,11 @@ def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
                    "--password", "******",]
 
         if store.get('hostnames', None):
-            cmdspec.extend(["--addlnodes", store.get('hostnames', "")])
+            hosts = ""
+            for host in json.loads(store.get('hostnames',"")):
+                hosts += host + ';'
+
+            cmdspec.extend(["--addlnodes", hosts])
         if store.get('preferredgroup', None):
             grps = ""
             for grp in json.loads(store.get('preferredgroup', "")):
@@ -371,7 +375,7 @@ class CassandraWorkflow(workflow.Workflow):
     def discover(self):
         try:
             cntx = amqp.RpcContext.from_dict(self._store['context'])
-            instances = get_cassandra_instances(cntx, self._store, findpartitiontype = 'False')
+            instances, cassnodes, clusterinfo = get_cassandra_instances(cntx, self._store, findpartitiontype = 'False')
             for instance in instances:
                 del instance['hypervisor_hostname']
                 del instance['hypervisor_type']

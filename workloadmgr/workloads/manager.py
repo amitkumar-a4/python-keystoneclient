@@ -309,29 +309,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             # Create swift container for the workload
             json_wl = jsonutils.dumps(workload)
             json_wl_vms = jsonutils.dumps(vms)
-
-            # update metadata hostnames
-            metadatahash = {}
-            for meta in workload.metadata:
-                metadatahash[meta.key] = meta.value
-
-            instances = self.workload_type_discover_instances(context,
-                                         workload.workload_type_id,
-                                         metadatahash,
-                                         workload_id=workload_id)
-
-            hostnames = ""
-            for inst in instances['instances']:
-                hostnames += inst['hostname']
-                hostnames += ";"
-
             self.db.workload_update(context, 
                                     workload_id, 
                                     {
                                      'host': self.host,
                                      'status': 'available',
                                      'availability_zone': self.az,
-                                     'metadata': {'hostnames': hostnames}, 
                                     })
         except Exception as err:
             with excutils.save_and_reraise_exception():
