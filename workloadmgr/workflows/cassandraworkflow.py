@@ -150,13 +150,17 @@ def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
                    "--defaultnode", store['CassandraNode'],
                    "--port", store['SSHPort'],
                    "--username", store['Username'],
-                   "--password", "******",
-                   "--addlnodes", store.get('hostnames', ""),
-                   "--preferredgroups", store.get('preferredgroup', ""),
-                   "--findpartitiontype", findpartitiontype,
-                   "--outfile", outfile_path,
-                   "--errfile", errfile_path,
-                   ]
+                   "--password", "******",]
+
+        if store.get('hostnames', None):
+            cmdspec.extend(["--addlnodes", store.get('hostnames', "")])
+        if store.get('preferredgroup', None):
+            cmdspec.extend(["--preferredgroups", store.get('preferredgroup', "")])
+        
+        cmdspec.extend(["--findpartitiontype", findpartitiontype,
+                        "--outfile", outfile_path,
+                        "--errfile", errfile_path,
+                       ])
         cmd = " ".join(cmdspec)
         for idx, opt in enumerate(cmdspec):
             if opt == "--password":
@@ -174,24 +178,26 @@ def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
             finally:
                 raise exception.ErrorOccured(reason=reason)
     
-        cassandra_nodes = []
+        cassandra_nodes = None
+        clusterinfo = None
         with open(outfile_path, 'r') as fh:
-            cassandra_nodes = json.loads(fh.read())
-            LOG.info(_('Discovered Cassandra Nodes: ' + str(cassandra_nodes)))
+            clusterinfo = json.loads(fh.read())
+            LOG.info(_('Discovered Cassandra Nodes: ' + str(clusterinfo)))
         
         if os.path.isfile(outfile_path):
             os.remove(outfile_path)
         if os.path.isfile(errfile_path):
             os.remove(errfile_path)
         
-        return cassandra_nodes
+        return clusterinfo['cassandranodes'], clusterinfo
+
     finally:
         LOG.info(_('Exit get_cassandra_nodes'))    
     
 def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_instances'))
     try:    
-        cassandra_nodes = get_cassandra_nodes(cntx, store, findpartitiontype = findpartitiontype)
+        cassandra_nodes, clusterinfo = get_cassandra_nodes(cntx, store, findpartitiontype = findpartitiontype)
         
         interfaces = {}
         root_partition_type = {}
@@ -286,8 +292,8 @@ class CassandraWorkflow(workflow.Workflow):
         try:
             LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
             cntx = amqp.RpcContext.from_dict(self._store['context'])
-            cassnodes = get_cassandra_nodes(cntx, self._store, findpartitiontype = 'False')
-            """
+            cassnodes, clusterinfo = get_cassandra_nodes(cntx, self._store, findpartitiontype = 'False')
+
             dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
             for n in cassnodes:
                 # We discovered this datacenter for the first time, add it
@@ -323,8 +329,6 @@ class CassandraWorkflow(workflow.Workflow):
                     dv.pop("racks", None)
             dcs.pop("datacenters", None)
             return dict(topology=dcs)
-            """
-            return {}
         finally:
             pass
 

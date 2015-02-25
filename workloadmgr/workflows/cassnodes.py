@@ -26,8 +26,8 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
     if not addlnodes or  len(addlnodes) == 0:
         LOG.info(_("'addlnodes' is empty. Defaulting to defaultnode %s atribute") % defaultnode)
         if not defaultnode:
-            raise exception.InvalidState("Cassandra workload is in invalid state. Do not have any node information set")        
-        addlnodes = defaultnode    
+            raise exception.InvalidState("Cassandra workload is in invalid state. Do not have any node information set")
+        addlnodes = defaultnode
     try:
         output = pssh_exec_command( addlnodes.split(";"),
                                     int(SSHPort),
@@ -65,7 +65,7 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
         client = ParallelSSHClient(hosts, user=user, password=password, port=int(port), timeout=120)
         LOG.info(_("pssh_exec_command: %s") % (command))
         output = client.run_command(command, sudo=sudo)
-        
+
         # dump environment if any node fails with command not found
         for host in output:
             if output[host]['exit_code']:
@@ -93,7 +93,27 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
         raise
 
     return output
-    
+
+def getclusterinfo(hosts, port, username, password):
+    output = pssh_exec_command(hosts, port, username, password, "nodetool describecluster")
+    for host in output:
+        if output[host]['exit_code']:
+            LOG.info(_("'nodetool status' on %s cannot be executed. Error %s" % (host, str(output[host]['exit_code']))))
+            continue
+
+        clusterinfo = {}
+        for line in output[host]['stdout']:
+             if len(line.split(":")) < 2:
+                 continue;
+             clusterinfo[line.split(":")[0].strip()] = line.split(":")[1].strip()
+
+        return clusterinfo
+
+    msg = _('Cassandra cluster appears to be offline. Cannot execute describecluster successfully.')
+    LOG.error(msg)
+    raise exception.InvalidState(msg)
+     
+
 def discovercassandranodes(hosts, port, username, password):
     LOG.info(_('Enter discovercassandranodes'))
 
@@ -122,7 +142,7 @@ def discovercassandranodes(hosts, port, username, password):
             line = line.replace(" GB", "GB")
             line = line.replace(" (", "(")
             line = line.replace(" ID", "ID")
- 
+
             if line.startswith("--"):
                 casskeys = line.split()
                 continue
@@ -145,6 +165,11 @@ def discovercassandranodes(hosts, port, username, password):
             nodelist.append(node)
 
         break
+
+    if len(nodelist) == 0:
+        msg = _('Cassandra cluster appears to be offline. Please check the cluster and try the operation again')
+        LOG.error(msg)
+        raise exception.InvalidState(msg)
 
     cassandranodes = []
     availablenodes = []
@@ -195,9 +220,12 @@ def discovercassandranodes(hosts, port, username, password):
         cassandranodes.append(node)
 
     LOG.info(_('Discovered Cassandra Nodes: %s') % str(len(cassandranodes)))
-    LOG.info(_('Discovered Cassandra Nodes: ' + str(cassandranodes)))    
+    LOG.info(_('Discovered Cassandra Nodes: ' + str(cassandranodes)))
     LOG.info(_('Exit discovercassandranodes'))
-    return cassandranodes
+
+    clusterinfo = getclusterinfo(hosts, port, username, password)
+
+    return cassandranodes, clusterinfo
 
 def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=None, findpartitiontype=False):
     LOG.info(_('Enter get_cassandra_nodes'))
@@ -205,8 +233,8 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
         #
         # Getting sharding information
         #
-        allnodes = discovercassandranodes(alivenodes, port, username, password)
-    
+        allnodes, clusterinfo  = discovercassandranodes(alivenodes, port, username, password)
+
         # filter out nodes that are not in preferred datacenter
         preferrednodes = []
         if preferredgroups and len(preferredgroups):
@@ -237,7 +265,7 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
         #
         # Resolve the node name to VMs
         # Usually Hadoop spits out nodes IP addresses. These
-        # IP addresses need to be resolved to VM IDs by 
+        # IP addresses need to be resolved to VM IDs by
         # querying the VM objects from nova
         #
         ips = {}
@@ -278,8 +306,8 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
                         break
         for node in preferrednodes:
             node['root_partition_type'] = "lvm"
-        
-        """    
+
+        """
         if findpartitiontype is True:
             output = pssh_exec_command(ips, port, username, password, 'df /')
             for host in output:
@@ -315,17 +343,17 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
                                         node['root_partition_type'] = "Linux"
                                     LOG.info(_('%s: root partition is %s') % (node['IPAddress'], node['root_partition_type']))
                                     break
-  
+
                     except Exception as ex:
                         LOG.info(_("Cannot execute lvdisplay command on %s") % host)
                         LOG.exception(ex)
-        """                
+        """
         LOG.info(_('Preferred Cassandra Nodes: %s') % str(len(preferrednodes)))
         for node in preferrednodes:
             LOG.info(_(node))
         LOG.info(_('Exit get_cassandra_nodes'))
 
-        return preferrednodes
+        return preferrednodes, clusterinfo
     except Exception as ex:
         LOG.info(_("Unexpected Error in get_cassandra_nodes"))
         LOG.exception(ex)
@@ -334,7 +362,11 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
 def main(argv):
     try:
         errfile = '/tmp/cassnodes_errors.txt'
-        opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile="])
+        outfile = '/tmp/cassnodes_output.txt'
+        addlnodes = None
+        preferredgroups = None
+
+	opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile="])
         for opt, arg in opts:
             if opt == '--defaultnode':
                 defaultnode = arg
@@ -354,13 +386,17 @@ def main(argv):
                 outfile = arg
             elif opt == '--errfile':
                 errfile = arg
-                                
+
         with open(outfile,'w') as outfilehandle:
             pass
         alivenodes = find_alive_nodes(defaultnode, port, username, password, addlnodes)
-        cassandranodes = get_cassandra_nodes(alivenodes, port, username, password, preferredgroups = preferredgroups, findpartitiontype = findpartitiontype)
+        cassandranodes, clusterinfo = get_cassandra_nodes(alivenodes, port, username, password,
+                                                          preferredgroups = preferredgroups,
+                                                          findpartitiontype = findpartitiontype)
+        clusterinfo['cassandranodes'] = cassandranodes
         with open(outfile,'w') as outfilehandle:
-            outfilehandle.write(json.dumps(cassandranodes))
+            outfilehandle.write(json.dumps(clusterinfo))
+
     except getopt.GetoptError as ex:
         LOG.exception(ex)
         usage = _("Usage: cassnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode cassandra1 "
@@ -377,7 +413,7 @@ def main(argv):
         with open(errfile,'w') as errfilehandle:
             errfilehandle.write(str(ex))
         exit(1)
-            
+
 if __name__ == "__main__":
     flags.parse_args(sys.argv[1:2])
     logging.setup("workloadmgr")
