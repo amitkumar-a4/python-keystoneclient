@@ -155,7 +155,10 @@ def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
         if store.get('hostnames', None):
             cmdspec.extend(["--addlnodes", store.get('hostnames', "")])
         if store.get('preferredgroup', None):
-            cmdspec.extend(["--preferredgroups", store.get('preferredgroup', "")])
+            grps = ""
+            for grp in json.loads(store.get('preferredgroup', "")):
+                grps += grp['datacenter'] + ';'
+            cmdspec.extend(["--preferredgroups", grps])
         
         cmdspec.extend(["--findpartitiontype", findpartitiontype,
                         "--outfile", outfile_path,
@@ -196,9 +199,9 @@ def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
     
 def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_instances'))
-    try:    
+    try:
         cassandra_nodes, clusterinfo = get_cassandra_nodes(cntx, store, findpartitiontype = findpartitiontype)
-        
+
         interfaces = {}
         root_partition_type = {}
         for node in cassandra_nodes:
@@ -206,14 +209,14 @@ def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
                 for macaddress in node['MacAddresses']:
                     interfaces[macaddress.lower()] = node['IPAddress']
                     root_partition_type[macaddress.lower()] = node.get('root_partition_type', 'lvm')
-        
+
         # call nova list
         compute_service = nova.API(production=True)
         instances = compute_service.get_servers(cntx, admin=True)
-        hypervisors = compute_service.get_hypervisors(cntx)            
+        hypervisors = compute_service.get_hypervisors(cntx)
         vms = []
         # call nova interface-list <instanceid> to build the list of instances ids
-        # if node names are host names then lookup the VMid based on the 
+        # if node names are host names then lookup the VMid based on the
         for instance in instances:
             ifs = instance.addresses
             for addr in instance.addresses:
@@ -231,19 +234,19 @@ def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
                     if _if['OS-EXT-IPS-MAC:mac_addr'].lower() in interfaces:
                         utils.append_unique(vms, {'vm_id' : instance.id,
                                                   'vm_name' : instance.name,
-                                                  'vm_metadata' : instance.metadata,                                                
+                                                  'vm_metadata' : instance.metadata,
                                                   'vm_flavor_id' : instance.flavor['id'],
                                                   'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
                                                   'root_partition_type' : root_partition_type[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
                                                   'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                                   'hypervisor_hostname' : hypervisor_hostname,
-                                                  'hypervisor_type' :  hypervisor_type}, 
+                                                  'hypervisor_type' :  hypervisor_type},
                                                   "vm_id")
         LOG.info(_('Discovered Cassandra Virtual Machines: ' + str(vms)))
-        return vms            
+        return vms, cassandra_nodes, clusterinfo
     finally:
-        LOG.info(_('Exit get_cassandra_instances'))    
-            
+        LOG.info(_('Exit get_cassandra_instances'))
+
 class CassandraWorkflow(workflow.Workflow):
     """"
     Cassandra Workflow
@@ -252,27 +255,31 @@ class CassandraWorkflow(workflow.Workflow):
     def __init__(self, name, store):
         super(CassandraWorkflow, self).__init__(name)
         self._store = store
-        
+
     def initflow(self, composite=False):
         try:
             cntx = amqp.RpcContext.from_dict(self._store['context'])
+            
+            self._store['instances'], cassandra_nodes, clusterinfo  = \
+               get_cassandra_instances(cntx, self._store, findpartitiontype = 'True')
 
-            self._store['instances'] =  get_cassandra_instances(cntx, self._store, findpartitiontype = 'True')
+            self._store['topology'] = self.topology(cassandra_nodes, clusterinfo)
+
             for index,item in enumerate(self._store['instances']):
                 self._store['instance_'+item['vm_id']] = item
                 self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
-        
+
             snapshotvms = lf.Flow('cassandrawf')
-        
+
             # Enable safemode on the namenode
             snapshotvms.add(UnorderedSnapshotNode(self._store['instances']))
-    
+
             # This is an unordered pausing of VMs. This flow is created in
-            # common tasks library. This routine takes instance ids from 
-            # openstack. Workload manager should provide the list of 
+            # common tasks library. This routine takes instance ids from
+            # openstack. Workload manager should provide the list of
             # instance ids
             snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
-    
+
             # This is again unorder snapshot of VMs. This flow is implemented in
             # common tasks library
             snapshotvms.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
@@ -288,11 +295,12 @@ class CassandraWorkflow(workflow.Workflow):
         finally:
             pass
 
-    def topology(self):
+    def topology(self, cassnodes = None, clusterinfo = None):
         try:
             LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
             cntx = amqp.RpcContext.from_dict(self._store['context'])
-            cassnodes, clusterinfo = get_cassandra_nodes(cntx, self._store, findpartitiontype = 'False')
+            if cassnodes == None or clusterinfo == None:
+                cassnodes, clusterinfo = get_cassandra_nodes(cntx, self._store, findpartitiontype = 'False')
 
             dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
             for n in cassnodes:
@@ -378,11 +386,6 @@ class CassandraWorkflow(workflow.Workflow):
             search_opts['deep_discover'] = '1'
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             compute_service.get_servers(cntx, search_opts=search_opts)
-
-        # Iterate thru all hosts and pick the one that is alive
-        connection = self.find_first_alive_node()
-        if connection:            
-            connection.close()        
 
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)

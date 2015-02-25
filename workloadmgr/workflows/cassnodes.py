@@ -29,12 +29,14 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
             raise exception.InvalidState("Cassandra workload is in invalid state. Do not have any node information set")
         addlnodes = defaultnode
     try:
-        output = pssh_exec_command( addlnodes.split(";"),
+        nodes = addlnodes.split(";")
+        nodes.remove('')
+        output = pssh_exec_command( nodes,
                                     int(SSHPort),
                                     Username,
                                     Password,
                                     "nodetool status");
-        nodelist = addlnodes.split(";")
+        nodelist = nodes
     except exception.InvalidState as ex:
         raise
     except:
@@ -239,6 +241,7 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
         preferrednodes = []
         if preferredgroups and len(preferredgroups):
             datacenters = preferredgroups.split(';')
+            datacenters.remove('')
             for dc in datacenters:
                 for node in allnodes:
                     if dc == node['Data Center']:

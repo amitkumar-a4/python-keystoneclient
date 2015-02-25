@@ -371,9 +371,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
-            instances = workflow.discover()
-            topology = workflow.topology();
-            snapshot_metadata['topology'] = json.dumps(topology)
 
             workflow.initflow()
             self.db.snapshot_update(context, 
@@ -392,24 +389,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'metadata': snapshot_metadata})
             self.db.snapshot_type_time_update(context, snapshot_id)               
 
-            # update metadata hostnames
-            hostnames = ""
-            for inst in instances['instances']:
-                hostnames += inst['hostname']
-                hostnames += ";"
-
-            self.db.workload_update(context, 
-                                    snapshot.workload_id, 
-                                    {'metadata': {'hostnames': hostnames,
-                                                  'topology': json.dumps(topology)}}, 
-                                    )
              
             # Update vms
+            hostnames = ""
             for inst in workflow._store['instances']:
+                hostnames += inst['hostname']
+                hostnames += ";"
                 if not 'root_partition_type' in inst:
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
                                            {'metadata':{'root_partition_type':inst['root_partition_type']}})
+
+            self.db.workload_update(context, 
+                                    snapshot.workload_id, 
+                                    {'metadata': {'hostnames': hostnames,
+                                                  'topology': json.dumps(workflow._store['topology'])}}, 
+                                    )
 
             # Upload snapshot metadata to the vault
             vmtasks.UploadSnapshotDBEntry(context, snapshot_id)
