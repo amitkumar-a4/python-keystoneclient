@@ -88,7 +88,7 @@ class WorkloadMgrException(Exception):
     with the keyword arguments provided to the constructor.
 
     """
-    message = _("An unknown exception occurred.")
+    message = _("Error: %(reason)%s")
     code = 500
     headers = {}
     safe = False
@@ -148,7 +148,7 @@ class ImageNotAuthorized(WorkloadMgrException):
 
 
 class Invalid(WorkloadMgrException):
-    message = _("Unacceptable parameters.")
+    message = _("Unacceptable parameters: %(reason)s")
     code = 400
 
 
