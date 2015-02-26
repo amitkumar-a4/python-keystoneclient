@@ -523,6 +523,7 @@ class MongoDBWorkflow(workflow.Workflow):
                                             self._store['HostSSHPort'],
                                             self._store['HostUsername'],
                                             self._store['HostPassword'])
+        self._store['topology'] = self.topology()
         hosts_to_backup = secondaryhosts_to_backup(cntx,
                                                    self._store['DBHost'],
                                                    self._store['DBPort'],

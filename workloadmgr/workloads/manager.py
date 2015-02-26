@@ -352,6 +352,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 store[kvpair['key']] = str(kvpair['value'])
                 snapshot_metadata[kvpair['key']] = str(kvpair['value']) 
 
+            store['topology'] = json.dumps("")
             workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
 
@@ -374,20 +375,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
              
             # Update vms
-            hostnames = ""
+            hostnames = []
             for inst in workflow._store['instances']:
-                hostnames += inst['hostname']
-                hostnames += ";"
+                hostnames.append(inst['hostname'])
+
                 if not 'root_partition_type' in inst:
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
                                            {'metadata':{'root_partition_type':inst['root_partition_type']}})
 
+            workload_metadata = {'hostnames': json.dumps(hostnames),
+                                 'topology': json.dumps(workflow._store['topology'])}
             self.db.workload_update(context, 
                                     snapshot.workload_id, 
-                                    {'metadata': {'hostnames': hostnames,
-                                                  'topology': json.dumps(workflow._store['topology'])}}, 
-                                    )
+                                    {'metadata': workload_metadata})
+            snapshot_metadata['topology'] = json.dumps(workflow._store['topology'])
+            self.db.snapshot_update(context,
+                                    snapshot_id, 
+                                    {'metadata': snapshot_metadata})
 
             # Upload snapshot metadata to the vault
             vmtasks.UploadSnapshotDBEntry(context, snapshot_id)
