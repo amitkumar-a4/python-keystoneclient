@@ -715,11 +715,13 @@ def get_vm_ref_from_vmware_uuid(session, vmware_uuid):
             if not hasattr(obj_content, 'propSet'):
                 continue
             propdict = propset_dict(obj_content.propSet)
-            vm_name = propdict['name']
-            vm_config = propdict['config']
-            if vm_config.instanceUuid == vmware_uuid:
-                vm_ref = obj_content.obj
-                break
+            if 'name' in propdict:
+                vm_name = propdict['name']
+            if 'config' in propdict:    
+                vm_config = propdict['config']
+                if vm_config.instanceUuid == vmware_uuid:
+                    vm_ref = obj_content.obj
+                    break
             
         if vm_ref:
             if token:
