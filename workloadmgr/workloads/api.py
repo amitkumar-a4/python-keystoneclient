@@ -224,10 +224,15 @@ class API(base.Base):
         if not metadata:
             msg = _('metadata field is null. Pass valid metadata to connect to the workload')
             raise wlm_exceptions.Invalid(reason=msg)
-        return self.workloads_rpcapi.workload_type_discover_instances(context,
+        try:
+            return self.workloads_rpcapi.workload_type_discover_instances(context,
                                                                       socket.gethostname(),
                                                                       workload_type_id,
                                                                       metadata) 
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
+   
     @autolog.log_method(logger=Logger)
     def workload_type_topology(self, context, workload_type_id, metadata):
         """
@@ -237,10 +242,15 @@ class API(base.Base):
             msg = _('metadata field is null. Pass valid metadata to connect to the workload')
             raise wlm_exceptions.Invalid(reason=msg)
 
-        return self.workloads_rpcapi.workload_type_topology(context,
+        try:
+            return self.workloads_rpcapi.workload_type_topology(context,
                                                             socket.gethostname(),
                                                             workload_type_id,
                                                             metadata) 
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
+
     @autolog.log_method(logger=Logger)
     def workload_get(self, context, workload_id):
         workload = self.db.workload_get(context, workload_id)
@@ -371,83 +381,87 @@ class API(base.Base):
         """
         Make the RPC call to create a workload.
         """
-        AUDITLOG.log(context,'Workload Create Requested', None)
-        compute_service = nova.API(production=True)
-        instances_with_name = compute_service.get_servers(context,admin=True)
+        try:
+            AUDITLOG.log(context,'Workload Create Requested', None)
+            compute_service = nova.API(production=True)
+            instances_with_name = compute_service.get_servers(context,admin=True)
 
-        #TODO(giri): optimize this lookup
-        for instance in instances:
-            for instance_with_name in instances_with_name:
-                if instance['instance-id'] == instance_with_name.id:
-                    instance['instance-name'] = instance_with_name.name
-                    if instance_with_name.metadata:
-                        instance['metadata'] = instance_with_name.metadata
-                        if 'imported_from_vcenter' in instance_with_name.metadata and \
-                            instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
-                            source_platform = "vmware"
+            #TODO(giri): optimize this lookup
+            for instance in instances:
+                for instance_with_name in instances_with_name:
+                    if instance['instance-id'] == instance_with_name.id:
+                        instance['instance-name'] = instance_with_name.name
+                        if instance_with_name.metadata:
+                            instance['metadata'] = instance_with_name.metadata
+                            if 'imported_from_vcenter' in instance_with_name.metadata and \
+                                instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
+                                source_platform = "vmware"
         
-        workload_type_id_valid = False
-        workload_types = self.workload_type_get_all(context)            
-        for workload_type in workload_types:
-            if workload_type_id == workload_type.id:
-                workload_type_id_valid = True
-                break 
-        if workload_type_id_valid == False:
-            msg = _('Invalid workload type')
-            raise wlm_exceptions.InvalidState(reason=msg)                
+            workload_type_id_valid = False
+            workload_types = self.workload_type_get_all(context)            
+            for workload_type in workload_types:
+                if workload_type_id == workload_type.id:
+                    workload_type_id_valid = True
+                    break 
+            if workload_type_id_valid == False:
+                msg = _('Invalid workload type')
+                raise wlm_exceptions.InvalidState(reason=msg)                
 
-        if not 'hostnames' in metadata:
-            metadata['hostnames'] = json.dumps([])
+            if not 'hostnames' in metadata:
+                metadata['hostnames'] = json.dumps([])
 
-        if not 'preferredgroup' in metadata:
-            metadata['preferredgroup'] = json.dumps([])
+            if not 'preferredgroup' in metadata:
+                metadata['preferredgroup'] = json.dumps([])
 
-        options = {'user_id': context.user_id,
-                   'project_id': context.project_id,
-                   'display_name': name,
-                   'display_description': description,
-                   'status': 'creating',
-                   'source_platform': source_platform,
-                   'workload_type_id': workload_type_id,
-                   'metadata' : metadata,
-                   'jobschedule': pickle.dumps(jobschedule, 0),
-                   'host': socket.gethostname(), }
+            options = {'user_id': context.user_id,
+                       'project_id': context.project_id,
+                       'display_name': name,
+                       'display_description': description,
+                       'status': 'creating',
+                       'source_platform': source_platform,
+                       'workload_type_id': workload_type_id,
+                       'metadata' : metadata,
+                       'jobschedule': pickle.dumps(jobschedule, 0),
+                       'host': socket.gethostname(), }
 
-        workload = self.db.workload_create(context, options)
-        for instance in instances:
-            values = {'workload_id': workload.id,
-                      'vm_id': instance['instance-id'],
-                      'vm_name': instance['instance-name'],
-                      'status': 'available',
-                      'metadata': instance['metadata']}
-            vm = self.db.workload_vms_create(context, values)
+            workload = self.db.workload_create(context, options)
+            for instance in instances:
+                values = {'workload_id': workload.id,
+                          'vm_id': instance['instance-id'],
+                          'vm_name': instance['instance-name'],
+                          'status': 'available',
+                          'metadata': instance['metadata']}
+                vm = self.db.workload_vms_create(context, values)
 
-        self.workloads_rpcapi.workload_create(context,
-                                              workload['host'],
-                                              workload['id'])
+            self.workloads_rpcapi.workload_create(context,
+                                                  workload['host'],
+                                                  workload['id'])
 
-        # Now register the job with job scheduler
-        # HEre is the catch. The workload may not been fully created yet
-        # so the job call back should only start creating snapshots when
-        # the workload is successfully created.
-        # the workload has errored during workload creation, then it should
-        # remove itself from the job queue
-        # if we fail to schedule the job, we should fail the 
-        # workload create request?
-        #_snapshot_create_callback([], kwargs={  'workload_id':workload.id,  
-        #                                        'user_id': workload.user_id, 
-        #                                        'project_id':workload.project_id})
-        #
-        #               jobschedule = {'start_date': '06/05/2014',
-        #                              'end_date': '07/05/2015',
-        #                              'interval': '1 hr',
-        #                              'start_time': '2:30 PM',
-        #                              'snapshots_to_keep': '2'}
-        if not 'enabled' in jobschedule or jobschedule['enabled']:
-            self.workload_add_scheduler_job(jobschedule, workload)
+            # Now register the job with job scheduler
+            # HEre is the catch. The workload may not been fully created yet
+            # so the job call back should only start creating snapshots when
+            # the workload is successfully created.
+            # the workload has errored during workload creation, then it should
+            # remove itself from the job queue
+            # if we fail to schedule the job, we should fail the 
+            # workload create request?
+            #_snapshot_create_callback([], kwargs={  'workload_id':workload.id,  
+            #                                        'user_id': workload.user_id, 
+            #                                        'project_id':workload.project_id})
+            #
+            #               jobschedule = {'start_date': '06/05/2014',
+            #                              'end_date': '07/05/2015',
+            #                              'interval': '1 hr',
+            #                              'start_time': '2:30 PM',
+            #                              'snapshots_to_keep': '2'}
+            if not 'enabled' in jobschedule or jobschedule['enabled']:
+                self.workload_add_scheduler_job(jobschedule, workload)
         
-        AUDITLOG.log(context, "Workload Created", workload)        
-        return workload
+            AUDITLOG.log(context, "Workload Created", workload)        
+            return workload
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload):
@@ -760,26 +774,39 @@ class API(base.Base):
         """
         Get the workflow of the workload. RPC call is made
         """
-        return self.workloads_rpcapi.workload_get_workflow_details(context,
+        try:
+            return self.workloads_rpcapi.workload_get_workflow_details(context,
                                                                    socket.gethostname(),
                                                                    workload_id)    
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
+
     @autolog.log_method(logger=Logger)
     def workload_get_topology(self, context, workload_id):
         """
         Get the topology of the workload. RPC call is made
         """
-        return self.workloads_rpcapi.workload_get_topology(context,
+        try:
+            return self.workloads_rpcapi.workload_get_topology(context,
                                                            socket.gethostname(),
                                                            workload_id)   
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
 
     @autolog.log_method(logger=Logger)
     def workload_discover_instances(self, context, workload_id):
         """
         Discover Instances of a workload_type. RPC call is made
         """
-        return self.workloads_rpcapi.workload_discover_instances(context,
+        try:
+            return self.workloads_rpcapi.workload_discover_instances(context,
                                                                  socket.gethostname(),
                                                                  workload_id)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
                      
     @autolog.log_method(logger=Logger)
     def _is_workload_paused(self, context, workload_id): 
@@ -840,52 +867,56 @@ class API(base.Base):
         """
         Make the RPC call to snapshot a workload.
         """
-        workload = self.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload Snapshot Requested', workload)
-        
-        workloads = self.db.workload_get_all(context)
-        for workload in workloads:
-            if workload.deleted:
-                continue
-            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
-            if (workload_type.display_name == 'Composite'):
-                for kvpair in workload.metadata:
-                    if kvpair['key'] == 'workloadgraph':
-                        graph = json.loads(kvpair['value'])
-                        for flow in graph['children']:
-                            for member in flow['children']:
-                                if 'type' in member:
-                                    if member['data']['id'] == workload_id:
-                                        msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                        raise wlm_exceptions.InvalidState(reason=msg)                                    
-
         try:
-            workload_lock.acquire()
             workload = self.workload_get(context, workload_id)
-            if workload['status'].lower() != 'available':
-                msg = _("Workload must be in the 'available' state to take a snapshot")
-                raise wlm_exceptions.InvalidState(reason=msg)
-            self.db.workload_update(context, workload_id, {'status': 'locked'})
-        finally:
-            workload_lock.release()                    
+            AUDITLOG.log(context,'Workload Snapshot Requested', workload)
+        
+            workloads = self.db.workload_get_all(context)
+            for workload in workloads:
+                if workload.deleted:
+                    continue
+                workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+                if (workload_type.display_name == 'Composite'):
+                    for kvpair in workload.metadata:
+                        if kvpair['key'] == 'workloadgraph':
+                            graph = json.loads(kvpair['value'])
+                            for flow in graph['children']:
+                                for member in flow['children']:
+                                    if 'type' in member:
+                                        if member['data']['id'] == workload_id:
+                                            msg = _('Operation not allowed since this workload is a member of a composite workflow')
+                                            raise wlm_exceptions.InvalidState(reason=msg)                                    
 
-        options = {'user_id': context.user_id,
-                   'project_id': context.project_id,
-                   'workload_id': workload_id,
-                   'snapshot_type': snapshot_type,
-                   'display_name': name,
-                   'display_description': description,
-                   'host':'',                   
-                   'status': 'creating',}
-        snapshot = self.db.snapshot_create(context, options)
-        self.db.snapshot_update(context, 
-                                snapshot.id, 
-                                {'progress_percent': 0, 
-                                 'progress_msg': 'Snapshot operation is scheduled',
-                                 'status': 'executing'
-                                })
-        self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
-        return snapshot
+            try:
+                workload_lock.acquire()
+                workload = self.workload_get(context, workload_id)
+                if workload['status'].lower() != 'available':
+                    msg = _("Workload must be in the 'available' state to take a snapshot")
+                    raise wlm_exceptions.InvalidState(reason=msg)
+                self.db.workload_update(context, workload_id, {'status': 'locked'})
+            finally:
+                workload_lock.release()                    
+
+            options = {'user_id': context.user_id,
+                       'project_id': context.project_id,
+                       'workload_id': workload_id,
+                       'snapshot_type': snapshot_type,
+                       'display_name': name,
+                       'display_description': description,
+                       'host':'',                   
+                       'status': 'creating',}
+            snapshot = self.db.snapshot_create(context, options)
+            self.db.snapshot_update(context, 
+                                    snapshot.id, 
+                                    {'progress_percent': 0, 
+                                     'progress_msg': 'Snapshot operation is scheduled',
+                                     'status': 'executing'
+                                    })
+            self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
+            return snapshot
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
 
     @autolog.log_method(logger=Logger)
     def snapshot_get(self, context, snapshot_id):
@@ -989,51 +1020,59 @@ class API(base.Base):
         """
         Delete a workload snapshot. No RPC call required
         """
-        snapshot = self.snapshot_get(context, snapshot_id)
-        AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
-        workload = self.workload_get(context, snapshot['workload_id'])
+        try:
+            snapshot = self.snapshot_get(context, snapshot_id)
+            AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
+            workload = self.workload_get(context, snapshot['workload_id'])
 
-        if snapshot['status'] not in ['available', 'error']:
-            msg = _('Snapshot status must be available or error')
-            raise wlm_exceptions.InvalidState(reason=msg)
+            if snapshot['status'] not in ['available', 'error']:
+                msg = _('Snapshot status must be available or error')
+                raise wlm_exceptions.InvalidState(reason=msg)
 
-        restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
-        for restore in restores:
-            if restore.restore_type == 'test':
-                msg = _('This workload snapshot contains testbubbles')
-                raise wlm_exceptions.InvalidState(reason=msg)      
+            restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
+            for restore in restores:
+                if restore.restore_type == 'test':
+                    msg = _('This workload snapshot contains testbubbles')
+                    raise wlm_exceptions.InvalidState(reason=msg)      
         
-        self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
-        AUDITLOG.log(context,'Snapshot Deleted', snapshot)
+            self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
+            AUDITLOG.log(context,'Snapshot Deleted', snapshot)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
         
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
         """
         Make the RPC call to restore a snapshot.
         """
-        snapshot = self.snapshot_get(context, snapshot_id)
-        AUDITLOG.log(context,'Snapshot Restore Requested', snapshot)
-        workload = self.workload_get(context, snapshot['workload_id'])
-        if snapshot['status'] != 'available':
-            msg = _('Snapshot status must be available')
-            raise wlm_exceptions.InvalidState(reason=msg)
+        try:
+            snapshot = self.snapshot_get(context, snapshot_id)
+            AUDITLOG.log(context,'Snapshot Restore Requested', snapshot)
+            workload = self.workload_get(context, snapshot['workload_id'])
+            if snapshot['status'] != 'available':
+                msg = _('Snapshot status must be available')
+                raise wlm_exceptions.InvalidState(reason=msg)
         
-        restore_type = "restore"
-        if test:
-            restore_type = "test"
-        values = {'user_id': context.user_id,
-                   'project_id': context.project_id,
-                   'snapshot_id': snapshot_id,
-                   'restore_type': restore_type,
-                   'display_name': name,
-                   'display_description': description,
-                   'pickle': pickle.dumps(options, 0),
-                   'host':'',                   
-                   'status': 'restoring',}
-        restore = self.db.restore_create(context, values)
-        self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
-        AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
-        return restore
+            restore_type = "restore"
+            if test:
+                restore_type = "test"
+            values = {'user_id': context.user_id,
+                       'project_id': context.project_id,
+                       'snapshot_id': snapshot_id,
+                       'restore_type': restore_type,
+                       'display_name': name,
+                       'display_description': description,
+                       'pickle': pickle.dumps(options, 0),
+                       'host':'',                   
+                       'status': 'restoring',}
+            restore = self.db.restore_create(context, values)
+            self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
+            AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
+            return restore
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.InvalidState(reason=ex.message) 
 
     @autolog.log_method(logger=Logger)
     def restore_get(self, context, restore_id):

@@ -219,6 +219,11 @@ def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
         instances = compute_service.get_servers(cntx, admin=True)
         hypervisors = compute_service.get_hypervisors(cntx)
         vms = []
+
+        if len(instances) == 0:
+            LOG.info(_("No instances are discovered in the nova. Please run discover and try again"))
+            raise Exception(_("No instances are discovered in the nova. Please run discover and try again"))
+
         # call nova interface-list <instanceid> to build the list of instances ids
         # if node names are host names then lookup the VMid based on the
         for instance in instances:
