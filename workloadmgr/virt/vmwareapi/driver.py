@@ -16,6 +16,7 @@ import cPickle as pickle
 import shutil
 import math
 import subprocess
+import datetime
 from os import remove, close
 from Queue import Queue, Empty
 from threading  import Thread
@@ -122,6 +123,7 @@ class VMwareESXDriver(driver.ComputeDriver):
     # valid vCenter calls. There are some small edge-case
     # exceptions regarding VNC, CIM, User management & SSO.
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.__init__')
     def __init__(self, virtapi, read_only=False, scheme="https"):
         super(VMwareESXDriver, self).__init__(virtapi)
 
@@ -133,20 +135,22 @@ class VMwareESXDriver(driver.ComputeDriver):
                               "and host_password to use "
                               "compute_driver=vmwareapi.VMwareESXDriver or "
                               "vmwareapi.VMwareVCDriver"))
-
         self._session = VMwareAPISession(scheme=scheme)
         self._volumeops = volumeops.VMwareVolumeOps(self._session)
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.pause')
     def pause(self, cntx, db, instance):
         """Pause VM instance."""
         msg = _("pause not supported for vmwareapi")
         raise NotImplementedError(msg)
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.unpause')
     def unpause(self, cntx, db, instance):
         """Unpause paused VM instance."""
         msg = _("unpause not supported for vmwareapi")
         raise NotImplementedError(msg)
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.suspend')
     def suspend(self, cntx, db, instance):
         """Suspend the specified instance."""
         instance['uuid'] = instance['vm_id']
@@ -173,6 +177,7 @@ class VMwareESXDriver(driver.ComputeDriver):
             LOG.info(_("%s is already in suspended state. So returning "
                       "without doing anything") % instance['vm_name'])
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.resume')
     def resume(self, cntx, db, instance):
         """Resume the specified instance."""
         instance['uuid'] = instance['vm_id']
@@ -195,7 +200,7 @@ class VMwareESXDriver(driver.ComputeDriver):
             LOG.info(_("%s is not in suspended state. So returning "
                       "without doing anything") % instance['vm_name'])
 
-
+    @autolog.log_method(Logger, 'VMwareESXDriver.power_off')
     def power_off(self, vm_ref, instance):
         """Power off the specified instance."""
         pwr_state = self._session._call_method(vim_util,
@@ -217,6 +222,7 @@ class VMwareESXDriver(driver.ComputeDriver):
             LOG.info(_("%s is already in powered off state. So returning "
                         "without doing anything") % instance['vm_name'])
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.power_on')
     def power_on(self, vm_ref, instance):
         """Power on the specified instance."""
         pwr_state = self._session._call_method(vim_util,
@@ -259,6 +265,7 @@ class VMwareESXDriver(driver.ComputeDriver):
             self._session._wait_for_task(instance['uuid'], poweron_task)
             LOG.info(_("Powered on the VM %s") % instance['vm_name'])
 
+    @autolog.log_method(Logger, 'VMwareESXDriver.get_host_ip_addr')
     def get_host_ip_addr(self):
         """Retrieves the IP address of the ESX host."""
         return self._host_ip
@@ -276,12 +283,14 @@ class VMwareVCDriver(VMwareESXDriver):
     # hypervisor host machines and their guests. This fact can
     # subtly alter how vSphere and OpenStack interoperate.
 
+    @autolog.log_method(Logger, 'VMwareVCDriver.__init__')
     def __init__(self, virtapi, read_only=False, scheme="https"):
         super(VMwareVCDriver, self).__init__(virtapi)
 
         # Get the list of clusters to be used
         self._virtapi = virtapi
 
+    @autolog.log_method(Logger, 'VMwareVCDriver._mkdir')
     def _mkdir(self, ds_path, datacenter_ref):
         """
         Creates a directory at the path specified. If it is just "NAME",
@@ -295,6 +304,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     createParentDirectories=False)
         LOG.info(_("Created directory with path %s") % ds_path)
 
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_values_from_object_properties')
     def _get_values_from_object_properties(self, props, query):
         while props:
             token = vm_util._get_token(props)
@@ -311,10 +321,12 @@ class VMwareVCDriver(VMwareESXDriver):
             else:
                 break
 
+    @autolog.log_method(Logger, 'VMwareVCDriver._replace_last')
     def _replace_last(self, source_string, replace_what, replace_with):
         head, sep, tail = source_string.rpartition(replace_what)
         return head + replace_with + tail      
 
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_datacenter_ref_and_name')
     def _get_datacenter_ref_and_name(self, datastore_ref):
         """Get the datacenter name and the reference."""
         datacenter_ref = None
@@ -347,6 +359,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 break                
         raise exception.DatacenterNotFound()
     
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_host_ref_and_name')
     def _get_host_ref_and_name(self, datastore_ref):
         """
         Get the host name and the reference from datastore.
@@ -360,6 +373,7 @@ class VMwareVCDriver(VMwareESXDriver):
         raise exception.HostNotFound(host='none')
                     
 
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_root_disk_path_from_vm_ref')
     def _get_root_disk_path_from_vm_ref(self, vm_ref):
 
         # Get the vmdk file name that the VM is pointing to
@@ -368,6 +382,7 @@ class VMwareVCDriver(VMwareESXDriver):
                             "VirtualMachine", "layout.disk")
         return virtual_disks[0][0].diskFile[0]
     
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_vm_ref_from_name_folder')
     def _get_vm_ref_from_name_folder(self, vmfolder_ref, name):
         obj_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref, "Folder", "childEntity")
         for obj_ref in obj_refs.ManagedObjectReference:
@@ -378,6 +393,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 return obj_ref
         raise exception.VMNotFound()
     
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_vmfolder_ref_from_parent_folder')
     def _get_vmfolder_ref_from_parent_folder(self, vmfolder_ref_parent, vmfolder_moid):
         vmfolder_refs = self._session._call_method(vim_util, "get_dynamic_property", vmfolder_ref_parent, "Folder", "childEntity")
         if not len(vmfolder_refs):
@@ -390,7 +406,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 if result:
                     return result;
         return None 
-        
+    
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_vmfolder_ref')    
     def _get_vmfolder_ref(self, datacenter_ref, vmfolder_moid = None):
         vmfolder_ref = self._session._call_method(vim_util, "get_dynamic_property", datacenter_ref, "Datacenter", "vmFolder")
         if vmfolder_moid == None or vmfolder_ref.value == vmfolder_moid:
@@ -400,7 +417,8 @@ class VMwareVCDriver(VMwareESXDriver):
             return result
         else:
             raise exception.VMFolderNotFound()
-
+    
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_computeresource_host_ref')
     def _get_computeresource_host_ref(self, computeresource_moid):
         computeresource_ref = None
         computeresources = self._session._call_method(vim_util, "get_objects", "ComputeResource")
@@ -463,6 +481,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 
         raise exception.ResourcePoolNotFound()    
     
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_res_pool_ref')
     def _get_res_pool_ref(self, resourcepool_moid):
         res_pool_ref = None
         resourcepools = self._session._call_method(vim_util, "get_objects", "ResourcePool")
@@ -485,6 +504,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 break                
         raise exception.ResourcePoolNotFound()                
     
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_network_ref')
     def _get_network_ref(self, network_moid, dc_ref):
         network_folder_ref = self._session._call_method(vim_util, "get_dynamic_property", dc_ref, "Datacenter", "networkFolder")
         network_refs = self._session._call_method(vim_util, "get_dynamic_property", network_folder_ref, "Folder", "childEntity")
@@ -494,6 +514,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     return network_ref
         raise exception.NetworkNotFound()     
     
+    @autolog.log_method(Logger, 'VMwareVCDriver._detach_disk_from_vm')
     def _detach_disk_from_vm(self, vm_ref, instance, device, destroy_disk=False):
         """
         Detach disk from VM by reconfiguration.
@@ -513,7 +534,8 @@ class VMwareVCDriver(VMwareESXDriver):
         self._session._wait_for_task(instance_uuid, reconfig_task)
         LOG.info(_("Reconfigured VM instance %(instance_name)s to detach "
                    "disk %(disk_key)s"), {'instance_name': instance_name, 'disk_key': disk_key})
-
+    
+    @autolog.log_method(Logger, 'VMwareVCDriver._rebase_vmdk')
     def _rebase_vmdk(self, base, orig_base, base_descriptor, base_monolithicsparse,
                             top, orig_top, top_descriptor, top_monolithicsparse):
         """
@@ -550,6 +572,7 @@ class VMwareVCDriver(VMwareESXDriver):
             with open(top, "w") as top_descriptor_file:
                 top_descriptor_file.write("%s"%top_descriptor)                            
  
+    @autolog.log_method(Logger, 'VMwareVCDriver._commit_vmdk')
     def _commit_vmdk(self, file_to_commit, commit_to, test):
         """rebase the backing_file_top to backing_file_base
          :param backing_file_top: top file to commit from to its base
@@ -573,7 +596,8 @@ class VMwareVCDriver(VMwareESXDriver):
         else:
             return commit_to.replace(".vmdk", "-flat.vmdk") 
         """     
-
+    
+    @autolog.log_method(Logger, 'VMwareVCDriver._delete_datastore_file')
     def _delete_datastore_file(self, instance, datastore_path, dc_ref):
         LOG.debug(_("Deleting the datastore file %s") % datastore_path)
         vim = self._session._get_vim()
@@ -587,19 +611,19 @@ class VMwareVCDriver(VMwareESXDriver):
                                      file_delete_task)
         LOG.debug(_("Deleted the datastore file %s") % datastore_path)
         
-    @autolog.log_method(Logger, 'vmwareapi.driver.pre_snapshot_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
         self.enable_cbt(cntx, db, instance)               
     
-    @autolog.log_method(Logger, 'vmwareapi.driver.freeze_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.freeze_vm')
     def freeze_vm(self, cntx, db, instance, snapshot):
         pass     
     
-    @autolog.log_method(Logger, 'vmwareapi.driver.thaw_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.thaw_vm')
     def thaw_vm(self, cntx, db, instance, snapshot):
         pass      
     
-    @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_delete')
+    @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_delete')
     def snapshot_delete(self, cntx, db, snapshot): 
         
         def _remove_data():
@@ -627,7 +651,7 @@ class VMwareVCDriver(VMwareESXDriver):
         return _remove_data()
   
     
-    @autolog.log_method(Logger, 'vmwareapi.driver.enable_cbt')
+    @autolog.log_method(Logger, 'VMwareVCDriver.enable_cbt')
     def enable_cbt(self, cntx, db, instance):
         vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
                                                     'vm_name': instance['vm_name'],
@@ -667,7 +691,7 @@ class VMwareVCDriver(VMwareESXDriver):
             raise Exception(_("VM '%s(%s)' does not support changed block tracking") %
                              (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
 
-    @autolog.log_method(Logger, 'vmwareapi.driver.snapshot_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_vm')
     def snapshot_vm(self, cntx, db, instance, snapshot):
         try:
             vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
@@ -750,7 +774,7 @@ class VMwareVCDriver(VMwareESXDriver):
             raise  
 
 
-    @autolog.log_method(Logger, 'vmwareapi.driver.get_parent_changeId')
+    @autolog.log_method(Logger, 'VMwareVCDriver.get_parent_changeId')
     def get_parent_changeId(self, cntx, db, workload_id, vm_id, resource_pit_id):
         try:
             snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_id)
@@ -765,7 +789,7 @@ class VMwareVCDriver(VMwareESXDriver):
             return '*'
         
  
-    @autolog.log_method(Logger, 'vmwareapi.driver.get_vm_disk_resource_snap_backing')
+    @autolog.log_method(Logger, 'VMwareVCDriver.get_vm_disk_resource_snap_backing')
     def get_vm_disk_resource_snap_backing(self, cntx, db, workload_id, vm_id, resource_pit_id):
         try: 
             snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_id)
@@ -779,7 +803,7 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)
             return None
         
-    @autolog.log_method(Logger, 'vmwareapi.driver.get_vmdk_snap_size')
+    @autolog.log_method(Logger, 'VMwareVCDriver.get_vmdk_snap_size')
     def get_vmdk_snap_size(self, cntx, db, instance, snapshot, snapshot_data, dev): 
         try:
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
@@ -819,20 +843,21 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)      
             raise                
             
-    @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_data_size')
+    @autolog.log_method(Logger, 'VMwareVCDriver.get_snapshot_data_size')
     def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data): 
         vm_data_size = 0
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
             vm_data_size += self.get_vmdk_snap_size(cntx, db, instance, snapshot, snapshot_data, dev)
         return vm_data_size            
 
-    @autolog.log_method(Logger, 'vmwareapi.driver.get_snapshot_disk_info')
+    @autolog.log_method(Logger, 'VMwareVCDriver.get_snapshot_disk_info')
     def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
         return snapshot_data
     
-    @autolog.log_method(Logger, 'vmwareapi.driver..upload_snapshot')
+    @autolog.log_method(Logger, 'VMwareVCDriver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
         
+        @autolog.log_method(Logger, 'VMwareVCDriver.upload_snapshot._upload_vmdk')
         def _upload_vmdk(dev):
             try:
                 snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
@@ -1097,7 +1122,7 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)      
             raise 
                     
-    @autolog.log_method(Logger, 'vmwareapi.driver.remove_snapshot_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriverremove_snapshot_vm')
     def remove_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_ref): 
         try:
             vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
@@ -1114,9 +1139,10 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)      
             raise         
 
-    @autolog.log_method(Logger, 'vmwareapi.driver.apply_retention_policy')
+    @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot): 
         
+        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._get_child_vm_disk_resource_snap')
         def _get_child_vm_disk_resource_snap(snap_chain, vm_disk_resource_snap_backing):
             try:
                 for snap in snap_chain:
@@ -1130,7 +1156,8 @@ class VMwareVCDriver(VMwareESXDriver):
             except Exception as ex:
                 LOG.exception(ex)      
                 raise
-            
+        
+        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_disks_deleted')    
         def _snapshot_disks_deleted(snap):
             try:
                 snapshot_vm_resources = db.snapshot_resources_get(cntx, snap.id)
@@ -1144,6 +1171,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 LOG.exception(ex)
                 return True            
 
+        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_size_update')
         def _snapshot_size_update(cntx, snap):
             try:
                 snapshot_size = 0
@@ -1304,7 +1332,7 @@ class VMwareVCDriver(VMwareESXDriver):
             db.snapshot_update( cntx, snapshot['id'], {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
             #swallow the exception                  
                         
-    @autolog.log_method(Logger, 'vmwareapi.driver.post_snapshot_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
         try:
             if 'snapshot_ref' in snapshot_data:
@@ -1313,7 +1341,7 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)      
             raise                     
            
-    @autolog.log_method(Logger, 'vmwareapi.driver.restore_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.restore_vm')
     def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_security_groups,
                    restored_compute_flavor, restored_nics, instance_options):    
         """
@@ -1550,7 +1578,7 @@ class VMwareVCDriver(VMwareESXDriver):
     
                 LOG.info('Uploading disks of ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id)        
                 db.restore_update(cntx,  restore['id'], 
-                                  {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
+                                  {'progress_msg': 'Uploading disks of ' + instance['vm_name'],
                                    'status': 'uploading' 
                                   })
                 
@@ -1689,6 +1717,7 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)
             raise
 
+    @autolog.log_method(Logger, 'VMwareVCDriver.poweron_vm')
     def poweron_vm(self, cntx, instance, restore, restored_instance): 
         db = WorkloadMgrDB().db
         restore_obj = db.restore_get(cntx, restore['id'])
@@ -1704,6 +1733,7 @@ class VMwareVCDriver(VMwareESXDriver):
             db.restore_update(cntx,restore_obj.id, {'progress_msg': 'Powering on VM ' + restored_instance['vm_name'],'status': 'executing'})        
             self.power_on(vm_ref, instance)
 
+    @autolog.log_method(Logger, 'VMwareVCDriver.mount_instance_root_device')
     def mount_instance_root_device(self, cntx, instance, restore): 
         vm_ref = vm_util.get_vm_ref_from_vmware_uuid(self._session, instance['uuid'])
         db = WorkloadMgrDB().db
@@ -1771,6 +1801,7 @@ class VMwareVCDriver(VMwareESXDriver):
         process.stdin.close()
         return process, mountpath
 
+    @autolog.log_method(Logger, 'VMwareVCDriver.umount_instance_root_device')
     def umount_instance_root_device(self, process): 
         process.send_signal(18)
         process.wait()
@@ -1789,6 +1820,7 @@ class VMwareAPISession(object):
     the calls made to the host.
     """
 
+    @autolog.log_method(Logger, 'VMwareAPISession.__init__')
     def __init__(self, host_ip=CONF.vmware.host_ip,
                  username=CONF.vmware.host_username,
                  password=CONF.vmware.host_password,
@@ -1803,15 +1835,16 @@ class VMwareAPISession(object):
         self.vim = None
         self._create_session()
 
+    @autolog.log_method(Logger, 'VMwareAPISession._get_vim_object', log_retval = False)
     def _get_vim_object(self):
         """Create the VIM Object instance."""
         return vim.Vim(protocol=self._scheme, host=self._host_ip)
 
+    @autolog.log_method(Logger, 'VMwareAPISession._create_session')
     def _create_session(self):
         """Creates a session with the VC/ESX host."""
-
         delay = 1
-
+        start_time = timeutils.utcnow()
         while True:
             try:
                 # Login and setup the session with the host for making
@@ -1839,12 +1872,19 @@ class VMwareAPISession(object):
                 self._session_id = session.key
                 return
             except Exception as excep:
+                LOG.exception(excep)
                 LOG.critical(_("Unable to connect to server at %(server)s, "
                     "sleeping for %(seconds)s seconds"),
                     {'server': self._host_ip, 'seconds': delay})
                 time.sleep(delay)
                 delay = min(2 * delay, 60)
+                
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=2):
+                raise exception.ErrorOccured(reason='Timeout while establishing connection to vCenter Server %s' % self._host_ip)
+                           
 
+    @autolog.log_method(Logger, 'VMwareAPISession.__del__')
     def __del__(self):
         """Logs-out the session."""
         # Logout to avoid un-necessary increase in session count at the
@@ -1858,10 +1898,12 @@ class VMwareAPISession(object):
             # to ensure that the session is not left active.
             LOG.debug(excep)
 
+    @autolog.log_method(Logger, 'VMwareAPISession._is_vim_object')
     def _is_vim_object(self, module):
         """Check if the module is a VIM Object instance."""
         return isinstance(module, vim.Vim)
 
+    @autolog.log_method(Logger, 'VMwareAPISession._call_method')
     def _call_method(self, module, method, *args, **kwargs):
         """
         Calls a method within the module specified with
@@ -1929,16 +1971,17 @@ class VMwareAPISession(object):
                 break
             time.sleep(TIME_BETWEEN_API_CALL_RETRIES)
 
-        LOG.critical(_("In vmwareapi:_call_method, "
-                     "got this exception: %s") % exc)
+        LOG.critical(_("In VMwareAPISession:_call_method, got this exception: %s") % exc)
         raise
 
+    @autolog.log_method(Logger, 'VMwareAPISession._get_vim', log_retval = False)
     def _get_vim(self):
         """Gets the VIM object reference."""
         if self.vim is None:
             self._create_session()
         return self.vim
-
+    
+    @autolog.log_method(Logger, 'VMwareAPISession._wait_for_task')
     def _wait_for_task(self, instance_uuid, task_ref):
         """
         Return a Deferred that will give the result of the given task.
@@ -1953,6 +1996,7 @@ class VMwareAPISession(object):
         loop.stop()
         return ret_val
 
+    @autolog.log_method(Logger, 'VMwareAPISession._poll_task')
     def _poll_task(self, instance_uuid, task_ref, done):
         """
         Poll the given task, and fires the given Deferred if we

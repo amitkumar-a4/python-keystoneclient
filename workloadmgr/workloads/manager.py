@@ -47,6 +47,7 @@ from workloadmgr.workflows import vmtasks
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr.openstack.common import timeutils
+from taskflow.exceptions import WrappedFailure
 
 from workloadmgr import autolog
 
@@ -397,11 +398,26 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             # Upload snapshot metadata to the vault
             vmtasks.UploadSnapshotDBEntry(context, snapshot_id)
 
-        except Exception as ex:
-            msg = _("Error creating workload snapshot %(snapshot_id)s with failure: %(exception)s") %{
-                    'snapshot_id': snapshot_id, 'exception': ex,}
-            LOG.error(msg)
+        except WrappedFailure as ex:
             LOG.exception(ex)
+            msg = _("Failed creating workload snapshot with following error(s):")
+            if hasattr(ex, '_causes'):
+                for cause in ex._causes:
+                    if cause._exception_str not in msg:
+                        msg = msg + ' ' + cause._exception_str
+            LOG.error(msg)        
+            self.db.snapshot_update(context, 
+                                    snapshot_id, 
+                                    {'progress_percent': 100, 
+                                     'progress_msg': '',
+                                     'error_msg': msg,
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': 'error'
+                                    })            
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
+            LOG.error(msg)
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -575,16 +591,29 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                              'time_taken' : int((timeutils.utcnow() - restore.created_at).total_seconds()),
                              'status': 'available'
                             })
-
-        except Exception as ex:
-            if restore_type == 'test':
-                msg = _("Error creating test bubble %(restore_id)s with failure: %(exception)s") %{
-                        'restore_id': restore_id, 'exception': ex,}
-            else:
-                msg = _("Error restoring %(restore_id)s with failure: %(exception)s") %{
-                        'restore_id': restore_id, 'exception': ex,}
-            LOG.error(msg)
+        except WrappedFailure as ex:
             LOG.exception(ex)
+            msg = _("Failed restoring snapshot with following error(s):")
+            if hasattr(ex, '_causes'):
+                for cause in ex._causes:
+                    if cause._exception_str not in msg:
+                        msg = msg + ' ' + cause._exception_str
+            LOG.error(msg)        
+            self.db.restore_update( context,
+                                    restore_id,
+                                    {'progress_percent': 100,
+                                     'progress_msg': '',
+                                     'error_msg': msg,
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': 'error'
+                                    })       
+        except Exception as ex:
+            LOG.exception(ex)
+            if restore_type == 'test':
+                msg = _("Failed creating test bubble: %(exception)s") %{'exception': ex}
+            else:
+                msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
+            LOG.error(msg)
             self.db.restore_update( context,
                                     restore_id,
                                     {'progress_percent': 100,

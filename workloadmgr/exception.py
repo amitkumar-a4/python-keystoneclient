@@ -124,7 +124,7 @@ class InvalidState(WorkloadMgrException):
     message = _("Invalid state") + ": %(reason)s"
     
 class ErrorOccured(WorkloadMgrException):
-    message = _("Error Occurred") + ": %(reason)s"    
+    message = "%(reason)s"    
 
 class GlanceConnectionFailed(WorkloadMgrException):
     message = _("Connection to glance failed") + ": %(reason)s"
