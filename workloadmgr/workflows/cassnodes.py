@@ -6,7 +6,7 @@ import socket
 import itertools
 import re
 import json
-from pssh import ParallelSSHClient, AuthenticationException
+from workloadmgr.triliopssh import ParallelSSHClient, AuthenticationException
 from pssh import UnknownHostException, ConnectionErrorException, SSHException
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
@@ -71,7 +71,7 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
         # dump environment if any node fails with command not found
         for host in output:
             if output[host]['exit_code']:
-                envoutput = client.run_command('bash -c "env"')
+                envoutput = client.run_command('env')
                 LOG.info(_("Environment dump:"))
                 for h in envoutput:
                     for line in envoutput[h]['stdout']:

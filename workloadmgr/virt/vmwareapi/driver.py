@@ -1898,12 +1898,11 @@ class VMwareAPISession(object):
             # to ensure that the session is not left active.
             LOG.debug(excep)
 
-    @autolog.log_method(Logger, 'VMwareAPISession._is_vim_object')
     def _is_vim_object(self, module):
         """Check if the module is a VIM Object instance."""
         return isinstance(module, vim.Vim)
 
-    @autolog.log_method(Logger, 'VMwareAPISession._call_method')
+    @autolog.log_method(Logger, 'VMwareAPISession._call_method', log_retval = False)
     def _call_method(self, module, method, *args, **kwargs):
         """
         Calls a method within the module specified with
@@ -1981,7 +1980,7 @@ class VMwareAPISession(object):
             self._create_session()
         return self.vim
     
-    @autolog.log_method(Logger, 'VMwareAPISession._wait_for_task')
+    @autolog.log_method(Logger, 'VMwareAPISession._wait_for_task', log_retval = False)
     def _wait_for_task(self, instance_uuid, task_ref):
         """
         Return a Deferred that will give the result of the given task.
@@ -1996,7 +1995,7 @@ class VMwareAPISession(object):
         loop.stop()
         return ret_val
 
-    @autolog.log_method(Logger, 'VMwareAPISession._poll_task')
+    @autolog.log_method(Logger, 'VMwareAPISession._poll_task', log_retval = False)
     def _poll_task(self, instance_uuid, task_ref, done):
         """
         Poll the given task, and fires the given Deferred if we
