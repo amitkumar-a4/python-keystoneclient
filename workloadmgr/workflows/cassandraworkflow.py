@@ -78,7 +78,7 @@ def connect_server(host, port, user, password):
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
         client.connect(host, port, user, password, timeout=120)
         LOG.info(_( 'Connected to ' +host +' on port ' + str(port)+ '...'))
-        stdin, stdout, stderr = _exec_command(client, "nodetool status")
+        stdin, stdout, stderr = _exec_command(client, "ls")
     except Exception as ex:
         LOG.error(_( 'There was an error connecting to cassandra node. Error %s. Try again...'), str(ex))
         raise ex
@@ -101,16 +101,25 @@ class SnapshotNode(task.Task):
         return 
 
     def revert(self, *args, **kwargs):
-        if not isinstance(kwargs['result'], misc.Failure):
-            LOG.info(_("Reverting SnapshotNode"))
-            stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
-            out = stdout.read(),
-            LOG.info(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
-            self.client.close()
+        self.client = None
+        try:
+            if not isinstance(kwargs['result'], misc.Failure):
+                LOG.info(_("Reverting SnapshotNode"))
+                self.client = connect_server(kwargs['CassandraNode'], int(kwargs['SSHPort']), kwargs['Username'], kwargs['Password'])
+                stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
+                out = stdout.read(),
+                LOG.info(_("revert Snapshotnode nodetool clearsnapshot output:" + str(out)))
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            if self.client:
+                self.client.close()
+        
 
 class ClearSnapshot(task.Task):
 
     def execute(self, CassandraNode, SSHPort, Username, Password):
+        self.client = None
         try:
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
             LOG.info(_('ClearSnapshot:'))
@@ -118,10 +127,13 @@ class ClearSnapshot(task.Task):
             out = stdout.read(),
             LOG.info(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
             self.client.close()
-        except:
+        except Exception as ex:
+            LOG.exception(ex)
             LOG.warning(_("Cannot run nodetool clearsnapshot command on %s"), CassandraNode)
             LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
-            
+        finally:
+            if self.client:
+                self.client.close()            
 
         return 
 
@@ -632,9 +644,15 @@ class CassandraRestoreNode(task.Task):
 
     @autolog.log_method(Logger, 'CassandraRestoreNode.revert')
     def revert_with_log(self, *args, **kwargs):
-        if not isinstance(kwargs['result'], misc.Failure):
-            process = amqp.RpcContext.from_dict(kwargs['process'])
-            vmtasks_vcloud.umount_instance_root_device(process)
+        try:
+            if not isinstance(kwargs['result'], misc.Failure):
+                process = amqp.RpcContext.from_dict(kwargs['process'])
+                vmtasks_vcloud.umount_instance_root_device(process)
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            if self.client:
+                self.client.close()             
         
 def LinearCassandraRestoreNodes(workflow):
     flow = lf.Flow("cassandrarestoreuf")

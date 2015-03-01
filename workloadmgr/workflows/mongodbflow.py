@@ -115,9 +115,14 @@ class DisableProfiling(task.Task):
         return proflevel
 
     def revert(self, *args, **kwargs):
-        # Read profile level from the flow record?
-        if not isinstance(kwargs['result'], misc.Failure):
-            self.cfgclient.admin.set_profiling_level(kwargs['result'])
+        try:
+            # Read profile level from the flow record?
+            if not isinstance(kwargs['result'], misc.Failure):
+                self.cfgclient.admin.set_profiling_level(kwargs['result'])
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass            
 
 class EnableProfiling(task.Task):
 
@@ -155,9 +160,14 @@ class PauseDBInstance(task.Task):
         # Add code to wait until the fsync operations is complete
     
     def revert(self, *args, **kwargs):
-        # Resume DB
-        if self.client.is_locked:
-            self.client.unlock()
+        try:
+            # Resume DB
+            if self.client.is_locked:
+                self.client.unlock()
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass            
 
 
 class ResumeDBInstance(task.Task):
@@ -184,10 +194,14 @@ class PauseBalancer(task.Task):
             balancer_info = db.locks.find_one({'_id': 'balancer'})
     
     def revert(self, *args, **kwargs):
-        # Resume DB
-        db = self.client.config
-        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}});
-
+        try:
+            # Resume DB
+            db = self.client.config
+            db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}});
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
 class ResumeBalancer(task.Task):
 
     def execute(self, DBHost, DBPort, DBUser, DBPassword):
@@ -259,18 +273,19 @@ class ShutdownConfigServer(task.Task):
         return cfgsrv, cmdlineopts
 
         def revert(self, *args, **kwargs):
-            # Make sure all config servers are resumed
-            cfghost = kwargs['result']['cfgsrv'].split(':')[0]
-            
-            #ssh into the cfg host and start the config server
-            if not isinstance(kwargs['result'], misc.Failure):
-                port = kwargs['HostSSHPort']
+            client = None
+            try:
+                # Make sure all config servers are resumed
+                cfghost = kwargs['result']['cfgsrv'].split(':')[0]
                 
-                command = ''
-                for c in cfgsrvcmdline['argv']:
-                    command  = command + c + ' '
-                
-                try:
+                #ssh into the cfg host and start the config server
+                if not isinstance(kwargs['result'], misc.Failure):
+                    port = kwargs['HostSSHPort']
+                    
+                    command = ''
+                    for c in kwargs['cfgsrvcmdline']['argv']:
+                        command  = command + c + ' '
+
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
                     if HostPassword == '':
@@ -281,10 +296,14 @@ class ShutdownConfigServer(task.Task):
                 
                     stdin, stdout, stderr = client.exec_command(command, timeout=120)
                     LOG.debug(_(stdout.read()))
-                finally:
-                    client.close()
-            
-            LOG.debug(_('ShutdownConfigServer:revert'))
+
+                LOG.debug(_('ShutdownConfigServer:revert'))
+                
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                if client:
+                    client.close()            
 
 class ResumeConfigServer(task.Task):
 

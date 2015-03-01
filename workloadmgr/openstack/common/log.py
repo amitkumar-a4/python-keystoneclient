@@ -39,6 +39,7 @@ import logging.handlers
 import os
 import sys
 import traceback
+from eventlet import greenthread
 
 from oslo.config import cfg
 
@@ -273,9 +274,10 @@ class ContextAdapter(BaseLoggerAdapter):
         extra.update({"project": self.project})
         extra.update({"version": self.version})
         extra['extra'] = extra.copy()
+        msg = str(id(greenthread.getcurrent())) + ' ' + str(msg)
         return msg, kwargs
 
-
+        
 class JSONFormatter(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None):
         # NOTE(jkoelker) we ignore the fmt argument, but its still there
@@ -449,12 +451,10 @@ def _setup_logging_from_conf():
 
 _loggers = {}
 
-
+       
 def getLogger(name='unknown', version='unknown'):
     if name not in _loggers:
-        _loggers[name] = ContextAdapter(logging.getLogger(name),
-                                        name,
-                                        version)
+        _loggers[name] = ContextAdapter(logging.getLogger(name),name,version)
     return _loggers[name]
 
 
@@ -475,6 +475,7 @@ class WritableLogger(object):
         self.level = level
 
     def write(self, msg):
+        msg = str(id(greenthread.getcurrent())) + ' ' + str(msg)
         self.logger.log(self.level, msg)
 
 

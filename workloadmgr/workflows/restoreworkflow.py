@@ -46,7 +46,7 @@ def get_vms(cntx, restore_id):
     snapshot_vms = db.snapshot_vms_get(cntx, snapshot.id)
     
     vms_without_power_sequence = []
-    for snapshot_vm in snapshot_vms: 
+    for snapshot_vm in snapshot_vms:
         vm = {'vm_id' : snapshot_vm.vm_id,
               'vm_name' : snapshot_vm.vm_name,
               'hypervisor_hostname' : 'None',
@@ -78,8 +78,8 @@ def get_vms(cntx, restore_id):
                     vms_with_power_sequence.append(vm)
         sequence = sequence + 1
 
-            
-    return vms_with_power_sequence + vms_without_power_sequence
+    vms = vms_with_power_sequence + vms_without_power_sequence
+    return vms
 
 class RestoreWorkflow(object):
     """

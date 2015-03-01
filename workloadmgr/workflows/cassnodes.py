@@ -28,9 +28,15 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
         if not defaultnode:
             raise exception.InvalidState("Cassandra workload is in invalid state. Do not have any node information set")
         addlnodes = defaultnode
+    
+    nodes = addlnodes.split(";")
+    if defaultnode not in nodes:
+        addlnodes = defaultnode + ';' + addlnodes
+        
     try:
         nodes = addlnodes.split(";")
-        nodes.remove('')
+        if '' in nodes:
+            nodes.remove('')
         output = pssh_exec_command( nodes,
                                     int(SSHPort),
                                     Username,
@@ -41,7 +47,10 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
         raise
     except:
         LOG.info(_('Tried %s. One or more nodes are not accessible. Short listing good known nodes') % str(addlnodes.split(";")))
-        for host in addlnodes.split(";"):
+        nodes = addlnodes.split(";")
+        if '' in nodes:
+            nodes.remove('')
+        for host in nodes:
             try:
                 LOG.info(_( 'Testing cassandra node %s') % host)
                 pssh_exec_command(  [host],

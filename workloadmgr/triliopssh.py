@@ -182,24 +182,24 @@ class SSHClient(object):
                            sock=sock, timeout=self.timeout)
         except sock_gaierror, ex:
             logger.error("Could not resolve host '%s' - retry %s/%s",
-                         self.host, retries, self.num_retries)
+                         host, retries, self.num_retries)
             while retries < self.num_retries:
                 gevent.sleep(5)
                 return self._connect(client, host, port, sock=sock,
                                      retries=retries+1)
             raise UnknownHostException("%s - %s - retry %s/%s",
                                        str(ex.args[1]),
-                                       self.host, retries, self.num_retries)
+                                       host, retries, self.num_retries)
         except sock_error, ex:
             logger.error("Error connecting to host '%s:%s' - retry %s/%s",
-                         self.host, self.port, retries, self.num_retries)
+                         host, port, retries, self.num_retries)
             while retries < self.num_retries:
                 gevent.sleep(5)
                 return self._connect(client, host, port, sock=sock,
                                      retries=retries+1)
             error_type = ex.args[1] if len(ex.args) > 1 else ex.args[0]
             raise ConnectionErrorException("%s for host '%s:%s' - retry %s/%s",
-                                           str(error_type), self.host, self.port,
+                                           str(error_type), host, port,
                                            retries, self.num_retries,)
         except paramiko.AuthenticationException, ex:
             raise AuthenticationException(ex)

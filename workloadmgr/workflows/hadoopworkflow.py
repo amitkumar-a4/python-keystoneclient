@@ -81,23 +81,23 @@ def gethadoopcfg(connection):
     hcfg = {}
     for h in hcluster:
         if len(h.split(":")) == 2:
-           hcfg[h.split(":")[0]] = h.split(":")[1]
+            hcfg[h.split(":")[0]] = h.split(":")[1]
        
     dfsout.pop(0)
     datanodes = []
     for _ in range(totalnode):
-       x = dfsout.index("")
-       node = dfsout[:x]
-       datanodes.append(node)
-       x = x + 2
-       dfsout = dfsout[x:]
+        x = dfsout.index("")
+        node = dfsout[:x]
+        datanodes.append(node)
+        x = x + 2
+        dfsout = dfsout[x:]
 
     hnodes = []
     for node in datanodes:
-       dnode = {}
-       for s in node:
-          dnode[s.split(":")[0].strip()] = s.split(":")[1]
-       hnodes.append(dnode)
+        dnode = {}
+        for s in node:
+            dnode[s.split(":")[0].strip()] = s.split(":")[1]
+        hnodes.append(dnode)
 
     return {'hconfig': hcfg, 'hnodes':hnodes }
 
@@ -116,22 +116,22 @@ def getnodenames(connection):
     dfsout.pop(0)
     datanodes = []
     for _ in range(totalnode):
-       x = dfsout.index("")
-       node = dfsout[:x]
-       datanodes.append(node)
-       x = x + 2
-       dfsout = dfsout[x:]
+        x = dfsout.index("")
+        node = dfsout[:x]
+        datanodes.append(node)
+        x = x + 2
+        dfsout = dfsout[x:]
 
     hnodes = []
     for node in datanodes:
-       dnode = {}
-       for s in node:
-          dnode[s.split(":")[0]] = s.split(":")[1]
-       hnodes.append(dnode)
+        dnode = {}
+        for s in node:
+            dnode[s.split(":")[0]] = s.split(":")[1]
+        hnodes.append(dnode)
 
     nodenames = []
     for node in hnodes:
-       nodenames.append(node["Name"].strip())
+        nodenames.append(node["Name"].strip())
 
     return nodenames
 
@@ -158,12 +158,12 @@ def get_hadoop_nodes(cntx, host, port, username, password):
     for name in nodenames:
         # if the name is host name, resolve it to IP address
         try :
-           IP(name)
-           ips[name] = 1
+            IP(name)
+            ips[name] = 1
         except Exception, e:
-           # we got hostnames
-           import socket
-           ips[socket.gethostbyname(name)] = 1
+            # we got hostnames
+            import socket
+            ips[socket.gethostbyname(name)] = 1
 
     # call nova list
     compute_service = nova.API(production=True)
@@ -219,25 +219,30 @@ class EnableSafemode(task.Task):
         return safemode
 
     def revert(self, *args, **kwargs):
-        # Read profile level from the flow record?
-        if not isinstance(kwargs['result'], misc.Failure):
-            if not kwargs['result']:
-                # our workflow set the cluster to safemode
-                # revert back
-                stdin, stdout, stderr = self.client.exec_command("hadoop/bin/hadoop dfsadmin -safemode leave")
-                stdout.read()
+        try:
+            # Read profile level from the flow record?
+            if not isinstance(kwargs['result'], misc.Failure):
+                if not kwargs['result']:
+                    # our workflow set the cluster to safemode
+                    # revert back
+                    stdin, stdout, stderr = self.client.exec_command("hadoop/bin/hadoop dfsadmin -safemode leave")
+                    stdout.read()
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
               
 class DisableSafemode(task.Task):
 
     def execute(self, Namenode, NamenodeSSHPort, Username, Password, safemode):
         if not safemode:
-           self.client = connect_server(Namenode, int(NamenodeSSHPort), Username, Password)
-           # Make sure the cluster is set to safemode
-
-           LOG.debug(_('DisableSafemode:' + Namenode))
-           stdin, stdout, stderr = self.client.exec_command("hadoop/bin/hadoop dfsadmin -safemode leave")
-           mode = stdout.read()
-           LOG.debug(_(mode))
+            self.client = connect_server(Namenode, int(NamenodeSSHPort), Username, Password)
+            # Make sure the cluster is set to safemode
+            
+            LOG.debug(_('DisableSafemode:' + Namenode))
+            stdin, stdout, stderr = self.client.exec_command("hadoop/bin/hadoop dfsadmin -safemode leave")
+            mode = stdout.read()
+            LOG.debug(_(mode))
 
 class HadoopWorkflow(workflow.Workflow):
     """"
@@ -322,8 +327,8 @@ class HadoopWorkflow(workflow.Workflow):
                 if len(item._name.split('_')) == 2:
                     nodename = item._name.split("_")[1]
                     for n in nodes['instances']:
-                       if n['vm_id'] == nodename:
-                          nodename = n['vm_name']
+                        if n['vm_id'] == nodename:
+                            nodename = n['vm_name']
                     taskdetails['input'] = [['vm', nodename]]
                 return taskdetails
 

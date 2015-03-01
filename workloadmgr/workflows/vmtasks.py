@@ -128,9 +128,14 @@ class PreRestore(task.Task):
 
     @autolog.log_method(Logger, 'PreRestore.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})      
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
 
 class RestoreVM(task.Task):
 
@@ -164,9 +169,14 @@ class RestoreVM(task.Task):
     
     @autolog.log_method(Logger, 'RestoreVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',}) 
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass        
         
 class PowerOnVM(task.Task):
 
@@ -194,9 +204,14 @@ class PowerOnVM(task.Task):
 
     @autolog.log_method(Logger, 'PowerOnVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass            
                
              
 class PostRestore(task.Task):
@@ -226,9 +241,14 @@ class PostRestore(task.Task):
 
     @autolog.log_method(Logger, 'PostRestore.revert')    
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass            
 
 class SnapshotVMNetworks(task.Task):
         
@@ -336,15 +356,20 @@ class PauseVM(task.Task):
 
     @autolog.log_method(Logger, 'PauseVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
-            return        
-        if kwargs['source_platform'] == 'openstack':
-            return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
-        else:
-            return vmtasks_vcloud.unpause_vm(cntx, db, kwargs['instance'])  
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})             
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
+                return        
+            if kwargs['source_platform'] == 'openstack':
+                return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
+            else:
+                return vmtasks_vcloud.unpause_vm(cntx, db, kwargs['instance'])  
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})    
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass                     
         
 class UnPauseVM(task.Task):
 
@@ -369,9 +394,14 @@ class UnPauseVM(task.Task):
 
     @autolog.log_method(Logger, 'UnPauseVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass            
         
 class SuspendVM(task.Task):
 
@@ -396,15 +426,20 @@ class SuspendVM(task.Task):
 
     @autolog.log_method(Logger, 'SuspendVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
-            return        
-        if kwargs['source_platform'] == 'openstack':
-            return vmtasks_openstack.resume_vm(cntx, db, kwargs['instance'])
-        else:
-            return vmtasks_vcloud.resume_vm(cntx, db, kwargs['instance'])
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
+                return        
+            if kwargs['source_platform'] == 'openstack':
+                return vmtasks_openstack.resume_vm(cntx, db, kwargs['instance'])
+            else:
+                return vmtasks_vcloud.resume_vm(cntx, db, kwargs['instance'])
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass             
 
 class ResumeVM(task.Task):
 
@@ -429,9 +464,14 @@ class ResumeVM(task.Task):
 
     @autolog.log_method(Logger, 'ResumeVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass             
     
 class PreSnapshot(task.Task):
 
@@ -454,9 +494,14 @@ class PreSnapshot(task.Task):
 
     @autolog.log_method(Logger, 'PreSnapshot.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})  
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass               
         
 class FreezeVM(task.Task):
 
@@ -482,12 +527,17 @@ class FreezeVM(task.Task):
 
     @autolog.log_method(Logger, 'FreezeVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        if kwargs['source_platform'] == 'openstack':
-            return vmtasks_openstack.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
-        else:
-            return vmtasks_vcloud.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])           
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            if kwargs['source_platform'] == 'openstack':
+                return vmtasks_openstack.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
+            else:
+                return vmtasks_vcloud.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass                              
 
 class ThawVM(task.Task):
 
@@ -537,21 +587,26 @@ class SnapshotVM(task.Task):
     
     @autolog.log_method(Logger, 'SnapshotVM.revert')
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'],
-                              kwargs['snapshot']['id'], {'status': 'error',})        
-        db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'],
-                              {'snapshot_id': kwargs['snapshot']['id']})
-
-        if 'result' in kwargs:
-            result = kwargs['result']
-            if kwargs['source_platform'] == 'openstack':
-                vmtasks_openstack.post_snapshot(cntx, db, kwargs['instance'],
-                               kwargs['snapshot'], result)
-            else:
-                vmtasks_vcloud.post_snapshot(cntx, db, kwargs['instance'],
-                               kwargs['snapshot'], result)
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'],
+                                  kwargs['snapshot']['id'], {'status': 'error',})        
+            db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'],
+                                  {'snapshot_id': kwargs['snapshot']['id']})
+    
+            if 'result' in kwargs:
+                result = kwargs['result']
+                if kwargs['source_platform'] == 'openstack':
+                    vmtasks_openstack.post_snapshot(cntx, db, kwargs['instance'],
+                                   kwargs['snapshot'], result)
+                else:
+                    vmtasks_vcloud.post_snapshot(cntx, db, kwargs['instance'],
+                                   kwargs['snapshot'], result)
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass                     
   
 class SnapshotDataSize(task.Task):
 
@@ -578,9 +633,14 @@ class SnapshotDataSize(task.Task):
         return vm_data_size        
     @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',}) 
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',}) 
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass             
             
 class UploadSnapshot(task.Task):
 
@@ -643,9 +703,14 @@ class PostSnapshot(task.Task):
 
     @autolog.log_method(Logger, 'PostSnapshot.revert')    
     def revert_with_log(self, *args, **kwargs):
-        cntx = amqp.RpcContext.from_dict(kwargs['context'])
-        db = WorkloadMgrDB().db
-        db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass             
 
 class ApplyRetentionPolicy(task.Task):
 

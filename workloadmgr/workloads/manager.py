@@ -502,7 +502,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         return options
 
-    @autolog.log_method(logger=Logger)
     @synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, restore_id):
