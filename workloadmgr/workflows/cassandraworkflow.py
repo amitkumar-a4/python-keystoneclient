@@ -140,13 +140,13 @@ class ClearSnapshot(task.Task):
 def UnorderedSnapshotNode(instances):
     flow = uf.Flow("snapshotnodeuf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
+        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
 def UnorderedClearSnapshot(instances):
     flow = uf.Flow("clearsnapshotuf")
     for index,item in enumerate(instances):
-        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeName_'+item['vm_id'], "SSHPort", "Username", "Password")))
+        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
 
@@ -289,6 +289,7 @@ class CassandraWorkflow(workflow.Workflow):
             for index,item in enumerate(self._store['instances']):
                 self._store['instance_'+item['vm_id']] = item
                 self._store['CassandraNodeName_'+item['vm_id']] = item['vm_name']
+                self._store['CassandraNodeHostName_'+item['vm_id']] = item['hostname']
 
             snapshotvms = lf.Flow('cassandrawf')
 

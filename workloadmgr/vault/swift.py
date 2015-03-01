@@ -466,6 +466,9 @@ class SwiftBackupService(base.Base):
     def mount(self):
         pass
     
+    def get_size(self, vault_service_url):
+        pass    
+    
     def delete(self, snapshot):
         """Delete the given snapshot from swift."""
         container = snapshot['container']

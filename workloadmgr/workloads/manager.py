@@ -372,7 +372,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'available',
                                      'metadata': snapshot_metadata})
-            self.db.snapshot_type_time_update(context, snapshot_id)               
+            self.db.snapshot_type_time_size_update(context, snapshot_id)               
 
              
             # Update vms

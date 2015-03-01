@@ -30,6 +30,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.apscheduler import job
+from workloadmgr.vault import vault
 
 
 FLAGS = flags.FLAGS
@@ -961,12 +962,14 @@ def snapshot_update(context, snapshot_id, values, purge_metadata=False):
     return _snapshot_update(context, values, snapshot_id, purge_metadata, session)
 
 @require_context
-def snapshot_type_time_update(context, snapshot_id):
+def snapshot_type_time_size_update(context, snapshot_id):
     snapshot = snapshot_get(context, snapshot_id, read_deleted='yes')
     snapshot_type_full = False
     snapshot_type_incremental = False
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
     time_taken = 0
+    vault_service = vault.get_vault_service(context)
+    snapshot_size = 0
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
@@ -975,8 +978,19 @@ def snapshot_type_time_update(context, snapshot_id):
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
         time_taken = time_taken + snapshot_vm_resource.time_taken
+        #update size
+        vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+        snapshot_vm_resource_size = 0
+        for vm_disk_resource_snap in vm_disk_resource_snaps:
+            if vm_disk_resource_snap.vault_service_url:
+                vm_disk_resource_snap_size = vault_service.get_size(vm_disk_resource_snap.vault_service_url)
+                vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size}) 
+                snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
+        snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size})
+        snapshot_size = snapshot_size + snapshot_vm_resource_size
     
     time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
+    
         
     if snapshot_type_full and snapshot_type_incremental:
         snapshot_type = 'mixed'
@@ -987,7 +1001,9 @@ def snapshot_type_time_update(context, snapshot_id):
     else:
         snapshot_type = 'full'
                           
-    return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type, 'time_taken' : time_taken})
+    return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type, 
+                                                  'time_taken' : time_taken,
+                                                  'size' : snapshot_size})
     
 @require_context
 def snapshot_delete(context, snapshot_id):

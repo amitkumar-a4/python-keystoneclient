@@ -217,6 +217,15 @@ class VaultBackupService(base.Base):
         elif FLAGS.wlm_vault_storage_type == 'das':       
             command = ['sudo', 'mount', FLAGS.wlm_vault_storage_das_device, FLAGS.wlm_vault_local_directory]
             subprocess.check_call(command, shell=False) 
+            
+    def get_size(self, vault_service_url):
+        size = 0
+        try:
+            statinfo = os.stat(vault_service_url)
+            size = statinfo.st_size
+        except Exception as ex:
+            LOG.exception(ex)
+        return size             
         
 
 def get_vault_service(context):

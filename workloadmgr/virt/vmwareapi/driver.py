@@ -1308,7 +1308,7 @@ class VMwareVCDriver(VMwareESXDriver):
                             if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
                                 affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
                     
-                    db.snapshot_type_time_update(cntx, snapshot_to_commit.id)
+                    db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
                     _snapshot_size_update(cntx, snapshot_to_commit)
     
                     if _snapshot_disks_deleted(snap):
