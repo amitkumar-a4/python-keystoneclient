@@ -413,7 +413,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
-                                    })            
+                                    })  
+            try:
+                self.db.snapshot_type_time_size_update(context, snapshot_id)
+            except Exception as ex:
+                LOG.exception(ex)
+                      
         except Exception as ex:
             LOG.exception(ex)
             msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
@@ -426,6 +431,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })
+            try:
+                self.db.snapshot_type_time_size_update(context, snapshot_id)
+            except Exception as ex:
+                LOG.exception(ex)            
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
         self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})

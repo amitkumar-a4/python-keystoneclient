@@ -89,7 +89,7 @@ class SnapshotNode(task.Task):
     def execute(self, CassandraNode, SSHPort, Username, Password):
         try:
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-            LOG.info(_('SnapshotNode:'))
+            LOG.info(_('SnapshotNode:' + CassandraNode))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
             out = stdout.read(),
             LOG.info(_("nodetool snapshot output:" + str(out)))
