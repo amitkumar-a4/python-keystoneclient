@@ -89,7 +89,7 @@ def connect_server(host, port, user, password):
     return client
 
 
-class SnapshotNode(task.Task):
+class SnapshotCassandraNode(task.Task):
 
     def execute(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
         return self.execute_with_log(context, snapshot, CassandraNode, SSHPort, Username, Password)
@@ -97,26 +97,24 @@ class SnapshotNode(task.Task):
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs) 
       
-    @autolog.log_method(Logger, 'SnapshotNode.execute')
+    @autolog.log_method(Logger, 'SnapshotCassandraNode.execute')
     def execute_with_log(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
         try:
             cntx = amqp.RpcContext.from_dict(context)
             db = WorkloadMgrDB().db
             db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Invoking Cassandra Snapshot on ' + CassandraNode} )
-                        
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
             LOG.info(_('SnapshotNode:' + CassandraNode))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
             out = stdout.read(),
             LOG.info(_("nodetool snapshot output:" + str(out)))
             self.client.close()
-        except:
-            LOG.warning(_("Cannot run nodetool snapshot command on %s"), CassandraNode)
-            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
-
+        except Exception as ex:
+            LOG.exception(ex)
+            raise exception.ErrorOccured(_("Unable to run nodetool snapshot command on %s") % CassandraNode)
         return 
 
-    @autolog.log_method(Logger, 'SnapshotNode.revert')
+    @autolog.log_method(Logger, 'SnapshotCassandraNode.revert')
     def revert_with_log(self, *args, **kwargs):
         self.client = None
         try:
@@ -133,19 +131,18 @@ class SnapshotNode(task.Task):
                 self.client.close()
         
 
-class ClearSnapshot(task.Task):
+class ClearCassandraSnapshot(task.Task):
 
     def execute(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
         return self.execute_with_log(context, snapshot, CassandraNode, SSHPort, Username, Password)
     
-    @autolog.log_method(Logger, 'ClearSnapshot.execute')
+    @autolog.log_method(Logger, 'ClearCassandraSnapshot.execute')
     def execute_with_log(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
         self.client = None
         try:
             cntx = amqp.RpcContext.from_dict(context)
             db = WorkloadMgrDB().db
             db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Clearing Cassandra Snapshot on ' + CassandraNode} )
-                           
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
             LOG.info(_('ClearSnapshot:' + CassandraNode))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
@@ -154,8 +151,7 @@ class ClearSnapshot(task.Task):
             self.client.close()
         except Exception as ex:
             LOG.exception(ex)
-            LOG.warning(_("Cannot run nodetool clearsnapshot command on %s"), CassandraNode)
-            LOG.warning(_("Either node is down or cassandra service is not running on the node %s"), CassandraNode)
+            raise exception.ErrorOccured(_("Unable to run nodetool clearsnapshot command on %s") % CassandraNode)
         finally:
             if self.client:
                 self.client.close()            
@@ -163,17 +159,17 @@ class ClearSnapshot(task.Task):
         return 
 
 @autolog.log_method(logger=Logger)
-def UnorderedSnapshotNode(instances):
-    flow = uf.Flow("snapshotnodeuf")
+def UnorderedSnapshotCassandraNode(instances):
+    flow = uf.Flow("snapshot_cassandra_node_uf")
     for index,item in enumerate(instances):
-        flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
+        flow.add(SnapshotCassandraNode("SnapshotCassadraNode_" + item['vm_id'], rebind=("context", "snapshot", 'CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
 @autolog.log_method(logger=Logger)
-def UnorderedClearSnapshot(instances):
-    flow = uf.Flow("clearsnapshotuf")
+def UnorderedClearCassandraSnapshot(instances):
+    flow = uf.Flow("clear_cassandra_snapshot_uf")
     for index,item in enumerate(instances):
-        flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
+        flow.add(ClearCassandraSnapshot("ClearCassandraSnapshot_" + item['vm_id'], rebind=("context", "snapshot", 'CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
 @autolog.log_method(logger=Logger)
@@ -334,7 +330,7 @@ class CassandraWorkflow(workflow.Workflow):
             snapshotvms = lf.Flow('cassandrawf')
 
             # Enable safemode on the namenode
-            snapshotvms.add(UnorderedSnapshotNode(self._store['instances']))
+            snapshotvms.add(UnorderedSnapshotCassandraNode(self._store['instances']))
 
             # This is an unordered pausing of VMs. This flow is created in
             # common tasks library. This routine takes instance ids from
@@ -350,7 +346,7 @@ class CassandraWorkflow(workflow.Workflow):
             snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
     
             # enable profiling to the level before the flow started
-            snapshotvms.add(UnorderedClearSnapshot(self._store['instances']))
+            snapshotvms.add(UnorderedClearCassandraSnapshot(self._store['instances']))
 
             super(CassandraWorkflow, self).initflow(snapshotvms, composite=composite)
 

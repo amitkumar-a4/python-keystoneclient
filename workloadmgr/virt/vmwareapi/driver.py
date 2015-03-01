@@ -613,6 +613,7 @@ class VMwareVCDriver(VMwareESXDriver):
         
     @autolog.log_method(Logger, 'VMwareVCDriver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
+        db.snapshot_update( cntx, snapshot['id'], {'progress_msg': 'Enabling changed block tracking on ' + instance['vm_name']} )           
         self.enable_cbt(cntx, db, instance)               
     
     @autolog.log_method(Logger, 'VMwareVCDriver.freeze_vm')
@@ -740,7 +741,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         'vmx_datastore_name': datastore_name,
                         'vmx_datastore_ref' : datastore_ref,
                         'vmx_file_name': vmx_file_name}
-                    
+            db.snapshot_update( cntx, snapshot['id'], {'progress_msg': 'Creating Snapshot of Virtual Machine ' + instance['vm_name']} )        
             snapshot_task = self._session._call_method(
                         self._session._get_vim(),
                         "CreateSnapshot_Task", vm_ref,
@@ -1129,7 +1130,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         'vm_name': instance['vm_name'],
                                                         'vmware_uuid':instance['vm_metadata']['vmware_uuid'],
                                                        })
-    
+            db.snapshot_update( cntx, snapshot['id'], {'progress_msg': 'Removing Snapshot of Virtual Machine ' + instance['vm_name']} )     
             remove_snapshot_task = self._session._call_method(
                                                 self._session._get_vim(),
                                                 "RemoveSnapshot_Task", snapshot_ref,
