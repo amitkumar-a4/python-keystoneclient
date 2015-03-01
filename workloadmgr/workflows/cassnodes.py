@@ -14,7 +14,10 @@ from workloadmgr import exception
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import flags
 
+LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
+@autolog.log_method(Logger)
 def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None):
     # Iterate thru all hosts and identify the valid list of cassandra hosts
     # will start with last known hosts
@@ -29,10 +32,6 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
             raise exception.InvalidState("Cassandra workload is in invalid state. Do not have any node information set")
         addlnodes = defaultnode
     
-    nodes = addlnodes.split(";")
-    if defaultnode not in nodes:
-        addlnodes = defaultnode + ';' + addlnodes
-        
     try:
         nodes = addlnodes.split(";")
         if '' in nodes:
@@ -46,10 +45,13 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
     except exception.InvalidState as ex:
         raise
     except:
-        LOG.info(_('Tried %s. One or more nodes are not accessible. Short listing good known nodes') % str(addlnodes.split(";")))
+        LOG.info(_('Tried %s. One or more nodes are not accessible. Short listing good known nodes') % str(addlnodes))
         nodes = addlnodes.split(";")
         if '' in nodes:
-            nodes.remove('')
+            nodes.remove('')        
+        if defaultnode not in nodes:
+            nodes.append(defaultnode)
+
         for host in nodes:
             try:
                 LOG.info(_( 'Testing cassandra node %s') % host)
@@ -70,6 +72,7 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
     LOG.info(_( 'Seed nodes of the Cassandra cluster are %s') % str(nodelist))
     return nodelist
 
+@autolog.log_method(Logger)
 def pssh_exec_command(hosts, port, user, password, command, sudo=False):
     try:
         LOG.info(_("pssh_exec_command - hosts: %s") % (str(hosts)))
@@ -105,6 +108,7 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
 
     return output
 
+@autolog.log_method(Logger)
 def getclusterinfo(hosts, port, username, password):
     output = pssh_exec_command(hosts, port, username, password, "nodetool describecluster")
     for host in output:
@@ -114,9 +118,9 @@ def getclusterinfo(hosts, port, username, password):
 
         clusterinfo = {}
         for line in output[host]['stdout']:
-             if len(line.split(":")) < 2:
-                 continue;
-             clusterinfo[line.split(":")[0].strip()] = line.split(":")[1].strip()
+            if len(line.split(":")) < 2:
+                continue;
+            clusterinfo[line.split(":")[0].strip()] = line.split(":")[1].strip()
 
         return clusterinfo
 
@@ -124,7 +128,7 @@ def getclusterinfo(hosts, port, username, password):
     LOG.error(msg)
     raise exception.InvalidState(msg)
      
-
+@autolog.log_method(Logger)
 def discovercassandranodes(hosts, port, username, password):
     LOG.info(_('Enter discovercassandranodes'))
 
@@ -238,6 +242,7 @@ def discovercassandranodes(hosts, port, username, password):
 
     return cassandranodes, clusterinfo
 
+@autolog.log_method(Logger)
 def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=None, findpartitiontype=False):
     LOG.info(_('Enter get_cassandra_nodes'))
     try:
@@ -371,6 +376,7 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
         LOG.exception(ex)
         raise
 
+@autolog.log_method(Logger)
 def main(argv):
     try:
         errfile = '/tmp/cassnodes_errors.txt'
@@ -378,7 +384,7 @@ def main(argv):
         addlnodes = None
         preferredgroups = None
 
-	opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile="])
+        opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile="])
         for opt, arg in opts:
             if opt == '--defaultnode':
                 defaultnode = arg

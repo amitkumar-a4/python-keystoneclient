@@ -14,6 +14,7 @@ import time
 import re
 import shutil
 import socket
+import json
 
 import datetime 
 import json
@@ -43,6 +44,7 @@ from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr import utils
 from workloadmgr import autolog
 from workloadmgr import exception
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 import vmtasks
 import workflow
@@ -61,6 +63,7 @@ sys.path.insert(0, top_dir)
 def InitFlow(store):
     pass
 
+@autolog.log_method(logger=Logger)
 def _exec_command(connection, command):
     stdin, stdout, stderr = connection.exec_command('bash -c "' + command + '"', timeout=120)
     err_msg = stderr.read()
@@ -70,7 +73,8 @@ def _exec_command(connection, command):
         if err_msg != '':
             raise Exception(_("Error connecting to Cassandra Service on %s - %s") % (str(connection), err_msg))
     return stdin, stdout, stderr
-    
+
+@autolog.log_method(logger=Logger)    
 def connect_server(host, port, user, password):
     try:
         client = paramiko.SSHClient()
@@ -84,10 +88,22 @@ def connect_server(host, port, user, password):
         raise ex
     return client
 
+
 class SnapshotNode(task.Task):
 
-    def execute(self, CassandraNode, SSHPort, Username, Password):
+    def execute(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
+        return self.execute_with_log(context, snapshot, CassandraNode, SSHPort, Username, Password)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs) 
+      
+    @autolog.log_method(Logger, 'SnapshotNode.execute')
+    def execute_with_log(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
         try:
+            cntx = amqp.RpcContext.from_dict(context)
+            db = WorkloadMgrDB().db
+            db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Invoking Cassandra Snapshot on ' + CassandraNode} )
+                        
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
             LOG.info(_('SnapshotNode:' + CassandraNode))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool snapshot")
@@ -100,7 +116,8 @@ class SnapshotNode(task.Task):
 
         return 
 
-    def revert(self, *args, **kwargs):
+    @autolog.log_method(Logger, 'SnapshotNode.revert')
+    def revert_with_log(self, *args, **kwargs):
         self.client = None
         try:
             if not isinstance(kwargs['result'], misc.Failure):
@@ -118,11 +135,19 @@ class SnapshotNode(task.Task):
 
 class ClearSnapshot(task.Task):
 
-    def execute(self, CassandraNode, SSHPort, Username, Password):
+    def execute(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
+        return self.execute_with_log(context, snapshot, CassandraNode, SSHPort, Username, Password)
+    
+    @autolog.log_method(Logger, 'ClearSnapshot.execute')
+    def execute_with_log(self, context, snapshot, CassandraNode, SSHPort, Username, Password):
         self.client = None
         try:
+            cntx = amqp.RpcContext.from_dict(context)
+            db = WorkloadMgrDB().db
+            db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Clearing Cassandra Snapshot on ' + CassandraNode} )
+                           
             self.client = connect_server(CassandraNode, int(SSHPort), Username, Password)
-            LOG.info(_('ClearSnapshot:'))
+            LOG.info(_('ClearSnapshot:' + CassandraNode))
             stdin, stdout, stderr = _exec_command(self.client, "nodetool clearsnapshot")
             out = stdout.read(),
             LOG.info(_("ClearSnapshot nodetool clearsnapshot output:" + str(out)))
@@ -137,22 +162,30 @@ class ClearSnapshot(task.Task):
 
         return 
 
+@autolog.log_method(logger=Logger)
 def UnorderedSnapshotNode(instances):
     flow = uf.Flow("snapshotnodeuf")
     for index,item in enumerate(instances):
         flow.add(SnapshotNode("SnapshotNode_" + item['vm_name'], rebind=('CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
+@autolog.log_method(logger=Logger)
 def UnorderedClearSnapshot(instances):
     flow = uf.Flow("clearsnapshotuf")
     for index,item in enumerate(instances):
         flow.add(ClearSnapshot("ClearSnapshot_" + item['vm_name'], rebind=('CassandraNodeHostName_'+item['vm_id'], "SSHPort", "Username", "Password")))
     return flow
 
-
-def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
+@autolog.log_method(logger=Logger)
+def get_cassandra_nodes(store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_nodes'))
-    try:    
+    try:   
+        cntx = amqp.RpcContext.from_dict(store['context'])
+        db = WorkloadMgrDB().db
+        if 'snapshot' in store:
+            db.snapshot_update( cntx, store['snapshot']['id'], 
+                                {'progress_msg': 'Discovering Cassandra Topology'} )
+                 
         fh, outfile_path = mkstemp()
         os.close(fh)
         fh, errfile_path = mkstemp()
@@ -212,12 +245,20 @@ def get_cassandra_nodes(cntx, store, findpartitiontype = 'False'):
 
     finally:
         LOG.info(_('Exit get_cassandra_nodes'))    
-    
-def get_cassandra_instances(cntx, store, findpartitiontype = 'False'):
+
+@autolog.log_method(logger=Logger)    
+def get_cassandra_instances(store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_instances'))
     try:
-        cassandra_nodes, clusterinfo = get_cassandra_nodes(cntx, store, findpartitiontype = findpartitiontype)
+        cassandra_nodes, clusterinfo = get_cassandra_nodes(store, findpartitiontype = findpartitiontype)
 
+        cntx = amqp.RpcContext.from_dict(store['context'])
+        db = WorkloadMgrDB().db
+        if 'snapshot' in store:
+            db.snapshot_update( cntx, store['snapshot']['id'], 
+                                {'progress_msg': 'Identifying Virtual Machines of Cassandra'} )        
+        
+        
         interfaces = {}
         root_partition_type = {}
         for node in cassandra_nodes:
@@ -277,12 +318,11 @@ class CassandraWorkflow(workflow.Workflow):
         super(CassandraWorkflow, self).__init__(name)
         self._store = store
 
+    @autolog.log_method(Logger, 'CassandraWorkflow.initflow')
     def initflow(self, composite=False):
         try:
-            cntx = amqp.RpcContext.from_dict(self._store['context'])
-            
             self._store['instances'], cassandra_nodes, clusterinfo  = \
-               get_cassandra_instances(cntx, self._store, findpartitiontype = 'True')
+               get_cassandra_instances(self._store, findpartitiontype = 'True')
 
             self._store['topology'] = self.topology(cassandra_nodes, clusterinfo)
 
@@ -317,12 +357,13 @@ class CassandraWorkflow(workflow.Workflow):
         finally:
             pass
 
+    @autolog.log_method(Logger, 'CassandraWorkflow.topology')
     def topology(self, cassnodes = None, clusterinfo = None):
         try:
             LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
-            cntx = amqp.RpcContext.from_dict(self._store['context'])
+
             if cassnodes == None or clusterinfo == None:
-                cassnodes, clusterinfo = get_cassandra_nodes(cntx, self._store, findpartitiontype = 'False')
+                cassnodes, clusterinfo = get_cassandra_nodes(self._store, findpartitiontype = 'False')
 
             dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
             for n in cassnodes:
@@ -362,6 +403,7 @@ class CassandraWorkflow(workflow.Workflow):
         finally:
             pass
 
+    @autolog.log_method(Logger, 'CassandraWorkflow.details')
     def details(self):
         # workflow details based on the
         # current topology, number of VMs etc
@@ -390,10 +432,10 @@ class CassandraWorkflow(workflow.Workflow):
         workflow = recurseflow(self._flow)
         return dict(workflow=workflow)
 
+    @autolog.log_method(Logger, 'CassandraWorkflow.discover')
     def discover(self):
         try:
-            cntx = amqp.RpcContext.from_dict(self._store['context'])
-            instances, cassnodes, clusterinfo = get_cassandra_instances(cntx, self._store, findpartitiontype = 'False')
+            instances, cassnodes, clusterinfo = get_cassandra_instances(self._store, findpartitiontype = 'False')
             for instance in instances:
                 del instance['hypervisor_hostname']
                 del instance['hypervisor_type']
@@ -401,6 +443,7 @@ class CassandraWorkflow(workflow.Workflow):
         finally:
             pass
     
+    @autolog.log_method(Logger, 'CassandraWorkflow.execute')
     def execute(self):
         if self._store['source_platform'] == "vmware":
             compute_service = nova.API(production=True)
@@ -411,7 +454,9 @@ class CassandraWorkflow(workflow.Workflow):
 
         vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
-    
+
+
+@autolog.log_method(Logger)    
 def update_cassandra_yaml(mountpath, clustername, nodeip, ips):
     # modify the cassandra.yaml
     configpath = ""
@@ -452,6 +497,7 @@ def update_cassandra_yaml(mountpath, clustername, nodeip, ips):
     with open(yamlpath, 'w') as f:
         f.write(yaml.safe_dump(doc))
 
+@autolog.log_method(Logger)
 def update_cassandra_topology_yaml(mountpath, address, broadcast):
 
     configpath = ""
@@ -474,6 +520,7 @@ def update_cassandra_topology_yaml(mountpath, address, broadcast):
     with open(yamlpath, 'w') as f:
         f.write(yaml.safe_dump(doc))
 
+@autolog.log_method(Logger)
 def update_cassandra_topology_properties(mountpath, addresses):
 
     # modify the cassandra-topology.properties
@@ -494,6 +541,7 @@ def update_cassandra_topology_properties(mountpath, addresses):
         for addr in addresses.split(","):
             f.write(addr + "=DC1:RAC1\n")
 
+@autolog.log_method(Logger)
 def update_cassandra_env_sh(mountpath, hostname):
     # modify the cassandra-env.sh
     configpath = ""
@@ -515,6 +563,7 @@ def update_cassandra_env_sh(mountpath, hostname):
                     line = 'JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname=' + hostname + '"\n'
                 fout.write(line)
 
+@autolog.log_method(Logger)
 def update_hostname(mountpath, hostname):
     #modify hostname
     os.rename(mountpath + '/etc/hostname',
@@ -522,6 +571,7 @@ def update_hostname(mountpath, hostname):
     with open(mountpath + '/etc/hostname', 'w') as fout:
         fout.write(hostname)
 
+@autolog.log_method(Logger)
 def update_hostsfile(mountpath, hostnames, ipaddresses):
     with open(mountpath + '/etc/hosts', 'a') as f:
         ips = ipaddresses.split(",")
@@ -529,6 +579,7 @@ def update_hostsfile(mountpath, hostnames, ipaddresses):
         for index, item in enumerate(hosts):
             f.write(ips[index] + "    " + item + "\n")
 
+@autolog.log_method(Logger)
 def create_interface_stanza(interface, address, netmask,
                             broadcast, gateway):
     stanza = []
@@ -542,6 +593,7 @@ def create_interface_stanza(interface, address, netmask,
     stanza.append("    down ip link set $IFACE promisc off")
     return stanza
 
+@autolog.log_method(Logger)
 def update_network_interfaces(mountpath, interface, address, netmask,
                               broadcast, gateway):
     # modify network interfaces 
@@ -609,6 +661,7 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                     newinf.write(line)
                     line = f.readline()
 
+
 class CassandraRestoreNode(task.Task):
 
     def execute(self, context, instance, restore, restore_options, ipaddress, hostname):
@@ -654,7 +707,8 @@ class CassandraRestoreNode(task.Task):
         finally:
             if self.client:
                 self.client.close()             
-        
+
+@autolog.log_method(Logger)        
 def LinearCassandraRestoreNodes(workflow):
     flow = lf.Flow("cassandrarestoreuf")
     for index, item in enumerate(workflow._store['instances']):
@@ -665,8 +719,10 @@ def LinearCassandraRestoreNodes(workflow):
 
     return flow
 
+
 class CassandraRestore(restoreworkflow.RestoreWorkflow):
 
+    @autolog.log_method(Logger, 'CassandraRestore.initflow')
     def initflow(self):
         options = pickle.loads(self._store['restore']['pickle'].encode('ascii', 'ignore'))
         if 'restore_options' in options and options['restore_options'] != {}:
@@ -700,6 +756,7 @@ class CassandraRestore(restoreworkflow.RestoreWorkflow):
         else:
             super(CassandraRestore, self).initflow(pre_poweron=lf.Flow("cassandrarestoreuf"))
 
+    @autolog.log_method(Logger, 'CassandraRestore.execute')
     def execute(self):
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
         restore = pickle.loads(self._store['restore']['pickle'].encode('ascii','ignore'))
@@ -710,38 +767,3 @@ class CassandraRestore(restoreworkflow.RestoreWorkflow):
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             compute_service.get_servers(cntx, search_opts=search_opts)
         
-
-'''
-#test code
-import json
-
-#CassandraWorkflow Requires the following inputs in store:
-
-store = {
-    'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8',
-    # Instanceids will to be discovered automatically
-    'CassandraNode': 'cass1',   # cassandra node
-    'SSHPort': '22',            # ssh port of namenode
-    'Username': 'ubuntu',       # namenode user
-    'Password': 'ubuntu',       # namenode password if ssh key is not set
-}
-
-c = nova.novaclient(None, production=True, admin=True);
-context = context.RequestContext("4ca3ffa7849a4665b73e114907986e58", #admin user id
-                                 c.client.projectid,
-                                 is_admin = True,
-                                 auth_token=c.client.auth_token)
-store["context"] = context.__dict__
-store["context"]["conf"] = None
-cwf = CassandraWorkflow("testflow", store)
-#print json.dumps(cwf.discover())
-#print json.dumps(cwf.topology())
-cwf.initflow()
-#import pdb;pdb.set_trace()
-print json.dumps(cwf.details())
-
-#result = engines.load(cwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
-
-#print cwf.execute()
-'''
-

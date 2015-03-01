@@ -87,7 +87,10 @@ def format_args(args, kwargs, password_arg = None):
         elif 'password' in str(item).lower(): 
             allargs.append('%s' % '******')
         else:
-            allargs.append('%s' % str(item))
+            arg_str = '%s' % str(item)
+            if len(arg_str) > 100:
+                arg_str = arg_str[:96] + " ..."            
+            allargs.append(arg_str)
  
     for key, item in kwargs.items():
         if 'password' in key.lower():
@@ -95,12 +98,15 @@ def format_args(args, kwargs, password_arg = None):
         elif 'password' in str(item).lower():
             allargs.append('%s=%s' % (key, '******'))
         else:
-            allargs.append('%s=%s' % (key, str(item)))
+            arg_str = '%s=%s' % (key, str(item))
+            if len(arg_str) > 100:
+                arg_str = arg_str[:96] + " ..."                
+            allargs.append(arg_str)
  
     formattedArgs = ', '.join(allargs)
  
-    if len(formattedArgs) > 500:
-        return formattedArgs[:496] + " ..."
+    if len(formattedArgs) > 1000:
+        return formattedArgs[:996] + " ..."
     return formattedArgs
 
  

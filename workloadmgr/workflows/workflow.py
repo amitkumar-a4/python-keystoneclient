@@ -144,7 +144,8 @@ class Workflow(object):
 
     def __str__(self):
         lines = ["%s: %s" % (reflection.get_class_name(self), self.name)]
-        lines.append("%s" % (len(self)))
+        if hasattr(self, 'len'):
+            lines.append("%s" % (len(self)))
         return "; ".join(lines)
 
     def topology(self):
