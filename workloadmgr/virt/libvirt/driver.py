@@ -946,3 +946,7 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_delete')
     def snapshot_delete(self, cntx, db, snapshot): 
         db.snapshot_delete(cntx, snapshot.id)    
+
+    @autolog.log_method(Logger, 'libvirt.driver.workload_delete')
+    def workload_delete(self, cntx, db, workload): 
+        db.workload_delete(cntx, workload.id)    

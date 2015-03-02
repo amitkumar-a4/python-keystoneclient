@@ -238,7 +238,7 @@ class SwiftBackupService(base.Base):
             err = _('error writing metadata file to swift, MD5 of metadata'
                     ' file in swift [%(etag)s] is not the same as MD5 of '
                     'metadata file sent to swift [%(md5)s]') % locals()
-            raise exception.InvalidBackup(reason=err)
+            raise exception.ErrorOccurred(reason=err)
 
         vms = WorkloadMgrDB().db.workload_vms_get(self.context, workload.id)
         metadata_vms_json = jsonutils.dumps(vms, sort_keys=True, indent=2)

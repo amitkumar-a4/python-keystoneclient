@@ -42,6 +42,8 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
                                     Password,
                                     "nodetool status");
         nodelist = nodes
+    except AuthenticationException as ex:
+        raise 
     except exception.InvalidState as ex:
         raise
     except:
@@ -62,6 +64,8 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
                                     "nodetool status");
                 LOG.info(_( 'Chose "' + host +'" for cassandra nodetool'))
                 nodelist.append(host)
+            except AuthenticationException as ex:
+                raise                 
             except:
                 LOG.info(_( '%s appears to be offline. Skiping this node') % host)
                 pass

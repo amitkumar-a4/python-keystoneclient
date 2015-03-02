@@ -111,7 +111,7 @@ class SnapshotCassandraNode(task.Task):
             self.client.close()
         except Exception as ex:
             LOG.exception(ex)
-            raise exception.ErrorOccured(_("Unable to run nodetool snapshot command on %s") % CassandraNode)
+            raise exception.ErrorOccurred(_("Unable to run nodetool snapshot command on %s") % CassandraNode)
         return 
 
     @autolog.log_method(Logger, 'SnapshotCassandraNode.revert')
@@ -151,7 +151,7 @@ class ClearCassandraSnapshot(task.Task):
             self.client.close()
         except Exception as ex:
             LOG.exception(ex)
-            raise exception.ErrorOccured(_("Unable to run nodetool clearsnapshot command on %s") % CassandraNode)
+            raise exception.ErrorOccurred(_("Unable to run nodetool clearsnapshot command on %s") % CassandraNode)
         finally:
             if self.client:
                 self.client.close()            
@@ -224,7 +224,7 @@ def get_cassandra_nodes(store, findpartitiontype = 'False'):
                     LOG.info(_('Error discovering Cassandra nodes: ' + reason))
                 os.remove(errfile_path)
             finally:
-                raise exception.ErrorOccured(reason=reason)
+                raise exception.ErrorOccurred(reason=reason)
     
         cassandra_nodes = None
         clusterinfo = None

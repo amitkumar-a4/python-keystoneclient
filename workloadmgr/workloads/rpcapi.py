@@ -108,7 +108,6 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
     @autolog.log_method(logger=Logger)
     def workload_delete(self, ctxt, host, workload_id):
-        # this will not be called, since we delete workload in the API layer instead of making an RPC call
         LOG.debug("delete_workload  rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         self.cast(ctxt,
@@ -126,7 +125,6 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
     
     @autolog.log_method(logger=Logger)    
     def snapshot_delete(self, ctxt, host, snapshot_id):
-        # this will not be called, since we delete snapshot in the API layer instead of making an RPC call
         LOG.debug("delete_snapshot  rpcapi snapshot_id %s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         self.cast(ctxt,

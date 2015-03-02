@@ -69,7 +69,7 @@ class Workflow(object):
     def initflow(self, snapshotvms, presnapshot=None, snapshotmetadata=None, postsnapshot=None, composite=False):
 
         if snapshotvms is None:
-            raise exception.UndefinedSnapshotVMsWorkflow("snapshotvms is None")
+            raise exception.ErrorOccurred("Failed to initialize the workflow: snapshotvms workflow is not set")
 
         # Check if any pre snapshot conditions
         if presnapshot is None:

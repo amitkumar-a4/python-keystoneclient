@@ -222,7 +222,7 @@ class API(base.Base):
         Discover Instances of a workload_type. RPC call is made
         """
         if not metadata:
-            msg = _('metadata field is null. Pass valid metadata to connect to the workload')
+            msg = _('metadata field is null. Pass valid metadata to discover the workload')
             raise wlm_exceptions.Invalid(reason=msg)
         try:
             return self.workloads_rpcapi.workload_type_discover_instances(context,
@@ -231,7 +231,7 @@ class API(base.Base):
                                                                       metadata) 
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
    
     @autolog.log_method(logger=Logger)
     def workload_type_topology(self, context, workload_type_id, metadata):
@@ -239,7 +239,7 @@ class API(base.Base):
         Topology  of a workload_type. RPC call is made
         """
         if not metadata:
-            msg = _('metadata field is null. Pass valid metadata to connect to the workload')
+            msg = _('metadata field is null. Pass valid metadata to discover the workload')
             raise wlm_exceptions.Invalid(reason=msg)
 
         try:
@@ -249,7 +249,7 @@ class API(base.Base):
                                                             metadata) 
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
 
     @autolog.log_method(logger=Logger)
     def workload_get(self, context, workload_id):
@@ -405,7 +405,7 @@ class API(base.Base):
                     break 
             if workload_type_id_valid == False:
                 msg = _('Invalid workload type')
-                raise wlm_exceptions.InvalidState(reason=msg)                
+                raise wlm_exceptions.Invalid(reason=msg)                
 
             if not 'hostnames' in metadata:
                 metadata['hostnames'] = json.dumps([])
@@ -461,7 +461,7 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload):
@@ -525,42 +525,46 @@ class API(base.Base):
         """
         Delete a workload. No RPC call is made
         """
-        workload = self.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload Delete Requested', workload)
-        if workload['status'] not in ['available', 'error']:
-            msg = _('Workload status must be available or error')
-            raise wlm_exceptions.InvalidState(reason=msg)
-        
-        workloads = self.db.workload_get_all(context)
-        for workload in workloads:
-            if workload.deleted:
-                continue
-            workload_type = self.db.workload_type_get(context, workload.workload_type_id)
-            if (workload_type.display_name == 'Composite'):
-                for kvpair in workload.metadata:
-                    if kvpair['key'] == 'workloadgraph':
-                        graph = json.loads(kvpair['value'])
-                        for flow in graph['children']:
-                            for member in flow['children']:
-                                if 'type' in member:
-                                    if member['data']['id'] == workload_id:
-                                        msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                        raise wlm_exceptions.InvalidState(reason=msg)                    
-
-        snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
-        if len(snapshots) > 0:
-            msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
-            raise wlm_exceptions.InvalidState(reason=msg)
-                    
-        # First unschedule the job
-        jobs = self._scheduler.get_jobs()
-        for job in jobs:
-            if job.kwargs['workload_id'] == workload_id:
-                self._scheduler.unschedule_job(job)
-                break
-
-        self.db.workload_delete(context, workload_id)
-        AUDITLOG.log(context,'Workload Deleted', workload)
+        try:
+            workload = self.workload_get(context, workload_id)
+            AUDITLOG.log(context,'Workload Delete Requested', workload)
+            if workload['status'] not in ['available', 'error']:
+                msg = _('Workload status must be available or error')
+                raise wlm_exceptions.InvalidState(reason=msg)
+            
+            workloads = self.db.workload_get_all(context)
+            for workload in workloads:
+                if workload.deleted:
+                    continue
+                workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+                if (workload_type.display_name == 'Composite'):
+                    for kvpair in workload.metadata:
+                        if kvpair['key'] == 'workloadgraph':
+                            graph = json.loads(kvpair['value'])
+                            for flow in graph['children']:
+                                for member in flow['children']:
+                                    if 'type' in member:
+                                        if member['data']['id'] == workload_id:
+                                            msg = _('Operation not allowed since this workload is a member of a composite workflow')
+                                            raise wlm_exceptions.InvalidState(reason=msg)                    
+    
+            snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
+            if len(snapshots) > 0:
+                msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
+                raise wlm_exceptions.InvalidState(reason=msg)
+                        
+            # First unschedule the job
+            jobs = self._scheduler.get_jobs()
+            for job in jobs:
+                if job.kwargs['workload_id'] == workload_id:
+                    self._scheduler.unschedule_job(job)
+                    break
+    
+            self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
+            AUDITLOG.log(context,'Workload Deleted', workload)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs)         
     
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context):
@@ -586,8 +590,8 @@ class API(base.Base):
                 workloads.append(workload)
             except Exception as ex:
                 LOG.exception(ex)
-        return workloads
         AUDITLOG.log(context,'Import Workloads Completed', None)
+        return workloads
     
     @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
@@ -606,7 +610,7 @@ class API(base.Base):
             stdout, stderr = utils.execute('df', FLAGS.wlm_vault_local_directory)
             if stderr != '':
                 msg = _('Could not execute df command successfully. Error %s'), (stderr)
-                raise wlm_exceptions.InvalidState(reason=msg)
+                raise wlm_exceptions.ErrorOccurred(reason=msg)
 
             # Filesystem     1K-blocks      Used Available Use% Mounted on
             # /dev/sda1      464076568 248065008 192431096  57% /
@@ -619,7 +623,7 @@ class API(base.Base):
         total_capacity, total_utilization = get_total_capacity()
         storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}
         try:
-            for workload in self.db.workload_get_all(context):
+            for workload in self.db.workload_get_all(context, read_deleted='yes'):
                 for workload_snapshot in self.db.snapshot_get_all(context, workload.id, read_deleted='yes'):
                     if workload_snapshot.data_deleted == False:
                         if workload_snapshot.snapshot_type == 'incremental':
@@ -780,7 +784,7 @@ class API(base.Base):
                                                                    workload_id)    
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
 
     @autolog.log_method(logger=Logger)
     def workload_get_topology(self, context, workload_id):
@@ -793,7 +797,7 @@ class API(base.Base):
                                                            workload_id)   
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
 
     @autolog.log_method(logger=Logger)
     def workload_discover_instances(self, context, workload_id):
@@ -806,7 +810,7 @@ class API(base.Base):
                                                                  workload_id)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
                      
     @autolog.log_method(logger=Logger)
     def _is_workload_paused(self, context, workload_id): 
@@ -843,8 +847,8 @@ class API(base.Base):
                 raise wlm_exceptions.InvalidState(reason=msg)
         jobschedule = workload['jobschedule']
         if len(jobschedule) < 5:
-                msg = _('Job scheduler settings are not available')
-                raise wlm_exceptions.InvalidState(reason=msg)            
+                msg = _('Invalid job scheduler settings')
+                raise wlm_exceptions.Invalid(reason=msg)            
    
         self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                             jobschedule,
@@ -916,7 +920,7 @@ class API(base.Base):
             return snapshot
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
 
     @autolog.log_method(logger=Logger)
     def snapshot_get(self, context, snapshot_id):
@@ -1039,7 +1043,7 @@ class API(base.Base):
             AUDITLOG.log(context,'Snapshot Deleted', snapshot)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
         
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
@@ -1072,7 +1076,7 @@ class API(base.Base):
             return restore
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.InvalidState(reason=ex.message) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
 
     @autolog.log_method(logger=Logger)
     def restore_get(self, context, restore_id):

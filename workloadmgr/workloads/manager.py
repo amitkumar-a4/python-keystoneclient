@@ -357,13 +357,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow_class = get_workflow_class(context, workload.workload_type_id)
             workflow = workflow_class(workload.display_name, store)
 
-            workflow.initflow()
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 0, 
-                                     'progress_msg': 'Snapshot of workload is starting',
+                                     'progress_msg': 'Initializing Snapshot Workflow',
                                      'status': 'executing'
-                                    })            
+                                    })       
+            workflow.initflow()
             workflow.execute()
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -445,17 +445,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing workload
         """
-        snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
-        for snapshot in snapshots:
-            self.snapshot_delete(context, snapshot['id'])
-        self.db.workload_delete(context, workload_id)
-
+        workload = self.db.snapshot_get(context, workload_id)
+        self.driver.workload_delete(context, self.db, workload)           
+        
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
         if options['type'] != "vmware":
             msg= _("Platforms other than VMware are not supported for oneclick restore")
             LOG.error(msg)
-            raise InvalidRequest(msg)
+            raise wlm_exceptions.InvalidState(reason=msg)
 
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)

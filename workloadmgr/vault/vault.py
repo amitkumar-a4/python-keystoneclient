@@ -61,6 +61,14 @@ class VaultBackupService(base.Base):
     def __init__(self, context):
         self.context = context
 
+    def get_workload_path(self, workload_metadata):                 
+        snapshot_file_path = '/snapshots'
+        if FLAGS.wlm_vault_service == 'local':  
+            snapshot_file_path = FLAGS.wlm_vault_local_directory + snapshot_file_path 
+        
+        workload_file_path = snapshot_file_path + '/workload_%s' % (workload_metadata['workload_id'])
+        return workload_file_path   
+    
     def get_snapshot_path(self, snapshot_metadata):                 
         snapshot_file_path = '/snapshots'
         if FLAGS.wlm_vault_service == 'local':  

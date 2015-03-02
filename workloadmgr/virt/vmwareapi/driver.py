@@ -650,8 +650,24 @@ class VMwareVCDriver(VMwareESXDriver):
             return 
                    
         return _remove_data()
-  
-    
+
+    @autolog.log_method(Logger, 'VMwareVCDriver.workload_delete')
+    def workload_delete(self, cntx, db, workload): 
+        
+        def _remove_data():
+            try:
+                shutil.rmtree(vault.get_vault_service(cntx).get_workload_path({'workload_id': workload.id}))
+            except Exception as ex:
+                LOG.exception(ex)            
+        
+        snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload.id)
+        if len(snapshots) > 0:
+            msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
+            raise exception.InvalidState(reason=msg)
+            
+        db.workload_delete(cntx, workload.id)
+        return _remove_data()    
+   
     @autolog.log_method(Logger, 'VMwareVCDriver.enable_cbt')
     def enable_cbt(self, cntx, db, instance):
         vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
@@ -1882,7 +1898,7 @@ class VMwareAPISession(object):
                 
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=2):
-                raise exception.ErrorOccured(reason='Timeout while establishing connection to vCenter Server %s' % self._host_ip)
+                raise exception.ErrorOccurred(reason='Timeout while establishing connection to vCenter Server %s' % self._host_ip)
                            
 
     @autolog.log_method(Logger, 'VMwareAPISession.__del__')
