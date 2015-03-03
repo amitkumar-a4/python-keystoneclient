@@ -1119,16 +1119,20 @@ class VMwareVCDriver(VMwareESXDriver):
         @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_disks_deleted')    
         def _snapshot_disks_deleted(snap):
             try:
+                all_disks_deleted = True
+                some_disks_deleted = False
                 snapshot_vm_resources = db.snapshot_resources_get(cntx, snap.id)
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type != 'disk':
                         continue
                     if snapshot_vm_resource.status != 'deleted':
-                        return False
-                return True                 
+                        all_disks_deleted = False
+                    else:
+                        some_disks_deleted = True
+                return all_disks_deleted, some_disks_deleted 
             except exception.SnapshotVMResourcesNotFound as ex:
                 LOG.exception(ex)
-                return True
+                return False,True
         
         @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._delete_deleted_snap_chains')    
         def _delete_deleted_snap_chains(cntx, snapshot):
@@ -1312,7 +1316,10 @@ class VMwareVCDriver(VMwareESXDriver):
                     
                     db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
     
-                    if _snapshot_disks_deleted(snap):
+                    all_disks_deleted, some_disks_deleted = _snapshot_disks_deleted(snap)
+                    if some_disks_deleted:
+                        db.snapshot_delete(cntx, snap.id)
+                    if all_disks_deleted: 
                         db.snapshot_delete(cntx, snap.id)
                         db.snapshot_update(cntx, snap.id, {'data_deleted':True})
                         try:
@@ -1357,7 +1364,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 instance['name']= instance_name = instance_options['name']
             else:
                 instance['name']= instance_name = instance_options['name'] = instance['vm_name']
-        
+                
             msg = 'Creating VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id  
             db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
             

@@ -45,6 +45,16 @@ def get_vms(cntx, restore_id):
     restore_options = pickle.loads(str(restore.pickle))
     snapshot_vms = db.snapshot_vms_get(cntx, snapshot.id)
     
+    snapshots_vms_to_be_restored = []
+    for snapshot_vm in snapshot_vms:
+        instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
+        if instance_options.get('include', True) == False:  
+            continue
+        else:
+            snapshots_vms_to_be_restored.append(snapshot_vm)
+            
+    snapshot_vms = snapshots_vms_to_be_restored
+    
     vms_without_power_sequence = []
     for snapshot_vm in snapshot_vms:
         vm = {'vm_id' : snapshot_vm.vm_id,

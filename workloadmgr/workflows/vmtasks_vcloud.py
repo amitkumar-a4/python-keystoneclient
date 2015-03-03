@@ -144,7 +144,11 @@ def get_vm_restore_data_size(cntx, db, instance, restore):
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_restore_data_size')
 def get_restore_data_size(cntx, db, restore):
     restore_size = 0
+    restore_options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
     for vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
+        instance_options = utils.get_instance_restore_options(restore_options, vm.vm_id, restore_options['type'])
+        if instance_options and instance_options.get('include', True) == False:  
+            continue        
         restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
 
     return restore_size
