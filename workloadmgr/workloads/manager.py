@@ -376,7 +376,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.snapshot_type_time_size_update(context, snapshot_id)               
 
              
-            # Update vms
+            # Update vms of the workload
+            if  'instances' in workflow._store and workflow._store['instances']:
+                for vm in self.db.workload_vms_get(context, workload.id):
+                    self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+
+                for instance in workflow._store['instances']:
+                    values = {'workload_id': workload.id,
+                              'vm_id': instance['vm_id'],
+                              'metadata': instance['vm_metadata'],
+                              'vm_name': instance['vm_name']}
+                    vm = self.db.workload_vms_create(context, values)                                       
+            
             hostnames = []
             for inst in workflow._store['instances']:
                 hostnames.append(inst['hostname'])
