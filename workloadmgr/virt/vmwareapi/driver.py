@@ -624,50 +624,6 @@ class VMwareVCDriver(VMwareESXDriver):
     def thaw_vm(self, cntx, db, instance, snapshot):
         pass      
     
-    @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_delete')
-    def snapshot_delete(self, cntx, db, snapshot): 
-        
-        def _remove_data():
-            db.snapshot_update(cntx, snapshot.id, {'data_deleted':True})
-            try:
-                shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snapshot.workload_id,
-                                                                               'snapshot_id': snapshot.id}))
-            except Exception as ex:
-                LOG.exception(ex)            
-            
-        db.snapshot_delete(cntx, snapshot.id)
-        if snapshot.status == 'error':
-            return _remove_data()
-        try:
-            snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot.id)
-            for snapshot_vm_resource in snapshot_vm_resources:
-                if snapshot_vm_resource.resource_type != 'disk':
-                    continue
-                if snapshot_vm_resource.status != 'deleted':
-                    return
-        except exception.SnapshotVMResourcesNotFound as ex:
-            LOG.exception(ex)
-            return 
-                   
-        return _remove_data()
-
-    @autolog.log_method(Logger, 'VMwareVCDriver.workload_delete')
-    def workload_delete(self, cntx, db, workload): 
-        
-        def _remove_data():
-            try:
-                shutil.rmtree(vault.get_vault_service(cntx).get_workload_path({'workload_id': workload.id}))
-            except Exception as ex:
-                LOG.exception(ex)            
-        
-        snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload.id)
-        if len(snapshots) > 0:
-            msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
-            raise exception.InvalidState(reason=msg)
-            
-        db.workload_delete(cntx, workload.id)
-        return _remove_data()    
-   
     @autolog.log_method(Logger, 'VMwareVCDriver.enable_cbt')
     def enable_cbt(self, cntx, db, instance):
         vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
@@ -1159,21 +1115,7 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot): 
         
-        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._get_child_vm_disk_resource_snap')
-        def _get_child_vm_disk_resource_snap(snap_chain, vm_disk_resource_snap_backing):
-            try:
-                for snap in snap_chain:
-                    snapshot_vm_resources = db.snapshot_resources_get(cntx, snap.id)
-                    for snapshot_vm_resource in snapshot_vm_resources:
-                        if snapshot_vm_resource.resource_type != 'disk':
-                            continue
-                        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
-                        if vm_disk_resource_snap.vm_disk_resource_snap_backing_id == vm_disk_resource_snap_backing.id:
-                            return vm_disk_resource_snap                
-            except Exception as ex:
-                LOG.exception(ex)      
-                raise
-        
+       
         @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_disks_deleted')    
         def _snapshot_disks_deleted(snap):
             try:
@@ -1186,29 +1128,52 @@ class VMwareVCDriver(VMwareESXDriver):
                 return True                 
             except exception.SnapshotVMResourcesNotFound as ex:
                 LOG.exception(ex)
-                return True            
-
-        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_size_update')
-        def _snapshot_size_update(cntx, snap):
+                return True
+        
+        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._delete_deleted_snap_chains')    
+        def _delete_deleted_snap_chains(cntx, snapshot):
             try:
-                snapshot_size = 0
-                snapshot_vm_resources = db.snapshot_resources_get(cntx, snap.id)
-                for snapshot_vm_resource in snapshot_vm_resources:
-                    if snapshot_vm_resource.resource_type != 'disk':
-                        continue
-                    if snapshot_vm_resource.status != 'deleted':
-                        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
-                        disksize = os.path.getsize(vm_disk_resource_snap.vault_service_url)
-                        db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, {'size': disksize})
-                        db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'size': disksize})
-                        snapshot_size = snapshot_size + disksize
-                db.snapshot_update(cntx, snap.id, {'size': snapshot_size,'uploaded_size': snapshot_size})
-                return snapshot_size
-            except exception.SnapshotVMResourcesNotFound as ex:
+                snapshot_obj = db.snapshot_type_time_size_update(cntx, snapshot['id'])
+                workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)            
+                snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
+                
+                snap_chains = []
+                snap_chain = []
+                snap_chains.append(snap_chain)
+                for snap in reversed(snapshots_all):
+                    if snap.snapshot_type == 'full':
+                        snap_chain = []
+                        snap_chains.append(snap_chain)
+                    snap_chain.append(snap)
+                        
+                deleted_snap_chains = []        
+                for snap_chain in snap_chains:
+                    deleted_chain = True
+                    for snap in snap_chain:
+                        if snap.status != 'deleted':
+                            deleted_chain = False
+                            break
+                    if deleted_chain == True:
+                        deleted_snap_chains.append(snap_chain)
+                
+                for snap_chain in deleted_snap_chains:
+                    for snap in snap_chain:
+                        if snap.deleted == True and snap.data_deleted == False:
+                            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                    snap.id,
+                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                    workload_obj.display_name ))
+                            db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                            try:
+                                shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
+                            except Exception as ex:
+                                LOG.exception(ex)
+            except Exception as ex:
                 LOG.exception(ex)
             
         try:
-            db.snapshot_update( cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
+            db.snapshot_update(cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
+            _delete_deleted_snap_chains(cntx, snapshot)
             affected_snapshots = []             
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
@@ -1237,25 +1202,40 @@ class VMwareVCDriver(VMwareESXDriver):
             snapshots_to_delete = []
             retained_snap_count = 0
             for idx, snap in enumerate(snapshots_valid):
-                    if snapshots_to_keep['number'] == -1:
-                        if (timeutils.utcnow() - snap.created_at).days <  snapshots_to_keep['days']:    
-                            retained_snap_count = retained_snap_count + 1
-                        else:
-                            if snapshot_to_commit == None:
-                                snapshot_to_commit = snapshots_valid[idx-1]
-                            snapshots_to_delete.append(snap)
+                if snapshots_to_keep['number'] == -1:
+                    if (timeutils.utcnow() - snap.created_at).days <  snapshots_to_keep['days']:    
+                        retained_snap_count = retained_snap_count + 1
                     else:
-                        if retained_snap_count < snapshots_to_keep['number']:
-                            if snap.status == 'deleted':
-                                continue                            
-                            else:
-                                retained_snap_count = retained_snap_count + 1
+                        if snapshot_to_commit == None:
+                            snapshot_to_commit = snapshots_valid[idx-1]
+                        snapshots_to_delete.append(snap)    
+                else:
+                    if retained_snap_count < snapshots_to_keep['number']:
+                        if snap.status == 'deleted':
+                            continue                            
                         else:
-                            if snapshot_to_commit == None:
-                                snapshot_to_commit = snapshots_valid[idx-1]
-                            snapshots_to_delete.append(snap)
-
-            if snapshot_to_commit:
+                            retained_snap_count = retained_snap_count + 1
+                    else:
+                        if snapshot_to_commit == None:
+                            snapshot_to_commit = snapshots_valid[idx-1]
+                        snapshots_to_delete.append(snap) 
+            
+            #if commited snapshot is full delete all snapshots below it             
+            if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
+                for snap in snapshots_to_delete:
+                    db.snapshot_delete(cntx, snap.id)
+                    if snap.data_deleted == False:
+                        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                        try:
+                            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                    snap.id,
+                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                    workload_obj.display_name ))                            
+                            shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
+                        except Exception as ex:
+                            LOG.exception(ex)
+                                
+            elif snapshot_to_commit:
                 vix_disk_lib_env = os.environ.copy()
                 vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                 affected_snapshots.append(snapshot_to_commit.id)
@@ -1264,11 +1244,16 @@ class VMwareVCDriver(VMwareESXDriver):
                     snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id, read_deleted='yes')
                     if snapshot_to_commit.snapshot_type == 'full':
                         db.snapshot_delete(cntx, snap.id)
-                        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                        try:
-                            shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
-                        except Exception as ex:
-                            LOG.exception(ex)    
+                        if snap.data_deleted == False:
+                            db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                            try:
+                                LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                        snap.id,
+                                                                                                        snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                        workload_obj.display_name ))                            
+                                shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
+                            except Exception as ex:
+                                LOG.exception(ex)    
                         continue
                     
                     snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot_to_commit.id)
@@ -1326,15 +1311,15 @@ class VMwareVCDriver(VMwareESXDriver):
                                 affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
                     
                     db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
-                    _snapshot_size_update(cntx, snapshot_to_commit)
     
                     if _snapshot_disks_deleted(snap):
                         db.snapshot_delete(cntx, snap.id)
                         db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                        LOG.info(_("Deleted Snapshot %s %s %s") %(snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
-                                                                  snap.display_name,
-                                                                  snap.id))
                         try:
+                            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                    snap.id,
+                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                    workload_obj.display_name ))                            
                             shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id,
                                                                                            'snapshot_id': snap.id}))
                         except Exception as ex:

@@ -208,7 +208,7 @@ class API(base.Base):
         workload_type = self.workload_type_get(context, workload_type_id)
         AUDITLOG.log(context,'WorkloadType Delete Requested', workload_type)
         if workload_type['status'] not in ['available', 'error']:
-            msg = _('WorkloadType status must be available or error')
+            msg = _("WorkloadType status must be 'available' or 'error'")
             raise wlm_exceptions.InvalidState(reason=msg)
 
         #TODO(giri): check if this workload_type is referenced by other workloads
@@ -529,7 +529,7 @@ class API(base.Base):
             workload = self.workload_get(context, workload_id)
             AUDITLOG.log(context,'Workload Delete Requested', workload)
             if workload['status'] not in ['available', 'error']:
-                msg = _('Workload status must be available or error')
+                msg = _("Workload status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
             
             workloads = self.db.workload_get_all(context)
@@ -1030,7 +1030,7 @@ class API(base.Base):
             workload = self.workload_get(context, snapshot['workload_id'])
 
             if snapshot['status'] not in ['available', 'error']:
-                msg = _('Snapshot status must be available or error')
+                msg = _("Snapshot status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
 
             restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)

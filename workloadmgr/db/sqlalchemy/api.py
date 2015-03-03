@@ -979,17 +979,19 @@ def snapshot_type_time_size_update(context, snapshot_id):
             snapshot_type_incremental = True
         time_taken = time_taken + snapshot_vm_resource.time_taken
         #update size
-        vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
-        snapshot_vm_resource_size = 0
-        for vm_disk_resource_snap in vm_disk_resource_snaps:
-            if vm_disk_resource_snap.vault_service_url:
-                vm_disk_resource_snap_size = vault_service.get_size(vm_disk_resource_snap.vault_service_url)
-                vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size}) 
-                snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
-        snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size})
-        snapshot_size = snapshot_size + snapshot_vm_resource_size
+        if snapshot_vm_resource.status != 'deleted':
+            vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+            snapshot_vm_resource_size = 0
+            for vm_disk_resource_snap in vm_disk_resource_snaps:
+                if vm_disk_resource_snap.vault_service_url:
+                    vm_disk_resource_snap_size = vault_service.get_size(vm_disk_resource_snap.vault_service_url)
+                    vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size}) 
+                    snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
+            snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size})
+            snapshot_size = snapshot_size + snapshot_vm_resource_size
     
-    time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
+    if snapshot.finished_at:
+        time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
     
         
     if snapshot_type_full and snapshot_type_incremental:
@@ -1003,7 +1005,8 @@ def snapshot_type_time_size_update(context, snapshot_id):
                           
     return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type, 
                                                   'time_taken' : time_taken,
-                                                  'size' : snapshot_size})
+                                                  'size' : snapshot_size,
+                                                  'uploaded_size' : snapshot_size})
     
 @require_context
 def snapshot_delete(context, snapshot_id):

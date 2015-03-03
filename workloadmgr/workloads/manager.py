@@ -23,6 +23,7 @@ import uuid
 import cPickle as pickle
 import json
 from threading import Lock
+import shutil
 
 
 from oslo.config import cfg
@@ -445,8 +446,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing workload
         """
-        workload = self.db.snapshot_get(context, workload_id)
-        self.driver.workload_delete(context, self.db, workload)           
+        workload = self.db.workload_get(context, workload_id)
+        snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload.id)
+        if len(snapshots) > 0:
+            msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
+            raise wlm_exceptions.InvalidState(reason=msg)
+            
+        self.db.workload_delete(context, workload.id)
+        try:
+            LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
+                                                                    workload.id,
+                                                                    workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
+            shutil.rmtree(vault.get_vault_service(context).get_workload_path({'workload_id': workload.id}))
+        except Exception as ex:
+            LOG.exception(ex)          
         
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
@@ -635,9 +648,34 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing snapshot
         """
-        snapshot = self.db.snapshot_get(context, snapshot_id)
-        self.driver.snapshot_delete(context, self.db, snapshot)
-
+        def _remove_data(snapshot):
+            self.db.snapshot_update(context, snapshot.id, {'data_deleted':True})
+            try:
+                LOG.info(_('Deleting the data of snapshot %s %s %s') % (snapshot.display_name, 
+                                                                            snapshot.id,
+                                                                            snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S")))                            
+                
+                shutil.rmtree(vault.get_vault_service(context).get_snapshot_path({'workload_id': snapshot.workload_id,
+                                                                               'snapshot_id': snapshot.id}))
+            except Exception as ex:
+                LOG.exception(ex)            
+        
+        snapshot = self.db.snapshot_get(context, snapshot_id)    
+        self.db.snapshot_delete(context, snapshot.id)
+        if snapshot.status == 'error':
+            return _remove_data(snapshot)
+        try:
+            snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot.id)
+            for snapshot_vm_resource in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type != 'disk':
+                    continue
+                if snapshot_vm_resource.status != 'deleted':
+                    return
+        except wlm_exceptions.SnapshotVMResourcesNotFound as ex:
+            LOG.exception(ex)
+            return 
+                   
+        return _remove_data(snapshot)
 
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):

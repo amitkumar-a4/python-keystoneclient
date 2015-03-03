@@ -192,12 +192,6 @@ def restore_vm(self, cntx, db, instance, restore, restored_net_resources,
                restored_compute_flavor, restored_nics, instance_options):
     raise NotImplementedError() 
 
-def snapshot_delete(self, cntx, db, snapshot): 
-    raise NotImplementedError()  
-
-def workload_delete(self, cntx, db, workload): 
-    raise NotImplementedError()     
-    
 def mount_instance_root_device(self, cntx, db, instance, restore): 
     raise NotImplementedError()
 
