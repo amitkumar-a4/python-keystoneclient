@@ -181,26 +181,36 @@ class SSHClient(object):
                            pkey=self.pkey,
                            sock=sock, timeout=self.timeout)
         except sock_gaierror, ex:
-            logger.error("Could not resolve host '%s' - retry %s/%s",
-                         host, retries, self.num_retries)
+            logger.error("Could not resolve host '%s' - retry %s/%s" %
+                         (host, retries, self.num_retries))
             while retries < self.num_retries:
                 gevent.sleep(5)
                 return self._connect(client, host, port, sock=sock,
                                      retries=retries+1)
-            raise UnknownHostException("%s - %s - retry %s/%s",
-                                       str(ex.args[1]),
-                                       host, retries, self.num_retries)
+            """
+            raise UnknownHostException("%s - %s - retry %s/%s" %
+                                       (str(ex.args[1]), host, retries, self.num_retries))
+            """
+            logger.info("%s - %s - retry %s/%s" % (str(ex.args[1]), host, retries, self.num_retries))            
+            raise ConnectionErrorException("Unable to establish connection")
         except sock_error, ex:
-            logger.error("Error connecting to host '%s:%s' - retry %s/%s",
-                         host, port, retries, self.num_retries)
+            logger.error("Error connecting to host '%s:%s' - retry %s/%s" %
+                         (host, port, retries, self.num_retries))
             while retries < self.num_retries:
                 gevent.sleep(5)
                 return self._connect(client, host, port, sock=sock,
                                      retries=retries+1)
             error_type = ex.args[1] if len(ex.args) > 1 else ex.args[0]
-            raise ConnectionErrorException("%s for host '%s:%s' - retry %s/%s",
-                                           str(error_type), host, port,
-                                           retries, self.num_retries,)
+            
+            """
+            raise ConnectionErrorException("%s for host '%s:%s' - retry %s/%s" %
+                                           (str(error_type), host, port,
+                                           retries, self.num_retries))
+            """
+            logger.info("%s for host '%s:%s' - retry %s/%s" %
+                               (str(error_type), host, port,
+                               retries, self.num_retries))
+            raise ConnectionErrorException("Unable to establish connection")
         except paramiko.AuthenticationException, ex:
             raise AuthenticationException(ex)
         # SSHException is more general so should be below other types

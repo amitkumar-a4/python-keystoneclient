@@ -45,7 +45,7 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
     except AuthenticationException as ex:
         raise 
     except Exception as ex:
-        error_msg = _("Failed to connect to one or more nodes '%s' with error: %s") %(str(addlnodes), str(ex))
+        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") % ('nodetool status', str(addlnodes), str(ex))
         LOG.info(error_msg)
         nodes = addlnodes.split(";")
         if '' in nodes:
@@ -64,9 +64,10 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
                 LOG.info(_("Selected '" + host + "' for Cassandra nodetool"))
                 nodelist.append(host)
             except AuthenticationException as ex:
-                raise                 
+                error_msg = _("Failed to execute '%s' on host '%s' with error: %s") % ('nodetool status', host, str(ex))
+                raise exception.ErrorOccurred(reason=error_msg)
             except Exception as ex:
-                error_msg = _("Failed to connect to '%s' with error: %s") %(host, str(ex))
+                error_msg = _("Failed to execute '%s' on host '%s' with error: %s") % ('nodetool status', host, str(ex))
                 LOG.info(error_msg)                
                 pass
                 
@@ -107,12 +108,10 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
 
     except (AuthenticationException, UnknownHostException, ConnectionErrorException) as ex:
         LOG.exception(ex)
-        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: ") % (command, str(hosts), str(ex))
-        raise Exception(error_msg)
+        raise Exception(str(ex))
     except Exception as ex:
         LOG.exception(ex)
-        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: ") % (command, str(hosts), str(ex))
-        raise Exception(error_msg)
+        raise Exception(str(ex))
 
     return output
 
