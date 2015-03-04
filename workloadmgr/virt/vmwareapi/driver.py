@@ -1373,35 +1373,43 @@ class VMwareVCDriver(VMwareESXDriver):
             cookies = self._session._get_vim().client.options.transport.cookiejar
             vault_service = vault.get_vault_service(cntx)
             
-            """Restore vmx file"""
-            vmx_datastore_name = instance_options['vmxpath']['datastore']
-            vmx_datastore_name = vmx_datastore_name.replace('[', '')
-            vmx_datastore_name = vmx_datastore_name.replace(']', '')            
-            for datastore in instance_options['datastores']:
-                if datastore['name'] == vmx_datastore_name:
-                    vmx_datastore_moid = datastore['moid']
-                    break
-            vmx_datastore = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=vmx_datastore_moid)
-            vmx_datastore_ref = vmx_datastore[0]
-            datacenter = self._get_datacenter_ref_and_name(vmx_datastore_ref)
+
+            #get datacenter name and reference
+            datastore_info = vm_util.get_datastore_ref_and_name(self._session, datastore_moid=instance_options['datastores'][0]['moid'])
+            datastore_ref = datastore_info[0]
+            datacenter = self._get_datacenter_ref_and_name(datastore_ref)
             datacenter_ref = datacenter[0]
             datacenter_name = datacenter[1]
             
-            try:
-                vm_folder_name = instance_options['name']
-                vm_folder_path = vm_util.build_datastore_path(vmx_datastore_name, vm_folder_name)
-                self._mkdir(vm_folder_path, datacenter_ref)
-            except Exception as ex:
-                LOG.exception(ex)
-                vm_folder_name = instance_options['name'] + '-' + restore['id']
-                vm_folder_name = vm_folder_name.replace(' ', '-')
-                vm_folder_path = vm_util.build_datastore_path(vmx_datastore_name, vm_folder_name)
-                self._mkdir(vm_folder_path, datacenter_ref)                
-        
+            #create folders for vmx and vmdks            
+            for datastore in instance_options['datastores']:
+                datastore_name = datastore['name'].replace('[', '')
+                datastore_name = datastore['name'].replace(']', '')                        
+                try:
+                    folder_name = instance_options['name']
+                    folder_path = vm_util.build_datastore_path(datastore['name'], folder_name)
+                    self._mkdir(folder_path, datacenter_ref)
+                except Exception as ex:
+                    LOG.exception(ex)
+                    folder_name = instance_options['name'] + '-' + restore['id']
+                    folder_path = vm_util.build_datastore_path(datastore['name'], folder_name)
+                    self._mkdir(folder_path, datacenter_ref)
+                datastore['folder_name'] = folder_name          
+            
+            """Restore vmx file"""
+            vmx_datastore_name = instance_options['vmxpath']['datastore']
+            vmx_datastore_name = vmx_datastore_name.replace('[', '')
+            vmx_datastore_name = vmx_datastore_name.replace(']', '')
+            folder_name = None            
+            for datastore in instance_options['datastores']:
+                if datastore['name'] == vmx_datastore_name:
+                    folder_name = datastore['folder_name']
+                    break
+
             snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type == 'vmx':
-                    vmx_name = "%s/%s" % (vm_folder_name, os.path.basename(snapshot_vm_resource.resource_name))
+                    vmx_name = "%s/%s" % (folder_name, os.path.basename(snapshot_vm_resource.resource_name))
                     url_compatible = vmx_name.replace(" ", "%20")
                     vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
                                             self._session._host_ip,
@@ -1524,7 +1532,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     self._session._wait_for_task(instance_uuid, reconfig_task)
                     LOG.info(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
                                 {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
-                            
+                    
             #restore, rebase, commit & upload
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
@@ -1533,24 +1541,16 @@ class VMwareVCDriver(VMwareESXDriver):
                     if vdisk['label'] == snapshot_vm_resource.resource_name:
                         vdisk_datastore_name = vdisk['datastore']
                         break
-
+                
+                folder_name = None
                 vdisk_datastore_name = vdisk_datastore_name.replace('[', '')
                 vdisk_datastore_name = vdisk_datastore_name.replace(']', '')
-                
-                try:
-                    vdisk_folder_name = instance_options['name']
-                    vdisk_folder_path = vm_util.build_datastore_path(vdisk_datastore_name, vdisk_folder_name)
-                    self._mkdir(vdisk_folder_path, datacenter_ref)
-                except Exception as ex:
-                    LOG.exception(ex)
-                    if vdisk_datastore_name != vmx_datastore_name: 
-                        vdisk_folder_name = instance_options['name'] + '-' + restore['id']
-                        vdisk_folder_name = vdisk_folder_name.replace(' ', '-')                        
-                        vdisk_folder_path = vm_util.build_datastore_path(vdisk_datastore_name, vdisk_folder_name)
-                        self._mkdir(vdisk_folder_path, datacenter_ref)
-
-                                       
-                vmdk_name = "%s/%s.vmdk" % (vdisk_folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
+                for datastore in instance_options['datastores']:
+                    if datastore['name'] == vdisk_datastore_name:
+                        folder_name = datastore['folder_name']
+                        break
+                    
+                vmdk_name = "%s/%s.vmdk" % (folder_name, snapshot_vm_resource.resource_name.replace(' ', '-'))
                 vmdk_path = vm_util.build_datastore_path(vdisk_datastore_name, vmdk_name)
                 vmdk_create_spec = vm_util.get_vmdk_create_spec(client_factory,
                                                                 db.get_metadata_value(snapshot_vm_resource.metadata,'capacityInKB'),  #vmdk_file_size_in_kb, 

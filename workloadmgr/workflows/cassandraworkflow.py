@@ -175,6 +175,8 @@ def UnorderedClearCassandraSnapshot(instances):
 @autolog.log_method(logger=Logger)
 def get_cassandra_nodes(store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_nodes'))
+    outfile_path = ''
+    errfile_path = ''
     try:   
         cntx = amqp.RpcContext.from_dict(store['context'])
         db = WorkloadMgrDB().db
@@ -221,6 +223,8 @@ def get_cassandra_nodes(store, findpartitiontype = 'False'):
             try:
                 with open(errfile_path, 'r') as fh:
                     reason = fh.read()
+                    if len(reason) == 0:
+                        reason = 'Error discovering Cassandra nodes'
                     LOG.info(_('Error discovering Cassandra nodes: ' + reason))
                 os.remove(errfile_path)
             finally:
@@ -232,14 +236,13 @@ def get_cassandra_nodes(store, findpartitiontype = 'False'):
             clusterinfo = json.loads(fh.read())
             LOG.info(_('Discovered Cassandra Nodes: ' + str(clusterinfo)))
         
-        if os.path.isfile(outfile_path):
-            os.remove(outfile_path)
-        if os.path.isfile(errfile_path):
-            os.remove(errfile_path)
-        
         return clusterinfo['cassandranodes'], clusterinfo
 
     finally:
+        if os.path.isfile(outfile_path):
+            os.remove(outfile_path)
+        if os.path.isfile(errfile_path):
+            os.remove(errfile_path)        
         LOG.info(_('Exit get_cassandra_nodes'))    
 
 @autolog.log_method(logger=Logger)    

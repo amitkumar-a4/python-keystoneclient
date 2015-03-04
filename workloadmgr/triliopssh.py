@@ -246,8 +246,14 @@ class SSHClient(object):
                 user, command.replace('"', '\\"'),)
         else:
             command = 'bash -c "%s"' % command.replace('"', '\\"')
+        stdin = channel.makefile('wb', 8192)
         logger.debug("Running command %s on %s", command, self.host)
         channel.exec_command(command, **kwargs)
+        gevent.sleep(.2)
+        if _stdout.channel.closed is False: # If stdout is still open then sudo is asking us for a password
+            logger.debug("Writing credetials for sudo")
+            stdin.write('%s\n' % self.password)
+            stdin.flush()        
         logger.debug("Command started")
         while not (channel.recv_ready() or channel.closed):
             gevent.sleep(.2)

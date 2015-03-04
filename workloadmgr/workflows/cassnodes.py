@@ -24,7 +24,7 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
     # the cassandra service need not be running. This routine
     # only identifies the nodes that are up and running and take
     # ssh session
-
+    error_msg = 'Unknown Error'
     nodelist = []
     if not addlnodes or  len(addlnodes) == 0:
         LOG.info(_("'addlnodes' is empty. Defaulting to defaultnode %s atribute") % defaultnode)
@@ -44,10 +44,9 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
         nodelist = nodes
     except AuthenticationException as ex:
         raise 
-    except exception.InvalidState as ex:
-        raise
-    except:
-        LOG.info(_('Tried %s. One or more nodes are not accessible. Short listing good known nodes') % str(addlnodes))
+    except Exception as ex:
+        error_msg = _("Failed to connect to one or more nodes '%s' with error: %s") %(str(addlnodes), str(ex))
+        LOG.info(error_msg)
         nodes = addlnodes.split(";")
         if '' in nodes:
             nodes.remove('')        
@@ -56,24 +55,26 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
 
         for host in nodes:
             try:
-                LOG.info(_( 'Testing cassandra node %s') % host)
+                LOG.info(_( 'Connecting to Cassandra node %s') % host)
                 pssh_exec_command(  [host],
                                     int(SSHPort),
                                     Username,
                                     Password,
                                     "nodetool status");
-                LOG.info(_( 'Chose "' + host +'" for cassandra nodetool'))
+                LOG.info(_("Selected '" + host + "' for Cassandra nodetool"))
                 nodelist.append(host)
             except AuthenticationException as ex:
                 raise                 
-            except:
-                LOG.info(_( '%s appears to be offline. Skiping this node') % host)
+            except Exception as ex:
+                error_msg = _("Failed to connect to '%s' with error: %s") %(host, str(ex))
+                LOG.info(error_msg)                
                 pass
+                
     if len(nodelist) == 0:
-        LOG.info(_( 'Cassandra cluster appears to be offline. Please try the operation again'))
-        raise Exception(_("Cassandra cluster appears to be offline. Please try the operation again."))
+        LOG.info(error_msg)
+        raise Exception(error_msg)
 
-    LOG.info(_( 'Seed nodes of the Cassandra cluster are %s') % str(nodelist))
+    LOG.info(_("Seed nodes of the Cassandra cluster are '%s'") % str(nodelist))
     return nodelist
 
 @autolog.log_method(Logger)
@@ -83,7 +84,6 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
         client = ParallelSSHClient(hosts, user=user, password=password, port=int(port), timeout=120)
         LOG.info(_("pssh_exec_command: %s") % (command))
         output = client.run_command(command, sudo=sudo)
-
         # dump environment if any node fails with command not found
         for host in output:
             if output[host]['exit_code']:
@@ -97,18 +97,22 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
         # Dump every command output here for diagnostics puposes
         for host in output:
             output[host]['stdout'], iter1 = itertools.tee(output[host]['stdout'])
+            output_filtered = []
             for line in iter1:
+                if password == line:
+                    continue
+                output_filtered.append(line)
                 LOG.info(_("[%s]\t%s") % (host, line))
+            output[host]['stdout'] = output_filtered
 
-    except (AuthenticationException, UnknownHostException, ConnectionErrorException) as exp:
-        LOG.info(_('Error connecting to cassandra nodes: %s') % str(hosts))
-        LOG.info(_('Cannot execute %s successfully: %s') % (command, str(hosts)))
-        LOG.exception(exp)
-        raise
-    except Exception as exp:
-        LOG.info(_('Unknown exception: %s') % str(hosts))
-        LOG.exception(exp)
-        raise
+    except (AuthenticationException, UnknownHostException, ConnectionErrorException) as ex:
+        LOG.exception(ex)
+        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: ") % (command, str(hosts), str(ex))
+        raise Exception(error_msg)
+    except Exception as ex:
+        LOG.exception(ex)
+        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: ") % (command, str(hosts), str(ex))
+        raise Exception(error_msg)
 
     return output
 
@@ -128,9 +132,9 @@ def getclusterinfo(hosts, port, username, password):
 
         return clusterinfo
 
-    msg = _('Cassandra cluster appears to be offline. Cannot execute describecluster successfully.')
+    msg = _("Failed to execute 'nodetool describecluster' successfully.")
     LOG.error(msg)
-    raise exception.InvalidState(msg)
+    raise exception.ErrorOccurred(msg)
      
 @autolog.log_method(Logger)
 def discovercassandranodes(hosts, port, username, password):
@@ -186,9 +190,9 @@ def discovercassandranodes(hosts, port, username, password):
         break
 
     if len(nodelist) == 0:
-        msg = _('Cassandra cluster appears to be offline. Please check the cluster and try the operation again')
+        msg = _('Failed to connect to Cassandra cluster. Please check the status of the cluster and try the operation again')
         LOG.error(msg)
-        raise exception.InvalidState(msg)
+        raise exception.ErrorOccurred(msg)
 
     cassandranodes = []
     availablenodes = []
@@ -328,47 +332,51 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
         for node in preferrednodes:
             node['root_partition_type'] = "lvm"
 
-        """
+
         if findpartitiontype is True:
-            output = pssh_exec_command(ips, port, username, password, 'df /')
-            for host in output:
-                if output[host]['exit_code']:
-                    LOG.info(_('"df /" on host %s') % host)
+            try:
+                output = pssh_exec_command(ips, port, username, password, 'df /')
+                for host in output:
+                    if output[host]['exit_code']:
+                        LOG.info(_('"df /" on host %s') % host)
+                        for line in output[host]['stdout']:
+                            LOG.info(_('%s') % line)
+    
+                        continue
+    
                     for line in output[host]['stdout']:
-                        LOG.info(_('%s') % line)
+                        try:
+                            # find the type of the root partition
+                            m=re.search(r'(/[^\s]+)\s', str(line))
+                            if m:
+                                mp= m.group(1)
+    
+                                lvoutput = pssh_exec_command([host], port,
+                                                 username, password,
+                                                 #"lvdisplay " + mp, sudo=True)
+                                                 "sudo -k ls " + mp, sudo=True)
+                                LOG.info(_('lvdisplay: return value %d') % lvoutput[host]['exit_code'])
+                                LOG.info(_('lvdisplay: output\n'))
+                                for l in lvoutput[host]['stdout']:
+                                    # remove password from the stdout
+                                    l.replace(password, '******')
+                                    LOG.info(_(l))
+                                for node in preferrednodes:
+                                    if node['IPAddress'] == host:
+                                        if lvoutput[host]['exit_code'] is None or lvoutput[host]['exit_code'] == 0:
+                                            node['root_partition_type'] = "lvm"
+                                        else:
+                                            node['root_partition_type'] = "Linux"
+                                        LOG.info(_('%s: root partition is %s') % (node['IPAddress'], node['root_partition_type']))
+                                        break
+    
+                        except Exception as ex:
+                            LOG.info(_("Cannot execute lvdisplay command on %s") % host)
+                            LOG.exception(ex)
+            except Exception as ex:
+                LOG.info(_("Failed to find partition type on %s") % host)
+                LOG.exception(ex)                        
 
-                    continue
-
-                for line in output[host]['stdout']:
-                    try:
-                        # find the type of the root partition
-                        m=re.search(r'(/[^\s]+)\s', str(line))
-                        if m:
-                            mp= m.group(1)
-
-                            lvoutput = pssh_exec_command([host], port,
-                                             username, password,
-                                             #"lvdisplay " + mp, sudo=True)
-                                             "sudo -k ls " + mp, sudo=True)
-                            LOG.info(_('lvdisplay: return value %d') % lvoutput[host]['exit_code'])
-                            LOG.info(_('lvdisplay: output\n'))
-                            for l in lvoutput[host]['stdout']:
-                                # remove password from the stdout
-                                l.replace(password, '******')
-                                LOG.info(_(l))
-                            for node in preferrednodes:
-                                if node['IPAddress'] == host:
-                                    if lvoutput[host]['exit_code'] is None or lvoutput[host]['exit_code'] == 0:
-                                        node['root_partition_type'] = "lvm"
-                                    else:
-                                        node['root_partition_type'] = "Linux"
-                                    LOG.info(_('%s: root partition is %s') % (node['IPAddress'], node['root_partition_type']))
-                                    break
-
-                    except Exception as ex:
-                        LOG.info(_("Cannot execute lvdisplay command on %s") % host)
-                        LOG.exception(ex)
-        """
         LOG.info(_('Preferred Cassandra Nodes: %s') % str(len(preferrednodes)))
         for node in preferrednodes:
             LOG.info(_(node))
