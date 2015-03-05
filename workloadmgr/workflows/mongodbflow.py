@@ -713,7 +713,7 @@ class MongoDBWorkflow(workflow.Workflow):
         for instance in instances:
             del instance['hypervisor_hostname']
             del instance['hypervisor_type']
-        return dict(instances=instances)
+        return dict(instances=instances, topology=self.topology())
 
     def execute(self):
         if self._store['source_platform'] == "vmware":

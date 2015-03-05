@@ -120,7 +120,7 @@ def getclusterinfo(hosts, port, username, password):
     output = pssh_exec_command(hosts, port, username, password, "nodetool describecluster")
     for host in output:
         if output[host]['exit_code']:
-            LOG.info(_("'nodetool status' on %s cannot be executed. Error %s" % (host, str(output[host]['exit_code']))))
+            LOG.info(_("'nodetool describecluster' on %s cannot be executed. Error %s" % (host, str(output[host]['exit_code']))))
             continue
 
         clusterinfo = {}
@@ -226,7 +226,7 @@ def discovercassandranodes(hosts, port, username, password):
     output = pssh_exec_command(availablenodes, port, username, password, "nodetool info")
     for host in output:
         if output[host]['exit_code'] is not None and output[host]['exit_code'] != 0:
-            LOG.info(_("Cannot execute 'nodetool status' on %s. Error: ") % (host))
+            LOG.info(_("Cannot execute 'nodetool info' on %s. Error: ") % (host))
             for line in output[host]['stdout']:
                 LOG.info(_("%s") % (line))
             continue
@@ -381,7 +381,7 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
             LOG.info(_(node))
         LOG.info(_('Exit get_cassandra_nodes'))
 
-        return preferrednodes, clusterinfo
+        return preferrednodes, allnodes, clusterinfo
     except Exception as ex:
         LOG.info(_("Unexpected Error in get_cassandra_nodes"))
         LOG.exception(ex)
@@ -419,10 +419,11 @@ def main(argv):
         with open(outfile,'w') as outfilehandle:
             pass
         alivenodes = find_alive_nodes(defaultnode, port, username, password, addlnodes)
-        cassandranodes, clusterinfo = get_cassandra_nodes(alivenodes, port, username, password,
-                                                          preferredgroups = preferredgroups,
-                                                          findpartitiontype = findpartitiontype)
-        clusterinfo['cassandranodes'] = cassandranodes
+        cassandranodes, allnodes, clusterinfo = get_cassandra_nodes(alivenodes, port, username, password,
+                                                                    preferredgroups = preferredgroups,
+                                                                    findpartitiontype = findpartitiontype)
+        clusterinfo['preferrednodes'] = cassandranodes
+        clusterinfo['allnodes'] = allnodes
         with open(outfile,'w') as outfilehandle:
             outfilehandle.write(json.dumps(clusterinfo))
 

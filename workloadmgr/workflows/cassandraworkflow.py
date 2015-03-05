@@ -236,7 +236,7 @@ def get_cassandra_nodes(store, findpartitiontype = 'False'):
             clusterinfo = json.loads(fh.read())
             LOG.info(_('Discovered Cassandra Nodes: ' + str(clusterinfo)))
         
-        return clusterinfo['cassandranodes'], clusterinfo
+        return clusterinfo['preferrednodes'], clusterinfo['allnodes'], clusterinfo
 
     finally:
         if os.path.isfile(outfile_path):
@@ -249,7 +249,7 @@ def get_cassandra_nodes(store, findpartitiontype = 'False'):
 def get_cassandra_instances(store, findpartitiontype = 'False'):
     LOG.info(_('Enter get_cassandra_instances'))
     try:
-        cassandra_nodes, clusterinfo = get_cassandra_nodes(store, findpartitiontype = findpartitiontype)
+        cassandra_nodes, allnodes, clusterinfo = get_cassandra_nodes(store, findpartitiontype = findpartitiontype)
 
         cntx = amqp.RpcContext.from_dict(store['context'])
         db = WorkloadMgrDB().db
@@ -304,7 +304,7 @@ def get_cassandra_instances(store, findpartitiontype = 'False'):
                                                   'hypervisor_type' :  hypervisor_type},
                                                   "vm_id")
         LOG.info(_('Discovered Cassandra Virtual Machines: ' + str(vms)))
-        return vms, cassandra_nodes, clusterinfo
+        return vms, cassandra_nodes, allnodes, clusterinfo
     finally:
         LOG.info(_('Exit get_cassandra_instances'))
 
@@ -320,10 +320,10 @@ class CassandraWorkflow(workflow.Workflow):
     @autolog.log_method(Logger, 'CassandraWorkflow.initflow')
     def initflow(self, composite=False):
         try:
-            self._store['instances'], cassandra_nodes, clusterinfo  = \
+            self._store['instances'], cassandra_nodes, allnodes, clusterinfo  = \
                get_cassandra_instances(self._store, findpartitiontype = 'True')
 
-            self._store['topology'] = self.topology(cassandra_nodes, clusterinfo)
+            self._store['topology'] = self.topology(allnodes, clusterinfo)
 
             for index,item in enumerate(self._store['instances']):
                 self._store['instance_'+item['vm_id']] = item
@@ -434,11 +434,11 @@ class CassandraWorkflow(workflow.Workflow):
     @autolog.log_method(Logger, 'CassandraWorkflow.discover')
     def discover(self):
         try:
-            instances, cassnodes, clusterinfo = get_cassandra_instances(self._store, findpartitiontype = 'False')
+            instances, cassnodes, allnodes, clusterinfo = get_cassandra_instances(self._store, findpartitiontype = 'False')
             for instance in instances:
                 del instance['hypervisor_hostname']
                 del instance['hypervisor_type']
-            return dict(instances=instances)
+            return dict(instances=instances, topology=self.topology(allnodes, clusterinfo))
         finally:
             pass
     
