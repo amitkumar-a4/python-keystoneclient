@@ -362,7 +362,8 @@ class CassandraWorkflow(workflow.Workflow):
             LOG.info(_( 'Connecting to cassandra node ' + self._store['CassandraNode']))
 
             if cassnodes == None or clusterinfo == None:
-                cassnodes, clusterinfo = get_cassandra_nodes(self._store, findpartitiontype = 'False')
+                cassnodes, allnodes, clusterinfo = get_cassandra_nodes(self._store, findpartitiontype = 'False')
+                cassnodes = allnodes
 
             dcs = {'name': clusterinfo['Name'], "datacenters":{}, "input":[]}
             for n in cassnodes:

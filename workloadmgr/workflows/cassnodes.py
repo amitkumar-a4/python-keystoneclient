@@ -353,7 +353,7 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
                                 lvoutput = pssh_exec_command([host], port,
                                                  username, password,
                                                  #"lvdisplay " + mp, sudo=True)
-                                                 "sudo -k ls " + mp, sudo=True)
+                                                 "ls " + mp, sudo=True)
                                 LOG.info(_('lvdisplay: return value %d') % lvoutput[host]['exit_code'])
                                 LOG.info(_('lvdisplay: output\n'))
                                 for l in lvoutput[host]['stdout']:
