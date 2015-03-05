@@ -260,10 +260,11 @@ class SSHClient(object):
         logger.debug("Running command %s on %s", command, self.host)
         channel.exec_command(command, **kwargs)
         gevent.sleep(.2)
-        if stdin.channel.closed is False: # If stdin is still open then sudo is asking us for a password
-            logger.debug("Writing credetials for sudo")
-            stdin.write('%s\n' % self.password)
-            stdin.flush()        
+        if sudo or user:
+            if stdin.channel.closed is False: # If stdin is still open then sudo is asking us for a password
+                logger.debug("Writing credetials for sudo")
+                stdin.write('%s\n' % self.password)
+                stdin.flush()        
         logger.debug("Command started")
         while not (channel.recv_ready() or channel.closed):
             gevent.sleep(.2)
