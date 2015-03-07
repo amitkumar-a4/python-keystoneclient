@@ -569,27 +569,30 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context):
         AUDITLOG.log(context,'Import Workloads Requested', None)
-        vault_service = vault.get_vault_service(context)
-        workloads = []
-        for workload_url in vault_service.get_workloads():
-            workload_values = json.loads(vault_service.get_object(workload_url['workload_url'] + '/workload_db'))
-            """
-            try:
-                jobs = self._scheduler.get_jobs()
-                for job in jobs:
-                    if job.kwargs['workload_id'] == workload_values['id']:
-                        self._scheduler._remove_job(job, 'alias', self._jobstore)
-                self.db.purge_workload(context, workload_values['id'])
-            except Exception as ex:
-                LOG.exception(ex)
-            """
-            import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
-            import_workload_method = getattr(import_workload_module, 'import_workload')
-            try:
-                workload = import_workload_method(context, workload_url, models.DB_VERSION)
-                workloads.append(workload)
-            except Exception as ex:
-                LOG.exception(ex)
+        try:
+            vault_service = vault.get_vault_service(context)
+            workloads = []
+            for workload_url in vault_service.get_workloads():
+                workload_values = json.loads(vault_service.get_object(workload_url['workload_url'] + '/workload_db'))
+                """
+                try:
+                    jobs = self._scheduler.get_jobs()
+                    for job in jobs:
+                        if job.kwargs['workload_id'] == workload_values['id']:
+                            self._scheduler._remove_job(job, 'alias', self._jobstore)
+                    self.db.purge_workload(context, workload_values['id'])
+                except Exception as ex:
+                    LOG.exception(ex)
+                """
+                try:            
+                    import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
+                    import_workload_method = getattr(import_workload_module, 'import_workload')
+                    workload = import_workload_method(context, workload_url, models.DB_VERSION)
+                    workloads.append(workload)
+                except Exception as ex:
+                    LOG.exception(ex)
+        except Exception as ex:
+            LOG.exception(ex)                
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
     
