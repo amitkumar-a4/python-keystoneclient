@@ -1,13 +1,12 @@
 from __future__ import print_function
 import sys
 import getopt
-import pssh
 import socket
 import itertools
 import re
 import json
 from workloadmgr.triliopssh import ParallelSSHClient, AuthenticationException
-from pssh import UnknownHostException, ConnectionErrorException, SSHException
+from workloadmgr.triliopssh import UnknownHostException, ConnectionErrorException, SSHException
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
 from workloadmgr import exception
@@ -306,18 +305,17 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
                 if node['--'] not in ("DN", "DL", "DJ", "DM"):
                     ips[node['IPAddress']] = 1
 
-        output = pssh_exec_command(ips, port, username, password, "ifconfig | grep HWaddr")
+        output = pssh_exec_command(ips, port, username, password, "ifconfig | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}'", sudo=True)
         for host in output:
+            for line in output[host]['stdout']:
+                LOG.info(_('%s') % line)            
             if output[host]['exit_code']:
                 LOG.info(_('ifconfig failed on host %s') % host)
-                for line in output[host]['stdout']:
-                    LOG.info(_('%s') % line)
-
-                raise Exception(_('ifconfig failed: Error %s') % str(output[host]['exit_code']))
+                raise Exception(_("ifconfig failed on host '%s' Error Code %s") % (host, str(output[host]['exit_code'])))
             MacAddresses = []
             for line in output[host]['stdout']:
-                # Replace this with a more robust parsing
-                MacAddress = (line.split('HWaddr')[1].strip().lower())
+                LOG.info(_('%s') % line)
+                MacAddress = line.lower()
                 LOG.info(_("Found mac address %s on host %s") % (MacAddress, host))
                 MacAddresses.append(MacAddress)
             if len(MacAddresses) == 0:
