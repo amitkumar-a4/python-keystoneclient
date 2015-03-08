@@ -514,7 +514,7 @@ class MongoDBWorkflow(workflow.Workflow):
     def find_first_alive_node(self):
         # Iterate thru all hosts and pick the one that is alive
         if 'hostnames' in self._store:
-            for host in self._store['hostnames'].split(";"):
+            for host in json.loads(self._store['hostnames']):
                 try:
                     connection = connect_server(host, 
                                                 int(self._store['DBPort']),
