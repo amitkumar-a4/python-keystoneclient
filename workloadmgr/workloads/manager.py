@@ -239,7 +239,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         }
 
         for meta in workload.metadata:
+            if meta.key == 'preferredgroup':
+                continue            
             store[meta.key] = meta.value
+            
         
         workflow_class = get_workflow_class(context, workload.workload_type_id)
         workflow = workflow_class("discover_instances", store)
