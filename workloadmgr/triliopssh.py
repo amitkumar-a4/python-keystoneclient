@@ -274,7 +274,8 @@ class SSHClient(object):
         """Read from output buffers and log to host_logger"""
         for line in output_buffer:
             output = line.strip()
-            host_logger.info("[%s]%s\t%s", self.host, prefix, output,)
+            msg = output.replace(self.password, '******')
+            host_logger.info("[%s]%s\t%s", self.host, prefix, msg,)
             yield output
 
     def _make_sftp(self):
