@@ -802,8 +802,12 @@ def configure_form():
 @bottle.view('configure_form_vmware')
 @authorize()
 def configure_form_vmware():
-    bottle.request.environ['beaker.session']['error_message'] = ''    
-    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+    bottle.request.environ['beaker.session']['error_message'] = ''   
+    Config = ConfigParser.RawConfigParser()
+    Config.read('/etc/tvault-config/tvault-config.conf')
+    config_data = dict(Config._defaults)
+    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return config_data
 
 @bottle.route('/configure_openstack')
 @bottle.view('configure_form_openstack')
@@ -899,7 +903,7 @@ def configure_host():
             command = ['sudo', 'rescan-scsi-bus']
             subprocess.call(command, shell=False)
             
-            if config_data['create-file-system'] == 'on':
+            if config_data['create_file_system'] == 'on':
                 command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
                 subprocess.call(command, shell=False) 
             
@@ -1444,7 +1448,7 @@ def register_workloadtypes():
             
             if config_data['import_workloads'] == 'on':
                 wlm.workloads.importworkloads()
-                 
+            
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception                    
@@ -1466,12 +1470,31 @@ def discover_vcenter():
                 search_opts = {}
                 search_opts['deep_discover'] = '1'
                 client.servers.list(True, search_opts)
+        persist_config()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception                    
     time.sleep(1)
     return {'status':'Success'}
 
+@bottle.post('/configure_openstack')
+@authorize()
+def persist_config():
+    try:
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        for key, vaule in config_data.iteritems():
+            Config.set(None, key, vaule)
+        if not os.path.exists('/etc/tvault-config/'):
+            os.makedirs('/etc/tvault-config/')
+        with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
+            Config.write(configfile)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        raise exception                    
+    time.sleep(1)
+    return {'status':'Success'}    
+    
 @bottle.post('/configure_vmware')
 @authorize()
 def configure_vmware():
@@ -1497,9 +1520,9 @@ def configure_vmware():
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']
         if 'create-file-system' in config_inputs:
-            config_data['create-file-system'] = config_inputs['create-file-system']
+            config_data['create_file_system'] = config_inputs['create-file-system']
         else:
-            config_data['create-file-system'] = 'off'
+            config_data['create_file_system'] = 'off'
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
                
