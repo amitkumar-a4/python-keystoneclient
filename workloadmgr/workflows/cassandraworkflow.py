@@ -399,7 +399,7 @@ class CassandraWorkflow(workflow.Workflow):
                     rv.pop("nodes", None)
                     dv.pop("racks", None)
             dcs.pop("datacenters", None)
-            return dict(topology=dcs)
+            return dict(topology=dcs, keyspaces=clusterinfo['keyspaces'])
         finally:
             pass
 
@@ -473,6 +473,7 @@ def update_cassandra_yaml(mountpath, clustername, nodeip, ips):
     with open(yamlbakpath, 'r') as f:
         doc = yaml.load(f)
 
+    """
     if doc['cluster_name'] != clustername:
         # User chose a new cluster name
         # clean up the system directory
@@ -485,6 +486,7 @@ def update_cassandra_yaml(mountpath, clustername, nodeip, ips):
                 shutil.rmtree(os.path.join(syspath, subdir))
 
     doc['cluster_name'] = clustername
+    """
     if 'listen_address' in doc and doc['listen_address'] != None \
        and doc['listen_address'] != "0.0.0.0":
         doc['listen_address'] = nodeip
@@ -561,6 +563,7 @@ def update_cassandra_env_sh(mountpath, hostname):
             for line in f:
                 if "java.rmi.server.hostname" in line:
                     line = 'JVM_OPTS="$JVM_OPTS -Djava.rmi.server.hostname=' + hostname + '"\n'
+                    line += 'JVM_OPTS="$JVM_OPTS -Dcassandra.load_ring_state=false"\n'
                 fout.write(line)
 
 @autolog.log_method(Logger)

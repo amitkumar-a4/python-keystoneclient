@@ -269,7 +269,6 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
                 # temporarily we only consider the first group
                 # we will figure out how to support second group
                 # incase the first one is unavailable
-                break
 
             downnodes = 0
             for node in preferrednodes:
@@ -384,6 +383,49 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
         LOG.exception(ex)
         raise
 
+#exec_cqlsh_command(['cass1'], 22, 'ubuntu', 'project1', 'SELECT * FROM system.schema_keyspaces where keyspace_name=\'"\'Keyspace1\'"\'')
+#cmd += SELECT * FROM system.schema_keyspaces where keyspace_name=\'"\'Keyspace1\'"\';
+
+@autolog.log_method(Logger)
+def exec_cqlsh_command(hosts, port, user, password, cqlshcommand):
+    cmd = 'bash -c \'echo "'
+    cmd += cqlshcommand
+    cmd += ';" > /tmp/tvault-keyspace ; cqlsh -f /tmp/tvault-keyspace\'' 
+
+    return pssh_exec_command(hosts, port, user, password, cmd)
+
+@autolog.log_method(Logger)
+def get_keyspaces(alivenodes, port, username, password):
+    output = exec_cqlsh_command([alivenodes[0]], port, username, password, 'SELECT * FROM system.schema_keyspaces')
+
+    keyspaces = []
+    for host in output:
+        output[host]['stdout'].pop(0)
+        output[host]['stdout'].pop()
+        output[host]['stdout'].pop()
+        output[host]['stdout'].pop()
+        fieldsout = output[host]['stdout'][0].split('|')
+        
+        fields = []
+        for f in fieldsout:
+            fields.append(f.strip())
+
+        for ksidx, ks in enumerate(output[host]['stdout'][2:]):
+            ksfieldsout = ks.split('|')
+
+            ksdict = {}
+            for idx, ksfield in enumerate(ksfieldsout):
+                ksdict[fields[idx]] = ksfield.strip()
+            keyspaces.append(ksdict)
+
+    tmp = keyspaces
+    keyspaces = []
+    for idx, key in enumerate(tmp):
+        if key['keyspace_name'].lower() != 'system' and key['keyspace_name'].lower() != 'system_traces':
+            keyspaces.append(key)
+
+    return keyspaces
+
 @autolog.log_method(Logger)
 def main(argv):
     try:
@@ -415,12 +457,16 @@ def main(argv):
 
         with open(outfile,'w') as outfilehandle:
             pass
+
         alivenodes = find_alive_nodes(defaultnode, port, username, password, addlnodes)
         cassandranodes, allnodes, clusterinfo = get_cassandra_nodes(alivenodes, port, username, password,
                                                                     preferredgroups = preferredgroups,
                                                                     findpartitiontype = findpartitiontype)
+
         clusterinfo['preferrednodes'] = cassandranodes
         clusterinfo['allnodes'] = allnodes
+        clusterinfo['keyspaces'] = get_keyspaces(alivenodes, port, username, password)
+
         with open(outfile,'w') as outfilehandle:
             outfilehandle.write(json.dumps(clusterinfo))
 
