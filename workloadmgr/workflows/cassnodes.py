@@ -389,8 +389,8 @@ def get_cassandra_nodes(alivenodes, port, username, password, preferredgroups=No
 @autolog.log_method(Logger)
 def exec_cqlsh_command(hosts, port, user, password, cqlshcommand):
     cmd = 'bash -c \'echo "'
-    cmd += cqlshcommand
-    cmd += ';" > /tmp/tvault-keyspace ; cqlsh -f /tmp/tvault-keyspace\'' 
+    cmd += cqlshcommand 
+    cmd += ';" > /tmp/tvault-keyspace ; cqlsh ' + hosts[0] + ' -f /tmp/tvault-keyspace\'' 
 
     return pssh_exec_command(hosts, port, user, password, cmd)
 
