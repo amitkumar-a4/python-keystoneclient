@@ -9,7 +9,6 @@
 	<script src="js/jquery-1.11.0.min.js"></script>
 	<!-- Latest compiled and minified JavaScript -->
 	<script src="js/bootstrap.min.js"></script>
-	<script src="js/tooltip.js" type="text/javascript"></script>
 </head>
 
 <body>
@@ -40,7 +39,7 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/configure" target="_blank">http://&lt;ipaddress-of-tvault-vm&gt;/configure</a>
+                            <a href="/home" target="_blank">http://&lt;ipaddress-of-tvault-vm&gt;/home</a>
                         </div>
                     </li>
                 </ol>
