@@ -73,10 +73,8 @@ app = SessionMiddleware(app, session_opts)
 def postd():
     return bottle.request.forms
 
-
 def post_get(name, default=''):
     return bottle.request.POST.get(name, default).strip()
-
 
 @bottle.post('/login')
 def login():
@@ -117,7 +115,6 @@ def change_password():
     else:
        bottle.redirect("/home")
      
-
 @bottle.post('/change_password')
 @authorize()
 def change_password():
@@ -341,7 +338,6 @@ def authenticate_vcenter():
                                 userName=config_data['vcenter_username'],
                                 password=config_data['vcenter_password'])
         vim_obj.Logout(vim_obj.get_service_content().sessionManager)
-
 
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
@@ -819,10 +815,48 @@ def configure_horizon():
         command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
         subprocess.call(command, shell=False)      
 
-       
+
+@bottle.route('/services/<service_display_name>/<action>')
+@authorize()
+def service_action(service_display_name, action):
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    services = {'api_service' : 'wlm-api',
+                'scheduler_service' : 'wlm-scheduler',
+                'workloads_service' : 'wlm-workloads',
+                'inventory_service' : 'nova-api',
+                'tvault_gui_service' :'tvault-gui',}  
+    try:
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        config_data = dict(Config._defaults)
+        config_status = config_data.get('config_status', 'not_configured')
+        nodetype = config_data.get('nodetype', 'not_configured')
+    except Exception as exception:
+        config_status = 'not_configured'
+        nodetype = 'not_configured'  
+        
+    try:
+        if service_display_name not in services:
+            bottle.redirect("/services")
+        if config_status == 'not_configured':
+            bottle.redirect("/services")
+        if nodetype != 'controller' and service_display_name in ['api_service','scheduler_service','inventory_service',]:
+            bottle.redirect("/services")
+        if action not in ['start', 'stop']:
+            bottle.redirect("/services")
+        command = ['sudo', 'service', services[service_display_name], action];
+        subprocess.call(command, shell=False)        
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        raise exception
+        
+    bottle.redirect("/services_vmware")
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+           
 @bottle.route('/services')
 @authorize()
-def configure_form():
+def services():
     bottle.redirect("/services_vmware")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])                         
@@ -832,11 +866,11 @@ def configure_form():
 @authorize()
 def services_vmware():
     bottle.request.environ['beaker.session']['error_message'] = ''
-    values = {'api_service' : 'wlm-api',
-              'scheduler_service' : 'wlm-scheduler',
-              'workloads_service' : 'wlm-workloads',
-              'inventory_service' : 'nova',
-              'tvault_gui_service' :'tvault-gui',}
+    services = {'api_service' : 'wlm-api',
+                'scheduler_service' : 'wlm-scheduler',
+                'workloads_service' : 'wlm-workloads',
+                'inventory_service' : 'nova-api',
+                'tvault_gui_service' :'tvault-gui',} 
     
     config_status = 'not_configured'
     nodetype = 'not_configured'
@@ -851,31 +885,34 @@ def services_vmware():
         output = subprocess.check_output(command, shell=False)
     except Exception as exception:
         output = ''    
-       
-    output_lines = output.split('\n')   
-    for service_display_name, service_name in values.iteritems():
+    
+    output_lines = output.split('\n')
+    for service_display_name, service_name in services.iteritems():
+        if config_status == 'not_configured':
+            services[service_display_name] = 'Not Configured'
+            continue            
         if nodetype != 'controller' and service_display_name in ['api_service','scheduler_service','inventory_service',]:
-            values[service_display_name] = 'Not Applicable'
+            services[service_display_name] = 'Not Applicable'
             continue        
         for line in output_lines:
             if service_name in line:
                 if 'running' in line:
-                    values[service_display_name] = 'Running'
+                    services[service_display_name] = 'Running'
                 elif 'stop' in line:
-                    values[service_display_name] = 'Stopped'
+                    services[service_display_name] = 'Stopped'
                 else:
-                    values[service_display_name] = 'Unknown'
+                    services[service_display_name] = 'Unknown'
                 break
-        if values[service_display_name] not in ['Running', 'Stopped', 'Unknown']:
-            values[service_display_name] = 'Not Applicable'
+        if services[service_display_name] not in ['Running', 'Stopped', 'Unknown']:
+            services[service_display_name] = 'Not Applicable'
 
                    
-    values['error_message'] = bottle.request.environ['beaker.session']['error_message']
-    return values      
+    services['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return services      
 
 @bottle.route('/logs')
 @authorize()
-def configure_form():
+def logs():
     bottle.redirect("/logs_vmware")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 

@@ -47,9 +47,9 @@
         <!-- Example row of columns -->
         <div class="row">
             <div>
-                <a href="/tvault/tvaultlogs" target="_blank">Basic</a>
+                <a href="/tvault/tvaultlogs" >Basic</a>
             	<br><br>                       
-                <a href="/tvault/tvaultlogs_all" target="_blank">Complete</a>
+                <a href="/tvault/tvaultlogs_all" >Complete</a>
             	<br>
             	<br>                
             </div>

@@ -104,6 +104,8 @@
 	    		<div class="input-group" >
 					%if 'storage_type' in locals() and storage_type == 'local':
 						<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device
+					%elif 'storage_type' not in locals():
+						<input name="storage-type" checked id="storage-type-local" type="radio"  value="local"> Local Device						
 					%else:
 						<input name="storage-type" id="storage-type-local" type="radio"  value="local"> Local Device
 					%end
@@ -150,6 +152,8 @@
 		    <div id="collapseFour" class="panel-collapse collapse in">
 		      <div class="panel-body">
 				%if 'import_workloads' in locals() and import_workloads == 'on':
+					<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads
+				%elif 'import_workloads' not in locals():
 					<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads
 				%else:
 					<input name="import-workloads" id="import-workloads" type="checkbox" > Import Existing Workloads

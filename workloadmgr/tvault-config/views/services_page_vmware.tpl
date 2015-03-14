@@ -55,67 +55,82 @@
 	    <tbody>
 	      <tr>
 	        <td>tVault API Service</td>
-			%if 'api_service' in locals() and 'api_service' == 'Running':
+			%if 'api_service' in locals() and api_service == 'Running':
 		        <td>Running</td>
-		        <td><a href="/tvault/tvault_api_service/stop">Stop</a></td>			
+		        <td><a href="/services/api_service/stop">Stop</a></td>			
 			%elif 'api_service' in locals() and api_service == 'Stopped':
-		        <td>Running</td>
-		        <td><a href="/tvault/tvault_api_service/start">Start</a></td>	
+		        <td>Stopped</td>
+		        <td><a href="/services/api_service/start">Start</a></td>	
+			%elif 'api_service' in locals():
+		        <td>{{api_service}}</td>
+		        <td>None</td>
 			%else:
 		        <td>Not Applicable</td>
-		        <td>None</td>
-	        %end      	        
+		        <td>None</td>		        
+	        %end  	        
 	      </tr>
 	      <tr>
 	        <td>tVault Scheduler Service</td>
 			%if 'scheduler_service' in locals() and scheduler_service == 'Running':
 		        <td>Running</td>
-		        <td><a href="/tvault/tvault_scheduler_service/stop">Stop</a></td>			
+		        <td><a href="/services/scheduler_service/stop">Stop</a></td>			
 			%elif 'scheduler_service' in locals() and scheduler_service == 'Stopped':
-		        <td>Running</td>
-		        <td><a href="/tvault/tvault_scheduler_service/start">Start</a></td>	
+		        <td>Stopped</td>
+		        <td><a href="/services/scheduler_service/start">Start</a></td>	
+			%elif 'scheduler_service' in locals():
+		        <td>{{scheduler_service}}</td>
+		        <td>None</td>
 			%else:
 		        <td>Not Applicable</td>
-		        <td>None</td>
+		        <td>None</td>		        
 	        %end
 	      </tr>
 	      <tr>
 	        <td>tVault Workload Service</td>
 			%if 'workloads_service' in locals() and workloads_service == 'Running':
 		        <td>Running</td>
-		        <td><a href="/tvault/tvault_workloads_service/stop">Stop</a></td>			
+		        <td><a href="/services/workloads_service/stop">Stop</a></td>			
 			%elif 'workloads_service' in locals() and workloads_service == 'Stopped':
-		        <td>Running</td>
-		        <td><a href="/tvault/tvault_workloads_service/start">Start</a></td>	
+		        <td>Stopped</td>
+		        <td><a href="/services/workloads_service/start">Start</a></td>	
+			%elif 'workloads_service' in locals():
+		        <td>{{workloads_service}}</td>
+		        <td>None</td>
 			%else:
 		        <td>Not Applicable</td>
-		        <td>None</td>
+		        <td>None</td>		        
 	        %end
 	      </tr>
 	      <tr>
 	        <td>tVault Inventory Service</td>
 			%if 'inventory_service' in locals() and inventory_service == 'Running':
 		        <td>Running</td>
-		        <td><a href="/tvault/tvault_inventory_service/stop">Stop</a></td>			
+		        <td><a href="/services/inventory_service/stop">Stop</a></td>			
 			%elif 'inventory_service' in locals() and inventory_service == 'Stopped':
-		        <td>Running</td>
-		        <td><a href="/tvault/tvault_inventory_service/start">Start</a></td>	
+		        <td>Stopped</td>
+		        <td><a href="/services/inventory_service/start">Start</a></td>	
+			%elif 'inventory_service' in locals():
+		        <td>{{inventory_service}}</td>
+		        <td>None</td>
 			%else:
 		        <td>Not Applicable</td>
-		        <td>None</td>
+		        <td>None</td>		        
 	        %end
 	      </tr>	
 	      <tr>
-	        <td>tVault Inventory Service</td>
+	        <td>tVault GUI Service</td>
 			%if 'tvault_gui_service' in locals() and tvault_gui_service == 'Running':
 		        <td>Running</td>
-		        <td><a href="/tvault/tvault_tvault-gui_service/stop">Stop</a></td>			
+		        <td><a href="/services/tvault_gui_service/stop">Stop</a></td>			
 			%elif 'tvault_gui_service' in locals() and tvault_gui_service == 'Stopped':
-		        <td>Running</td>
-		        <td><a href="/tvault/tvault_tvault-gui_service/start">Start</a></td>	
+		        <td>Stopped</td>
+		        <td><a href="/services/tvault_gui_service/start">Start</a></td>	
+			%elif 'tvault_gui_service' in locals():
+		        <td>{{tvault_gui_service}}</td>
+		        <td>None</td>
 			%else:
 		        <td>Not Applicable</td>
-		        <td>None</td>
+		        <td>None</td>		        
 	        %end
 	      </tr>			      			      
 	    </tbody>
