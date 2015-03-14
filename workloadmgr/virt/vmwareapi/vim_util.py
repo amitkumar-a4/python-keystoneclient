@@ -163,8 +163,12 @@ def get_object_properties(vim, collector, mobj, type, properties):
 
 def get_dynamic_property(vim, mobj, type, property_name):
     """Gets a particular property of the Managed Object."""
-    property_dict = get_dynamic_properties(vim, mobj, type, [property_name])
-    return property_dict.get(property_name)
+    try:
+        property_dict = get_dynamic_properties(vim, mobj, type, [property_name])
+        return property_dict.get(property_name)
+    except Exception as ex:
+        msg = _("Cannot find properties %(property)s for VM %(vm)s. ") % {'property': str(property_name), 'vm': mobj.value}
+        raise error_util.VimAttributeError(msg, ex)
 
 
 def get_dynamic_properties(vim, mobj, type, property_names):
@@ -173,12 +177,18 @@ def get_dynamic_properties(vim, mobj, type, property_names):
     if hasattr(obj_content, 'token'):
         vim.CancelRetrievePropertiesEx(token=obj_content.token)
     property_dict = {}
-    if obj_content.objects:
-        dynamic_properties = obj_content.objects[0].propSet
-        if dynamic_properties:
-            for prop in dynamic_properties:
-                property_dict[prop.name] = prop.val
-    return property_dict
+    
+    try:
+        if obj_content.objects:
+            dynamic_properties = obj_content.objects[0].propSet
+            if dynamic_properties:
+                for prop in dynamic_properties:
+                    property_dict[prop.name] = prop.val
+        return property_dict
+    except Exception as ex:
+        msg = _("Cannot find properties %(properties)s for VM %(vm)s. ") % {'properties': str(property_names), 'vm': mobj.value}
+        raise error_util.VimAttributeError(msg, ex)
+   
 
 
 def get_objects(vim, type, properties_to_collect=None, all=False):
