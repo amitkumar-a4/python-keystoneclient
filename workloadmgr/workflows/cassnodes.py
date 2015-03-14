@@ -421,7 +421,7 @@ def get_keyspaces(alivenodes, port, username, password):
     tmp = keyspaces
     keyspaces = []
     for idx, key in enumerate(tmp):
-        if key['keyspace_name'].lower() != 'system' and key['keyspace_name'].lower() != 'system_traces':
+        if key['keyspace_name'].lower() not in ['system', 'system_traces', 'dse_system'] :            
             keyspaces.append(key)
 
     return keyspaces
