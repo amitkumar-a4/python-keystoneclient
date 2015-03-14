@@ -2,53 +2,125 @@
 <html>
 
 <head>
-
+	<!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	
+	<!-- Optional theme -->
+	<link rel="stylesheet" href="css/bootstrap-theme.min.css">
+	
+	<script src="js/jquery-1.11.0.min.js"></script>
+	<!-- Latest compiled and minified JavaScript -->
+	<script src="js/bootstrap.min.js"></script>
 </head>
 
 <body>
-    <div class="container">
-        <!-- Example row of columns -->
-        <div class="row">
-            <div>
-            	<br>
-            	<br>
-                <div class="well">
-				  <table class="table table-hover">
-				    <thead>
-				      <tr>
-				        <th class="col-md-1">Name</th>
-				        <th class="col-md-1">Status</th>
-				        <th class="col-md-1">Action</th>
-				      </tr>
-				    </thead>
-				    <tbody>
-				      <tr>
-				        <td>tVault API Service</td>
-				        <td>Not Applicable</td>
-				        <td><a href="/tvault/tvault_api_service" target="_blank">Start</a></td>
-				      </tr>
-				      <tr>
-				        <td>tVault Scheduler Service</td>
-				        <td>Not Applicable</td>
-				        <td><a href="/tvault/tvault_scheduler_service" target="_blank">Start</a></td>
-				      </tr>
-				      <tr>
-				        <td>tVault Workload Service</td>
-				        <td>Not Applicable</td>
-				        <td><a href="/tvault/tvault_workload_service" target="_blank">Start</a></td>
-				      </tr>
-				      <tr>
-				        <td>tVault Inventory Service</td>
-				        <td>Not Applicable</td>
-				        <td><a href="/tvault/tvault_inventory_service" target="_blank">Start</a></td>
-				      </tr>				      
-				    </tbody>
-				  </table>
-				</div>
-            	<br>
-            	<br>				
-            </div>
-        </div>
-    </div>
+	<meta content="text/html; charset=utf-8" http-equiv="content-type">
+	<nav class="navbar navbar-default" role="navigation">
+	  <div class="container-fluid">
+	    <!-- Brand and toggle get grouped for better mobile display -->
+	    <div class="navbar-header">
+	      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+	        <span class="sr-only">Toggle navigation</span>
+	        <span class="icon-bar"></span>
+	        <span class="icon-bar"></span>
+	        <span class="icon-bar"></span>
+	      </button>
+	      <a class="navbar-brand" href="/home"><img src="images/triliodata-144x36.png" alt="Trilio Data, Inc" height="36" width="144"></a>
+	    </div>
+	    <div id="bs-example-navbar-collapse-3" class="collapse navbar-collapse navbar-right">
+	       <button class="btn btn-default navbar-btn" type="button" onClick="parent.location='/logout'">Sign Out</button>
+	    </div>
+	  </div><!-- /.container-fluid -->
+	</nav>
+	<div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
+	  <!-- Default panel contents -->
+	  <div class="panel-heading"><h3 class="panel-title">trilioVault Services</h3></div>
+	  % if len(error_message) > 0:
+		  	<div class="alert alert-danger alert-dismissible" role="alert">
+			  <button type="button" class="close" data-dismiss="alert">
+			  <span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+			  <strong>{{error_message}}</strong>
+	 		</div>
+	  % end
+  	<div style="margin-left:auto; margin-right:auto; padding:20px">	
+  	
+	<table class="table table-hover">
+	    <thead>
+	      <tr>
+	        <th>Name</th>
+	        <th>Status</th>
+	        <th>Action</th>
+	      </tr>
+	    </thead>
+	    <tbody>
+	      <tr>
+	        <td>tVault API Service</td>
+			%if 'api_service' in locals() and 'api_service' == 'Running':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_api_service/stop">Stop</a></td>			
+			%elif 'api_service' in locals() and api_service == 'Stopped':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_api_service/start">Start</a></td>	
+			%else:
+		        <td>Not Applicable</td>
+		        <td>None</td>
+	        %end      	        
+	      </tr>
+	      <tr>
+	        <td>tVault Scheduler Service</td>
+			%if 'scheduler_service' in locals() and scheduler_service == 'Running':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_scheduler_service/stop">Stop</a></td>			
+			%elif 'scheduler_service' in locals() and scheduler_service == 'Stopped':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_scheduler_service/start">Start</a></td>	
+			%else:
+		        <td>Not Applicable</td>
+		        <td>None</td>
+	        %end
+	      </tr>
+	      <tr>
+	        <td>tVault Workload Service</td>
+			%if 'workloads_service' in locals() and workloads_service == 'Running':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_workloads_service/stop">Stop</a></td>			
+			%elif 'workloads_service' in locals() and workloads_service == 'Stopped':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_workloads_service/start">Start</a></td>	
+			%else:
+		        <td>Not Applicable</td>
+		        <td>None</td>
+	        %end
+	      </tr>
+	      <tr>
+	        <td>tVault Inventory Service</td>
+			%if 'inventory_service' in locals() and inventory_service == 'Running':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_inventory_service/stop">Stop</a></td>			
+			%elif 'inventory_service' in locals() and inventory_service == 'Stopped':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_inventory_service/start">Start</a></td>	
+			%else:
+		        <td>Not Applicable</td>
+		        <td>None</td>
+	        %end
+	      </tr>	
+	      <tr>
+	        <td>tVault Inventory Service</td>
+			%if 'tvault_gui_service' in locals() and tvault_gui_service == 'Running':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_tvault-gui_service/stop">Stop</a></td>			
+			%elif 'tvault_gui_service' in locals() and tvault_gui_service == 'Stopped':
+		        <td>Running</td>
+		        <td><a href="/tvault/tvault_tvault-gui_service/start">Start</a></td>	
+			%else:
+		        <td>Not Applicable</td>
+		        <td>None</td>
+	        %end
+	      </tr>			      			      
+	    </tbody>
+	  </table>
+	<br>
+	<br>				
 </body>
 </html>

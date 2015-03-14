@@ -138,19 +138,6 @@ def login_form():
     """Serve login form"""
     return {}
 
-@bottle.route('/services_page_vmware')
-@bottle.view('services_page_vmware')
-@authorize()
-def services_page_vmware():
-    return {}
-
-@bottle.route('/logs_page_vmware')
-@bottle.view('logs_page_vmware')
-@authorize()
-def logs_page_vmware():
-    return {}
-
-
 # Static pages
 @bottle.route('/<filename:re:.*\.png>')
 def send_image(filename):
@@ -198,47 +185,47 @@ def send_upstart_logs(filename):
     return static_file(filename, root='/var/log/upstart', mimetype='text/plain', download=True)
 
 
-@bottle.route('/workloadmgr/<filename:re:.*\.log>')
+@bottle.route('/tvault/workloadmgr/<filename:re:.*\.log>')
 @authorize()
 def send_wlm_logs(filename):
     return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain', download=True)
 
-@bottle.route('/workloadmgr/<filename:re:.*\.log.1>')
+@bottle.route('/tvault/workloadmgr/<filename:re:.*\.log.1>')
 @authorize()
 def send_wlm_logs1(filename):
     return static_file(filename, root='/var/log/workloadmgr', mimetype='text/plain', download=True)
 
-@bottle.route('/tvault-gui/<filename:re:.*\.log>')
+@bottle.route('/tvault/tvault-gui/<filename:re:.*\.log>')
 @authorize()
 def send_tvault_gui_logs(filename):
     return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain', download=True)
 
-@bottle.route('/tvault-gui/<filename:re:.*\.log.1>')
+@bottle.route('/tvault/tvault-gui/<filename:re:.*\.log.1>')
 @authorize()
 def send_tvault_gui_logs1(filename):
     return static_file(filename, root='/var/log/tvault-gui', mimetype='text/plain', download=True)
 
-@bottle.route('/nova/<filename:re:.*\.log>')
+@bottle.route('/tvault/nova/<filename:re:.*\.log>')
 @authorize()
 def send_nova_logs(filename):
     return static_file(filename, root='/var/log/nova', mimetype='text/plain', download=True)
 
-@bottle.route('/nova/<filename:re:.*\.log.1>')
+@bottle.route('/tvault/nova/<filename:re:.*\.log.1>')
 @authorize()
 def send_nova_logs1(filename):
     return static_file(filename, root='/var/log/nova', mimetype='text/plain', download=True)
 
-@bottle.route('/neutron/<filename:re:.*\.log>')
+@bottle.route('/tvault/neutron/<filename:re:.*\.log>')
 @authorize()
 def send_neutron_logs(filename):
     return static_file(filename, root='/var/log/neutron', mimetype='text/plain', download=True)
 
-@bottle.route('/neutron/<filename:re:.*\.log.1>')
+@bottle.route('/tvault/neutron/<filename:re:.*\.log.1>')
 @authorize()
 def send_neutron_logs1(filename):
     return static_file(filename, root='/var/log/neutron', mimetype='text/plain', download=True)
 
-@bottle.route('/keystone/<filename:re:.*\.log>')
+@bottle.route('/tvault/keystone/<filename:re:.*\.log>')
 @authorize()
 def send_keystone_logs(filename):
     return static_file(filename, root='/var/log/keystone', mimetype='text/plain', download=True)
@@ -830,10 +817,77 @@ def configure_horizon():
         command = ['sudo', 'service', 'apache2', 'stop'];
         subprocess.call(command, shell=False)             
         command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
-        subprocess.call(command, shell=False)                       
+        subprocess.call(command, shell=False)      
+
+       
+@bottle.route('/services')
+@authorize()
+def configure_form():
+    bottle.redirect("/services_vmware")
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])                         
+
+@bottle.route('/services_vmware')
+@bottle.view('services_page_vmware')
+@authorize()
+def services_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    values = {'api_service' : 'wlm-api',
+              'scheduler_service' : 'wlm-scheduler',
+              'workloads_service' : 'wlm-workloads',
+              'inventory_service' : 'nova',
+              'tvault_gui_service' :'tvault-gui',}
+    
+    config_status = 'not_configured'
+    nodetype = 'not_configured'
+    try:
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        config_data = dict(Config._defaults)
+        config_status = config_data.get('config_status', 'not_configured')
+        nodetype = config_data.get('nodetype', 'not_configured')
+        
+        command = ['sudo', 'initctl', 'list'];
+        output = subprocess.check_output(command, shell=False)
+    except Exception as exception:
+        output = ''    
+       
+    output_lines = output.split('\n')   
+    for service_display_name, service_name in values.iteritems():
+        if nodetype != 'controller' and service_display_name in ['api_service','scheduler_service','inventory_service',]:
+            values[service_display_name] = 'Not Applicable'
+            continue        
+        for line in output_lines:
+            if service_name in line:
+                if 'running' in line:
+                    values[service_display_name] = 'Running'
+                elif 'stop' in line:
+                    values[service_display_name] = 'Stopped'
+                else:
+                    values[service_display_name] = 'Unknown'
+                break
+        if values[service_display_name] not in ['Running', 'Stopped', 'Unknown']:
+            values[service_display_name] = 'Not Applicable'
+
+                   
+    values['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return values      
+
+@bottle.route('/logs')
+@authorize()
+def configure_form():
+    bottle.redirect("/logs_vmware")
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
+
+@bottle.route('/logs_vmware')
+@bottle.view('logs_page_vmware')
+@authorize()
+def logs_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
             
 @bottle.route('/configure')
-@bottle.view('configure_form')
 @authorize()
 def configure_form():
     bottle.redirect("/configure_vmware")
@@ -1512,9 +1566,12 @@ def discover_vcenter():
                 search_opts = {}
                 search_opts['deep_discover'] = '1'
                 client.servers.list(True, search_opts)
+        config_data['config_status'] = 'success'
         persist_config()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        config_data['config_status'] = 'failed'
+        persist_config()        
         raise exception                    
     time.sleep(1)
     return {'status':'Success'}
