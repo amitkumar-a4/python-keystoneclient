@@ -56,10 +56,11 @@ authorize = aaa.make_auth_decorator(fail_redirect="/login", role="user")
 import datetime
 app = bottle.app()
 session_opts = {
+    'session.auto': True,
     'session.cookie_expires': True,
-    'session.encrypt_key': 'please use a random key and keep it secret!',
+    'session.encrypt_key': '52T8FVYZJse',
     'session.httponly': True,
-    'session.timeout': 3600 * 24,  # 1 day
+    'session.timeout': 1200,  # 20 min
     'session.type': 'cookie',
     'session.validate_key': True,
 }
@@ -114,7 +115,7 @@ def change_password():
     if aaa.current_user.email_addr == 'admin@localhost.local':
        return {}
     else:
-       bottle.redirect("/configure")
+       bottle.redirect("/home")
      
 
 @bottle.post('/change_password')
@@ -122,7 +123,7 @@ def change_password():
 def change_password():
     """Change password"""
     aaa.current_user.update(pwd=post_get('newpassword'), email_addr="info@triliodata.com")
-    bottle.redirect("/configure")
+    bottle.redirect("/home")
 
 
 @bottle.route('/')
@@ -136,6 +137,19 @@ def index():
 def login_form():
     """Serve login form"""
     return {}
+
+@bottle.route('/services_page_vmware')
+@bottle.view('services_page_vmware')
+@authorize()
+def services_page_vmware():
+    return {}
+
+@bottle.route('/logs_page_vmware')
+@bottle.view('logs_page_vmware')
+@authorize()
+def logs_page_vmware():
+    return {}
+
 
 # Static pages
 @bottle.route('/<filename:re:.*\.png>')
@@ -229,7 +243,7 @@ def send_neutron_logs1(filename):
 def send_keystone_logs(filename):
     return static_file(filename, root='/var/log/keystone', mimetype='text/plain', download=True)
 
-@bottle.route('/tvault/logs')
+@bottle.route('/tvault/tvaultlogs')
 @authorize()
 def send_tvault_logs():
     try:
@@ -240,13 +254,41 @@ def send_tvault_logs():
         os.mkdir('/tmp/tvaultlogs')
         logtarfilename = '/tmp/tvaultlogs/tvaultlogs_' + datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + '.tar'
         logtar = tarfile.open(name=logtarfilename, mode='w:gz')
-        logtar.add('/var/log/workloadmgr')
-        #logtar.add('/var/log/nova')
-        #logtar.add('/var/log/tvault-gui')
+        if os.path.exists('/var/log/workloadmgr'):
+            logtar.add('/var/log/workloadmgr')
         logtar.close()
         return static_file(os.path.basename(logtarfilename), root='/tmp/tvaultlogs', mimetype='text/plain', download=True)
     except Exception as exception:
         raise exception
+    
+@bottle.route('/tvault/tvaultlogs_all')
+@authorize()
+def send_tvaultlogs_all():
+    try:
+        try:
+            shutil.rmtree('/tmp/tvaultlogs_all')
+        except Exception as exception:
+            pass
+        os.mkdir('/tmp/tvaultlogs_all')
+        logtarfilename = '/tmp/tvaultlogs_all/tvaultlogs_' + datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + '.tar'
+        logtar = tarfile.open(name=logtarfilename, mode='w:gz')
+        if os.path.exists('/var/log/workloadmgr'):
+            logtar.add('/var/log/workloadmgr')
+        if os.path.exists('/var/log/tvault-gui'):
+            logtar.add('/var/log/tvault-gui')
+        if os.path.exists('/var/log/nova'):
+            logtar.add('/var/log/nova')
+        if os.path.exists('/var/log/glance'):
+            logtar.add('/var/log/glance')
+        if os.path.exists('/var/log/keystone'):
+            logtar.add('/var/log/keystone')
+        if os.path.exists('/var/log/upstart'):
+            logtar.add('/var/log/upstart')
+
+        logtar.close()
+        return static_file(os.path.basename(logtarfilename), root='/tmp/tvaultlogs_all', mimetype='text/plain', download=True)
+    except Exception as exception:
+        raise exception    
 
 """############################ tvault config API's ########################"""
 
@@ -802,8 +844,12 @@ def configure_form():
 @bottle.view('configure_form_vmware')
 @authorize()
 def configure_form_vmware():
-    bottle.request.environ['beaker.session']['error_message'] = ''    
-    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+    bottle.request.environ['beaker.session']['error_message'] = ''   
+    Config = ConfigParser.RawConfigParser()
+    Config.read('/etc/tvault-config/tvault-config.conf')
+    config_data = dict(Config._defaults)
+    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return config_data
 
 @bottle.route('/configure_openstack')
 @bottle.view('configure_form_openstack')
@@ -899,7 +945,7 @@ def configure_host():
             command = ['sudo', 'rescan-scsi-bus']
             subprocess.call(command, shell=False)
             
-            if config_data['create-file-system'] == 'on':
+            if config_data['create_file_system'] == 'on':
                 command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
                 subprocess.call(command, shell=False) 
             
@@ -1444,7 +1490,7 @@ def register_workloadtypes():
             
             if config_data['import_workloads'] == 'on':
                 wlm.workloads.importworkloads()
-                 
+            
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception                    
@@ -1466,12 +1512,31 @@ def discover_vcenter():
                 search_opts = {}
                 search_opts['deep_discover'] = '1'
                 client.servers.list(True, search_opts)
+        persist_config()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception                    
     time.sleep(1)
     return {'status':'Success'}
 
+@bottle.post('/configure_openstack')
+@authorize()
+def persist_config():
+    try:
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        for key, vaule in config_data.iteritems():
+            Config.set(None, key, vaule)
+        if not os.path.exists('/etc/tvault-config/'):
+            os.makedirs('/etc/tvault-config/')
+        with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
+            Config.write(configfile)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        raise exception                    
+    time.sleep(1)
+    return {'status':'Success'}    
+    
 @bottle.post('/configure_vmware')
 @authorize()
 def configure_vmware():
@@ -1497,32 +1562,14 @@ def configure_vmware():
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']
         if 'create-file-system' in config_inputs:
-            config_data['create-file-system'] = config_inputs['create-file-system']
+            config_data['create_file_system'] = config_inputs['create-file-system']
         else:
-            config_data['create-file-system'] = 'off'
+            config_data['create_file_system'] = 'off'
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']
-        if config_data['ldap_server_url']:
-            config_data['ldap_domain_name_suffix'] = config_inputs['ldap-domain-name-suffix']
-            config_data['ldap_user_tree_dn'] = config_inputs['ldap-user-tree-dn']
-            config_data['ldap_user_dn'] = config_inputs['ldap-user-dn']
-            config_data['ldap_user_password'] = config_data['vcenter_password'] 
-            config_data['ldap_use_dumb_member'] = False
-            config_data['ldap_user_allow_create'] = False
-            config_data['ldap_user_allow_update'] = False
-            config_data['ldap_user_allow_delete'] = False
-            config_data['ldap_tenant_allow_create'] = False
-            config_data['ldap_tenant_allow_update'] = False
-            config_data['ldap_tenant_allow_delete'] = False
-            config_data['ldap_role_allow_create'] = False
-            config_data['ldap_role_allow_update'] = False
-            config_data['ldap_role_allow_delete'] = False
-            config_data['ldap_user_objectclass'] = config_inputs['ldap-user-objectclass']
-            config_data['ldap_user_name_attribute'] = config_inputs['ldap-user-name-attribute']
-                      
-        else:
+        if not config_data['ldap_server_url'] or  config_data['ldap_server_url'] == "ldap://localhost":
             config_data['ldap_server_url'] = "ldap://localhost"
             config_data['ldap_domain_name_suffix'] = "dc=openstack,dc=org"
             config_data['ldap_user_tree_dn'] = "ou=Users,dc=openstack,dc=org"
@@ -1539,7 +1586,25 @@ def configure_vmware():
             config_data['ldap_role_allow_update'] = True
             config_data['ldap_role_allow_delete'] = True
             config_data['ldap_user_objectclass'] = "inetOrgPerson" 
-            config_data['ldap_user_name_attribute'] = "sn"            
+            config_data['ldap_user_name_attribute'] = "sn"                       
+        else:
+            config_data['ldap_domain_name_suffix'] = config_inputs['ldap-domain-name-suffix']
+            config_data['ldap_user_tree_dn'] = config_inputs['ldap-user-tree-dn']
+            config_data['ldap_user_dn'] = config_inputs['ldap-user-dn']
+            config_data['ldap_user_password'] = config_data['vcenter_password'] 
+            config_data['ldap_use_dumb_member'] = False
+            config_data['ldap_user_allow_create'] = False
+            config_data['ldap_user_allow_update'] = False
+            config_data['ldap_user_allow_delete'] = False
+            config_data['ldap_tenant_allow_create'] = False
+            config_data['ldap_tenant_allow_update'] = False
+            config_data['ldap_tenant_allow_delete'] = False
+            config_data['ldap_role_allow_create'] = False
+            config_data['ldap_role_allow_update'] = False
+            config_data['ldap_role_allow_delete'] = False
+            config_data['ldap_user_objectclass'] = config_inputs['ldap-user-objectclass']
+            config_data['ldap_user_name_attribute'] = config_inputs['ldap-user-name-attribute']
+                       
 
         config_data['keystone_admin_url'] = "http://" + config_data['tvault_primary_node'] + ":35357/v2.0"
         config_data['keystone_public_url'] = "http://" + config_data['tvault_primary_node'] + ":5000/v2.0"
@@ -1621,10 +1686,8 @@ def configure_openstack():
 @authorize()
 def configure():
     bottle.request.environ['beaker.session']['error_message'] = ''
-    
     try:
         config_inputs = bottle.request.POST
-       
         bottle.redirect("/configure_" + config_inputs['configuration-type'])
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -1632,6 +1695,13 @@ def configure():
            raise exception
         else:
            bottle.redirect("/configure")
+           
+@bottle.route('/home')
+@bottle.view('home_vmware')
+@authorize()
+def home():
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
 
 def findXmlSection(dom, sectionName):
     sections = dom.getElementsByTagName(sectionName)

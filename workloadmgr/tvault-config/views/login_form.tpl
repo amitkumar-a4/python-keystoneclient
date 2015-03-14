@@ -33,7 +33,7 @@
 <div class="container" style="width:370px">
  <img width="200" height="100" src="images/triliovault.png" alt="trilio-splash" id="tdmini">
  <form role="form" class="form-signin" action="/login" method="post">
-  <h2 class="form-signin-heading">Configure</h2><br><br>
+  <h2 class="form-signin-heading">Appliance Configuration</h2><br><br>
         <input name="username" type="text" autofocus="" required="" placeholder="User Name" class="form-control"><br>
         <input name="password" type="password" required="" placeholder="Password" class="form-control">
         <br>
