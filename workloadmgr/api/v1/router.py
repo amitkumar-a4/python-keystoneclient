@@ -112,7 +112,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workloads/import_workloads",
                        controller=self.resources['workloads'],
                        action='import_workloads',
-                       conditions={"method": ['POST']})    
+                       conditions={"method": ['POST']})  
+        
+        #import workloads
+        mapper.connect("workloads_settings",
+                       "/{project_id}/workloads/settings",
+                       controller=self.resources['workloads'],
+                       action='settings',
+                       conditions={"method": ['POST']})            
         
         #get workloadmanager nodes
         mapper.connect("workloads_nodes",

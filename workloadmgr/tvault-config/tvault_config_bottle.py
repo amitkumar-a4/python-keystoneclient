@@ -1619,8 +1619,8 @@ def persist_config():
     try:
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
-        for key, vaule in config_data.iteritems():
-            Config.set(None, key, vaule)
+        for key, value in config_data.iteritems():
+            Config.set(None, key, value)
         if not os.path.exists('/etc/tvault-config/'):
             os.makedirs('/etc/tvault-config/')
         with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:

@@ -5,11 +5,13 @@
 
 """The workloads api."""
 
+import os
 import json
 import webob
 from webob import exc
 from xml.dom import minidom
 from datetime import datetime
+import ConfigParser
 
 from cgi import parse_qs, escape
 from workloadmgr.api import extensions
@@ -546,8 +548,35 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))                      
+            raise exc.HTTPServerError(explanation=unicode(error))   
+        
+    def settings(self, req, body=None):                           
+        """settings"""
+        try:
+            context = req.environ['workloadmgr.context']
+            Config = ConfigParser.RawConfigParser()
+            Config.read('/opt/stack/data/wlm/settings/workloadmgr-settings.conf')
+                        
+            if (body and 'settings' in body):
+                for key, value in body['settings'].iteritems():
+                    Config.set(None, key, value)
+                if not os.path.exists('/opt/stack/data/wlm/settings/'):
+                    os.makedirs('/opt/stack/data/wlm/settings/')                      
+                with open('/opt/stack/data/wlm/settings/workloadmgr-settings.conf', 'wb') as configfile:
+                    Config.write(configfile)                
 
+            settings = dict(Config._defaults)
+            return {'settings': settings}
+        except exception.WorkloadNotFound as error:
+            LOG.exception(error)
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            LOG.exception(error)
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+        
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
 
