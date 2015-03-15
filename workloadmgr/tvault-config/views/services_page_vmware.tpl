@@ -56,10 +56,10 @@
 	      <tr>
 	        <td>tVault API Service</td>
 			%if 'api_service' in locals() and api_service == 'Running':
-		        <td>Running</td>
+		        <td style="color:green">Running</td>
 		        <td><a href="/services/api_service/stop">Stop</a></td>			
 			%elif 'api_service' in locals() and api_service == 'Stopped':
-		        <td>Stopped</td>
+		        <td style="color:red">Stopped</td>
 		        <td><a href="/services/api_service/start">Start</a></td>	
 			%elif 'api_service' in locals():
 		        <td>{{api_service}}</td>
@@ -72,10 +72,10 @@
 	      <tr>
 	        <td>tVault Scheduler Service</td>
 			%if 'scheduler_service' in locals() and scheduler_service == 'Running':
-		        <td>Running</td>
+		        <td style="color:green">Running</td>
 		        <td><a href="/services/scheduler_service/stop">Stop</a></td>			
 			%elif 'scheduler_service' in locals() and scheduler_service == 'Stopped':
-		        <td>Stopped</td>
+		        <td style="color:red">Stopped</td>
 		        <td><a href="/services/scheduler_service/start">Start</a></td>	
 			%elif 'scheduler_service' in locals():
 		        <td>{{scheduler_service}}</td>
@@ -88,10 +88,10 @@
 	      <tr>
 	        <td>tVault Workload Service</td>
 			%if 'workloads_service' in locals() and workloads_service == 'Running':
-		        <td>Running</td>
+		        <td style="color:green">Running</td>
 		        <td><a href="/services/workloads_service/stop">Stop</a></td>			
 			%elif 'workloads_service' in locals() and workloads_service == 'Stopped':
-		        <td>Stopped</td>
+		        <td style="color:red">Stopped</td>
 		        <td><a href="/services/workloads_service/start">Start</a></td>	
 			%elif 'workloads_service' in locals():
 		        <td>{{workloads_service}}</td>
@@ -104,10 +104,10 @@
 	      <tr>
 	        <td>tVault Inventory Service</td>
 			%if 'inventory_service' in locals() and inventory_service == 'Running':
-		        <td>Running</td>
+		        <td style="color:green">Running</td>
 		        <td><a href="/services/inventory_service/stop">Stop</a></td>			
 			%elif 'inventory_service' in locals() and inventory_service == 'Stopped':
-		        <td>Stopped</td>
+		        <td style="color:red">Stopped</td>
 		        <td><a href="/services/inventory_service/start">Start</a></td>	
 			%elif 'inventory_service' in locals():
 		        <td>{{inventory_service}}</td>
@@ -120,10 +120,10 @@
 	      <tr>
 	        <td>tVault GUI Service</td>
 			%if 'tvault_gui_service' in locals() and tvault_gui_service == 'Running':
-		        <td>Running</td>
+		        <td style="color:green">Running</td>
 		        <td><a href="/services/tvault_gui_service/stop">Stop</a></td>			
 			%elif 'tvault_gui_service' in locals() and tvault_gui_service == 'Stopped':
-		        <td>Stopped</td>
+		        <td style="color:red">Stopped</td>
 		        <td><a href="/services/tvault_gui_service/start">Start</a></td>	
 			%elif 'tvault_gui_service' in locals():
 		        <td>{{tvault_gui_service}}</td>
