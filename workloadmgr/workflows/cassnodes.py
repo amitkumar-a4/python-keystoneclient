@@ -12,6 +12,7 @@ from workloadmgr import autolog
 from workloadmgr import exception
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import flags
+from workloadmgr import utils
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -81,7 +82,8 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
 def pssh_exec_command(hosts, port, user, password, command, sudo=False):
     try:
         LOG.info(_("pssh_exec_command - hosts: %s") % (str(hosts)))
-        client = ParallelSSHClient(hosts, user=user, password=password, port=int(port), timeout=120)
+        timeout = utils.get_settings().get('cassandra_discovery_timeout', '120')
+        client = ParallelSSHClient(hosts, user=user, password=password, port=int(port), timeout=int(timeout))
         LOG.info(_("pssh_exec_command: %s") % (command))
         output = client.run_command(command, sudo=sudo)
         # dump environment if any node fails with command not found
