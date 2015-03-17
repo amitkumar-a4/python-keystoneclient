@@ -10,7 +10,19 @@
 	<script src="js/jquery-1.11.0.min.js"></script>
 	<!-- Latest compiled and minified JavaScript -->
 	<script src="js/bootstrap.min.js"></script>
-	
+
+	<script>
+	function warnCreateFileSystem(cb) {
+	  if(cb.checked == true){
+	   var r = confirm("Creating a new file system will erase the previous contents permanently.\nDo you want to create a new file system?");
+	   if (r == true) {
+		   cb.checked = true;
+	   } else {
+	     cb.checked = false;
+	   }
+	  }
+	}
+	</script>  
 </head>
 
 <body>
@@ -34,7 +46,7 @@
 	</nav>
 	<div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
 	  <!-- Default panel contents -->
-	  <div class="panel-heading"><h3 class="panel-title">trilioVault</h3></div>
+	  <div class="panel-heading"><h3 class="panel-title">trilioVault Troubleshooting</h3></div>
 	  % if len(error_message) > 0:
 		  	<div class="alert alert-danger alert-dismissible" role="alert">
 			  <button type="button" class="close" data-dismiss="alert">
@@ -43,20 +55,15 @@
 	 		</div>
 	  % end
   	<div style="margin-left:auto; margin-right:auto; padding:20px">	
-    <div class="container">
-        <!-- Example row of columns -->
-        <div class="row">
-            <div>
-                <a href="/configure">Configuration</a>
-            	<br><br>                       
-                <a href="/services">Services</a>
-            	<br><br>
-                <a href="/logs">Logs</a>
-            	<br><br>
-                <a href="/troubleshooting">Troubleshooting</a>
-            	<br>              	                
-            </div>
-        </div>
-    </div>
+	<form class="form-inline" method="post">
+		<label >Hostname/IPAddress </label>
+		<input {{'value=' + ping_address if defined('ping_address') else ''}} class="form-control" name="ping_address" type="text" required>
+	   	<button type="submit" class="btn btn-primary">Ping</button>
+	</form>
+	<br>
+	<textarea name=ping_output_textarea" rows="10" cols="75" readonly>
+{{ping_output if defined('ping_output') else ''}}
+	</textarea>		
+  </div>
 </body>
 </html>

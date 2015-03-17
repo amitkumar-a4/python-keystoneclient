@@ -910,6 +910,34 @@ def services_vmware():
     services['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return services      
 
+@bottle.route('/troubleshooting')
+@authorize()
+def logs():
+    bottle.redirect("/troubleshooting_vmware")
+    bottle.request.environ['beaker.session']['error_message'] = ''    
+    return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
+
+@bottle.post('/troubleshooting_vmware')
+@bottle.route('/troubleshooting_vmware')
+@bottle.view('troubleshooting_page_vmware')
+@authorize()
+def troubleshooting_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    values = {}
+    if bottle.request and bottle.request.POST:    
+        try:
+            values['ping_address'] = bottle.request.POST['ping_address']
+            command = ['sudo', 'ping', '-c 6', values['ping_address']];
+            output = subprocess.check_output(command, shell=False)                
+            values['ping_output'] = output
+        except subprocess.CalledProcessError as ex:
+            values['ping_output'] = str(ex.output)
+        except Exception as ex:
+            values['ping_output'] = str(ex)
+    
+    values['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return values
+
 @bottle.route('/logs')
 @authorize()
 def logs():
