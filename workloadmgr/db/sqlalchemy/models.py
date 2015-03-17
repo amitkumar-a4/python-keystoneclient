@@ -485,6 +485,27 @@ class RestoredVMResourceMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)    
 
+class Tasks(BASE, WorkloadsBase):
+    """Represents Tasks"""
+    __tablename__ = str('tasks')
+    id = Column(String(255), primary_key=True)
+
+    display_name = Column(String(255))
+    display_description = Column(String(255))
+    finished_at = Column(DateTime)
+    result = Column(String(65535))
+    status =  Column(String(32), nullable=False)
+    
+class TaskStatusMessages(BASE, WorkloadsBase):
+    """Represents  messages for the task"""
+    __tablename__ = 'task_status_messages'
+
+    id = Column(Integer, primary_key=True)
+    task_id = Column(String(36), ForeignKey('tasks.id'), nullable=False)
+    task = relationship(Tasks, backref=backref('status_messages'))
+    status_message = Column(Text)      
+
+
         
 def register_models():
     """Register Models and create metadata.
@@ -495,7 +516,6 @@ def register_models():
     """
     from sqlalchemy import create_engine
     models = (Service,
-              VaultServices,
               WorkloadTypes,
               WorkloadTypeMetadata,
               Workloads,
@@ -518,6 +538,7 @@ def register_models():
               RestoredVMs,
               RestoredVMResources,
               RestoredVMResourceMetadata,
+              Tasks,
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

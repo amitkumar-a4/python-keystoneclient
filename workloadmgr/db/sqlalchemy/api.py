@@ -2148,6 +2148,153 @@ def restored_vm_resource_delete(context, id, vm_id, restore_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
+#### Tasks ################################################################
+""" task functions """
+def _set_status_messages_for_task(context, task_ref, status_messages, session):
+    """
+    Create or update a set of task_status_messages for a given task
+
+    :param context: Request context
+    :param task_ref: A task object
+    :param status_messages: A dict of status_messages to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    for status_message in status_messages.iteritems():
+        status_messages_values = {'task_id': task_ref.id, 'status_message': status_message}
+        _task_status_messages_create(context, status_messages_values, session)
+
+@require_context
+def _task_status_messages_create(context, values, session):
+    """Create a TaskStatusMessages object"""
+    status_messages_ref = models.TaskStatusMessages()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _task_status_messages_update(context, status_messages_ref, values, session)
+
+@require_context
+def task_status_messages_create(context, values, session):
+    """Create an TaskStatusMessages object"""
+    session = get_session()
+    return _task_status_messages_create(context, values, session)
+
+@require_context
+def _task_status_messages_update(context, status_messages_ref, values, session):
+    """
+    Used internally by task_status_messages_create and task_status_messages_update
+    """
+    values["deleted"] = False
+    status_messages_ref.update(values)
+    status_messages_ref.save(session=session)
+    return status_messages_ref
+
+@require_context
+def _task_status_messages_delete(context, status_messages_ref, session):
+    """
+    Used internally by task_status_messages_create and task_status_messages_update
+    """
+    status_messages_ref.delete(session=session)
+
+def _task_update(context, values, task_id, session):
+    try:
+        lock.acquire()    
+        status_messages = values.pop('status_messages', {})
+        
+        if task_id:
+            task_ref = model_query(context, models.Tasks, session=session, read_deleted="yes").\
+                                        filter_by(id=task_id).first()
+            if not task_ref:
+                lock.release()
+                raise exception.TasksNotFound(task_id = task_id)
+                                                        
+        else:
+            task_ref = models.Tasks()
+            if not values.get('id'):
+                values['id'] = str(uuid.uuid4())
+                
+        task_ref.update(values)
+        task_ref.save(session)
+        
+        if status_messages:
+            _set_status_messages_for_task(context, task_ref, status_messages, ession=session)  
+          
+        return task_ref
+    finally:
+        lock.release()
+    return task_ref               
+        
+@require_context
+def _task_get(context, task_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(   context, models.Tasks, **kwargs).\
+                            options(sa_orm.joinedload(models.Tasks.status_messages)).\
+                            filter_by(id=task_id).\
+                            first()
+
+    if not result:
+        raise exception.TasksNotFound(task_id=task_id)
+
+    return result
+
+@require_context
+def task_get(context, task_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()    
+    return _task_get(context, task_id, **kwargs) 
+
+@require_admin_context
+def task_get_all(context, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+
+    return model_query(context, models.Tasks, **kwargs).\
+                        options(sa_orm.joinedload(models.Tasks.status_messages)).\
+                        order_by(models.Tasks.created_at.desc()).all()        
+
+@require_context
+def task_get_all_by_project(context, project_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    authorize_project_context(context, project_id)
+    return model_query(context, models.Tasks, **kwargs).\
+                            options(sa_orm.joinedload(models.Tasks.status_messages)).\
+                            filter_by(project_id=project_id).all()
+        
+
+@require_context
+def task_show(context, task_id):
+    session = get_session()
+    result = model_query(context, models.Tasks, session=session).\
+                            options(sa_orm.joinedload(models.Tasks.status_messages)).\
+                            filter_by(id=task_id).\
+                            first()
+
+    if not result:
+        raise exception.TasksNotFound(task_id=task_id)
+
+    return result
+
+@require_context
+def task_create(context, values):
+    session = get_session()
+    return _task_update(context, values, None, False, session)
+
+@require_context
+def task_update(context, task_id, values):
+    session = get_session()
+    return _task_update(context, values, task_id, session)
+
+@require_context
+def task_delete(context, task_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.Tasks).\
+            filter_by(id=task_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
 """
 Permanent Deletes
 """

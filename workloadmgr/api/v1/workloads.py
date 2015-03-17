@@ -24,6 +24,7 @@ from workloadmgr import workloads as workloadAPI
 from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
+from workloadmgr import settings as settings_module
 
 FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
@@ -556,16 +557,12 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             Config = ConfigParser.RawConfigParser()
             Config.read('/opt/stack/data/wlm/settings/workloadmgr-settings.conf')
-                        
+            
+            settings = None            
             if (body and 'settings' in body):
-                for key, value in body['settings'].iteritems():
-                    Config.set(None, key, value)
-                if not os.path.exists('/opt/stack/data/wlm/settings/'):
-                    os.makedirs('/opt/stack/data/wlm/settings/')                      
-                with open('/opt/stack/data/wlm/settings/workloadmgr-settings.conf', 'wb') as configfile:
-                    Config.write(configfile)                
-
-            settings = dict(Config._defaults)
+                settings = settings_module.set_settings(body['settings'])
+            if not settings:
+                settings = settings_module.get_settings()
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)

@@ -456,7 +456,36 @@ def upgrade(migrate_engine):
         Column('value', Text()),
         UniqueConstraint('restored_vm_resource_id', 'key'),
         mysql_engine='InnoDB'
-    )            
+    )
+    
+    tasks = Table(
+        'tasks', meta,
+        Column('created_at', DateTime),
+        Column('finished_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('version', String(length=255)),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('display_name', String(length=255)),
+        Column('display_description', String(length=255)),
+        Column('result', String(length=65535)),
+        Column('status', String(length=32), nullable=False),
+        mysql_engine='InnoDB'
+    )
+    
+    task_status_messages = Table(
+        'task_status_messages', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('version', String(length=255)),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('task_id', String(length=255), ForeignKey('tasks.id'),nullable=False,index=True),        
+        Column('status_message', Text()),
+        mysql_engine='InnoDB'
+    )                        
    
     # create all tables
     # Take care on create order for those with FK dependencies
@@ -484,7 +513,9 @@ def upgrade(migrate_engine):
               restores,
               restored_vms,
               restored_vm_resources,
-              restored_vm_resource_metadata]
+              restored_vm_resource_metadata,
+              tasks,
+              task_status_messages]
 
     for table in tables:
         try:

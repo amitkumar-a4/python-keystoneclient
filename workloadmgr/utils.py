@@ -1487,13 +1487,3 @@ def check_ssh_injection(cmd_list):
                 if result == 0 or not arg[result - 1] == '\\':
                     raise exception.SSHInjectionThreat(command=cmd_list)
 
-def get_settings():                           
-    """settings"""
-    try:
-        Config = ConfigParser.RawConfigParser()
-        Config.read('/opt/stack/data/wlm/settings/workloadmgr-settings.conf')
-        return dict(Config._defaults)
-    except exception.WorkloadNotFound as error:
-        LOG.exception(error)
-        return {}
-
