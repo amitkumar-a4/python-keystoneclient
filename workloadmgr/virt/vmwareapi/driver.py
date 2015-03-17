@@ -1357,6 +1357,7 @@ class VMwareVCDriver(VMwareESXDriver):
         Restores the specified instance from a snapshot
         """
         try:
+            LOG.info(_('Restore Options: %s') % str(instance_options))
             restore_obj = db.restore_get(cntx, restore['id'])
             snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
             instance['uuid']= instance_uuid = instance_options['id']
@@ -1367,6 +1368,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 
             msg = 'Creating VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id  
             db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
+            LOG.info(msg)
             
             client_factory = self._session._get_vim().client.factory
             service_content = self._session._get_vim().get_service_content()
@@ -1411,6 +1413,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot_vm_resource.resource_type == 'vmx':
                     vmx_name = "%s/%s" % (folder_name, os.path.basename(snapshot_vm_resource.resource_name))
                     url_compatible = vmx_name.replace(" ", "%20")
+                    LOG.info(_('Restoring vmx: %s %s') % (vmx_datastore_name, vmx_name))
                     vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
                                             self._session._host_ip,
                                             datacenter_name,
@@ -1421,6 +1424,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
                     vmdk_write_file_handle.write(vmx_file_data)
                     vmdk_write_file_handle.close()
+                    LOG.info(_('Restored vmx: %s %s') % (vmx_datastore_name, vmx_name))
                     break    
                     
             """Register VM on ESX host."""
@@ -1480,11 +1484,12 @@ class VMwareVCDriver(VMwareESXDriver):
             if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
                 hardware_devices = hardware_devices.VirtualDevice
             
+            LOG.info(_('Detaching disks'))
             for device in hardware_devices:
                 if device.__class__.__name__ == "VirtualDisk":
                     self._detach_disk_from_vm(vm_ref, instance, device, destroy_disk=False)
             
-                  
+            LOG.info(_('Reconfiguring networks'))      
             for device in hardware_devices:
                 if hasattr(device, 'backing') and device.backing:
                     new_network_ref = None
@@ -1534,6 +1539,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                 {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
                     
             #restore, rebase, commit & upload
+            LOG.info(_('Uploading disks'))
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
@@ -1995,42 +2001,36 @@ class VMwareAPISession(object):
         Return a Deferred that will give the result of the given task.
         The task is polled until it completes.
         """
-        done = event.Event()
-        loop = loopingcall.FixedIntervalLoopingCall(self._poll_task,
-                                                    instance_uuid,
-                                                    task_ref, done)
-        loop.start(CONF.vmware.task_poll_interval)
-        ret_val = done.wait()
-        loop.stop()
-        return ret_val
+        loop = loopingcall.FixedIntervalLoopingCall(self._poll_task, instance_uuid, task_ref)
+        evt = loop.start(CONF.vmware.task_poll_interval)
+        LOG.debug("Waiting for the task: %s to complete.", task_ref)
+        return evt.wait()    
 
     @autolog.log_method(Logger, 'VMwareAPISession._poll_task', log_retval = False)
-    def _poll_task(self, instance_uuid, task_ref, done):
+    def _poll_task(self, instance_uuid, task_ref):
         """
         Poll the given task, and fires the given Deferred if we
         get a result.
         """
         try:
-            task_info = self._call_method(vim_util, "get_dynamic_property",
-                            task_ref, "Task", "info")
+            task_info = self._call_method(vim_util, "get_dynamic_property", task_ref, "Task", "info")
+        except Exception as excep:
+            LOG.info(_("In vmwareapi:_poll_task, Got this error %s") % excep)
+            raise
+        else:            
             task_name = task_info.name
             if task_info.state in ['queued', 'running']:
+                if hasattr(task_info, 'progress'):
+                    LOG.info("Task: %(task)s progress is %(progress)s%%.", {'task': task_ref, 'progress': task_info.progress})                
                 return
             elif task_info.state == 'success':
-                LOG.debug(_("Task [%(task_name)s] %(task_ref)s "
-                            "status: success"),
-                          {'task_name': task_name, 'task_ref': task_ref})
-                done.send(task_info)
+                LOG.info(_("Task [%(task_name)s] %(task_ref)s status: success"), {'task_name': task_name, 'task_ref': task_ref})
+                raise loopingcall.LoopingCallDone(task_info)
             else:
                 error_info = str(task_info.error.localizedMessage)
-                LOG.warn(_("Task [%(task_name)s] %(task_ref)s "
-                          "status: error %(error_info)s"),
-                         {'task_name': task_name, 'task_ref': task_ref,
-                          'error_info': error_info})
-                done.send_exception(exception.WorkloadMgrException(error_info))
-        except Exception as excep:
-            LOG.warn(_("In vmwareapi:_poll_task, Got this error %s") % excep)
-            done.send_exception(excep)
-            
+                LOG.info(_("Task [%(task_name)s] %(task_ref)s status: error %(error_info)s"),
+                            {'task_name': task_name, 'task_ref': task_ref, 'error_info': error_info})
+                raise (exception.WorkloadMgrException(error_info))
+          
 
-        
+            
