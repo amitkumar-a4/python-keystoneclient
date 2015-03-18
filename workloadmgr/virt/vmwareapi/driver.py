@@ -1413,18 +1413,36 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot_vm_resource.resource_type == 'vmx':
                     vmx_name = "%s/%s" % (folder_name, os.path.basename(snapshot_vm_resource.resource_name))
                     url_compatible = vmx_name.replace(" ", "%20")
-                    LOG.info(_('Restoring vmx: %s %s') % (vmx_datastore_name, vmx_name))
-                    vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
-                                            self._session._host_ip,
-                                            datacenter_name,
-                                            vmx_datastore_name,
-                                            cookies,
-                                            url_compatible,
-                                            snapshot_vm_resource.size)
-                    vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
-                    vmdk_write_file_handle.write(vmx_file_data)
-                    vmdk_write_file_handle.close()
-                    LOG.info(_('Restored vmx: %s %s') % (vmx_datastore_name, vmx_name))
+                    try:
+                        LOG.info(_('Restoring vmx: %s %s') % (vmx_datastore_name, vmx_name))
+                        vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
+                                                self._session._host_ip,
+                                                datacenter_name,
+                                                vmx_datastore_name,
+                                                cookies,
+                                                url_compatible,
+                                                snapshot_vm_resource.size)
+                        vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
+                        vmdk_write_file_handle.write(vmx_file_data)
+                        vmdk_write_file_handle.close()
+                        LOG.info(_('Restored vmx: %s %s') % (vmx_datastore_name, vmx_name))
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        client_factory = self._session._get_vim().client.factory
+                        service_content = self._session._get_vim().get_service_content()
+                        cookies = self._session._get_vim().client.options.transport.cookiejar
+                        LOG.info(_('Restoring vmx: %s %s') % (vmx_datastore_name, vmx_name))
+                        vmdk_write_file_handle = read_write_util.VMwareHTTPWriteFile(
+                                                self._session._host_ip,
+                                                datacenter_name,
+                                                vmx_datastore_name,
+                                                cookies,
+                                                url_compatible,
+                                                snapshot_vm_resource.size)
+                        vmx_file_data =  db.get_metadata_value(snapshot_vm_resource.metadata,'vmx_file_data')              
+                        vmdk_write_file_handle.write(vmx_file_data)
+                        vmdk_write_file_handle.close()
+                        LOG.info(_('Restored vmx: %s %s') % (vmx_datastore_name, vmx_name))
                     break    
                     
             """Register VM on ESX host."""
