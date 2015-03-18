@@ -629,7 +629,7 @@ class API(base.Base):
                     msg = _('Could not execute du command successfully. Error %s'), (stderr)
                     raise wlm_exceptions.ErrorOccurred(reason=msg)
                 #196022926557    /opt/stack/data/wlm
-                du_values = stdout.split('\n')[1].split()                
+                du_values = stdout.split()                
                 total_utilization = int(du_values[0])
             except Exception as ex:
                 LOG.exception(ex)

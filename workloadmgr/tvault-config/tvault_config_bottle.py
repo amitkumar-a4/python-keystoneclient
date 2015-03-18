@@ -1539,7 +1539,7 @@ def register_workloadtypes():
                 #Hadoop
                 time.sleep(2)
                 metadata = {'Namenode':'{"default": "", "display_name": "Hadoop Host", "required": "True", "type": "string", "tooltip": "One of the nodes of the Hadoop cluster", "restore_option": "False", "group_name": "Host Settings"}', 
-                            'NamenodeSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"(Optional) Enter ssh port number if it is other than default", "restore_option": "False", "group_name": "Host Settings"}', 
+                            'NamenodeSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings"}', 
                             'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings"}', 
                             'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings"}', 
                             'capabilities':'discover:topology',
@@ -1554,7 +1554,7 @@ def register_workloadtypes():
                 time.sleep(2)
                 metadata = {'HostUsername':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}', 
                             'HostPassword':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "ordinal":20, "index":2}', 
-                            'HostSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"(Optional) Enter ssh port number if it is other than default", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}', 
+                            'HostSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}', 
                             'DBHost':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "One of the nodes of the MongoDB cluster", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
                             'DBPort':'{"default": "27019", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "MongoDB database port", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}', 
                             'DBUser':'{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "restore_option": "False", "group_name": "Database Settings", "ordinal":10, "index":1}', 
@@ -1570,7 +1570,7 @@ def register_workloadtypes():
                 #Cassandra
                 time.sleep(2)
                 metadata = {'CassandraNode':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "One of the nodes of the Cassandra cluster", "restore_option": "False", "group_name": "Host Settings", "index":3}', 
-                            'SSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"(Optional) Enter ssh port number if it is other than default", "restore_option": "False", "group_name": "Host Settings", "index":4}', 
+                            'SSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "index":4}', 
                             'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "index":1}', 
                             'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "index":2}',
                             'IPAddress':'{"default": "192.168.1.160", "display_name": "IP Address", "required": "True", "type": "string", "tooltip":"Enter ip address for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":2}',
