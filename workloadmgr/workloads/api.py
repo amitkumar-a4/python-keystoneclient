@@ -620,8 +620,21 @@ class API(base.Base):
 
             fields = stdout.split('\n')[0].split()
             values = stdout.split('\n')[1].split()
+            
+            total_capacity = int(values[1]) * 1024
+            total_utilization = int(values[2]) * 1024
+            try:
+                stdout, stderr = utils.execute('du', '-shb', FLAGS.wlm_vault_local_directory, run_as_root=True)
+                if stderr != '':
+                    msg = _('Could not execute du command successfully. Error %s'), (stderr)
+                    raise wlm_exceptions.ErrorOccurred(reason=msg)
+                #196022926557    /opt/stack/data/wlm
+                du_values = stdout.split('\n')[1].split()                
+                total_utilization = int(du_values[0])
+            except Exception as ex:
+                LOG.exception(ex)
 
-            return int(values[1]) * 1024, int(values[2]) * 1024
+            return total_capacity,total_utilization 
 
         total_capacity, total_utilization = get_total_capacity()
         storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}
