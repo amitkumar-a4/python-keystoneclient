@@ -526,15 +526,16 @@ class WorkloadMgrsController(wsgi.Controller):
                     time_in_minutes = time_in_minutes[0]
                     time_in_minutes = int(escape(time_in_minutes))
                 
-                time_range = var.get('time_range',None)
-                if time_range:
-                    time_range = json.loads(time_range[0])
-                    time_from = datetime.strptime(time_range['time_from'], "%d-%m-%Y %H:%M:%S")
-                    time_to = datetime.strptime(time_range['time_to'], "%d-%m-%Y %H:%M:%S")
+                start_range = var.get('start_range',None)
+                end_range = var.get('end_range',None)
+                if start_range:
+                    start_range = datetime.strptime(start_range[0] + " 00:00:00", "%m-%d-%Y  %H:%M:%S")
+                if end_range:
+                    end_range = datetime.strptime(end_range[0] + " 23:59:59", "%m-%d-%Y  %H:%M:%S")
                     
             auditlog = {'auditlog':[]}
             try:
-                auditlog = self.workload_api.get_auditlog(context, time_in_minutes, time_from, time_to)
+                auditlog = self.workload_api.get_auditlog(context, time_in_minutes, start_range, end_range)
             except Exception as ex:
                 LOG.exception(ex)
             return auditlog
