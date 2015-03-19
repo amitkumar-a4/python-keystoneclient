@@ -305,6 +305,8 @@ def get_cassandra_instances(store, findpartitiontype = 'False'):
                                                   "vm_id")
         LOG.info(_('Discovered Cassandra Virtual Machines: ' + str(vms)))
         return vms, cassandra_nodes, allnodes, clusterinfo
+    except Exception as ex:
+        LOG.exception(ex)
     finally:
         LOG.info(_('Exit get_cassandra_instances'))
 
@@ -353,6 +355,8 @@ class CassandraWorkflow(workflow.Workflow):
 
             super(CassandraWorkflow, self).initflow(snapshotvms, composite=composite)
 
+        except Exception as ex:
+            LOG.exception(ex)
         finally:
             pass
 
@@ -400,6 +404,8 @@ class CassandraWorkflow(workflow.Workflow):
                     dv.pop("racks", None)
             dcs.pop("datacenters", None)
             return dict(topology=dcs, keyspaces=clusterinfo['keyspaces'])
+        except Exception as ex:
+            LOG.exception(ex)
         finally:
             pass
 
@@ -440,6 +446,8 @@ class CassandraWorkflow(workflow.Workflow):
                 del instance['hypervisor_hostname']
                 del instance['hypervisor_type']
             return dict(instances=instances, topology=self.topology(allnodes, clusterinfo))
+        except Exception as ex:
+            LOG.exception(ex)
         finally:
             pass
     
@@ -457,7 +465,7 @@ class CassandraWorkflow(workflow.Workflow):
 
 
 @autolog.log_method(Logger)    
-def update_cassandra_yaml(mountpath, clustername, nodeip, ips):
+def update_cassandra_yaml(mountpath, nodeip, ips):
     # modify the cassandra.yaml
     configpath = ""
     if os.path.exists(os.path.join(mountpath, 'usr/share/dse/resources/cassandra/conf/')):
@@ -679,8 +687,7 @@ class CassandraRestoreNode(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         process, mountpath = vmtasks_vcloud.mount_instance_root_device(cntx, instance, restore)
         try:
-            update_cassandra_yaml(mountpath, restore_options['NewClusterName'],
-                                  ipaddress,
+            update_cassandra_yaml(mountpath, ipaddress,
                                   restore_options['IPAddresses'])
             update_cassandra_topology_yaml(mountpath, ipaddress,
                                            restore_options['Broadcast'])
@@ -696,6 +703,8 @@ class CassandraRestoreNode(task.Task):
                                       restore_options['Netmask'],
                                       restore_options['Broadcast'],
                                       restore_options['Gateway'])
+        except Exception as ex:
+            LOG.exception(ex)
         finally:
             vmtasks_vcloud.umount_instance_root_device(process)
 
