@@ -307,6 +307,7 @@ def get_cassandra_instances(store, findpartitiontype = 'False'):
         return vms, cassandra_nodes, allnodes, clusterinfo
     except Exception as ex:
         LOG.exception(ex)
+        raise
     finally:
         LOG.info(_('Exit get_cassandra_instances'))
 
@@ -357,6 +358,7 @@ class CassandraWorkflow(workflow.Workflow):
 
         except Exception as ex:
             LOG.exception(ex)
+            raise
         finally:
             pass
 
@@ -406,6 +408,7 @@ class CassandraWorkflow(workflow.Workflow):
             return dict(topology=dcs, keyspaces=clusterinfo['keyspaces'])
         except Exception as ex:
             LOG.exception(ex)
+            raise
         finally:
             pass
 
@@ -448,6 +451,7 @@ class CassandraWorkflow(workflow.Workflow):
             return dict(instances=instances, topology=self.topology(allnodes, clusterinfo))
         except Exception as ex:
             LOG.exception(ex)
+            raise
         finally:
             pass
     
@@ -705,6 +709,7 @@ class CassandraRestoreNode(task.Task):
                                       restore_options['Gateway'])
         except Exception as ex:
             LOG.exception(ex)
+            raise
         finally:
             vmtasks_vcloud.umount_instance_root_device(process)
 
