@@ -14,9 +14,11 @@ import sys
 import time
 
 import json
-import datetime 
+import datetime
 import paramiko
 import uuid
+from tempfile import mkstemp
+import subprocess
 
 from taskflow import engines
 from taskflow.utils import misc
@@ -33,6 +35,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
 
 import vmtasks
@@ -52,7 +55,7 @@ top_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
 sys.path.insert(0, top_dir)
 
 #from workloadmgr import exception
-# 
+#
 # Function that create the connection to the mongos server to be use as
 # primary source of information in order to pick the servers. host, port
 # user and password should be fed into the flow and other tasks should use
@@ -96,7 +99,7 @@ class DisableProfiling(task.Task):
         LOG.debug(_('DisableProfiling:'))
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
-        
+
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
@@ -109,7 +112,7 @@ class DisableProfiling(task.Task):
                 pass
 
         proflevel = self.cfgclient.admin.profiling_level()
-        
+
         # diable profiling
         self.cfgclient.admin.set_profiling_level(pymongo.OFF)
         return proflevel
@@ -122,17 +125,17 @@ class DisableProfiling(task.Task):
         except Exception as ex:
             LOG.exception(ex)
         finally:
-            pass            
+            pass
 
 class EnableProfiling(task.Task):
 
     def execute(self, DBHost, DBPort, DBUser, DBPassword, proflevel):
         LOG.debug(_('EnableProfiling'))
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
-    
+
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
-    
+
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
@@ -156,9 +159,9 @@ class PauseDBInstance(task.Task):
         LOG.debug(_(host_info))
         self.client = connect_server(host_info[0], int(host_info[1]), '', '')
         self.client.fsync(lock = True)
-    
+
         # Add code to wait until the fsync operations is complete
-    
+
     def revert(self, *args, **kwargs):
         try:
             # Resume DB
@@ -167,7 +170,7 @@ class PauseDBInstance(task.Task):
         except Exception as ex:
             LOG.exception(ex)
         finally:
-            pass            
+            pass
 
 
 class ResumeDBInstance(task.Task):
@@ -186,13 +189,13 @@ class PauseBalancer(task.Task):
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         # Pause the DB
         db = self.client.config
-    
+
         db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
         balancer_info = db.locks.find_one({'_id': 'balancer'})
         while int(str(balancer_info['state'])) > 0:
             LOG.debug(_('\t\twaiting for migration'))
             balancer_info = db.locks.find_one({'_id': 'balancer'})
-    
+
     def revert(self, *args, **kwargs):
         try:
             # Resume DB
@@ -208,7 +211,7 @@ class ResumeBalancer(task.Task):
         LOG.debug(_('ResumeBalancer'))
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         # Resume DB
-    
+
         db = self.client.config
         db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
 
@@ -230,13 +233,13 @@ class ShutdownConfigServer(task.Task):
     #}
     #'''
     def execute(self, DBHost, DBPort, DBUser, DBPassword, HostUsername, HostPassword, HostSSHPort=22, RunAsRoot=False):
-        # Get the list of config servers 
+        # Get the list of config servers
         # shutdown one of them
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
-        
+
         dbmap = self.client.admin.command('getShardMap')
         cfgsrvs = dbmap['map']['config'].split(',')
-        
+
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
@@ -247,13 +250,13 @@ class ShutdownConfigServer(task.Task):
             except:
                 LOG.debug(_( '"' + cfghost +'" appears to be offline'))
                 pass
-        
+
         cmdlineopts = self.cfgclient.admin.command('getCmdLineOpts')
-        
+
         command = 'mongod --shutdown --port ' + cfgport + ' --configsvr'
         if RunAsRoot:
             command = 'sudo ' + command
-        
+
         LOG.debug(_('ShutdownConfigServer'))
         try:
             client = paramiko.SSHClient()
@@ -263,12 +266,12 @@ class ShutdownConfigServer(task.Task):
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
-            
+
             stdin, stdout, stderr = client.exec_command(command, timeout=120)
             LOG.debug(_(stdout.read()))
         finally:
             client.close()
-    
+
         # Also make sure the config server command line operations are saved
         return cfgsrv, cmdlineopts
 
@@ -277,11 +280,11 @@ class ShutdownConfigServer(task.Task):
             try:
                 # Make sure all config servers are resumed
                 cfghost = kwargs['result']['cfgsrv'].split(':')[0]
-                
+
                 #ssh into the cfg host and start the config server
                 if not isinstance(kwargs['result'], misc.Failure):
                     port = kwargs['HostSSHPort']
-                    
+
                     command = ''
                     for c in kwargs['cfgsrvcmdline']['argv']:
                         command  = command + c + ' '
@@ -293,17 +296,17 @@ class ShutdownConfigServer(task.Task):
                     else:
                         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                     client.connect(cfghost, port=kwargs['HostSSHPort'], username=kwargs['HostUsername'], password=kwargs['HostPassword'], timeout=120)
-                
+
                     stdin, stdout, stderr = client.exec_command(command, timeout=120)
                     LOG.debug(_(stdout.read()))
 
                 LOG.debug(_('ShutdownConfigServer:revert'))
-                
+
             except Exception as ex:
                 LOG.exception(ex)
             finally:
                 if client:
-                    client.close()            
+                    client.close()
 
 class ResumeConfigServer(task.Task):
 
@@ -311,14 +314,14 @@ class ResumeConfigServer(task.Task):
         # Make sure all config servers are resumed
         cfghost = cfgsrv.split(':')[0]
         port = 22
-    
+
         command = ''
         for c in cfgsrvcmdline['argv']:
             command  = command + c + ' '
-    
+
         if RunAsRoot:
             command = 'sudo ' + command
-    
+
         try:
             client = paramiko.SSHClient()
             client.load_system_host_keys()
@@ -327,12 +330,12 @@ class ResumeConfigServer(task.Task):
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
-    
+
             stdin, stdout, stderr = client.exec_command(command, timeout=120)
             LOG.debug(_(stdout.read()))
         finally:
             client.close()
-    
+
         #ssh into the cfg host and start the config server
         LOG.debug(_('ResumeConfigServer'))
 
@@ -340,7 +343,7 @@ class ResumeConfigServer(task.Task):
 # pause each VM in parallel.
 def PauseDBInstances(hosts_list):
     flow = uf.Flow('PauseDBInstances')
- 
+
     for index, h in enumerate(hosts_list):
         host_info = h['secondaryReplica'].split(':')
         flow.add(PauseDBInstance('PauseDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'DBUser', 'DBPassword']))
@@ -349,7 +352,7 @@ def PauseDBInstances(hosts_list):
 
 def ResumeDBInstances(hosts_list):
     flow = uf.Flow('ResumeDBInstances')
- 
+
     for index, h in enumerate(hosts_list):
         host_info = h['secondaryReplica'].split(':')
         flow.add(ResumeDBInstance('ResumeDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'DBUser', 'DBPassword']))
@@ -429,7 +432,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
             hostname = h.split(':')[0]
             if not hostname in hostnames:
                 hostnames[hostname] = 1
-    
+
     interfaces = {}
     for hostname in hostnames:
         try:
@@ -472,15 +475,15 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                             hypervisor_hostname = hypervisor.hypervisor_hostname
                             hypervisor_type = hypervisor.hypervisor_type
                             break
-                   
+
                     utils.append_unique(vms, {'vm_id' : instance.id,
                                               'vm_name' : instance.name,
                                               'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr']],
-                                              'vm_metadata' : instance.metadata,                                                
+                                              'vm_metadata' : instance.metadata,
                                               'vm_flavor_id' : instance.flavor['id'],
                                               'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
                                               'hypervisor_hostname' : hypervisor_hostname,
-                                              'hypervisor_type' :  hypervisor_type}, 
+                                              'hypervisor_type' :  hypervisor_type},
                                               "vm_id")
     return vms
 
@@ -490,7 +493,7 @@ MongoDBWorkflow Requires the following inputs in store:
     'connection': FLAGS.sql_connection,     # taskflow persistence connection
     'context': context_dict,                # context dictionary
     'snapshot': snapshot,                   # snapshot dictionary
-                    
+
     # Instanceids will to be discovered automatically
     'host': 'mongodb1',              # one of the nodes of mongodb cluster
     'port': 27017,                   # listening port of mongos service
@@ -516,7 +519,7 @@ class MongoDBWorkflow(workflow.Workflow):
         if 'hostnames' in self._store:
             for host in json.loads(self._store['hostnames']):
                 try:
-                    connection = connect_server(host, 
+                    connection = connect_server(host,
                                                 int(self._store['DBPort']),
                                                 self._store['DBUser'],
                                                 self._store['DBPassword'])
@@ -529,8 +532,8 @@ class MongoDBWorkflow(workflow.Workflow):
         LOG.warning(_( 'MongoDB cluster appears to be offline'))
 
     #
-    # MongoDB flow is an directed acyclic flow. 
-    # :param host - One of the mongo db node in the cluster that has mongos 
+    # MongoDB flow is an directed acyclic flow.
+    # :param host - One of the mongo db node in the cluster that has mongos
     #               service running and will be used to discover the mongo db
     #               shards, their replicas etc
     # : port - port at which mongos service is running
@@ -558,45 +561,111 @@ class MongoDBWorkflow(workflow.Workflow):
             self._store['instance_'+item['vm_id']] = item
         for index, item in enumerate(hosts_to_backup):
             self._store['secondary_'+str(index)] = item
-        
+
         snapshotvms = lf.Flow('mongodbwf')
-        
+
         # Add disable profile task. Stopping balancer fails if profile process
         # is running
         snapshotvms.add(DisableProfiling('DisableProfiling', provides='proflevel'))
         snapshotvms.add(PauseBalancer('PauseBalancer'))
-    
+
         # This will be a flow that needs to be added to mongo db flow.
         # This is a flow that pauses all related VMs in unordered pattern
         snapshotvms.add(PauseDBInstances(hosts_to_backup))
-    
+
         snapshotvms.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
-    
+
         # This is an unordered pausing of VMs. This flow is created in
-        # common tasks library. This routine takes instance ids from 
-        # openstack. Workload manager should provide the list of 
+        # common tasks library. This routine takes instance ids from
+        # openstack. Workload manager should provide the list of
         # instance ids
         snapshotvms.add(vmtasks.UnorderedPauseVMs(self._store['instances']))
-    
+
         # This is again unorder snapshot of VMs. This flow is implemented in
         # common tasks library
         snapshotvms.add(vmtasks.UnorderedSnapshotVMs(self._store['instances']))
-    
+
         # This is an unordered pausing of VMs.
         snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
-    
+
         # Restart the config servers so metadata changes can happen
         snapshotvms.add(ResumeConfigServer('ResumeConfigServer'))
-    
+
         # unlock all locekd replicas so it starts receiving all updates from primary and
         # will eventually get into sync with primary
         snapshotvms.add(ResumeDBInstances(hosts_to_backup))
-    
+
         snapshotvms.add(ResumeBalancer('ResumeBalancer'))
         # enable profiling to the level before the flow started
         snapshotvms.add(EnableProfiling('EnableProfiling'))
 
         super(MongoDBWorkflow, self).initflow(snapshotvms, composite=composite)
+
+
+    def get_databases(self):
+        LOG.info(_('Enter get_databases'))
+        outfile_path = ''
+        errfile_path = ''
+        try:
+            cntx = amqp.RpcContext.from_dict(self._store['context'])
+            db = WorkloadMgrDB().db
+            if 'snapshot' in self._store:
+                db.snapshot_update( cntx, self._store['snapshot']['id'],
+                                    {'progress_msg': 'Discovering MongoDB Databases'} )
+
+            fh, outfile_path = mkstemp()
+            os.close(fh)
+            fh, errfile_path = mkstemp()
+            os.close(fh)
+
+            cmdspec = ["python", "/opt/stack/workloadmgr/workloadmgr/workflows/mongodbnodes.py",
+                       "--config-file", "/etc/workloadmgr/workloadmgr.conf",
+                       "--defaultnode", self._store['DBHost'],
+                       "--port", self._store['HostSSHPort'],
+                       "--username", self._store['HostUsername'],
+                       "--password", "******",]
+
+            if self._store.get('hostnames', None):
+                hosts = ""
+                for host in json.loads(self._store.get('hostnames',"")):
+                    hosts += host + ';'
+
+                cmdspec.extend(["--addlnodes", hosts])
+            cmdspec.extend(["--outfile", outfile_path,
+                            "--errfile", errfile_path,
+                           ])
+            cmd = " ".join(cmdspec)
+            for idx, opt in enumerate(cmdspec):
+                if opt == "--password":
+                    cmdspec[idx+1] = self._store['HostPassword']
+                    break
+            process = subprocess.Popen(cmdspec,shell=False)
+            stdoutdata, stderrdata = process.communicate()
+            if process.returncode != 0:
+                reason = 'Error discovering MongoDB Databases'
+                try:
+                    with open(errfile_path, 'r') as fh:
+                        reason = fh.read()
+                        if len(reason) == 0:
+                            reason = 'Error discovering MongoDB Databases'
+                        LOG.info(_('Error discovering MongoDB Databases: ' + reason))
+                    os.remove(errfile_path)
+                finally:
+                    raise exception.ErrorOccurred(reason=reason)
+
+            databases = None
+            with open(outfile_path, 'r') as fh:
+                databases = json.loads(fh.read())
+                LOG.info(_('Discovered MongoDB Databases: ' + str(databases)))
+
+            return databases
+
+        finally:
+            if os.path.isfile(outfile_path):
+                os.remove(outfile_path)
+            if os.path.isfile(errfile_path):
+                os.remove(errfile_path)
+            LOG.info(_('Exit get_databases'))
 
     def topology(self):
         # Discover the shards
@@ -668,10 +737,10 @@ class MongoDBWorkflow(workflow.Workflow):
                 m["input"][2].append(m["health"])
             replicas.append(status)
 
-        # Covert the topology into generic topology that can be 
+        # Covert the topology into generic topology that can be
         # returned as restful payload
         mongodb = {"name": "MongoDB", "children":replicas, "input":[]}
-        return dict(topology=mongodb)
+        return dict(topology=mongodb, databases=self.get_databases()['databases'])
 
     def details(self):
         # workflow details based on the
@@ -738,7 +807,7 @@ store = {
     'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8',
     #'context': context_dict,                # context dictionary
     #'snapshot': snapshot,                   # snapshot dictionary
-                    
+
     # Instanceids will to be discovered automatically
     'host': 'mongodb1',              # one of the nodes of mongodb cluster
     'port': 27017,                   # listening port of mongos service
