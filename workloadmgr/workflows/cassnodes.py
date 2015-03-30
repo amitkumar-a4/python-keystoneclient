@@ -398,35 +398,45 @@ def exec_cqlsh_command(hosts, port, user, password, cqlshcommand):
 
 @autolog.log_method(Logger)
 def get_keyspaces(alivenodes, port, username, password):
-    output = exec_cqlsh_command([alivenodes[0]], port, username, password, 'SELECT * FROM system.schema_keyspaces')
+    for alive in alivenodes:
+        output = exec_cqlsh_command([alive], port, username, password, 'SELECT * FROM system.schema_keyspaces')
 
-    keyspaces = []
-    for host in output:
-        output[host]['stdout'].pop(0)
-        output[host]['stdout'].pop()
-        output[host]['stdout'].pop()
-        output[host]['stdout'].pop()
-        fieldsout = output[host]['stdout'][0].split('|')
+        keyspaces = []
+        for host in output:
+            if "Connection error" in output[host]['stdout'][0]:
+                 continue
+
+            if len(output[host]['stdout']) < 5:
+                 continue 
+
+            output[host]['stdout'].pop(0)
+            output[host]['stdout'].pop()
+            output[host]['stdout'].pop()
+            output[host]['stdout'].pop()
+
+            fieldsout = output[host]['stdout'][0].split('|')
         
-        fields = []
-        for f in fieldsout:
-            fields.append(f.strip())
+            fields = []
+            for f in fieldsout:
+                fields.append(f.strip())
 
-        for ksidx, ks in enumerate(output[host]['stdout'][2:]):
-            ksfieldsout = ks.split('|')
+            for ksidx, ks in enumerate(output[host]['stdout'][2:]):
+                ksfieldsout = ks.split('|')
 
-            ksdict = {}
-            for idx, ksfield in enumerate(ksfieldsout):
-                ksdict[fields[idx]] = ksfield.strip()
-            keyspaces.append(ksdict)
+                ksdict = {}
+                for idx, ksfield in enumerate(ksfieldsout):
+                    ksdict[fields[idx]] = ksfield.strip()
+                keyspaces.append(ksdict)
 
-    tmp = keyspaces
-    keyspaces = []
-    for idx, key in enumerate(tmp):
-        if key['keyspace_name'].lower() not in ['system', 'system_traces', 'dse_system'] :            
-            keyspaces.append(key)
+            tmp = keyspaces
+            keyspaces = []
+            for idx, key in enumerate(tmp):
+                if key['keyspace_name'].lower() not in ['system', 'system_traces', 'dse_system'] :            
+                    keyspaces.append(key)
 
-    return keyspaces
+            return keyspaces
+
+    return None
 
 @autolog.log_method(Logger)
 def main(argv):
