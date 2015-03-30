@@ -363,8 +363,14 @@ class Scheduler(object):
             the job is still allowed to be run
         :rtype: :class:`~apscheduler.job.Job`
         """
-        trigger = WorkloadMgrTrigger(jobschedule)
-        return self.add_job(trigger, func, args, kwargs, **options)
+        try:
+            trigger = WorkloadMgrTrigger(jobschedule)
+            return self.add_job(trigger, func, args, kwargs, **options)
+        except Exception as ex:
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')  
+            logger.exception(ex)
+            trigger = WorkloadMgrTrigger(jobschedule)
+            return self.add_job(trigger, func, args, kwargs, **options)            
 
     def add_cron_job(self, func, year=None, month=None, day=None, week=None,
                      day_of_week=None, hour=None, minute=None, second=None,
