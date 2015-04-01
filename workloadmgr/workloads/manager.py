@@ -247,6 +247,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workflow_class = get_workflow_class(context, workload.workload_type_id)
         workflow = workflow_class("discover_instances", store)
         instances = workflow.discover()
+
+
+        for vm in self.db.workload_vms_get(context, workload.id):
+            self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+        
+        if instances and 'instances' in instances:
+            for instance in instances['instances']:
+                values = {'workload_id': workload.id,
+                          'vm_id': instance['vm_id'],
+                          'metadata': instance['vm_metadata'],
+                          'vm_name': instance['vm_name']}
+                vm = self.db.workload_vms_create(context, values)                                       
+        
         return instances
 
     @autolog.log_method(logger=Logger)
