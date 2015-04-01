@@ -457,6 +457,13 @@ class Scheduler(object):
                 if job in list(jobstore.jobs):
                     self._remove_job(job, alias, jobstore)
                     return
+        except Exception as ex:
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')  
+            logger.exception(ex)
+            for alias, jobstore in iteritems(self._jobstores):
+                if job in list(jobstore.jobs):
+                    self._remove_job(job, alias, jobstore)
+                    return        
         finally:
             self._jobstores_lock.release()
 
