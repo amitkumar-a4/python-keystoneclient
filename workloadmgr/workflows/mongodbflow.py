@@ -384,24 +384,38 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
         hosts = str(s['host'])
         hosts = hosts.replace(str(s['_id']), '').strip()
         hosts = hosts.replace('/', '').strip()
+
         #print 'Getting secondary from hosts in ', hosts
         # Get the replica set for each shard
         c = pymongo.MongoClient(hosts,
                     read_preference=ReadPreference.SECONDARY)
-        status = c.admin.command('replSetGetStatus')
-        hosts_list = []
-        preferredreplica = None
-        for member in pgroup:
-            if member['replica'] == status['set']:
-                preferredreplica = member['name']
 
-        for m in status['members']:
-            if preferredreplica and m['name'] != preferredreplica:
-                continue
-            if m['stateStr'] == 'SECONDARY':
-                hosts_to_backup.append({'replicaSetName': status['set'],
-                                        'secondaryReplica': m['name']})
-                break
+        status = c.admin.command('replSetGetStatus')
+
+        # If user specified preferred group, backup only those
+        # replicas
+        if preferredgroup and len(pgroup) > 0:
+            preferredreplica = None
+            for member in pgroup:
+                if member['replica'] == status['set']:
+                    preferredreplica = member['name']
+
+            # Select a replica member only when user specifies a replica
+            if preferredreplica:
+                for m in status['members']:
+                    if m['name'] != preferredreplica:
+                        continue
+                    if m['stateStr'] == 'SECONDARY':
+                        hosts_to_backup.append({'replicaSetName': status['set'],
+                                                'secondaryReplica': m['name']})
+                        break
+        else:
+            # if user did not specify preferred group, backup entire cluster
+            for m in status['members']:
+                if m['stateStr'] == 'SECONDARY':
+                    hosts_to_backup.append({'replicaSetName': status['set'],
+                                            'secondaryReplica': m['name']})
+                    break
 
     return hosts_to_backup
 
@@ -542,7 +556,7 @@ class MongoDBWorkflow(workflow.Workflow):
     def initflow(self, composite=False):
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        self._store['instances'] =  get_vms(cntx, self._store['DBHost'],
+        instances =  get_vms(cntx, self._store['DBHost'],
                                             self._store['DBPort'],
                                             self._store['DBUser'],
                                             self._store['DBPassword'],
@@ -556,9 +570,16 @@ class MongoDBWorkflow(workflow.Workflow):
                                                    self._store['DBUser'],
                                                    self._store['DBPassword'],
                                                    self._store['preferredgroup'])
-        for index,item in enumerate(self._store['instances']):
-            #self._store['instance_'+str(index)] = item
-            self._store['instance_'+item['vm_id']] = item
+
+        # Filter the VMs based on the preferred secondary replica 
+        self._store['instances'] = [];
+        for index, vm in enumerate(instances):
+            for index, srep in enumerate(hosts_to_backup):
+                if srep['secondaryReplica'].split(':')[0] == vm['hostname']:
+                    self._store['instance_'+vm['vm_id']] = vm
+                    self._store['instances'].append(vm);
+                    break
+
         for index, item in enumerate(hosts_to_backup):
             self._store['secondary_'+str(index)] = item
 
