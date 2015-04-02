@@ -459,6 +459,9 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
             client.connect(hostname, port=int(sshport), username=hostusername, password=hostpassword, timeout=120)
             stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
             interfaces[stdout.read().split('HWaddr')[1].strip()] = hostname
+        except:
+            LOG.info(_( '"' + hostname +'" appears to be offline'))
+            pass
         finally:
             client.close()
 
