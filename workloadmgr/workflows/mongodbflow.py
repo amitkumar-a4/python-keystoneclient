@@ -193,6 +193,7 @@ class PauseBalancer(task.Task):
         db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
         balancer_info = db.locks.find_one({'_id': 'balancer'})
         while int(str(balancer_info['state'])) > 0:
+            time.sleep(5)
             LOG.debug(_('\t\twaiting for migration'))
             balancer_info = db.locks.find_one({'_id': 'balancer'})
 
