@@ -273,7 +273,7 @@ def send_tvaultlogs_all():
         return static_file(os.path.basename(logtarfilename), root='/tmp/tvaultlogs_all', mimetype='text/plain', download=True)
     except Exception as exception:
         raise exception    
-
+    
 """############################ tvault config API's ########################"""
 
 def replace_line(file_path, pattern, substitute, starts_with = False):
@@ -917,23 +917,125 @@ def logs():
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
 
-@bottle.post('/troubleshooting_vmware')
+"""############################ tvault Troubleshooting ########################"""
+
+def get_default_reset_cbt_output():
+    reset_cbt_output = 'Specify comma seperated virtual machine names.'
+    reset_cbt_output = reset_cbt_output + '\n\n' + 'Reset involves the following operations:'
+    reset_cbt_output = reset_cbt_output + '\n\t' + 'Remove any previous snapshots'
+    reset_cbt_output = reset_cbt_output + '\n\t' + 'Set changed block tracking to false'
+    reset_cbt_output = reset_cbt_output + '\n\t' + 'Create a temporary snapshot'
+    reset_cbt_output = reset_cbt_output + '\n\t' + 'Remove the temporary snapshot'
+    reset_cbt_output = reset_cbt_output + '\n\n' + "If the VM was in 'powered on' state before the initiating the reset, *-ctk.vmdk needs to be removed manually from the datastores."
+    return reset_cbt_output  
+    
 @bottle.route('/troubleshooting_vmware')
 @bottle.view('troubleshooting_page_vmware')
 @authorize()
 def troubleshooting_vmware():
     bottle.request.environ['beaker.session']['error_message'] = ''
     values = {}
-    if bottle.request and bottle.request.POST:    
-        try:
-            values['ping_address'] = bottle.request.POST['ping_address']
-            command = ['sudo', 'ping', '-c 6', values['ping_address']];
-            output = subprocess.check_output(command, shell=False)                
-            values['ping_output'] = output
-        except subprocess.CalledProcessError as ex:
-            values['ping_output'] = str(ex.output)
-        except Exception as ex:
-            values['ping_output'] = str(ex)
+    values['ping_output'] = ''
+    values['reset_cbt_output'] = get_default_reset_cbt_output()
+    values['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return values
+
+
+@bottle.post('/troubleshooting_vmware_ping')
+@bottle.view('troubleshooting_page_vmware')
+@authorize()
+def troubleshooting_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    values = {}
+    values['reset_cbt_output'] = get_default_reset_cbt_output()
+    try:
+        values['ping_address'] = bottle.request.POST['ping_address']
+        command = ['sudo', 'ping', '-c 6', values['ping_address']];
+        output = subprocess.check_output(command, shell=False)                
+        values['ping_output'] = output
+    except subprocess.CalledProcessError as ex:
+        values['ping_output'] = str(ex.output)
+    except Exception as ex:
+        values['ping_output'] = str(ex)
+    
+    values['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return values
+
+@bottle.post('/troubleshooting_vmware_reset_cbt')
+@bottle.view('troubleshooting_page_vmware')
+@authorize()
+def troubleshooting_vmware():
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    values = {}
+    values['ping_output'] = ''
+    output = ''
+    try:
+        values['reset_cbt_vms'] = bottle.request.POST['reset_cbt_vms']
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        config_data = dict(Config._defaults)
+        config_status = config_data.get('config_status', 'not_configured')
+        vcenter = config_data.get('vcenter', 'not_configured')
+        vcenter_username = config_data.get('vcenter_username', 'not_configured')
+        vcenter_password = config_data.get('vcenter_password', 'not_configured')
+        if config_status == 'not_configured':
+            raise Exception("trilioVault Appliance is not configured")
+                
+        from workloadmgr.virt.vmwareapi.driver import VMwareAPISession
+        from workloadmgr.virt.vmwareapi import vim
+        from workloadmgr.virt.vmwareapi import vm_util
+        from workloadmgr.virt.vmwareapi import vim_util
+
+        session = VMwareAPISession(host_ip = vcenter, 
+                                   username = vcenter_username, 
+                                   password = vcenter_password, 
+                                   retry_count = 3, 
+                                   scheme="https")           
+        
+        output = 'Virtual Machine(s): ' + values['reset_cbt_vms']
+        for vm_name in values['reset_cbt_vms'].split(","):
+            output = output + '\n' + 'Resetting CBT for ' + vm_name
+            vm_ref = vm_util.get_vm_ref_from_name(session, vm_name)
+            rootsnapshot = session._call_method(vim_util,"get_dynamic_property", vm_ref, "VirtualMachine", "rootSnapshot")
+            if rootsnapshot:
+                remove_snapshot_task = session._call_method(session._get_vim(), 
+                                                                  "RemoveSnapshot_Task", 
+                                                                  rootsnapshot[0][0], 
+                                                                  removeChildren=True)
+                session._wait_for_task("12345", remove_snapshot_task)
+                output = output + '\n' + 'Removed previous snapshots for ' + vm_name                
+
+            client_factory = session._get_vim().client.factory
+            config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
+            config_spec.changeTrackingEnabled = False
+            reconfig_task = session._call_method( session._get_vim(),
+                                                        "ReconfigVM_Task", vm_ref,
+                                                        spec=config_spec)
+            session._wait_for_task("12345", reconfig_task)
+            output = output + '\n' + 'Disabled changed block tracking for ' + vm_name
+            
+            snapshot_task = session._call_method(
+                            session._get_vim(),
+                            "CreateSnapshot_Task", vm_ref,
+                            name="snapshot_to_reset_cbt",
+                            description="Snapshot taken to reset cbt",
+                            memory=False,
+                            quiesce=True)
+            task_info = session._wait_for_task("12345", snapshot_task)
+            snapshot_ref = task_info.result
+            output = output + '\n' + 'Created temporary snapshot for ' + vm_name                
+            remove_snapshot_task = session._call_method(session._get_vim(), 
+                                                              "RemoveSnapshot_Task", 
+                                                              snapshot_ref, 
+                                                              removeChildren=True)
+            session._wait_for_task("12345", remove_snapshot_task)                                                                   
+            output = output + '\n' + 'Removed temporary snapshot for ' + vm_name 
+
+        values['reset_cbt_output'] = output
+    except subprocess.CalledProcessError as ex:
+        values['reset_cbt_output'] = output + '\n' + str(ex.output)
+    except Exception as ex:
+        values['reset_cbt_output'] = output + '\n' + str(ex)
     
     values['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return values

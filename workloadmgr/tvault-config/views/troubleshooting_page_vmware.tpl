@@ -23,6 +23,12 @@
 	  }
 	}
 	</script>  
+	
+	<style>
+		.form-inline .form-group input {
+	    width:348px;
+		}
+	</style>	
 </head>
 
 <body>
@@ -55,15 +61,31 @@
 	 		</div>
 	  % end
   	<div style="margin-left:auto; margin-right:auto; padding:20px">	
-	<form class="form-inline" method="post">
-		<label >Hostname/IPAddress </label>
-		<input {{'value=' + ping_address if defined('ping_address') else ''}} class="form-control" name="ping_address" type="text" required>
+	<form class="form-inline" action="/troubleshooting_vmware_ping" method="post">
+		<div class="form-group">
+			<label >Hostname/IPAddress </label>
+			<input {{'value=' + ping_address if defined('ping_address') else ''}} class="form-control" name="ping_address" type="text" required>
+		</div>
 	   	<button type="submit" class="btn btn-primary">Ping</button>
 	</form>
 	<br>
 	<textarea name=ping_output_textarea" rows="10" cols="75" readonly>
 {{ping_output if defined('ping_output') else ''}}
 	</textarea>		
-  </div>
+  	</div>
+  	
+  	<div style="margin-left:auto; margin-right:auto; padding:20px">	
+	<form  class="form-inline" action="/troubleshooting_vmware_reset_cbt" method="post">
+		<div class="form-group">
+			<label >Virtual Machines(s) </label>
+			<input {{'value=' + reset_cbt_vms if defined('reset_cbt_vms') else ''}} class="form-control" name="reset_cbt_vms" type="text" required>
+		</div>
+		<button type="submit" class="btn btn-primary">Reset</button>
+	</form>
+	<br>
+	<textarea name=reset_cbt_vms_output_textarea" rows="11" cols="75" readonly>
+{{reset_cbt_output if defined('reset_cbt_output') else ''}}
+	</textarea>		
+  	</div>  	
 </body>
 </html>
