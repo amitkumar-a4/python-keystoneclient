@@ -34,7 +34,9 @@ import keystoneclient
 import keystoneclient.v2_0.client as ksclient
 import workloadmgrclient
 import workloadmgrclient.v1.client as wlmclient
-from workloadmgr.compute import nova 
+from workloadmgr.compute import nova
+from workloadmgr.openstack.common.gettextutils import _
+
 
 
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
@@ -926,7 +928,7 @@ def get_default_reset_cbt_output():
     reset_cbt_output = reset_cbt_output + '\n\t' + 'Set changed block tracking to false'
     reset_cbt_output = reset_cbt_output + '\n\t' + 'Create a temporary snapshot'
     reset_cbt_output = reset_cbt_output + '\n\t' + 'Remove the temporary snapshot'
-    reset_cbt_output = reset_cbt_output + '\n\n' + "If the VM was in 'powered on' state before the initiating the reset, *-ctk.vmdk needs to be removed manually from the datastores."
+    reset_cbt_output = reset_cbt_output + '\n\n' + "If the VM was in 'powered on' state before initiating the reset, *-ctk.vmdk needs to be removed manually from the datastores."
     return reset_cbt_output  
     
 @bottle.route('/troubleshooting_vmware')
@@ -996,6 +998,8 @@ def troubleshooting_vmware():
         for vm_name in values['reset_cbt_vms'].split(","):
             output = output + '\n' + 'Resetting CBT for ' + vm_name
             vm_ref = vm_util.get_vm_ref_from_name(session, vm_name)
+            if not vm_ref:
+                raise Exception("Virtul Machine '" + vm_name + "' not found")
             rootsnapshot = session._call_method(vim_util,"get_dynamic_property", vm_ref, "VirtualMachine", "rootSnapshot")
             if rootsnapshot:
                 remove_snapshot_task = session._call_method(session._get_vim(), 
@@ -1023,6 +1027,8 @@ def troubleshooting_vmware():
                             quiesce=True)
             task_info = session._wait_for_task("12345", snapshot_task)
             snapshot_ref = task_info.result
+            if not snapshot_ref:
+                raise Exception("Failed to create temporary snapshot for Virtul Machine '" + vm_name + "'")            
             output = output + '\n' + 'Created temporary snapshot for ' + vm_name                
             remove_snapshot_task = session._call_method(session._get_vim(), 
                                                               "RemoveSnapshot_Task", 

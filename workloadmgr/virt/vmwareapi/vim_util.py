@@ -9,6 +9,7 @@ The VMware API utility module.
 from oslo.config import cfg
 
 from workloadmgr.virt.vmwareapi import error_util
+from workloadmgr.openstack.common.gettextutils import _
 
 
 vmware_opts = cfg.IntOpt('maximum_objects', default=100,
