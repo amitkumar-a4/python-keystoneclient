@@ -298,30 +298,34 @@ def get_metadata_value(metadata, key, default=None):
 
 def restore_mark_incomplete_as_error(context, host):
     return IMPL.restore_mark_incomplete_as_error(context, host)
-
-def restore_get(context, restore_id):
-    return IMPL.restore_get(context, restore_id)
-
-def restore_get_all(context, **kwargs):
-    return IMPL.restore_get_all(context, **kwargs)
-
-def restore_get_all_by_project(context, project_id):
-    return IMPL.restore_get_all_by_project(context, project_id)
-        
-def restore_get_all_by_project_snapshot(context, project_id, snapshot_id):
-    return IMPL.restore_get_all_by_project_snapshot(context, project_id, snapshot_id)
-
-def restore_show(context, restore_id):
-    return IMPL.restore_show(context, restore_id)
-
+    
 def restore_create(context, values):
     return IMPL.restore_create(context, values)
 
+def restore_delete(context, restore_id):
+    """Destroy the restore or raise if it does not exist."""
+    return IMPL.restore_delete(context, restore_id)
+
+def restore_get(context, restore_id, **kwargs):
+    return IMPL.restore_get(context, restore_id, **kwargs)
+    
+def restore_get_all(context, snapshot_id=None, **kwargs):
+    return IMPL.restore_get_all(context, snapshot_id, **kwargs)    
+
+def restore_get_all_by_project(context, project_id, **kwargs):
+    """Get all restores belonging to a project."""
+    return IMPL.restore_get_all_by_project(context, project_id, **kwargs)
+    
+def restore_get_all_by_project_snapshot(context, project_id, snapshot_id, **kwargs):
+    """Get all restores belonging to a project and snapshot"""
+    return IMPL.restore_get_all_by_project_snapshot(context, project_id, snapshot_id, **kwargs)
+    
+def restore_show(context, restore_id):
+    """Get more details of the  restore or raise if it does not exist."""
+    return IMPL.restore_show(context, restore_id)
+
 def restore_update(context, restore_id, values):
     return IMPL.restore_update(context, restore_id, values)
-
-def restore_delete(context, restore_id):
-    return IMPL.restore_delete(context, restore_id)
 
 def restored_vm_create(context, values):
     return IMPL.restored_vm_create(context, values)

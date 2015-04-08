@@ -1826,8 +1826,8 @@ def get_metadata_value(metadata, key, default=None):
             return kvpair['value']
     return default
 
-########################################################################################################
-# Restore Functions
+#### Restore ################################################################
+""" restore functions """
 @require_admin_context
 def restore_mark_incomplete_as_error(context, host):
     """
@@ -1843,11 +1843,113 @@ def restore_mark_incomplete_as_error(context, host):
                        'status': 'error' }
             restore.update(values)
             restore.save(session=session)
+            
+def _set_metadata_for_restore(context, restore_ref, metadata,
+                                    purge_metadata, session):
+    """
+    Create or update a set of restore_metadata for a given restore
+
+    :param context: Request context
+    :param restore_ref: A restore object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in restore_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'restore_id': restore_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _restore_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _restore_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _restore_metadata_delete(context, metadata_ref, session=session)
 
 @require_context
-def restore_get(context, restore_id):
+def _restore_metadata_create(context, values, session):
+    """Create a RestoreMetadata object"""
+    metadata_ref = models.RestoreMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _restore_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def restore_metadata_create(context, values, session):
+    """Create an RestoreMetadata object"""
     session = get_session()
-    result = model_query(context, models.Restores, session=session).\
+    return _restore_metadata_create(context, values, session)
+
+@require_context
+def _restore_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by restore_metadata_create and restore_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _restore_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by restore_metadata_create and restore_metadata_update
+    """
+    metadata_ref.delete(session=session)
+
+def _restore_update(context, values, restore_id, purge_metadata, session):
+    try:
+        lock.acquire()    
+        metadata = values.pop('metadata', {})
+        
+        if restore_id:
+            restore_ref = model_query(context, models.Restores, session=session, read_deleted="yes").\
+                                        filter_by(id=restore_id).first()
+            if not restore_ref:
+                lock.release()
+                raise exception.RestoreNotFound(restore_id = restore_id)
+                                                        
+            if not values.get('uploaded_size'):
+                if values.get('uploaded_size_incremental'):
+                    values['uploaded_size'] =  restore_ref.uploaded_size + values.get('uploaded_size_incremental') 
+                    if not values.get('progress_percent') and restore_ref.size > 0:
+                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/restore_ref.size )
+        else:
+            restore_ref = models.Restores()
+            if not values.get('id'):
+                values['id'] = str(uuid.uuid4())
+            if not values.get('size'):
+                values['size'] = 0
+            if not values.get('uploaded_size'):
+                values['uploaded_size'] = 0
+            if not values.get('progress_percent'):
+                values['progress_percent'] = 0 
+                
+        restore_ref.update(values)
+        restore_ref.save(session)
+        
+        if metadata:
+            _set_metadata_for_restore(context, restore_ref, metadata, purge_metadata, session=session)  
+          
+        return restore_ref
+    finally:
+        lock.release()
+    return restore_ref               
+        
+@require_context
+def _restore_get(context, restore_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(   context, models.Restores, **kwargs).\
+                            options(sa_orm.joinedload(models.Restores.metadata)).\
                             filter_by(id=restore_id).\
                             first()
 
@@ -1856,35 +1958,52 @@ def restore_get(context, restore_id):
 
     return result
 
+@require_context
+def restore_get(context, restore_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()    
+    return _restore_get(context, restore_id, **kwargs) 
+
 @require_admin_context
-def restore_get_all(context, **kwargs):
+def restore_get_all(context, snapshot_id=None, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    return model_query( context, models.Restores, **kwargs).\
-                        order_by(models.Restores.created_at.desc()).all()
-
-
+    if snapshot_id == None:
+        return model_query(context, models.Restores, **kwargs).\
+                            options(sa_orm.joinedload(models.Restores.metadata)).\
+                            order_by(models.Restores.created_at.desc()).all()        
+    else:
+        return model_query(context, models.Restores, **kwargs).\
+                            options(sa_orm.joinedload(models.Restores.metadata)).\
+                            filter_by(snapshot_id=snapshot_id).\
+                            order_by(models.Restores.created_at.desc()).all()
 @require_context
-def restore_get_all_by_project(context, project_id):
+def restore_get_all_by_project(context, project_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
-    session = get_session()
-    return model_query(context, models.Restores, session=session).\
-                        filter_by(project_id=project_id).all()
+    return model_query(context, models.Restores, **kwargs).\
+                            options(sa_orm.joinedload(models.Restores.metadata)).\
+                            filter_by(project_id=project_id).all()
         
 @require_context
-def restore_get_all_by_project_snapshot(context, project_id, snapshot_id):
+def restore_get_all_by_project_snapshot(context, project_id, snapshot_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
-    session = get_session()
-    return model_query(context, models.Restores, session=session).\
-                        filter_by(project_id=project_id).\
-                        filter_by(snapshot_id=snapshot_id).all()
+    return model_query(context, models.Restores, **kwargs).\
+                            options(sa_orm.joinedload(models.Restores.metadata)).\
+                            filter_by(project_id=project_id).\
+                            filter_by(snapshot_id=snapshot_id).\
+                            order_by(models.Restores.created_at.desc()).all()
 
 @require_context
 def restore_show(context, restore_id):
     session = get_session()
-    result = model_query(context, models.Restores,session=session).\
-                             filter_by(id=restore_id).\
-                             first()
+    result = model_query(context, models.Restores, session=session).\
+                            options(sa_orm.joinedload(models.Restores.metadata)).\
+                            filter_by(id=restore_id).\
+                            first()
 
     if not result:
         raise exception.RestoreNotFound(restore_id=restore_id)
@@ -1893,46 +2012,15 @@ def restore_show(context, restore_id):
 
 @require_context
 def restore_create(context, values):
-    restore = models.Restores()
-    if not values.get('id'):
-        values['id'] = str(uuid.uuid4())
-    if not values.get('size'):
-        values['size'] = 0        
-    if not values.get('uploaded_size'):
-        values['uploaded_size'] = 0
-    if not values.get('progress_percent'):
-        values['progress_percent'] = 0         
-    restore.update(values)
-    restore.save()
-    return restore
+    session = get_session()
+    return _restore_update(context, values, None, False, session)
 
 @require_context
-def restore_update(context, restore_id, values):
-    try:
-        lock.acquire()
-        session = get_session()
-        with session.begin():
-            restore = model_query(context, models.Restores,
-                                 session=session, read_deleted="yes").\
-                filter_by(id=restore_id).first()
-    
-            if not restore:
-                lock.release()
-                raise exception.RestoreNotFound(
-                    _("No restore with id %(restore_id)s") % locals())
-                
-            if not values.get('uploaded_size'):
-                if values.get('uploaded_size_incremental'):
-                    values['uploaded_size'] =  restore.uploaded_size + values.get('uploaded_size_incremental') 
-                    if not values.get('progress_percent'):
-                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/restore.size)
-    
-            restore.update(values)
-            restore.save(session=session)
-    finally:
-        lock.release()
-    return restore
+def restore_update(context, restore_id, values, purge_metadata=False):
+    session = get_session()
+    return _restore_update(context, values, restore_id, purge_metadata, session)
 
+   
 @require_context
 def restore_delete(context, restore_id):
     session = get_session()

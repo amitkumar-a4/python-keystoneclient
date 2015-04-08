@@ -408,6 +408,21 @@ def upgrade(migrate_engine):
         mysql_engine='InnoDB'
     )
     
+    restore_metadata = Table(
+        'restore_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('version', String(length=255)),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('restore_id', String(length=255), ForeignKey('restores.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('restore_id', 'key'),
+        mysql_engine='InnoDB'
+    ) 
+        
     restored_vms = Table(
         'restored_vms', meta,
         Column('created_at', DateTime),
@@ -527,6 +542,7 @@ def upgrade(migrate_engine):
               vm_security_group_rule_snaps,
               vm_security_group_rule_snap_metadata,
               restores,
+              restore_metadata,
               restored_vms,
               restored_vm_metadata,
               restored_vm_resources,
@@ -565,6 +581,7 @@ def upgrade(migrate_engine):
                   "vm_security_group_rule_snaps",
                   "vm_security_group_rule_snap_metadata",
                   "restores",
+                  "restore_metadata",
                   "restored_vms",
                   "restored_vm_metadata",
                   "restored_vm_resources",

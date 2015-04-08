@@ -443,6 +443,17 @@ class Restores(BASE, WorkloadsBase):
     time_taken = Column(BigInteger, default=0)   
     status =  Column(String(32), nullable=False)
 
+class RestoreMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the restore"""
+    __tablename__ = 'restore_metadata'
+    __table_args__ = (UniqueConstraint('restore_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    restore_id = Column(String(36), ForeignKey('restores.id'), nullable=False)
+    restore = relationship(Restores, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)      
+    
 class RestoredVMs(BASE, WorkloadsBase):
     """Represents restored vms of a workload snapshot"""
     __tablename__ = str('restored_vms')
@@ -548,6 +559,7 @@ def register_models():
               VMSecurityGroupRuleSnaps,
               VMSecurityGroupRuleSnapMetadata,
               Restores,
+              RestoreMetadata,
               RestoredVMs,
               RestoredVMMetadata,
               RestoredVMResources,
