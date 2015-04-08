@@ -420,11 +420,27 @@ def upgrade(migrate_engine):
         Column('vm_id', String(length=255), nullable= False),
         Column('vm_name', String(length=255), nullable= False),
         Column('restore_id', String(length=255), ForeignKey('restores.id')),
+        Column('size', BigInteger, nullable=False),
+        Column('restore_type', String(length=32)),    
         Column('status', String(length=32), nullable=False),
         mysql_engine='InnoDB'
     )
     
-   
+    restored_vm_metadata = Table(
+        'restored_vm_metadata', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('version', String(length=255)),
+        Column('id', String(length=255), primary_key=True, nullable= False),
+        Column('restored_vm_id', String(length=255), ForeignKey('restored_vms.id'),nullable=False,index=True),        
+        Column('key', String(255), nullable=False),
+        Column('value', Text()),
+        UniqueConstraint('restored_vm_id', 'key'),
+        mysql_engine='InnoDB'
+    )  
+       
     restored_vm_resources = Table(
         'restored_vm_resources', meta,
         Column('created_at', DateTime),
@@ -512,6 +528,7 @@ def upgrade(migrate_engine):
               vm_security_group_rule_snap_metadata,
               restores,
               restored_vms,
+              restored_vm_metadata,
               restored_vm_resources,
               restored_vm_resource_metadata,
               tasks,
@@ -549,6 +566,7 @@ def upgrade(migrate_engine):
                   "vm_security_group_rule_snap_metadata",
                   "restores",
                   "restored_vms",
+                  "restored_vm_metadata",
                   "restored_vm_resources",
                   "restored_vm_resource_metadata"]                  
 

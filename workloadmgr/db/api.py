@@ -329,8 +329,11 @@ def restored_vm_create(context, values):
 def restored_vm_update(context, vm_id, restore_id, values):
     return IMPL.restored_vm_update(context, vm_id, restore_id, values)
 
-def restored_vm_get(context, restore_id):
-    return IMPL.restored_vm_get(context, restore_id)
+def restored_vm_get(context, vm_id, restore_id):
+    return IMPL.restored_vm_get(context, vm_id, restore_id)
+
+def restored_vms_get(context, restore_id, **kwargs):
+    return IMPL.restored_vms_get(context, restore_id, **kwargs)
 
 def restored_vm_delete(context, vm_id, restore_id):
     return IMPL.restored_vm_delete(context, vm_id, restore_id)

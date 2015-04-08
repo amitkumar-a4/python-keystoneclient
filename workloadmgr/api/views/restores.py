@@ -36,8 +36,23 @@ class ViewBuilder(common.ViewBuilder):
         d['snapshot_id'] = restore['snapshot_id']
         if 'workload_id' in restore:
             d['workload_id'] = restore['workload_id']
+            
         if 'instances' in restore:
-            d['instances'] = restore['instances']
+            instances = []
+            for vm in restore['instances']:
+                instance = {'id':vm['id'],
+                            'name':vm['name'],
+                            'status':vm['status'],
+                            'metadata':vm['metadata'],
+                            }
+                if 'flavor' in vm:
+                    instance['flavor'] = vm['flavor']
+                if 'nics' in vm:
+                    instance['nics'] = vm['nics']
+                instances.append(instance)    
+                
+            d['instances'] = instances  
+            
         if 'networks' in restore:
             d['networks'] = restore['networks']
         if 'subnets' in restore:
@@ -68,11 +83,27 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = restore['status']
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
-
         if 'snapshot_details' in restore:
-            d['snapshot_details'] = restore['snapshot_details']
+            d['snapshot_details'] = restore['snapshot_details']        
         if 'workload_id' in restore:
             d['workload_id'] = restore['workload_id']
+            
+        if 'instances' in restore:
+            instances = []
+            for vm in restore['instances']:
+                instance = {'id':vm['id'],
+                            'name':vm['name'],
+                            'status':vm['status'],
+                            'metadata':vm['metadata'],
+                            }
+                if 'flavor' in vm:
+                    instance['flavor'] = vm['flavor']
+                if 'nics' in vm:
+                    instance['nics'] = vm['nics']
+                instances.append(instance)    
+                
+            d['instances'] = instances            
+            
         if 'instances' in restore:
             d['instances'] = restore['instances']
         if 'networks' in restore:
@@ -86,6 +117,7 @@ class ViewBuilder(common.ViewBuilder):
         d['name'] = restore['display_name']
         d['description'] =  restore['display_description']
         d['host'] = restore['host']
+        d['size'] = restore['size']        
         d['progress_percent'] =  restore['progress_percent']          
         d['progress_msg'] =  restore['progress_msg'] 
         d['warning_msg'] =  restore['warning_msg']

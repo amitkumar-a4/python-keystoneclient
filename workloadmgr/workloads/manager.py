@@ -620,6 +620,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
             workflow.execute()
+            
+            compute_service = nova.API(production=True)
+            for restored_vm in self.db.restored_vms_get(context, restore_id):
+                instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
+                if instance == None:
+                    pass 
+                else:
+                    self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})                    
+                                   
+                                        
 
             if restore_type == 'test':
                 self.db.restore_update( context,

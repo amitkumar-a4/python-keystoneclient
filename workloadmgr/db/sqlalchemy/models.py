@@ -455,8 +455,21 @@ class RestoredVMs(BASE, WorkloadsBase):
     vm_id = Column(String(255))
     vm_name = Column(String(255))
     restore_id = Column(String(255), ForeignKey('restores.id'))
+    size = Column(BigInteger)
+    restore_type = Column(String(32))       
     finished_at = Column(DateTime)
     status =  Column(String(32), nullable=False)
+    
+class RestoredVMMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the restored vm"""
+    __tablename__ = 'restored_vm_metadata'
+    __table_args__ = (UniqueConstraint('restored_vm_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    restored_vm_id = Column(String(36), ForeignKey('restored_vms.id'), nullable=False)
+    restored_vm = relationship(RestoredVMs, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)             
     
 class RestoredVMResources(BASE, WorkloadsBase):
     """Represents vm resources of a restored snapshot"""
@@ -536,6 +549,7 @@ def register_models():
               VMSecurityGroupRuleSnapMetadata,
               Restores,
               RestoredVMs,
+              RestoredVMMetadata,
               RestoredVMResources,
               RestoredVMResourceMetadata,
               Tasks,

@@ -1101,14 +1101,21 @@ class API(base.Base):
         
         snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes")
         restore_details.setdefault('workload_id', snapshot.workload_id)
-
+        
         restore_details['snapshot_details'] = dict(snapshot.iteritems())
                 
         instances = []
         try:
-            vms = self.db.restore_vm_get(context, restore_id)
+            vms = self.db.restored_vms_get(context, restore_id)
             for vm in vms:
-                instances.append(dict(vm.iteritems()))
+                restored_vm = {'id': vm.vm_id, 
+                               'name':vm.vm_name,
+                               'status':vm.status,}
+                metadata = {}
+                for kvpair in vm.metadata:
+                    metadata.setdefault(kvpair['key'], kvpair['value'])
+                restored_vm['metadata'] = metadata                
+                instances.append(restored_vm)
         except Exception as ex:
             pass
         restore_details.setdefault('instances', instances)    
@@ -1121,14 +1128,21 @@ class API(base.Base):
         
         snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes")
         restore_details.setdefault('workload_id', snapshot.workload_id)
-
+        
         restore_details['snapshot_details'] = dict(snapshot.iteritems())
         
         instances = []
         try:
-            vms = self.db.restored_vm_get(context, restore_id)
+            vms = self.db.restored_vms_get(context, restore_id)
             for vm in vms:
-                instances.append({'id':vm.vm_id, 'name':vm.vm_name})
+                restored_vm = {'id': vm.vm_id, 
+                               'name':vm.vm_name,
+                               'status':vm.status,}
+                metadata = {}
+                for kvpair in vm.metadata:
+                    metadata.setdefault(kvpair['key'], kvpair['value'])
+                restored_vm['metadata'] = metadata                
+                instances.append(restored_vm)
         except Exception as ex:
             pass
         restore_details.setdefault('instances', instances) 
