@@ -869,6 +869,8 @@ def _snapshot_update(context, values, snapshot_id, purge_metadata, session):
                 values['id'] = str(uuid.uuid4())
             if not values.get('size'):
                 values['size'] = 0
+            if not values.get('restore_size'):
+                values['restore_size'] = 0                
             if not values.get('uploaded_size'):
                 values['uploaded_size'] = 0
             if not values.get('progress_percent'):
@@ -1094,6 +1096,8 @@ def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, ses
             values['id'] = str(uuid.uuid4())
         if not values.get('size'):
             values['size'] = 0
+        if not values.get('restore_size'):
+            values['restore_size'] = 0   
 
     snapshot_vm_ref.update(values)
     snapshot_vm_ref.save(session)
@@ -1280,7 +1284,9 @@ def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge
         snapshot_vm_resource_ref = models.SnapshotVMResources()
         if not values.get('size'):
             values['size'] = 0        
-    
+        if not values.get('restore_size'):
+            values['restore_size'] = 0   
+                
     snapshot_vm_resource_ref.update(values)
     snapshot_vm_resource_ref.save(session)
     
@@ -1471,7 +1477,9 @@ def _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, pur
         vm_disk_resource_snap_ref = models.VMDiskResourceSnaps()
         if not values.get('size'):
             values['size'] = 0
-
+        if not values.get('restore_size'):
+            values['restore_size'] = 0   
+            
     vm_disk_resource_snap_ref.update(values)
     vm_disk_resource_snap_ref.save(session)
     
@@ -1534,7 +1542,7 @@ def _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session):
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapNotFound(vm_disk_resource_snap_id = vm_disk_resource_snap_id)
+        vm_disk_resource_snap = None
     
     return vm_disk_resource_snap
 

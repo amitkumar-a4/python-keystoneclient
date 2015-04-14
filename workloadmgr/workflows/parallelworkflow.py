@@ -28,6 +28,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
+from workloadmgr import exception
 
 import vmtasks
 import workflow
@@ -50,8 +51,8 @@ def get_vms(cntx, workload_id):
                 vm_instance = instance
                 break;
         if vm_instance == None:
-            pass #TODO(giri): Throw exception
-        
+            raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in vCenter inventory") % vm.vm_name)
+                
         vm_hypervisor = None
         for hypervisor in hypervisors:
             if hypervisor.hypervisor_hostname == vm_instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:

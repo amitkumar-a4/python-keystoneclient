@@ -534,6 +534,50 @@ class VMwareVCDriver(VMwareESXDriver):
         self._session._wait_for_task(instance_uuid, reconfig_task)
         LOG.info(_("Reconfigured VM instance %(instance_name)s to detach "
                    "disk %(disk_key)s"), {'instance_name': instance_name, 'disk_key': disk_key})
+        
+    @autolog.log_method(Logger, 'VMwareVCDriver._adjust_vmdk_content_id')
+    def _adjust_vmdk_content_id(self, base_vmdk, top_vmdk):
+        try:            
+            cmdline = []
+            cmdline.append('dd')
+            cmdline.append('if=' + base_vmdk)
+            cmdline.append('of=' + base_vmdk + '.des')
+            cmdline.append('bs=1')
+            cmdline.append('skip=512')
+            cmdline.append('count=1024')
+            check_output(cmdline, stderr=subprocess.STDOUT)
+            with open(base_vmdk + '.des', "r") as base_descriptor_file:
+                base_descriptor =  base_descriptor_file.read() 
+            baseCID = re.search('\nCID=(\w+)', base_descriptor).group(1)
+            
+            cmdline = []
+            cmdline.append('dd')
+            cmdline.append('if=' + top_vmdk)
+            cmdline.append('of=' + top_vmdk + '.des')
+            cmdline.append('bs=1')
+            cmdline.append('skip=512')
+            cmdline.append('count=1024')
+            check_output(cmdline, stderr=subprocess.STDOUT)
+            with open(top_vmdk + '.des', "r") as top_descriptor_file:
+                top_descriptor =  top_descriptor_file.read()
+            top_descriptor = re.sub(r'(parentCID=)(\w+)', "parentCID=%s"%baseCID, top_descriptor)
+            with open(top_vmdk + '.des', "w") as top_descriptor_file:
+                top_descriptor_file.write("%s"%top_descriptor)
+            
+            cmdline = []
+            cmdline.append('dd')
+            cmdline.append('conv=notrunc,nocreat')
+            cmdline.append('if=' + top_vmdk + '.des')
+            cmdline.append('of=' + top_vmdk)
+            cmdline.append('bs=1')
+            cmdline.append('seek=512')
+            cmdline.append('count=1024')
+            check_output(cmdline, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as ex:
+            LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+            raise       
+        
+        
     
     @autolog.log_method(Logger, 'VMwareVCDriver._rebase_vmdk')
     def _rebase_vmdk(self, base, orig_base, base_descriptor, base_monolithicsparse,
@@ -755,15 +799,17 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot.status != "available":
                     continue
                 snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, vm_id, snapshot.id, resource_pit_id)
-                return db.get_metadata_value(snapshot_vm_resource.metadata, 'changeId', default='*')                
-            return '*'
+                changeId = db.get_metadata_value(snapshot_vm_resource.metadata, 'changeId', default='*')
+                vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,snapshot_vm_resource.id)
+                return vm_disk_resource_snap.vault_service_url, changeId                
+            return None,'*'
         except Exception as ex:
             LOG.exception(ex)
-            return '*'
+            return None,'*'
         
  
-    @autolog.log_method(Logger, 'VMwareVCDriver.get_vm_disk_resource_snap_backing')
-    def get_vm_disk_resource_snap_backing(self, cntx, db, workload_id, vm_id, resource_pit_id):
+    @autolog.log_method(Logger, 'VMwareVCDriver.get_top_vm_disk_resource_snap')
+    def get_top_vm_disk_resource_snap(self, cntx, db, workload_id, vm_id, resource_pit_id):
         try: 
             snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_id)
             for snapshot in snapshots:
@@ -783,12 +829,12 @@ class VMwareVCDriver(VMwareESXDriver):
             vmdk_snap_size = 0
 
             if snapshot_obj.snapshot_type == 'full':
-                changeId = '*'  
+                parent_changeId = '*'  
             else:              
-                changeId = self.get_parent_changeId(cntx, db, 
-                                                    snapshot['workload_id'],
-                                                    instance['vm_id'], 
-                                                    dev.backing.uuid)
+                parent_vault_service_url, parent_changeId = self.get_parent_changeId(cntx, db, 
+                                                                              snapshot['workload_id'],
+                                                                              instance['vm_id'], 
+                                                                              dev.backing.uuid)
             position = 0
             while position < dev.capacityInBytes:
                 changes = self._session._call_method(self._session._get_vim(),
@@ -796,14 +842,14 @@ class VMwareVCDriver(VMwareESXDriver):
                                                      snapshot=snapshot_data['snapshot_ref'],
                                                      deviceKey=dev['key'],
                                                      startOffset=position,
-                                                     changeId=changeId)
+                                                     changeId=parent_changeId)
                 if changes == []:
                     changes = self._session._call_method(self._session._get_vim(),
                                                      "QueryChangedDiskAreas", snapshot_data['vm_ref'],
                                                      snapshot=snapshot_data['snapshot_ref'],
                                                      deviceKey=dev['key'],
                                                      startOffset=position,
-                                                     changeId=changeId)
+                                                     changeId=parent_changeId)
            
                 if 'changedArea' in changes:
                     for change in changes.changedArea:
@@ -835,18 +881,19 @@ class VMwareVCDriver(VMwareESXDriver):
             try:
                 snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
                 if snapshot_obj.snapshot_type == 'full':
-                    changeId = '*'
+                    parent_vault_service_url = None
+                    parent_changeId = '*'
                 else:
-                    changeId = self.get_parent_changeId( cntx, db, 
+                    parent_vault_service_url, parent_changeId = self.get_parent_changeId( cntx, db, 
                                                          snapshot['workload_id'],
                                                          instance['vm_id'], 
                                                          dev.backing.uuid)
     
                 vmdk_snap_size = self.get_vmdk_snap_size(cntx, db, instance, snapshot, snapshot_data, dev)
-                vm_disk_resource_snap_backing = self.get_vm_disk_resource_snap_backing( cntx, db, 
-                                                                                        snapshot['workload_id'],
-                                                                                        instance['vm_id'], 
-                                                                                        dev.backing.uuid)
+                vm_disk_resource_snap_backing = self.get_top_vm_disk_resource_snap( cntx, db, 
+                                                                                    snapshot['workload_id'],
+                                                                                    instance['vm_id'], 
+                                                                                    dev.backing.uuid)
                 if vm_disk_resource_snap_backing:
                     vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.id
                 else:
@@ -898,15 +945,16 @@ class VMwareVCDriver(VMwareESXDriver):
                 vix_disk_lib_env = os.environ.copy()
                 vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                 # Create empty vmdk file
-                try:
-                    cmdline = "trilio-vix-disk-cli -create " 
-                    cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
-                    cmdline += " " + copy_to_file_path
-                    check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                except subprocess.CalledProcessError as ex:
-                    LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
-                    LOG.exception(ex)
-                    raise
+                if parent_vault_service_url == None:
+                    try:
+                        cmdline = "trilio-vix-disk-cli -create " 
+                        cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
+                        cmdline += " " + copy_to_file_path
+                        check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                    except subprocess.CalledProcessError as ex:
+                        LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
+                        LOG.exception(ex)
+                        raise
             
                 totalBytesToTransfer = 0
                 with open(copy_to_file_path + "-ctk", 'w') as ctkfile:
@@ -918,14 +966,14 @@ class VMwareVCDriver(VMwareESXDriver):
                                                         snapshot=snapshot_data['snapshot_ref'],
                                                         deviceKey=dev.key,
                                                         startOffset=position,
-                                                        changeId=changeId)
+                                                        changeId=parent_changeId)
                         if changes == []:
                             changes = self._session._call_method(self._session._get_vim(),
                                                          "QueryChangedDiskAreas", snapshot_data['vm_ref'],
                                                          snapshot=snapshot_data['snapshot_ref'],
                                                          deviceKey=dev['key'],
                                                          startOffset=position,
-                                                         changeId=changeId)
+                                                         changeId=parent_changeId)
                    
                         if 'changedArea' in changes:
                             for extent in changes.changedArea:
@@ -935,15 +983,26 @@ class VMwareVCDriver(VMwareESXDriver):
                                 ctkfile.write(str(start) + "," + str(length)+"\n")
                                 totalBytesToTransfer += length
                         position = changes.startOffset + changes.length;
-                
-                cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
-                           str(dev.backing.fileName),
-                           "-extentfile", copy_to_file_path + "-ctk",
-                           "-host", self._session._host_ip,
-                           "-user", self._session._host_username,
-                           "-password", "***********",
-                           "-vm", vmxspec,
-                           copy_to_file_path]
+                if parent_vault_service_url:
+                    cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
+                               str(dev.backing.fileName),
+                               "-extentfile", copy_to_file_path + "-ctk",
+                               "-parentPath", parent_vault_service_url,
+                               "-host", self._session._host_ip,
+                               "-user", self._session._host_username,
+                               "-password", "***********",
+                               "-vm", vmxspec,
+                               copy_to_file_path]
+                else:
+                    cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
+                               str(dev.backing.fileName),
+                               "-extentfile", copy_to_file_path + "-ctk",
+                               "-host", self._session._host_ip,
+                               "-user", self._session._host_username,
+                               "-password", "***********",
+                               "-vm", vmxspec,
+                               copy_to_file_path]        
+                                
                 cmd = " ".join(cmdspec)
                 for idx, opt in enumerate(cmdspec):
                     if opt == "-password":
@@ -1021,7 +1080,16 @@ class VMwareVCDriver(VMwareESXDriver):
                                                 'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()), 
                                                 'status': 'available'}
                 vm_disk_resource_snap = db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
-                snapshot_type = 'full' if changeId == '*' else 'incremental'
+                if vm_disk_resource_snap_backing:
+                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(cntx, 
+                                                                                    vm_disk_resource_snap_backing.id,
+                                                                                    {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
+                    # Upload snapshot metadata to the vault
+                    snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                    vmtasks.UploadSnapshotDBEntry(cntx, snapshot_vm_resource_backing.snapshot_id)  
+  
+                                    
+                snapshot_type = 'full' if parent_changeId == '*' else 'incremental'
                 return vmdk_snap_size, snapshot_type            
                 # END of inner function _upload_vmdk
             except Exception as ex:
@@ -1095,7 +1163,7 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.exception(ex)      
             raise 
                     
-    @autolog.log_method(Logger, 'VMwareVCDriverremove_snapshot_vm')
+    @autolog.log_method(Logger, 'VMwareVCDriver.remove_snapshot_vm')
     def remove_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_ref): 
         try:
             vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
@@ -1110,12 +1178,53 @@ class VMwareVCDriver(VMwareESXDriver):
             self._session._wait_for_task(instance['vm_id'], remove_snapshot_task)
         except Exception as ex:
             LOG.exception(ex)      
-            raise         
+            raise   
+
+    @autolog.log_method(Logger, 'VMwareVCDriver.repair_vm_disk_resource_snap')        
+    def repair_vm_disk_resource_snap(self, cntx, db, snapshot_vm_resource, current_snapshot):
+        top_snapshot_vm_resource = None
+        if current_snapshot:
+            top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, 
+                                                                                      snapshot_vm_resource.vm_id, 
+                                                                                      current_snapshot['id'], 
+                                                                                      snapshot_vm_resource.resource_pit_id) 
+        if top_snapshot_vm_resource == None:
+            snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, current_snapshot['workload_id'])
+            for snapshot in snapshots:
+                if snapshot.status != "available":
+                    continue
+                top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, 
+                                                                                          snapshot_vm_resource.vm_id, 
+                                                                                          snapshot.id, 
+                                                                                          snapshot_vm_resource.resource_pit_id)
+        vm_disk_resource_snap_chain = []
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,top_snapshot_vm_resource.id)
+        while vm_disk_resource_snap:
+            vm_disk_resource_snap_chain.insert(0,vm_disk_resource_snap)
+            if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
+                vm_disk_resource_snap = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+            else:
+                vm_disk_resource_snap = None
+            
+        vix_disk_lib_env = os.environ.copy()
+        vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+        for vm_disk_resource_snap in vm_disk_resource_snap_chain:    
+            try:            
+                cmdline = "vmware-vdiskmanager -R".split(" ")
+                cmdline.append(vm_disk_resource_snap.vault_service_url)
+                output = check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                LOG.info(" ".join(cmdline))
+                LOG.info(output)
+            except subprocess.CalledProcessError as ex:
+                LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+                raise
+                       
+       
+          
 
     @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot): 
         
-       
         @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_disks_deleted')    
         def _snapshot_disks_deleted(snap):
             try:
@@ -1284,22 +1393,14 @@ class VMwareVCDriver(VMwareESXDriver):
                                             LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
                                             raise
                                         backing_ctkfile.write(str(start) + "," + str(length)+"\n")
-    
-                            try:            
-                                cmdline = "vmware-vdiskmanager -R".split(" ")
-                                cmdline.append(vm_disk_resource_snap_backing.vault_service_url)
-                                check_output(cmdline, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                            except subprocess.CalledProcessError as ex:
-                                LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
-                                raise
-                            
-                                        
+
                             os.remove(vm_disk_resource_snap.vault_service_url)
                             os.remove(vm_disk_resource_snap.vault_service_url + '-ctk')
                             shutil.move(vm_disk_resource_snap_backing.vault_service_url, vm_disk_resource_snap.vault_service_url)
                             shutil.move(vm_disk_resource_snap_backing.vault_service_url + '-ctk', vm_disk_resource_snap.vault_service_url + '-ctk')
                             vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
-                                                            'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id}
+                                                            'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                                                            }
                             db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                             
                             snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
@@ -1313,7 +1414,15 @@ class VMwareVCDriver(VMwareESXDriver):
                             snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
                             if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
                                 affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
-                    
+                             
+                            vm_disk_resource_snap_child = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
+
+                            if vm_disk_resource_snap_child:   
+                                self._adjust_vmdk_content_id(vm_disk_resource_snap.vault_service_url, vm_disk_resource_snap_child.vault_service_url)
+
+                            self.repair_vm_disk_resource_snap(cntx, db, snapshot_vm_resource, snapshot)    
+                           
+                            
                     db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
     
                     all_disks_deleted, some_disks_deleted = _snapshot_disks_deleted(snap)

@@ -33,7 +33,7 @@ def import_workload(cntx, workload_url, new_version):
             values['host'] = socket.gethostname()
          
         return values
-               
+    
     vault_service = vault.get_vault_service(cntx)
     db = WorkloadMgrDB().db
     

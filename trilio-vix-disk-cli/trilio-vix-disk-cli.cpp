@@ -1177,6 +1177,11 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.extentfile = argv[++i];
+        } else if (!strcmp(argv[i], "-parentPath")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.parentPath = argv[++i];
         } else if (!strcmp(argv[i], "-count")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -1746,16 +1751,25 @@ DoUploadExtents(void)
 static void
 DoDownloadExtents(void)
 {
+    VixError vixError;
+    if (appGlobals.parentPath != NULL)
+   	{
+		VixDisk parentDisk(appGlobals.localConnection, appGlobals.parentPath, 0);
+		vixError = VixDiskLib_CreateChild(parentDisk.Handle(),
+	                                     appGlobals.diskPath,
+	                                     VIXDISKLIB_DISK_MONOLITHIC_SPARSE,
+	                                     NULL, NULL);
+	    CHECK_AND_THROW(vixError);   	
+   	}
     uint32 localFlags = appGlobals.openFlags & ~VIXDISKLIB_FLAG_OPEN_READ_ONLY;
-    VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, localFlags);
+   	VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, localFlags);
     VixDisk remoteDisk(appGlobals.connection, appGlobals.remotePath, appGlobals.openFlags);
     uint8 buf[VIXDISKLIB_BUF_SIZE];
     VixDiskLibSectorType numSectors;
     VixDiskLibSectorType startSector;
     VixDiskLibSectorType totalBytesTransferred = 0;
     VixDiskLibSectorType i;
-    VixError vixError;
-    
+
     std::string delimiter = ",";
     string line;
     ifstream myfile(appGlobals.extentfile);
