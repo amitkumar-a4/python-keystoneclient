@@ -1717,11 +1717,13 @@ class VMwareVCDriver(VMwareESXDriver):
                 unit_number = db.get_metadata_value(snapshot_vm_resource.metadata,'unit_number')
                 disk_type = db.get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
                 device_name = db.get_metadata_value(snapshot_vm_resource.metadata,'label')
-                linked_clone = False
+
                 self._volumeops.attach_disk_to_vm( vm_ref, instance,
                                                    adapter_type, disk_type, vmdk_path,
-                                                   capacityInKB, linked_clone,
-                                                   vmdk_controler_key, unit_number, device_name)            
+                                                   capacityInKB, linked_clone = False,
+                                                   controller_key = vmdk_controler_key, 
+                                                   unit_number = unit_number, 
+                                                   device_name = device_name)            
     
                 LOG.info('Uploading disks of ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id)        
                 db.restore_update(cntx,  restore['id'], 
@@ -1730,76 +1732,88 @@ class VMwareVCDriver(VMwareESXDriver):
                                   })
                 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
-                vm_disk_resource_snap_chain = []
-                vm_disk_resource_snap_chain.insert(0,vm_disk_resource_snap)
-                vdr_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                while vdr_snap_backing_id:
-                    vdr_snap = db.vm_disk_resource_snap_get(cntx, vdr_snap_backing_id)
-                    vm_disk_resource_snap_chain.insert(0, vdr_snap)
-                    vdr_snap_backing_id = vdr_snap.vm_disk_resource_snap_backing_id
                 
                 vix_disk_lib_env = os.environ.copy()
-                vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
-                vmxspec = 'moref=' + vm_ref.value                
-                for vdr_snap in vm_disk_resource_snap_chain:
-                    cmdspec = ["trilio-vix-disk-cli", "-uploadextents",
-                               vdr_snap.vault_service_url,
-                               "-extentfile", vdr_snap.vault_service_url + "-ctk",
-                               "-host", self._session._host_ip,
-                               "-user", self._session._host_username,
-                               "-password", "***********",
-                               "-vm", vmxspec,
-                               vmdk_path, ]
+                vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'   
+                
+                space_for_clone = 0
+                try:
+                    cmdspec = [ "trilio-vix-disk-cli", "-spaceforclone", disk_type,
+                               vm_disk_resource_snap.vault_service_url,]      
                     cmd = " ".join(cmdspec)
                     for idx, opt in enumerate(cmdspec):
                         if opt == "-password":
                             cmdspec[idx+1] = self._session._host_password
                             break
+                                  
+                    output = check_output(cmdspec, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                    space_for_clone_str = re.search(r'\d+ Bytes Required for Cloning',output)
+                    space_for_clone = int(space_for_clone_str.group().split(" ")[0])
+                except subprocess.CalledProcessError as ex:
+                    LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
+                    LOG.exception(ex)
+                    raise
+                
+                vmxspec = 'moref=' + vm_ref.value              
+                cmdspec = ["trilio-vix-disk-cli", "-clone",
+                           vm_disk_resource_snap.vault_service_url,
+                           "-host", self._session._host_ip,
+                           "-user", self._session._host_username,
+                           "-password", "***********",
+                           "-vm", vmxspec,
+                           vmdk_path, ]
+                cmd = " ".join(cmdspec)
+                for idx, opt in enumerate(cmdspec):
+                    if opt == "-password":
+                        cmdspec[idx+1] = self._session._host_password
+                        break
 
-                    process = subprocess.Popen(cmdspec,
-                                           stdin=subprocess.PIPE,
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           bufsize= -1,
-                                           env=vix_disk_lib_env,
-                                           close_fds=True,
-                                           shell=False)
-                
-                    queue = Queue()
-                    read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
-                    read_thread.daemon = True # thread dies with the program
-                    read_thread.start()            
-                
-                    uploaded_size = 0
-                    uploaded_size_incremental = 0
-                    previous_uploaded_size = 0
-                    while process.poll() is None:
+                process = subprocess.Popen(cmdspec,
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       bufsize= -1,
+                                       env=vix_disk_lib_env,
+                                       close_fds=True,
+                                       shell=False)
+            
+                queue = Queue()
+                read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                read_thread.daemon = True # thread dies with the program
+                read_thread.start()            
+            
+                uploaded_size = 0
+                uploaded_size_incremental = 0
+                previous_uploaded_size = 0
+                while process.poll() is None:
+                    try:
                         try:
-                            try:
-                                output = queue.get(timeout=5)
-                            except Empty:
-                                continue 
-                            except Exception as ex:
-                                LOG.exception(ex)
-                            done_bytes = re.search(r'\d+ Done',output)
-                            if done_bytes:
-                                totalbytes = int(done_bytes.group().split(" ")[0])                                
-                                uploaded_size_incremental = totalbytes - previous_uploaded_size
-                                uploaded_size = totalbytes
-                                restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': uploaded_size_incremental})
-                                previous_uploaded_size = uploaded_size                        
+                            output = queue.get(timeout=5)
+                        except Empty:
+                            continue 
                         except Exception as ex:
                             LOG.exception(ex)
+                        done_percentage_str = re.search(r'\d+% Done',output)
+                        if done_percentage_str:
+                            done_percentage = int(done_percentage_str.group().split(" ")[0].strip('%'))
+                            totalbytes =  (space_for_clone * done_percentage)/100                                 
+                            uploaded_size_incremental = totalbytes - previous_uploaded_size
+                            uploaded_size = totalbytes
+                            restore_obj = db.restore_update(cntx, restore['id'], {'uploaded_size_incremental': uploaded_size_incremental})
+                            previous_uploaded_size = uploaded_size                        
+                    except Exception as ex:
+                        LOG.exception(ex)
+            
+                process.stdin.close()
+                _returncode = process.returncode  # pylint: disable=E1101
+                if _returncode:
+                    LOG.debug(_('Result was %s') % _returncode)
+                    raise exception.ProcessExecutionError(
+                            exit_code=_returncode,
+                            stdout=output,
+                            stderr=process.stderr.read(),
+                            cmd=cmd)                
                 
-                    process.stdin.close()
-                    _returncode = process.returncode  # pylint: disable=E1101
-                    if _returncode:
-                        LOG.debug(_('Result was %s') % _returncode)
-                        raise exception.ProcessExecutionError(
-                                exit_code=_returncode,
-                                stdout=output,
-                                stderr=process.stderr.read(),
-                                cmd=cmd)
                 """
                 Repair is not working for remote disks
                 try:

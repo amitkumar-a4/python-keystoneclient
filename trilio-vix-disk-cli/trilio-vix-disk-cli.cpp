@@ -69,6 +69,7 @@ using std::stoul;
 #define COMMAND_DOWNLOADEXTENTS (1 << 19)
 #define COMMAND_MOUNT           (1 << 20)
 #define COMMAND_UNMOUNT         (1 << 21)
+#define	COMMAND_SPACE_FOR_CLONE	(1 << 22)
 
 #define VIXDISKLIB_VERSION_MAJOR 5
 #define VIXDISKLIB_VERSION_MINOR 5
@@ -127,7 +128,8 @@ static struct {
     char *libdir;
     char *ssMoRef;
     int repair;
-    char const *source;       
+    char const *source;
+    char const *diskType;       
 } appGlobals;
 
 static int ParseArguments(int argc, char* argv[]);
@@ -154,6 +156,7 @@ static void DoCopy(void);
 static void DoAttach(void);
 static void DoMount(void);
 static void DoUnmount(void);
+static void DoSpaceForClone(void);
 
 #define THROW_ERROR(vixError) \
    throw VixDiskLibErrWrapper((vixError), __FILE__, __LINE__)
@@ -844,6 +847,8 @@ PrintUsage(void)
     printf("\toverwrite the contents of the disk specified.\n");
     printf(" -mount mounts a virtual disk.\n");
     printf(" -unmount unmounts a virtual disk that was previously mounted using -mount option.\n");
+    printf(" -spaceforclone computes the space required for clone for the specified disk type.\n");
+
 
     printf("\n\n");
     printf("options:\n");
@@ -993,6 +998,8 @@ main(int argc, char* argv[])
             vixError = VixDiskLib_Connect(&cnxParams, &appGlobals.localConnection);
             CHECK_AND_THROW(vixError);
             DoCompare();
+        } else if (appGlobals.command & COMMAND_SPACE_FOR_CLONE) {
+            DoSpaceForClone();            
         } else if (appGlobals.command & COMMAND_DUMP) {
             DoDump();
         } else if (appGlobals.command & COMMAND_READ_META) {
@@ -1156,6 +1163,12 @@ ParseArguments(int argc, char* argv[])
             appGlobals.command |= COMMAND_COMPARE;
             appGlobals.openFlags |= VIXDISKLIB_FLAG_OPEN_READ_ONLY;
             appGlobals.localPath = argv[++i];
+        } else if (!strcmp(argv[i], "-spaceforclone")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.command |= COMMAND_SPACE_FOR_CLONE;
+            appGlobals.diskType = argv[++i];                
         } else if (!strcmp(argv[i], "-copy")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -2665,4 +2678,42 @@ DoUnmount()
        CHECK_AND_THROW(err);
    }
    VixMntapi_FreeVolumeHandles(volumeHandles);
+}
+
+ /*--------------------------------------------------------------------------
+ *
+ * DoSpaceForClone --
+ *
+ *      Computes the space required to clone to the given disktype.
+ *
+ * Results:
+ *      Space Needed for Clone in Bytes.
+ *
+ * Side effects:
+ *      None.
+ *
+ *--------------------------------------------------------------------------
+ */
+
+static void
+DoSpaceForClone(void)
+{
+    VixDisk disk(appGlobals.connection, appGlobals.diskPath, appGlobals.openFlags);
+    VixDiskLibDiskType disk_type = VIXDISKLIB_DISK_MONOLITHIC_FLAT;
+    if (strcmp(appGlobals.diskType, "flatMonolithic") == 0 
+    	|| strcmp(appGlobals.diskType, "thick") == 0 
+    	|| strcmp(appGlobals.diskType, "eagerZeroedThick") == 0
+    	|| strcmp(appGlobals.diskType, "preallocated") == 0 )
+    	disk_type = VIXDISKLIB_DISK_MONOLITHIC_FLAT;
+    else if (strcmp(appGlobals.diskType, "flatMonolithic") == 0 
+    		 || strcmp(appGlobals.diskType, "seSparse") == 0
+    		 || strcmp(appGlobals.diskType, "sparseMonolithic") == 0
+    		 || strcmp(appGlobals.diskType, "thin") == 0)
+    	disk_type = VIXDISKLIB_DISK_MONOLITHIC_SPARSE;
+
+	uint64 spaceNeeded = 0;
+    VixError vixError = VixDiskLib_SpaceNeededForClone(disk.Handle(), disk_type,  &spaceNeeded);
+    CHECK_AND_THROW(vixError);
+
+	cout << "" << spaceNeeded << " Bytes Required for Cloning" << endl;
 }
