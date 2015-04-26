@@ -13,6 +13,8 @@ import types
 import time
 from ctypes import *
 import subprocess
+from subprocess import check_output
+import re
 
 import eventlet
 from oslo.config import cfg
@@ -233,8 +235,30 @@ class VaultBackupService(base.Base):
             size = statinfo.st_size
         except Exception as ex:
             LOG.exception(ex)
-        return size             
-        
+        return size            
+
+    def get_restore_size(self, vault_service_url, disk_format, disk_type):
+        restore_size = 0
+        if disk_format == 'vmdk':
+            try:
+                vix_disk_lib_env = os.environ.copy()
+                vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+                                   
+                cmdspec = [ "trilio-vix-disk-cli", "-spaceforclone", disk_type, vault_service_url,]      
+                cmd = " ".join(cmdspec)
+                for idx, opt in enumerate(cmdspec):
+                    if opt == "-password":
+                        cmdspec[idx+1] = self._session._host_password
+                        break
+                              
+                output = check_output(cmdspec, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                space_for_clone_str = re.search(r'\d+ Bytes Required for Cloning',output)
+                restore_size = int(space_for_clone_str.group().split(" ")[0])
+            except subprocess.CalledProcessError as ex:
+                LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
+                LOG.exception(ex)
+        return restore_size
+                  
 
 def get_vault_service(context):
     if FLAGS.wlm_vault_service == 'swift':

@@ -468,6 +468,9 @@ class SwiftBackupService(base.Base):
     
     def get_size(self, vault_service_url):
         pass    
+
+    def get_restore_size(self, vault_service_url, disk_format, disk_type):
+        pass
     
     def delete(self, snapshot):
         """Delete the given snapshot from swift."""

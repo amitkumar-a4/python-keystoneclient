@@ -87,6 +87,7 @@ class ViewBuilder(common.ViewBuilder):
         d['description'] =  snapshot['display_description']
         d['host'] = snapshot['host']       
         d['size'] = snapshot['size']
+        d['restore_size'] = snapshot['restore_size']
         d['progress_percent'] =  snapshot['progress_percent']          
         d['progress_msg'] =  snapshot['progress_msg'] 
         d['warning_msg'] =  snapshot['warning_msg']

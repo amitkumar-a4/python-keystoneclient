@@ -983,6 +983,8 @@ class API(base.Base):
                 for kvpair in snapshot_vm_obj.metadata:
                     metadata.setdefault(kvpair['key'], kvpair['value'])
                 snapshot_vm['metadata'] = metadata
+                vdisks = snapshot_vm['metadata'].get('vdisks', '[]')
+                vdisks = json.loads(vdisks)                
                 snapshot_vm['nics'] = []
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm_obj.vm_id, snapshot_id)
                 snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot_id, snapshot_id)                
@@ -1015,6 +1017,14 @@ class API(base.Base):
                                                      'gateway_ip':subnet.get('gateway_ip', None),
                                                      }
                         snapshot_vm['nics'].append(nic)
+                    """ vdisks """
+                    if snapshot_vm_resource.resource_type == 'disk':
+                        label = self.db.get_metadata_value(snapshot_vm_resource.metadata,'label')
+                        for vdisk in vdisks:
+                            if vdisk['label'] == label:
+                                vdisk['restore_size'] = snapshot_vm_resource.restore_size
+                                break
+                snapshot_vm['metadata']['vdisks'] = json.dumps(vdisks)
                 snapshot_vms.append(snapshot_vm)              
 
         except Exception as ex:

@@ -972,6 +972,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
     time_taken = 0
     vault_service = vault.get_vault_service(context)
     snapshot_size = 0
+    snapshot_restore_size = 0
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
@@ -982,15 +983,24 @@ def snapshot_type_time_size_update(context, snapshot_id):
         time_taken = time_taken + snapshot_vm_resource.time_taken
         #update size
         if snapshot_vm_resource.status != 'deleted':
+            disk_type = get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
             vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
             snapshot_vm_resource_size = 0
+            snapshot_vm_resource_restore_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 if vm_disk_resource_snap.vault_service_url:
                     vm_disk_resource_snap_size = vault_service.get_size(vm_disk_resource_snap.vault_service_url)
-                    vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size}) 
+                    disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
+                    vm_disk_resource_snap_restore_size = vault_service.get_restore_size(vm_disk_resource_snap.vault_service_url,
+                                                                                        disk_format, disk_type)
+                    vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
+                                                                                     'restore_size' : vm_disk_resource_snap_restore_size}) 
                     snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
-            snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size})
+                    snapshot_vm_resource_restore_size = snapshot_vm_resource_restore_size + vm_disk_resource_snap_restore_size
+            snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size,
+                                                                           'restore_size' : snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
+            snapshot_restore_size = snapshot_restore_size + snapshot_vm_resource_restore_size
     
     if snapshot.finished_at:
         time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
@@ -1008,6 +1018,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
     return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type, 
                                                   'time_taken' : time_taken,
                                                   'size' : snapshot_size,
+                                                  'restore_size' : snapshot_restore_size,
                                                   'uploaded_size' : snapshot_size})
     
 @require_context
