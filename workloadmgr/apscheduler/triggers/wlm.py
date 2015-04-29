@@ -16,7 +16,7 @@ class WorkloadMgrTrigger(object):
         self.snapshots_to_keep = jobschedule['snapshots_to_keep']
 
         if 'start_date' in jobschedule and jobschedule['start_date'].strip(" ").lower() != "now":
-            self.start_date = convert_to_datetime(parse(jobschedule['start_date']))
+            self.start_date = convert_to_datetime(parse(jobschedule['start_date'] + " " + jobschedule['start_time']))
 
         if 'end_date' in jobschedule and jobschedule['end_date'].strip(" ").lower() != "no end":
             self.end_date = convert_to_datetime(parse(jobschedule['end_date']))
