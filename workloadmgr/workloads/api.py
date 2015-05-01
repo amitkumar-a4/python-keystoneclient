@@ -454,14 +454,20 @@ class API(base.Base):
             #                              'interval': '1 hr',
             #                              'start_time': '2:30 PM',
             #                              'snapshots_to_keep': '2'}
-            if not 'enabled' in jobschedule or jobschedule['enabled']:
-                self.workload_add_scheduler_job(jobschedule, workload)
-        
+            try:
+                if not 'enabled' in jobschedule or jobschedule['enabled']:
+                    self.workload_add_scheduler_job(jobschedule, workload)
+            except Exception as ex:
+                LOG.exception(ex)    
+                
             AUDITLOG.log(context, "Workload Created", workload)        
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            if hasattr(ex, 'kwargs'):
+                raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs)
+            else:
+                raise wlm_exceptions.ErrorOccurred(reason = ex.message)
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload):
