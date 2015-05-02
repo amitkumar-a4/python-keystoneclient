@@ -39,7 +39,7 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/home" target="_blank">http://&lt;ipaddress-of-tvault-vm&gt;/home</a>
+                            <a href="/home" target="_blank">https://&lt;ipaddress-of-tvault-vm&gt;/home</a>
                         </div>
                     </li>
                 </ol>
@@ -49,7 +49,7 @@
                         <br>
                         <br>
                         <div class="well">
-                        	<a href="/" onclick="javascript:event.target.port=3000">http://&lt;ipaddress-of-tvault-vm&gt;:3000</a>
+                        	<a href="/" onclick="javascript:event.target.port=3000">https://&lt;ipaddress-of-tvault-vm&gt;:3000</a>
                         </div>
                     </li>
                 </ol>
