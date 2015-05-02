@@ -23,9 +23,10 @@ import ConfigParser
 import tarfile
 import shutil
 import datetime
+from threading  import Thread
     
 import bottle
-from bottle import static_file
+from bottle import static_file, ServerAdapter
 from beaker.middleware import SessionMiddleware
 from cork import Cork
 import logging
@@ -55,8 +56,14 @@ aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.mag
 # alias the authorization decorator with defaults
 authorize = aaa.make_auth_decorator(fail_redirect="/login", role="user")
 
-import datetime
-app = bottle.app()
+
+def get_https_app(app):
+    def https_app(environ, start_response):
+        environ['wsgi.url_scheme'] = 'https'
+        return app(environ, start_response)
+    return https_app
+
+app = get_https_app(bottle.app())
 session_opts = {
     'session.auto': True,
     'session.cookie_expires': True,
@@ -68,7 +75,21 @@ session_opts = {
 }
 app = SessionMiddleware(app, session_opts)
 
-
+class SSLWSGIRefServer(ServerAdapter):
+    def run(self, handler):
+        from wsgiref.simple_server import make_server, WSGIRequestHandler
+        import ssl
+        if self.quiet:
+            class QuietHandler(WSGIRequestHandler):
+                def log_request(*args, **kw): pass
+            self.options['handler_class'] = QuietHandler
+        srv = make_server(self.host, self.port, handler, **self.options)
+        srv.socket = ssl.wrap_socket (
+             srv.socket,
+             keyfile='/etc/tvault/ssl/localhost.key',
+             certfile='/etc/tvault/ssl/localhost.crt',  # path to certificate
+             server_side=True)
+        srv.serve_forever()
 
 # #  Bottle methods  # #
 
@@ -128,7 +149,12 @@ def change_password():
 @bottle.route('/')
 @bottle.view('landing_page_vmware')
 def index():
-    return {}
+    scheme = bottle.request.urlparts[0]
+    if scheme == 'http':
+        # request is http; redirect to https
+        bottle.redirect(bottle.request.url.replace('http', 'https', 1))
+    else:
+        return {}
 
 # Static pages
 @bottle.route('/login')
@@ -2011,7 +2037,11 @@ def set_network_interfaces(propertyMap):
     subprocess.call(command, shell=False)            
 
 # #  Web application main  # #
-
+def main_http():
+    # Start the Bottle webapp
+    bottle.debug(True)
+    bottle.run(host='0.0.0.0', port=80)
+    
 def main():
     #configure the networking
     try:
@@ -2066,9 +2096,13 @@ def main():
         #TODO: implement logging
         pass
 
-    # Start the Bottle webapp
+    http_thread = Thread(target=main_http)
+    http_thread.daemon = True # thread dies with the program
+    http_thread.start()
+
     bottle.debug(True)
-    bottle.run(host='0.0.0.0', app=app, quiet=False, reloader=True, port=80)
+    srv = SSLWSGIRefServer(host='0.0.0.0', port=443)
+    bottle.run(server=srv, app=app, quiet=False, reloader=True)          
 
 if __name__ == "__main__":
     main()
