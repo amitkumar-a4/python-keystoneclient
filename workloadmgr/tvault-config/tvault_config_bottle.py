@@ -359,7 +359,7 @@ def get_lan_ip():
     return ip
 
 def authenticate_vcenter():
-    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
+    if config_data['configuration_type'] == 'vmware':
         from workloadmgr.virt.vmwareapi import vim
         vim_obj = vim.Vim(protocol="https", host=config_data['vcenter'])
         session = vim_obj.Login(vim_obj.get_service_content().sessionManager,
@@ -1023,9 +1023,17 @@ def troubleshooting_vmware():
         output = 'Virtual Machine(s): ' + values['reset_cbt_vms']
         for vm_name in values['reset_cbt_vms'].split(","):
             output = output + '\n' + 'Resetting CBT for ' + vm_name
-            vm_ref = vm_util.get_vm_ref_from_name(session, vm_name)
-            if not vm_ref:
-                raise Exception("Virtul Machine '" + vm_name + "' not found")
+            vm_refs = vm_util.get_vms_ref_from_name(session, vm_name)
+            if not vm_refs:
+                output = output + '\n' + "ERROR: Virtual Machine '" + vm_name + "' not found."
+                continue
+            if len(vm_refs) == 0:
+                output = output + '\n' + "ERROR: Virtual Machine '" + vm_name + "' not found."
+                continue  
+            if len(vm_refs) != 1:
+                output = output + '\n' + "ERROR: Multiple Virtual Machines with name '" + vm_name + "' found."
+                continue 
+            vm_ref =  vm_refs[0]               
             rootsnapshot = session._call_method(vim_util,"get_dynamic_property", vm_ref, "VirtualMachine", "rootSnapshot")
             if rootsnapshot:
                 remove_snapshot_task = session._call_method(session._get_vim(), 
