@@ -753,6 +753,30 @@ def get_vm_ref(session, instance):
     return vm_ref
 
 @autolog.log_method(Logger, log_retval = False)
+def _get_objects_from_results(session, results, value):
+    found_objects = []
+    while results:
+        token = _get_token(results)
+        for object in results.objects:
+            if object.propSet[0].val == value:
+                found_objects.append(object.obj)            
+        if token:
+            results = session._call_method(vim_util,
+                                           "continue_to_get_objects",
+                                           token)
+        else:
+            return found_objects
+        
+    return found_objects  
+            
+@autolog.log_method(Logger, log_retval = False)
+def get_vms_ref_from_name(session, vm_name):
+    """Get reference to 'ALL' the VMs with the name specified."""
+    vms = session._call_method(vim_util, "get_objects",
+                "VirtualMachine", ["name"])
+    return _get_objects_from_results(session, vms, vm_name)  
+
+@autolog.log_method(Logger, log_retval = False)
 def get_host_ref_from_id(session, host_id, property_list=None):
     """Get a host reference object for a host_id string."""
 
