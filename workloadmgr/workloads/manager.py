@@ -25,6 +25,11 @@ import json
 from threading import Lock
 import shutil
 
+import smtplib
+# Import the email modules
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 
 from oslo.config import cfg
 
@@ -51,6 +56,7 @@ from workloadmgr.openstack.common import timeutils
 from taskflow.exceptions import WrappedFailure
 
 from workloadmgr import autolog
+from workloadmgr import settings
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -346,6 +352,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Take a snapshot of the workload
         """
+        
         try:
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
@@ -465,6 +472,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)            
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
+		
+        self.send_email(snapshot.status)
+		
         self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
         
             
@@ -719,4 +729,40 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing restore
         """
-        self.db.restore_delete(context, restore_id)
+        self.db.restore_delete(context, restore_id)		
+		
+    @autolog.log_method(logger=Logger)
+    def send_email(self, status):
+        """
+        Sends success email to administrator if snapshot done
+        else error email
+        """  
+       
+                
+        if status == 'error':
+             subject = 'Failure to take snapshot'
+        
+             html = """\
+             <html><head></head><body> <p>Hi admin</p><p>There is some error taking snapshot</p</body></html>
+             """
+        else:
+             subject = 'Snapshot success'
+
+             html = """\
+             <html><head></head><body><p>Hi admin</p><p>Snapshot operation successfully performed</p></body></html>
+             """
+            
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['To'] = settings.get_settings().get('notification_email_to')
+        msg['From'] = settings.get_settings().get('notification_email_from')
+        
+        part2 = MIMEText(html, 'html')
+        
+        msg.attach(part2)
+        
+        s = smtplib.SMTP(settings.get_settings().get('smtp_server'))
+        #s.login(smtp_user,smtp_pass)
+        s.sendmail(msg['From'], msg['To'], msg.as_string())
+        s.quit()
+	
