@@ -1487,3 +1487,28 @@ def check_ssh_injection(cmd_list):
                 if result == 0 or not arg[result - 1] == '\\':
                     raise exception.SSHInjectionThreat(command=cmd_list)
 
+def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=None):
+    mac_addresses = []
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    if password == '':
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+    else:
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(hostname, port=int(sshport), username=username, password=password, timeout=timeout)
+
+    stdin, stdout, stderr = client.exec_command('ls -la /etc/debian_version', timeout=timeout)
+    if not stderr.read():
+        stdin, stdout, stderr = client.exec_command('ifconfig | grep HWaddr', timeout=timeout)
+        for macline in stdout.read().strip().split('\n'):
+            mac_addresses.append(macline.split('HWaddr')[1].strip())
+        return mac_addresses
+
+    stdin, stdout, stderr = client.exec_command('ls -la /etc/centos-release', timeout=timeout)
+    if not stderr.read():
+        stdin, stdout, stderr = client.exec_command('/usr/sbin/ifconfig | grep ether', timeout=timeout)
+        for macline in stdout.read().strip().split('\n'):
+            mac_addresses.append(macline.split('ether')[1].split()[0].strip())
+        return mac_addresses
+
+    return 
