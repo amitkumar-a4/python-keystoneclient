@@ -451,21 +451,14 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
     interfaces = {}
     for hostname in hostnames:
         try:
-            client = paramiko.SSHClient()
-            client.load_system_host_keys()
-            if hostpassword == '':
-                client.set_missing_host_key_policy(paramiko.WarningPolicy())
-            else:
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(hostname, port=int(sshport), username=hostusername, password=hostpassword, timeout=120)
-            stdin, stdout, stderr = client.exec_command('ifconfig eth0 | grep HWaddr', timeout=120)
-            interfaces[stdout.read().split('HWaddr')[1].strip()] = hostname
+            mac_addresses = utils.get_mac_addresses(hostname, sshport,
+                                                    username=hostusername,
+                                                    password=hostpassword, timeout=120)
+            for mac in mac_addresses:
+                interfaces[mac] = hostname
         except:
             LOG.info(_( '"' + hostname +'" appears to be offline'))
             pass
-        finally:
-            client.close()
-
 
     # query VM by ethernet and get instance info here
     # call nova list
