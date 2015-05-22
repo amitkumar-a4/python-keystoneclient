@@ -26,10 +26,12 @@ from threading import Lock
 import shutil
 
 import smtplib
+import socket
+
 # Import the email modules
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
+from keystoneclient.v2_0 import client as keystone_v2
 
 from oslo.config import cfg
 
@@ -68,6 +70,8 @@ scheduler_config = {'standalone': 'True'}
 
 FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
+
+CONF = cfg.CONF
        
 @autolog.log_method(logger=Logger)
 def get_workflow_class(context, workload_type_id, restore=False):
@@ -125,28 +129,36 @@ def synchronized(lock):
         return new_function
     return wrap
   
+
+class objectview(object):
+      def __init__(self, d):
+          self.__dict__ = d
+
     
 class WorkloadMgrManager(manager.SchedulerDependentManager):
     """Manages WorkloadMgr """
 
     RPC_API_VERSION = '1.0'
+
     
     @autolog.log_method(logger=Logger)
     def __init__(self, service_name=None, *args, **kwargs):
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
-        self.scheduler.start()
+       # self.scheduler.add_interval_job(self.job_def,args=['hello','there'],hours=1)
+        self.scheduler.start()       
         self.driver = driver.load_compute_driver(None, None)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
-    
+
+ 
     @autolog.log_method(logger=Logger)    
     def init_host(self):
         """
         Do any initialization that needs to be run if this is a standalone service.
         """
 
-        ctxt = context.get_admin_context()
-
+        ctxt = context.get_admin_context()        
+        
         LOG.info(_("Cleaning up incomplete operations"))
         
         try:
@@ -472,8 +484,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)            
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
-		
-        self.send_email(snapshot.status)
+	
+        if settings.get_settings().get('email_enable') == 'yes':
+	
+           self.send_email(context,snapshot,'snapshot')
 		
         self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
         
@@ -688,6 +702,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })
+
+            restore = self.db.restore_get(context, restore_id)
+
+            if settings.get_settings().get('email_enable') == 'yes':
+
+               self.send_email(context,restore,'restore')
+
+
             return;
         
     @autolog.log_method(logger=Logger)
@@ -732,37 +754,128 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.db.restore_delete(context, restore_id)		
 		
     @autolog.log_method(logger=Logger)
-    def send_email(self, status):
+    def send_email(self,context,object,type):
         """
-        Sends success email to administrator if snapshot done
+        Sends success email to administrator if snapshot/restore done
         else error email
         """  
-       
-                
-        if status == 'error':
-             subject = 'Failure to take snapshot'
         
-             html = """\
-             <html><head></head><body> <p>Hi admin</p><p>There is some error taking snapshot</p</body></html>
-             """
-        else:
-             subject = 'Snapshot success'
-
-             html = """\
-             <html><head></head><body><p>Hi admin</p><p>Snapshot operation successfully performed</p></body></html>
-             """
+        try:
+            try:
+                keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
+                user = keystone.users.get(context.user_id)
+            except:
+                   o = {'name':'admin','email':settings.get_settings().get('notification_email_to')}
+                   user = objectview(o)
+                   pass
             
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['To'] = settings.get_settings().get('notification_email_to')
-        msg['From'] = settings.get_settings().get('notification_email_from')
+            if type == 'snapshot':
+            
+               subject = 'Snapshot success'
+                
+               html = """\
+               <html>
+                 <head></head>
+                 <body>
+                    <p>Hi """+user.name+"""</p>
+                    <p>Snapshot operation successfully performed</p>
+                    <p>Below are snapshot details</p>
+                    <table border='1px solid black'>
+                    <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
+                    <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
+                    <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                    <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
+                    <tr><td>Time taken</td><td>"""+str(object.time_taken)+"""</td></tr>
+                    <tr><td>Type</td><td>"""+object.snapshot_type+"""</td></tr>
+                    </table>
+                 </body>
+               </html>
+               """  
+                
+                
+               if object.status == 'error':
+                  subject = 'Failure to take snapshot'
+            
+                  html = """\
+                  <html>
+                    <head></head>
+                    <body>
+                      <p>Hi """+user.name+"""</p>
+                      <p>There is some error taking snapshot</p>
+                      <p>Below are snapshot details</p>
+                      <table border='1px solid black'>
+                      <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
+                      <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
+                      <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                      <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
+                      <tr><td>Status</td><td>"""+object.status+"""</td></tr>
+                      <tr><td>Error message</td><td>"""+object.error_msg+"""</td></tr>
+                      </table>
+                    </body>
+                  </html>
+                  """
+                
+            elif type == 'restore':
+                 subject = 'Restore success'
+                
+                 html = """\
+                 <html>
+                   <head></head>
+                   <body>
+                      <p>Hi """+user.name+"""</p>
+                      <p>Restore operation successfully performed</p>
+                      <p>Below are restore details</p>
+                      <table border='1px solid black'>
+                      <tr><td>Restore name</td><td>"""+object.display_name+"""</td></tr>
+                      <tr><td>Restore description</td><td>"""+object.display_description+"""</td></tr>
+                      <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                      <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
+                      <tr><td>Time taken</td><td>"""+str(object.time_taken)+"""</td></tr>
+                      <tr><td>Type</td><td>"""+object.restore_type+"""</td></tr>
+                      </table>
+                   </body>
+                 </html>
+                 """
+                 
+                 if object.status == 'error':
+                    subject = 'Failure to do restore'
+              
+                    html = """\
+                    <html>
+                      <head></head>
+                      <body>
+                        <p>Hi """+user.name+"""</p>
+                        <p>There is some error making restore</p>
+                        <p>Below are restore details</p>
+                        <table border='1x solid black'>
+                        <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
+                        <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
+                        <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                        <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
+                        <tr><td>Status</td><td>"""+object.status+"""</td></tr>
+                        <tr><td>Error message</td><td>"""+object.error_msg+"""</td></tr>
+                        </table>
+                      </body>
+                    </html>
+                    """      
+                            
+                
+            msg = MIMEMultipart('alternative')
+            msg['To'] = user.email
+            msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
+            #msg['From'] = 'administrator@vsphere'
+            msg['Subject'] = subject
+            
+            part2 = MIMEText(html, 'html')          
+            msg.attach(part2)
+            
+            s = smtplib.SMTP(settings.get_settings().get('smtp_server'))
+            #s.login(smtp_user,smtp_pass)
+            s.sendmail(msg['From'], msg['To'], msg.as_string())
+            s.quit()
         
-        part2 = MIMEText(html, 'html')
-        
-        msg.attach(part2)
-        
-        s = smtplib.SMTP(settings.get_settings().get('smtp_server'))
-        #s.login(smtp_user,smtp_pass)
-        s.sendmail(msg['From'], msg['To'], msg.as_string())
-        s.quit()
-	
+        except:
+               pass
+                
+               
+     
