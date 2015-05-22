@@ -9,11 +9,15 @@ from datetime import timedelta
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
 from oslo.config import cfg
+from keystoneclient.v2_0 import client as keystone_v2
  
 auditlog_opts = [
     cfg.StrOpt('auditlog_admin_user',
                default='admin',
-               help='auditlog admin user'),               
+               help='auditlog admin user'),
+    cfg.StrOpt('keystone_endpoint_url',
+               default='http://localhost:35357/v2.0',
+               help='keystone endpoint url for connecting to keystone'),                                   
 ]
 
 CONF = cfg.CONF
@@ -45,8 +49,12 @@ class AuditLog(object):
                 message = 'NA'
             if object == None:
                 object = {}
+            
+            keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
+            user = keystone.users.get(context.user_id)
+            
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
-            auditlogmsg = auditlogmsg + ',' + CONF.auditlog_admin_user + ',' + context.user_id
+            auditlogmsg = auditlogmsg + ',' + user.name + ',' + context.user_id
             auditlogmsg = auditlogmsg + ',' +  object.get('display_name', 'NA') + ',' + object.get('id', 'NA')  
             auditlogmsg = auditlogmsg + ',' + message + '\n'
             with open(self._filepath, 'a') as auditlogfile:   
