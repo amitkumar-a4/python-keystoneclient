@@ -1487,3 +1487,18 @@ def check_ssh_injection(cmd_list):
                 if result == 0 or not arg[result - 1] == '\\':
                     raise exception.SSHInjectionThreat(command=cmd_list)
 
+def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=None):
+    mac_addresses = []
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    if password == '':
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+    else:
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(hostname, port=int(sshport), username=username, password=password, timeout=timeout)
+
+    ifcfgcmd = "ifconfig | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}'"
+    stdin, stdout, stderr = client.exec_command(ifcfgcmd, timeout=timeout)
+    for macline in stdout.read().strip().split('\n'):
+            mac_addresses.append(macline);
+    return mac_addresses
