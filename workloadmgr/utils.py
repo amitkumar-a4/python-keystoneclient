@@ -1497,18 +1497,8 @@ def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=N
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(hostname, port=int(sshport), username=username, password=password, timeout=timeout)
 
-    stdin, stdout, stderr = client.exec_command('ls -la /etc/debian_version', timeout=timeout)
-    if not stderr.read():
-        stdin, stdout, stderr = client.exec_command('ifconfig | grep HWaddr', timeout=timeout)
-        for macline in stdout.read().strip().split('\n'):
-            mac_addresses.append(macline.split('HWaddr')[1].strip())
-        return mac_addresses
-
-    stdin, stdout, stderr = client.exec_command('ls -la /etc/centos-release', timeout=timeout)
-    if not stderr.read():
-        stdin, stdout, stderr = client.exec_command('/usr/sbin/ifconfig | grep ether', timeout=timeout)
-        for macline in stdout.read().strip().split('\n'):
-            mac_addresses.append(macline.split('ether')[1].split()[0].strip())
-        return mac_addresses
-
-    return 
+    ifcfgcmd = "ifconfig | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}'"
+    stdin, stdout, stderr = client.exec_command(ifcfgcmd, timeout=timeout)
+    for macline in stdout.read().strip().split('\n'):
+            mac_addresses.append(macline);
+    return mac_addresses

@@ -37,6 +37,7 @@ import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
+from workloadmgr import exception
 
 import vmtasks
 import workflow
@@ -409,6 +410,15 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
                     if m['stateStr'] == 'SECONDARY':
                         hosts_to_backup.append({'replicaSetName': status['set'],
                                                 'secondaryReplica': m['name']})
+                    else:
+                        LOG.error(_(preferredreplica + " state is " +
+                                    m['stateStr'] +
+                                    ". Will pick next secondary for backup"))
+                        for m in status['members']:
+                            if m['stateStr'] == 'SECONDARY':
+                                hosts_to_backup.append({'replicaSetName': status['set'],
+                                                        'secondaryReplica': m['name']})
+                                break
                         break
         else:
             # if user did not specify preferred group, backup entire cluster
@@ -456,9 +466,11 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                                                     password=hostpassword, timeout=120)
             for mac in mac_addresses:
                 interfaces[mac] = hostname
+
         except:
-            LOG.info(_( '"' + hostname +'" appears to be offline'))
+            LOG.info(_( '"' + hostname +'" appears to be offline. Cannot exec ifconfig' ))
             pass
+
 
     # query VM by ethernet and get instance info here
     # call nova list
@@ -528,7 +540,7 @@ class MongoDBWorkflow(workflow.Workflow):
     def find_first_alive_node(self):
         # Iterate thru all hosts and pick the one that is alive
         if 'hostnames' in self._store:
-            for host in json.loads(self._store['hostnames']):
+            for host in [self._store['DBHost']] + json.loads(self._store['hostnames']):
                 try:
                     connection = connect_server(host,
                                                 int(self._store['DBPort']),
@@ -641,7 +653,8 @@ class MongoDBWorkflow(workflow.Workflow):
                        "--defaultnode", self._store['DBHost'],
                        "--port", self._store['HostSSHPort'],
                        "--username", self._store['HostUsername'],
-                       "--password", "******",]
+                       "--password", "******",
+                       "--dbport", self._store["DBPort"],]
 
             if self._store.get('hostnames', None):
                 hosts = ""
@@ -657,6 +670,8 @@ class MongoDBWorkflow(workflow.Workflow):
                 if opt == "--password":
                     cmdspec[idx+1] = self._store['HostPassword']
                     break
+
+            LOG.debug(_( 'Executing: ' + " ".join(cmdspec)))
             process = subprocess.Popen(cmdspec,shell=False)
             stdoutdata, stderrdata = process.communicate()
             if process.returncode != 0:
