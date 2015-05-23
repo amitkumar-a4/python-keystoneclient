@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
 @autolog.log_method(Logger)
-def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None):
+def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes = None):
     # Iterate thru all hosts and identify the valid list of mongodb hosts
     # will start with last known hosts
     # the mongo service need not be running. This routine
@@ -26,21 +26,19 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, addlnodes = None)
     # ssh session
     error_msg = 'Unknown Error'
     nodelist = []
-    if not addlnodes or  len(addlnodes) == 0:
-        LOG.info(_("'addlnodes' is empty. Defaulting to defaultnode %s atribute") % defaultnode)
-        if not defaultnode:
-            raise exception.InvalidState("MongoDB workload is in invalid state. Do not have any node information set")
-        addlnodes = defaultnode
+    addlnodes = defaultnode + ";" + addlnodes
 
     try:
         nodes = addlnodes.split(";")
         if '' in nodes:
             nodes.remove('')
+        s = set(nodes)
+        nodes = list(s)
         output = pssh_exec_command( nodes,
                                     int(SSHPort),
                                     Username,
                                     Password,
-                                    'mongo --eval ' + '"printjson(db.adminCommand(\'listDatabases\'))"');
+                                    'mongo --port ' + DBPort + ' --eval "printjson(db.adminCommand(\'listDatabases\'))"');
         nodelist = nodes
     except AuthenticationException as ex:
         raise
@@ -118,12 +116,12 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
     return output
 
 @autolog.log_method(Logger)
-def get_databases(hosts, port, username, password):
+def get_databases(hosts, port, username, password, dbport):
     output = pssh_exec_command(hosts, port, username, password,
-                     'mongo --quiet --eval ' + '"JSON.stringify(db.adminCommand(\'listDatabases\'))"');
+                     'mongo --quiet --port ' + dbport + ' --eval "JSON.stringify(db.adminCommand(\'listDatabases\'))"');
     for host in output:
         if output[host]['exit_code']:
-            LOG.info(_("mongo --eval " + 'JSON.stringify(db.adminCommand("listDatabases"))' +
+            LOG.warning(_("mongo --port " + dbport + " --eval " + 'JSON.stringify(db.adminCommand("listDatabases"))' +
                        "on %s cannot be executed. Error %s" % (host, str(output[host]['exit_code']))))
             continue
 
@@ -143,13 +141,17 @@ def main(argv):
         errfile = '/tmp/mongodbnodes_errors.txt'
         outfile = '/tmp/mongodbnodes_output.txt'
         addlnodes = None
+        dbport = "27017"
+        port = "22"
 
-        opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile="])
+        opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile=", "dbport=",])
         for opt, arg in opts:
             if opt == '--defaultnode':
                 defaultnode = arg
             elif opt == '--port':
                 port = arg
+            elif opt == '--dbport':
+                dbport = arg
             elif opt == '--username':
                 username = arg
             elif opt == '--password':
@@ -164,10 +166,10 @@ def main(argv):
         with open(outfile,'w') as outfilehandle:
             pass
 
-        alivenodes = find_alive_nodes(defaultnode, port, username, password, addlnodes)
+        alivenodes = find_alive_nodes(defaultnode, port, username, password, dbport, addlnodes)
 
         clusterinfo = {}
-        clusterinfo['databases'] = get_databases(alivenodes, port, username, password)
+        clusterinfo['databases'] = get_databases(alivenodes, port, username, password, dbport)
 
         with open(outfile,'w') as outfilehandle:
             outfilehandle.write(json.dumps(clusterinfo))
@@ -176,6 +178,7 @@ def main(argv):
         LOG.exception(ex)
         usage = _("Usage: mongodbnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode mongodb1 "
                   "--port 22 --username ubuntu --password password "
+                  "--dbport <mongos/mongodport> "
                   "--addlnodes 'mongodb1;mongodb2;mongodb3' "
                   "--outfile /tmp/mongodbnodes.txt --errfile /tmp/mongodbnodes_error.txt")
         LOG.info(usage)
