@@ -81,6 +81,10 @@ def connect_server(host, port, user, password, verbose=False):
         raise e
     return connection
 
+def isShardedCluster(conn):
+    status = conn.admin.command("ismaster")
+    return not ('primary' in status and 'secondary' in status)
+
 def getShards(conn):
     try:
         db = conn.config
@@ -382,20 +386,54 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
     # Getting the secondaries list
     #
     hosts_to_backup = []
-    for s in shards:
-        hosts = str(s['host'])
-        hosts = hosts.replace(str(s['_id']), '').strip()
-        hosts = hosts.replace('/', '').strip()
+    if isShardedCluster(connection):
+        for s in shards:
+            hosts = str(s['host'])
+            hosts = hosts.replace(str(s['_id']), '').strip()
+            hosts = hosts.replace('/', '').strip()
 
-        #print 'Getting secondary from hosts in ', hosts
-        # Get the replica set for each shard
-        c = pymongo.MongoClient(hosts,
-                    read_preference=ReadPreference.SECONDARY)
+            #print 'Getting secondary from hosts in ', hosts
+            # Get the replica set for each shard
+            c = pymongo.MongoClient(hosts,
+                        read_preference=ReadPreference.SECONDARY)
 
-        status = c.admin.command('replSetGetStatus')
+            status = c.admin.command('replSetGetStatus')
 
-        # If user specified preferred group, backup only those
-        # replicas
+            # If user specified preferred group, backup only those
+            # replicas
+            if preferredgroup and len(pgroup) > 0:
+                preferredreplica = None
+                for member in pgroup:
+                    if member['replica'] == status['set']:
+                        preferredreplica = member['name']
+
+                # Select a replica member only when user specifies a replica
+                if preferredreplica:
+                    for m in status['members']:
+                        if m['name'] != preferredreplica:
+                            continue
+                        if m['stateStr'] == 'SECONDARY':
+                            hosts_to_backup.append({'replicaSetName': status['set'],
+                                                    'secondaryReplica': m['name']})
+                        else:
+                            LOG.error(_(preferredreplica + " state is " +
+                                        m['stateStr'] +
+                                        ". Will pick next secondary for backup"))
+                            for m in status['members']:
+                                if m['stateStr'] == 'SECONDARY':
+                                    hosts_to_backup.append({'replicaSetName': status['set'],
+                                                            'secondaryReplica': m['name']})
+                                    break
+                            break
+            else:
+                # if user did not specify preferred group, backup entire cluster
+                for m in status['members']:
+                    if m['stateStr'] == 'SECONDARY':
+                        hosts_to_backup.append({'replicaSetName': status['set'],
+                                                'secondaryReplica': m['name']})
+                        break
+    else:
+        status = connection.admin.command('replSetGetStatus')
         if preferredgroup and len(pgroup) > 0:
             preferredreplica = None
             for member in pgroup:
@@ -409,7 +447,7 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
                         continue
                     if m['stateStr'] == 'SECONDARY':
                         hosts_to_backup.append({'replicaSetName': status['set'],
-                                                'secondaryReplica': m['name']})
+                                               'secondaryReplica': m['name']})
                     else:
                         LOG.error(_(preferredreplica + " state is " +
                                     m['stateStr'] +
@@ -417,16 +455,16 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
                         for m in status['members']:
                             if m['stateStr'] == 'SECONDARY':
                                 hosts_to_backup.append({'replicaSetName': status['set'],
-                                                        'secondaryReplica': m['name']})
+                                                            'secondaryReplica': m['name']})
                                 break
+                            break
+            else:
+                # if user did not specify preferred group, backup entire cluster
+                for m in status['members']:
+                    if m['stateStr'] == 'SECONDARY':
+                        hosts_to_backup.append({'replicaSetName': status['set'],
+                                                'secondaryReplica': m['name']})
                         break
-        else:
-            # if user did not specify preferred group, backup entire cluster
-            for m in status['members']:
-                if m['stateStr'] == 'SECONDARY':
-                    hosts_to_backup.append({'replicaSetName': status['set'],
-                                            'secondaryReplica': m['name']})
-                    break
 
     return hosts_to_backup
 
@@ -449,14 +487,26 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
     # Getting the secondaries list
     #
     hostnames = {}
-    for s in shards:
-        hosts = str(s['host'])
-        hosts = hosts.replace(str(s['_id']), '').strip()
-        hosts = hosts.replace('/', '').strip()
-        for h in hosts.split(','):
-            hostname = h.split(':')[0]
-            if not hostname in hostnames:
-                hostnames[hostname] = 1
+
+    # This is a sharded cluster
+    if isShardedCluster(connection):
+        for s in shards:
+            hosts = str(s['host'])
+            hosts = hosts.replace(str(s['_id']), '').strip()
+            hosts = hosts.replace('/', '').strip()
+            for h in hosts.split(','):
+                hostname = h.split(':')[0]
+                if not hostname in hostnames:
+                    hostnames[hostname] = 1
+    else:
+        # this is a replica set
+        status = connection.admin.command('replSetGetStatus')
+
+        # If user specified preferred group, backup only those
+        # replicas
+        for m in status['members']:
+            hostname = m['name'].split(":")[0]
+            hostnames[hostname] = 1
 
     interfaces = {}
     for hostname in hostnames:
@@ -563,15 +613,18 @@ class MongoDBWorkflow(workflow.Workflow):
     # : usename/password - username and password to authenticate to the database
     #
     def initflow(self, composite=False):
+        connection = connect_server(self._store['DBHost'], self._store['DBPort'],
+                                    self._store['DBUser'], self._store['DBPassword'])
+        isMongos = isShardedCluster(connection)
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         instances =  get_vms(cntx, self._store['DBHost'],
-                                            self._store['DBPort'],
-                                            self._store['DBUser'],
-                                            self._store['DBPassword'],
-                                            self._store['HostSSHPort'],
-                                            self._store['HostUsername'],
-                                            self._store['HostPassword'])
+                                   self._store['DBPort'],
+                                   self._store['DBUser'],
+                                   self._store['DBPassword'],
+                                   self._store['HostSSHPort'],
+                                   self._store['HostUsername'],
+                                   self._store['HostPassword'])
         self._store['topology'] = self.topology()
         hosts_to_backup = secondaryhosts_to_backup(cntx,
                                                    self._store['DBHost'],
@@ -596,14 +649,16 @@ class MongoDBWorkflow(workflow.Workflow):
 
         # Add disable profile task. Stopping balancer fails if profile process
         # is running
-        snapshotvms.add(DisableProfiling('DisableProfiling', provides='proflevel'))
-        snapshotvms.add(PauseBalancer('PauseBalancer'))
+        if isMongos:
+            snapshotvms.add(DisableProfiling('DisableProfiling', provides='proflevel'))
+            snapshotvms.add(PauseBalancer('PauseBalancer'))
 
         # This will be a flow that needs to be added to mongo db flow.
         # This is a flow that pauses all related VMs in unordered pattern
         snapshotvms.add(PauseDBInstances(hosts_to_backup))
 
-        snapshotvms.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
+        if isMongos:
+            snapshotvms.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
 
         # This is an unordered pausing of VMs. This flow is created in
         # common tasks library. This routine takes instance ids from
@@ -619,18 +674,19 @@ class MongoDBWorkflow(workflow.Workflow):
         snapshotvms.add(vmtasks.UnorderedUnPauseVMs(self._store['instances']))
 
         # Restart the config servers so metadata changes can happen
-        snapshotvms.add(ResumeConfigServer('ResumeConfigServer'))
+        if isMongos:
+            snapshotvms.add(ResumeConfigServer('ResumeConfigServer'))
 
         # unlock all locekd replicas so it starts receiving all updates from primary and
         # will eventually get into sync with primary
         snapshotvms.add(ResumeDBInstances(hosts_to_backup))
 
-        snapshotvms.add(ResumeBalancer('ResumeBalancer'))
-        # enable profiling to the level before the flow started
-        snapshotvms.add(EnableProfiling('EnableProfiling'))
+        if isMongos:
+            snapshotvms.add(ResumeBalancer('ResumeBalancer'))
+            # enable profiling to the level before the flow started
+            snapshotvms.add(EnableProfiling('EnableProfiling'))
 
         super(MongoDBWorkflow, self).initflow(snapshotvms, composite=composite)
-
 
     def get_databases(self):
         LOG.info(_('Enter get_databases'))
@@ -716,26 +772,36 @@ class MongoDBWorkflow(workflow.Workflow):
         LOG.debug(_( 'Connecting to mongos server ' + self._store['DBHost']))
         connection = connect_server(self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'])
 
-        #
-        # Getting sharding information
-        #
-        LOG.debug(_( 'Getting sharding configuration'))
-        shards = getShards(connection)
-
-        # Get the replica set for each shard
         replicas = []
-        for s in shards:
-            hosts = str(s['host'])
-            hosts = hosts.replace(str(s['_id']), '').strip()
-            hosts = hosts.replace('/', '').strip()
-            LOG.debug(_('Getting secondary from hosts in ' + hosts))
+        replicahosts = {}
+        if isShardedCluster(connection):
+            #
+            # Getting sharding information
+            #
+            LOG.debug(_( 'Getting sharding configuration'))
+            shards = getShards(connection)
+
             # Get the replica set for each shard
+            for s in shards:
+                hosts = str(s['host'])
+                hosts = hosts.replace(str(s['_id']), '').strip()
+                hosts = hosts.replace('/', '').strip()
+                replicahosts[s['_id']] = hosts
+        else:
+            # Get the replica set for each shard
+            status = connection.admin.command('replSetGetStatus')
+            s = []
+            for m in status['members']:
+               s.append(m['name'])
+            replicahosts[status['set']] = ",".join(s)
+
+        for replica, hosts in replicahosts.iteritems():
+            LOG.debug(_('Getting secondary from hosts in ' + hosts +
+                        " for replica " + replica))
             c = MongoClient(hosts,
                         read_preference=ReadPreference.SECONDARY)
             status = c.admin.command('replSetGetStatus')
-            c = MongoClient(hosts,
-                        read_preference=ReadPreference.SECONDARY)
-            status = c.admin.command('replSetGetStatus')
+
             status["date"] = str(status["date"])
             status["children"] = status.pop("members")
             status["name"] = status.pop("set")
