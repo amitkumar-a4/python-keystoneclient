@@ -372,12 +372,6 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
     LOG.debug(_('Connecting to mongos server ' + host))
     connection = connect_server(host, port, username, password)
 
-    #
-    # Getting sharding information
-    #
-    LOG.debug(_('Getting sharding configuration'))
-    shards = getShards(connection)
-
     pgroup = []
     if preferredgroup:
         pgroup = json.loads(preferredgroup)
@@ -387,6 +381,12 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
     #
     hosts_to_backup = []
     if isShardedCluster(connection):
+        #
+        # Getting sharding information
+        #
+        LOG.debug(_('Getting sharding configuration'))
+        shards = getShards(connection)
+
         for s in shards:
             hosts = str(s['host'])
             hosts = hosts.replace(str(s['_id']), '').strip()
