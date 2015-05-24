@@ -26,7 +26,10 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes
     # ssh session
     error_msg = 'Unknown Error'
     nodelist = []
-    addlnodes = defaultnode + ";" + addlnodes
+    if addlnodes:
+        addlnodes = defaultnode + ";" + addlnodes
+    else:
+        addlnodes = defaultnode + ";"
 
     try:
         nodes = addlnodes.split(";")
