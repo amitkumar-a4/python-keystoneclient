@@ -197,3 +197,9 @@ def mount_instance_root_device(self, cntx, db, instance, restore):
 
 def umount_instance_root_device(self, process): 
     raise NotImplementedError()
+
+def snapshot_mount(self, cntx, snapshot):
+    raise NotImplementedError()
+
+def snapshot_dismount(self, cntx, snapshot):
+    raise NotImplementedError()

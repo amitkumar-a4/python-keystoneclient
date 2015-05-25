@@ -281,6 +281,40 @@ class SnapshotsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))          
-    
+
+    def mount(self, req, id, workload_id=None, body=None):
+        try:
+            context = req.environ['workloadmgr.context']
+            self.workload_api.snapshot_mount(context, id)
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+        
+    def dismount(self, req, id, workload_id=None, body=None):
+        try:
+            context = req.environ['workloadmgr.context']
+            self.workload_api.snapshot_dismount(context, id)
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))        
+
 def create_resource(ext_mgr):
     return wsgi.Resource(SnapshotsController(ext_mgr))

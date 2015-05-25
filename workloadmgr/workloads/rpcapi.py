@@ -127,14 +127,37 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
     def snapshot_delete(self, ctxt, host, snapshot_id):
         LOG.debug("delete_snapshot  rpcapi snapshot_id %s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
-        self.cast(ctxt,
+        self.call(ctxt,
                   self.make_msg('snapshot_delete',snapshot_id=snapshot_id),
-                  topic=topic)
+                  topic=topic,
+                  timeout=300)
+        
+    @autolog.log_method(logger=Logger)     
+    def snapshot_mount(self, ctxt, host, snapshot_id):
+        LOG.debug("snapshot_mount in rpcapi snapshot_id %s", snapshot_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        mountpoints = self.call(ctxt,
+                              self.make_msg('snapshot_mount', snapshot_id=snapshot_id),
+                              topic=topic,
+                              timeout=300)
+        return mountpoints
+    
+    @autolog.log_method(logger=Logger)     
+    def snapshot_dismount(self, ctxt, host, snapshot_id):
+        LOG.debug("snapshot_dismount in rpcapi snapshot_id %s", snapshot_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        self.call(ctxt,
+                  self.make_msg('snapshot_dismount', snapshot_id=snapshot_id),
+                  topic=topic,
+                  timeout=300)
     
     @autolog.log_method(logger=Logger)    
     def restore_delete(self, ctxt, host, restore_id):
         LOG.debug("delete_restore  rpcapi restore_id %s", restore_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
-        self.cast(ctxt,
+        self.call(ctxt,
                   self.make_msg('restore_delete',restore_id=restore_id),
-                  topic=topic)        
+                  topic=topic,
+                  timeout=300)        

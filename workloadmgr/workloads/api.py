@@ -231,7 +231,7 @@ class API(base.Base):
                                                                       metadata) 
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
    
     @autolog.log_method(logger=Logger)
     def workload_type_topology(self, context, workload_type_id, metadata):
@@ -249,7 +249,7 @@ class API(base.Base):
                                                             metadata) 
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
 
     @autolog.log_method(logger=Logger)
     def workload_get(self, context, workload_id):
@@ -464,10 +464,7 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            if hasattr(ex, 'kwargs'):
-                raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs)
-            else:
-                raise wlm_exceptions.ErrorOccurred(reason = ex.message)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload):
@@ -570,7 +567,7 @@ class API(base.Base):
             AUDITLOG.log(context,'Workload Deleted', workload)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs)         
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
     
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context):
@@ -806,7 +803,7 @@ class API(base.Base):
                                                                    workload_id)    
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
 
     @autolog.log_method(logger=Logger)
     def workload_get_topology(self, context, workload_id):
@@ -819,7 +816,7 @@ class API(base.Base):
                                                            workload_id)   
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
 
     @autolog.log_method(logger=Logger)
     def workload_discover_instances(self, context, workload_id):
@@ -832,7 +829,7 @@ class API(base.Base):
                                                                  workload_id)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
                      
     @autolog.log_method(logger=Logger)
     def _is_workload_paused(self, context, workload_id): 
@@ -942,7 +939,7 @@ class API(base.Base):
             return snapshot
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
 
     @autolog.log_method(logger=Logger)
     def snapshot_get(self, context, snapshot_id):
@@ -1075,7 +1072,7 @@ class API(base.Base):
             AUDITLOG.log(context,'Snapshot Deleted', snapshot)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
@@ -1108,7 +1105,44 @@ class API(base.Base):
             return restore
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % ex.kwargs) 
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
+
+    @autolog.log_method(logger=Logger)
+    def snapshot_mount(self, context, snapshot_id):
+        """
+        Make the RPC call to Mount the snapshot.
+        """
+        try:
+            snapshot = self.snapshot_get(context, snapshot_id)
+            AUDITLOG.log(context,'Snapshot Mount Requested', snapshot)
+            workload = self.workload_get(context, snapshot['workload_id'])
+            if snapshot['status'] != 'available':
+                msg = _('Snapshot status must be available')
+                raise wlm_exceptions.InvalidState(reason=msg)
+            mountpoints = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id)
+                        
+            AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Mounted', snapshot)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
+        
+    @autolog.log_method(logger=Logger)
+    def snapshot_dismount(self, context, snapshot_id):
+        """
+        Make the RPC call to Dismount the snapshot.
+        """
+        try:
+            snapshot = self.snapshot_get(context, snapshot_id)
+            AUDITLOG.log(context,'Snapshot Dismount Requested', snapshot)
+            workload = self.workload_get(context, snapshot['workload_id'])
+            if snapshot['status'] != 'mounted':
+                msg = _('Snapshot status must be mounted')
+                raise wlm_exceptions.InvalidState(reason=msg)
+            self.workloads_rpcapi.snapshot_dismount(context, workload['host'], snapshot_id)
+            AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Dismounted', snapshot)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
 
     @autolog.log_method(logger=Logger)
     def restore_get(self, context, restore_id):

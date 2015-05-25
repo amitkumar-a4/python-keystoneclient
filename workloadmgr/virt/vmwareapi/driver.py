@@ -23,6 +23,7 @@ from threading  import Thread
 from subprocess import call
 from subprocess import check_call
 from subprocess import check_output
+from tempfile import mkstemp
 
 from eventlet import event
 from oslo.config import cfg
@@ -1468,7 +1469,7 @@ class VMwareVCDriver(VMwareESXDriver):
         try:
             LOG.info(_('Restore Options: %s') % str(instance_options))
             restore_obj = db.restore_get(cntx, restore['id'])
-            snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
+            snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot.id)
             instance['uuid']= instance_uuid = instance_options['id']
             if 'name' in instance_options and instance_options['name']: 
                 instance['name']= instance_name = instance_options['name']
@@ -1974,7 +1975,104 @@ class VMwareVCDriver(VMwareESXDriver):
             raise exception.ProcessExecutionError(
                                     exit_code=_returncode,
                                     stderr=process.stderr.read())
+            
+    @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_mount')
+    def snapshot_mount(self, cntx, snapshot):
+        db = WorkloadMgrDB().db 
+        vix_disk_lib_env = os.environ.copy()
+        vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'   
+        try:
+            mountpointsfile_fh, mountpointsfile_path = mkstemp()
+            close(mountpointsfile_fh)
+            diskpathsfile_fh, diskpathsfile_path = mkstemp()
+            close(diskpathsfile_fh)
+            
+            diskpathsfile_fh = open(diskpathsfile_path,'w')
+            snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot['id'])
+            for snapshot_vm_resource in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type == 'disk':
+                    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,snapshot_vm_resource.id)
+                    diskpathsfile_fh.write(vm_disk_resource_snap.vault_service_url+'\n')
+            diskpathsfile_fh.close()                    
 
+                        
+            cmdspec = [ "trilio-vix-disk-cli", "-mount",
+                       "-mountpointsfile", mountpointsfile_path,
+                       diskpathsfile_path]      
+            cmd = " ".join(cmdspec)
+            for idx, opt in enumerate(cmdspec):
+                if opt == "-password":
+                    cmdspec[idx+1] = self._session._host_password
+                    break
+                          
+            process = subprocess.Popen(cmdspec,
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   bufsize= -1,
+                                   env=vix_disk_lib_env,
+                                   close_fds=True,
+                                   shell=False)
+        
+            queue = Queue()
+            read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+            read_thread.daemon = True # thread dies with the program
+            read_thread.start()            
+        
+            output = ''
+            while process.poll() is None:
+                try:
+                    try:
+                        output = queue.get(timeout=5)
+                    except Empty:
+                        continue 
+                    except Exception as ex:
+                        LOG.exception(ex)
+                    if output.startswith("Pausing the process"):
+                        break
+                except Exception as ex:
+                    LOG.exception(ex)
+        
+            if not process.poll() is None:
+                _returncode = process.returncode  # pylint: disable=E1101
+                if _returncode:
+                    LOG.debug(_('Result was %s') % _returncode)
+                    raise exception.ProcessExecutionError(
+                                        exit_code=_returncode,
+                                        stderr=process.stderr.read() + output,
+                                        cmd=cmd)
+            process.stdin.close()
+            snapshot_metadata = {'mountprocess' : process.pid,
+                                 'mountpointsfile' : mountpointsfile_path,
+                                 'diskpathsfile' : diskpathsfile_path}
+            db.snapshot_update(cntx, snapshot['id'], {'status': 'mounted', 'metadata': snapshot_metadata})            
+
+        except subprocess.CalledProcessError as ex:
+            LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
+            LOG.exception(ex)
+            raise
+            
+    @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_dismount')
+    def snapshot_dismount(self, cntx, snapshot):
+        db = WorkloadMgrDB().db 
+        
+        mountprocess = db.get_metadata_value(snapshot.metadata,'mountprocess')
+        mountpointsfile = db.get_metadata_value(snapshot.metadata,'mountpointsfile')
+        diskpathsfile = db.get_metadata_value(snapshot.metadata,'diskpathsfile')        
+        
+        os.kill(int(mountprocess), 18)
+        
+        snapshot_metadata = {'mountprocess' : '',
+                             'mountpointsfile' : '',
+                             'diskpathsfile' : ''}
+        db.snapshot_update(cntx, snapshot['id'], {'status': 'available', 'metadata': snapshot_metadata})            
+        
+        remove(mountpointsfile)
+        remove(diskpathsfile)
+        
+                  
+        pass
+        
 class VMwareAPISession(object):
     """
     Sets up a session with the VC/ESX host and handles all
