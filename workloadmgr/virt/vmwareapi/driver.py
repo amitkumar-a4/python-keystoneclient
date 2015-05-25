@@ -2000,11 +2000,7 @@ class VMwareVCDriver(VMwareESXDriver):
                        "-mountpointsfile", mountpointsfile_path,
                        diskpathsfile_path]      
             cmd = " ".join(cmdspec)
-            for idx, opt in enumerate(cmdspec):
-                if opt == "-password":
-                    cmdspec[idx+1] = self._session._host_password
-                    break
-                          
+                         
             process = subprocess.Popen(cmdspec,
                                    stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE,
