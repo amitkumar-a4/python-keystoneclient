@@ -764,14 +764,39 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
                 user = keystone.users.get(context.user_id)
+                if user.email == '':
+		   user.email = settings.get_settings().get('default_recipient')
             except:
-                   o = {'name':'admin','email':settings.get_settings().get('notification_email_to')}
+                   o = {'name':'admin','email':settings.get_settings().get('default_recipient')}
                    user = objectview(o)
                    pass
+
+            if type == 'snapshot':
+               workload = self.db.workload_get(context, object.workload_id)
+               workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+               snapshotvms = self.db.snapshot_vms_get(context, object.id)
+            elif type == 'restore':
+                  snapshot = self.db.snapshot_get(context, object.snapshot_id)
+                  workload = self.db.workload_get(context, snapshot.workload_id)
+                  workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+                  snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
+
+            vms_html = """ <tr><td><b>VM name</b></td><td><b>Size</b></td></tr>"""
+            for inst in snapshotvms:
+                size_kb = inst.size * 0.001
+                vms_html += """\
+                           <tr><td>"""+inst.vm_name+"""</td><td>"""+str(size_kb)+""" Kb or """+str(inst.size)+""" bytes</td></tr>
+                           """
             
             if type == 'snapshot':
             
                subject = 'Snapshot success'
+              
+               size_snap_kb = object.size * 0.001
+
+               minutes = object.time_taken / 60
+               seconds = object.time_taken % 60
+               time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
                 
                html = """\
                <html>
@@ -779,14 +804,23 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                  <body>
                     <p>Hi """+user.name+"""</p>
                     <p>Snapshot operation successfully performed</p>
-                    <p>Below are snapshot details</p>
-                    <table border='1px solid black'>
+                    <p>Below are details</p>
+                    <table border='1px solid black' width='100%'>
+                    <tr>
+                    <td valign='top'><table align='center' border='1px solid blue'><tr><td>Workload name</td>
+                    <td>"""+workload.display_name+"""</td></tr><tr><td>Workload Type</td>
+                    <td>"""+workload_type.display_name+"""</td></tr><tr>
+                    </tr></table>
+                    <table style='margin-top:20px;' align='center' border='1px solid green'>"""+vms_html+"""</table></td>
+                    <td valign='top' width='55%'><table align='center' border='1px solid green'>
                     <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
                     <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
-                    <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                    <tr><td>Size</td><td>"""+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes</td></tr>
                     <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
-                    <tr><td>Time taken</td><td>"""+str(object.time_taken)+"""</td></tr>
+                    <tr><td>Time taken</td><td>"""+time_unit+"""</td></tr>
                     <tr><td>Type</td><td>"""+object.snapshot_type+"""</td></tr>
+                    </table></td>
+                    <tr>
                     </table>
                  </body>
                </html>
@@ -794,22 +828,31 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
                 
                if object.status == 'error':
-                  subject = 'Failure to take snapshot'
-            
+                  subject = 'Failure to take snapshot'                  
+ 
                   html = """\
                   <html>
                     <head></head>
                     <body>
                       <p>Hi """+user.name+"""</p>
                       <p>There is some error taking snapshot</p>
-                      <p>Below are snapshot details</p>
-                      <table border='1px solid black'>
+                      <p>Below are details</p>
+                      <table border='1px solid black' width='100%'>
+                      <tr>
+                      <td valign='top'><table align='center' border='1px solid blue'><tr><td>Workload name</td>
+                      <td>"""+workload.display_name+"""</td></tr><tr><td>Workload Type</td>
+                      <td>"""+workload_type.display_name+"""</td></tr><tr>
+                      </tr></table>
+                      <table style='margin-top:20px;' align='center' border='1px solid green'>"""+vms_html+"""</table></td>
+                      <td valign='top' width='55%'><table align='center' border='1px solid green'>
                       <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
                       <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
-                      <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                      <tr><td>Size</td><td>"""+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes</td></tr>
                       <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
                       <tr><td>Status</td><td>"""+object.status+"""</td></tr>
                       <tr><td>Error message</td><td>"""+object.error_msg+"""</td></tr>
+                      </table></td>
+                      <tr>
                       </table>
                     </body>
                   </html>
@@ -817,6 +860,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
             elif type == 'restore':
                  subject = 'Restore success'
+
+                 size_snap_kb = object.size * 0.001
+
+                 minutes = object.time_taken / 60
+                 seconds = object.time_taken % 60
+                 time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
+
                 
                  html = """\
                  <html>
@@ -824,14 +874,23 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                    <body>
                       <p>Hi """+user.name+"""</p>
                       <p>Restore operation successfully performed</p>
-                      <p>Below are restore details</p>
-                      <table border='1px solid black'>
+                      <p>Below are details</p>
+                      <table border='1px solid black' width='100%'>
+                      <tr>
+                      <td valign='top'><table align='center' border='1px solid blue'><tr><td>Workload name</td>
+                      <td>"""+workload.display_name+"""</td></tr><tr><td>Workload Type</td>
+                      <td>"""+workload_type.display_name+"""</td></tr><tr>
+                      </tr></table>
+                      <table style='margin-top:20px;' align='center' border='1px solid green'>"""+vms_html+"""</table></td>
+                      <td valign='top' width='55%'><table align='center' border='1px solid green'>
                       <tr><td>Restore name</td><td>"""+object.display_name+"""</td></tr>
                       <tr><td>Restore description</td><td>"""+object.display_description+"""</td></tr>
-                      <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                      <tr><td>Size</td><td>"""+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes</td></tr>
                       <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
-                      <tr><td>Time taken</td><td>"""+str(object.time_taken)+"""</td></tr>
+                      <tr><td>Time taken</td><td>"""+time_unit+"""</td></tr>
                       <tr><td>Type</td><td>"""+object.restore_type+"""</td></tr>
+                      </table></td>
+                      <tr>
                       </table>
                    </body>
                  </html>
@@ -846,14 +905,23 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                       <body>
                         <p>Hi """+user.name+"""</p>
                         <p>There is some error making restore</p>
-                        <p>Below are restore details</p>
-                        <table border='1x solid black'>
-                        <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
-                        <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
-                        <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
+                        <p>Below are details</p>
+                        <table border='1px solid black' width='100%'>
+                        <tr>
+                        <td valign='top'><table align='center' border='1px solid blue'><tr><td>Workload name</td>
+                        <td>"""+workload.display_name+"""</td></tr><tr><td>Workload Type</td>
+                        <td>"""+workload_type.display_name+"""</td></tr><tr>
+                        </tr></table>
+                        <table style='margin-top:20px;' align='center' border='1px solid green'>"""+vms_html+"""</table></td>
+                        <td valign='top' width='55%'><table align='center' border='1px solid green'>
+                        <tr><td>Restore name</td><td>"""+object.display_name+"""</td></tr>
+                        <tr><td>Restore description</td><td>"""+object.display_description+"""</td></tr>
+                        <tr><td>Size</td><td>"""+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes</td></tr>
                         <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
                         <tr><td>Status</td><td>"""+object.status+"""</td></tr>
                         <tr><td>Error message</td><td>"""+object.error_msg+"""</td></tr>
+                        </table></td>
+                        <tr>
                         </table>
                       </body>
                     </html>
@@ -862,13 +930,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
             msg = MIMEMultipart('alternative')
             msg['To'] = user.email
-            msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
-            #msg['From'] = 'administrator@vsphere'
+            #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
+            msg['From'] = settings.get_settings().get('default_sender')
             msg['Subject'] = subject
             
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            
             s = smtplib.SMTP(settings.get_settings().get('smtp_server'))
             #s.login(smtp_user,smtp_pass)
             s.sendmail(msg['From'], msg['To'], msg.as_string())
