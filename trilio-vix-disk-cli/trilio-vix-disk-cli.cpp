@@ -101,6 +101,7 @@ static struct {
     char *remotePath;
     char *localPath;
     char *extentfile;
+    char *mountpointsfile;    
 
     char *transportModes;
     char *metaKey;
@@ -348,6 +349,12 @@ static VixError
                        size_t numberOfDisks,
                        uint32 openFlags,
                        VixDiskSetHandle *handle);
+                       
+static VixError
+(*VixMntapi_OpenDiskSet)(VixDiskLibHandle diskHandles[],
+                       	int numberOfDisks,
+                       	uint32 openMode,
+                       	VixDiskSetHandle *handle);                       
 
 static VixError
 (*VixMntapi_GetDiskSetInfo)(VixDiskSetHandle handle,
@@ -794,6 +801,55 @@ private:
     VixDiskSetHandle _handle;
 };
 
+/* --------------------------------------------------------------------------
+ * This is applicable to WIN32 Platform
+class VixDiskSet
+{
+public:
+
+    VixDiskSetHandle Handle() { return _handle; }
+    VixDiskSet(VixDiskLibConnection connection, const char *paths[], int numberOfDisks, uint32 flags)
+    {
+		_numberOfDisks = numberOfDisks;
+		_diskHandles = new VixDiskLibHandle[_numberOfDisks];
+		for (int i=0; i< _numberOfDisks; i++) {
+			_diskHandles[i] = NULL;
+		}
+		for (int i=0; i<_numberOfDisks; i++) {
+			VixDiskLibHandle diskHandle = NULL;
+			VixError vixError =  VixDiskLib_Open(connection, paths[i], flags, &diskHandle);
+			CHECK_AND_THROW(vixError);
+			_diskHandles[i] = diskHandle;
+		}
+
+		_handle = NULL;
+		VixError vixError = VixMntapi_OpenDiskSet(_diskHandles, _numberOfDisks, flags, &_handle);
+		CHECK_AND_THROW(vixError);
+    }
+
+    ~VixDiskSet()
+    {
+		for (int i=0; i<_numberOfDisks; i++) {
+			if (_diskHandles[i] != NULL) { 
+				VixDiskLib_Close(_diskHandles[i]);
+			}
+		} 
+		delete [] _diskHandles; 
+		  
+        if (_handle) 
+        {
+           VixMntapi_CloseDiskSet(_handle);
+        }
+        _handle = NULL;
+    }
+
+private:
+    VixDiskSetHandle _handle;
+	int _numberOfDisks;
+	VixDiskLibHandle* _diskHandles;
+};
+
+--------------------------------------------------------------------------*/
 
 /*
  *--------------------------------------------------------------------------
@@ -845,7 +901,8 @@ PrintUsage(void)
     printf(" -writebench blocksize: Does a write benchmark on a disk using the\n");
     printf("\tspecified I/O block size (in sectors). WARNING: This will\n");
     printf("\toverwrite the contents of the disk specified.\n");
-    printf(" -mount mounts a virtual disk.\n");
+    printf(" -mount mounts virtual disks specified in diskPath. Mountpoints will be written to the\n"
+    	   " file specified by -mountpointsfile\n");
     printf(" -unmount unmounts a virtual disk that was previously mounted using -mount option.\n");
     printf(" -spaceforclone computes the space required for clone for the specified disk type.\n");
 
@@ -858,6 +915,7 @@ PrintUsage(void)
     printf(" -count n : number of sectors for 'dump/fill' options (default=1)\n");
     printf(" -val byte : byte value to fill with for 'write' option (default=255)\n");
     printf(" -extentfile filename: file name that has all the extents the format (start, length)\n");
+    printf(" -mountpointsfile filename: file name where all the mount points are listed after mount operation\n");
     printf(" -cap megabytes : capacity in MB for -create option (default=100)\n");
     printf(" -single : open file as single disk link (default=open entire chain)\n");
     printf(" -multithread n: start n threads and copy the file to n new files\n");
@@ -910,10 +968,12 @@ main(int argc, char* argv[])
     appGlobals.success = TRUE;
     appGlobals.isRemote = FALSE;
 
+	cout << "Water Mark: Before ParseArguments" << endl;
     retval = ParseArguments(argc, argv);
     if (retval) {
         return retval;
     }
+	cout << "Water Mark: After ParseArguments" << endl;
 
 #ifdef DYNAMIC_LOADING
     DynLoadDiskLib();
@@ -1190,6 +1250,11 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.extentfile = argv[++i];
+        } else if (!strcmp(argv[i], "-mountpointsfile")) {
+            if (i >= argc - 2) {
+                return PrintUsage();
+            }
+            appGlobals.mountpointsfile = argv[++i];            
         } else if (!strcmp(argv[i], "-parentPath")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -2599,43 +2664,84 @@ DoCheckRepair(Bool repair)
 static void
 DoMount()
 {
-   VixError err;
-   VixDiskSetHandle *handle;
-   const char *diskPaths[] = {appGlobals.diskPath, };
-   VixVolumeHandle *volumeHandles;
-   size_t numberOfVolumes;
-   VixOsInfo *info = NULL;
+	cout << "Enter DoMount" << endl;
+	cout << "Disk Paths File: " << appGlobals.diskPath << endl;
+	cout << "Mount Points File: " << appGlobals.mountpointsfile << endl;
+	
+	VixError err;
+	VixDiskSetHandle *handle;
+	VixVolumeHandle *volumeHandles;
+	size_t numberOfVolumes;
+	VixOsInfo *info = NULL;
+   
+    
+	std::vector<std::string> lines;
+	std::ifstream diskpaths_file(appGlobals.diskPath);
+	std::ofstream mountpoints_file(appGlobals.mountpointsfile);
+	if(diskpaths_file.is_open())
+	{
+	    std::string line;
+	    while(getline(diskpaths_file, line))
+	    {
+	        lines.push_back(line);
+	    }
+	}    
+	diskpaths_file.close();
+	
+	char** diskPaths = (char**) calloc( lines.size()+1, sizeof(char*) );
+	if (diskPaths == NULL) 
+		exit(-1);
 
-   VixDisks disks(appGlobals.connection, diskPaths, 1, appGlobals.openFlags);
+	int i=0;
+	for (std::vector<std::string>::iterator it = lines.begin(); it != lines.end(); ++it)
+	{
+	    diskPaths[i] = (char*)((*it).c_str());	 
+	    cout <<  "diskPath: " << diskPaths[i] << endl;
+	    i++; 
+	}
+	
+	cout << "Mounting Disks" << endl;
+	VixDisks disks(appGlobals.connection, (const char**)diskPaths, 1, appGlobals.openFlags);
+	VixDiskSetInfo* diskSetInfo = NULL;
+	VixMntapi_GetDiskSetInfo(disks.Handle(), &diskSetInfo);
+	cout <<  "diskSetInfo->mountPath: " << diskSetInfo->mountPath << endl;
+	VixMntapi_FreeDiskSetInfo(diskSetInfo);
+	
+	cout << "Mounting Volumes" << endl;
+	err = VixMntapi_GetVolumeHandles(disks.Handle(), &numberOfVolumes, &volumeHandles);
+	CHECK_AND_THROW(err);
+	for (size_t i = 0; i < numberOfVolumes; i++) 
+	{
+		err = VixMntapi_MountVolume(volumeHandles[i], FALSE);
+		CHECK_AND_THROW(err);
 
-   err = VixMntapi_GetVolumeHandles(disks.Handle(), &numberOfVolumes, &volumeHandles);
-   CHECK_AND_THROW(err);
+		VixVolumeInfo *volumeInfo = NULL;
+		err = VixMntapi_GetVolumeInfo(volumeHandles[i], &volumeInfo);
+		CHECK_AND_THROW(err);
+		
+		if (volumeInfo->symbolicLink != NULL)
+			mountpoints_file << volumeInfo->symbolicLink << "\n";
+			cout <<  "volumeInfo->symbolicLink: " << volumeInfo->symbolicLink << endl;
+		VixMntapi_FreeVolumeInfo(volumeInfo);
+		volumeInfo = NULL;
+	}
+	
+	mountpoints_file.close();
+	diskpaths_file.close();
+	printf("Pausing the process until it is resumed\n");
+	std::cout.flush();
+	
+	raise(SIGSTOP);	
 
-   for (size_t i = 0; i < numberOfVolumes; i++) 
-   {
-       VixVolumeHandle volumeHandle = volumeHandles[i];
-       VixVolumeInfo *volumeInfo;
-
-       err = VixMntapi_MountVolume(volumeHandle, FALSE);
-       CHECK_AND_THROW(err);
-
-       err = VixMntapi_GetVolumeInfo(volumeHandle, &volumeInfo);
-       CHECK_AND_THROW(err);
-
-       printf("The root partition is mounted at %s\n", volumeInfo->symbolicLink);
- 
-       VixMntapi_FreeVolumeInfo(volumeInfo);
-       printf("Pausing the process until it is resumed\n");
-       std::cout.flush();
-       //sleep(5);
-       raise(SIGSTOP);
-
-       err = VixMntapi_DismountVolume(volumeHandle, false);
-       CHECK_AND_THROW(err);
-       
-       break;
-   }
-   VixMntapi_FreeVolumeHandles(volumeHandles);
+	cout << "Dismounting Volumes" << endl;
+	for (size_t i = 0; i < numberOfVolumes; i++) 
+	{	
+		err = VixMntapi_DismountVolume(volumeHandles[i], false);
+		CHECK_AND_THROW(err);		
+	}
+	VixMntapi_FreeVolumeHandles(volumeHandles);	
+	free(diskPaths);
+	cout << "Exit DoMount" << endl;
 }
 
 /*

@@ -267,7 +267,33 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['snapshots'],
                        action='delete',
                        conditions={"method": ['DELETE']})     
-                
+
+        #mount a snapshot
+        mapper.connect("mount_snapshot_1",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/mount",
+                       controller=self.resources['snapshots'],
+                       action='mount',
+                       conditions={"method": ['POST']}) 
+        
+        mapper.connect("mount_snapshot_2",
+                       "/{project_id}/snapshots/{id}/mount",
+                       controller=self.resources['snapshots'],
+                       action='mount',
+                       conditions={"method": ['POST']})            
+        
+        #dismount a snapshot
+        mapper.connect("dismount_snapshot1",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/dismount",
+                       controller=self.resources['snapshots'],
+                       action='dismount',
+                       conditions={"method": ['POST']}) 
+        
+        mapper.connect("dismount_snapshot2",
+                       "/{project_id}/snapshots/{id}/dismount",
+                       controller=self.resources['snapshots'],
+                       action='dismount',
+                       conditions={"method": ['POST']})                     
+                        
         ###################################################################################################
         self.resources['restores'] = restores.create_resource(ext_mgr)
         #detail list of restores

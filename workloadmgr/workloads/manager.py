@@ -747,6 +747,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         return _remove_data(snapshot)
 
     @autolog.log_method(logger=Logger)
+    def snapshot_mount(self, context, snapshot_id):
+        """
+        Mount an existing snapshot
+        """
+        snapshot = self.db.snapshot_get(context, snapshot_id) 
+        compute_driver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')   
+        return compute_driver.snapshot_mount(context, snapshot)
+    
+    @autolog.log_method(logger=Logger)
+    def snapshot_dismount(self, context, snapshot_id):
+        """
+        DisMount an existing snapshot
+        """
+        snapshot = self.db.snapshot_get(context, snapshot_id)    
+        compute_driver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')   
+        return compute_driver.snapshot_dismount(context, snapshot)   
+    
+    @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
         Delete an existing restore
