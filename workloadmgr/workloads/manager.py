@@ -485,7 +485,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
 	
-        if settings.get_settings().get('email_enable') == 'yes':
+        if settings.get_settings().get('smtp_email_enable') == 'yes':
 	
            self.send_email(context,snapshot,'snapshot')
 		
@@ -705,7 +705,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             restore = self.db.restore_get(context, restore_id)
 
-            if settings.get_settings().get('email_enable') == 'yes':
+            if settings.get_settings().get('smtp_email_enable') == 'yes':
 
                self.send_email(context,restore,'restore')
 
@@ -765,9 +765,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
                 user = keystone.users.get(context.user_id)
                 if user.email == '':
-		   user.email = settings.get_settings().get('default_recipient')
+		   user.email = settings.get_settings().get('smtp_default_recipient')
             except:
-                   o = {'name':'admin','email':settings.get_settings().get('default_recipient')}
+                   o = {'name':'admin','email':settings.get_settings().get('smtp_default_recipient')}
                    user = objectview(o)
                    pass
 
@@ -792,7 +792,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
                subject = 'Snapshot success'
               
-               size_snap_kb = object.size * 0.001
+               size_snap_kb = object.size / 1024
 
                minutes = object.time_taken / 60
                seconds = object.time_taken % 60
@@ -861,7 +861,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif type == 'restore':
                  subject = 'Restore success'
 
-                 size_snap_kb = object.size * 0.001
+                 size_snap_kb = object.size / 1024
 
                  minutes = object.time_taken / 60
                  seconds = object.time_taken % 60
@@ -931,12 +931,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = MIMEMultipart('alternative')
             msg['To'] = user.email
             #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
-            msg['From'] = settings.get_settings().get('default_sender')
-            msg['Subject'] = subject
-            
+            msg['From'] = settings.get_settings().get('smtp_default_sender')
+            msg['Subject'] = subject        
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            s = smtplib.SMTP(settings.get_settings().get('smtp_server'))
+            s = smtplib.SMTP(settings.get_settings().get('smtp_server_name'))
             #s.login(smtp_user,smtp_pass)
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
