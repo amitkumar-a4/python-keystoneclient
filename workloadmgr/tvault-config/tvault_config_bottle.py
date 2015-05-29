@@ -1678,6 +1678,7 @@ def register_workloadtypes():
                 workload_type_names[workload_type.name] = True
                 
             if workload_type_names['Hadoop'] == False:
+                """ Do not created Hadoop workload type until it is fully supported
                 #Hadoop
                 time.sleep(2)
                 metadata = {'Namenode':'{"default": "", "display_name": "Hadoop Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Hadoop node", "restore_option": "False", "group_name": "Host Settings"}', 
@@ -1690,15 +1691,15 @@ def register_workloadtypes():
                 wlm.workload_types.create(metadata=metadata, is_public = True, 
                                           name= 'Hadoop', description = 'Hadoop workload',
                                           id = '09f7b42e-75da-4f77-8c34-0aef60b3d62e')
-
+                """
             if workload_type_names['MongoDB'] == False:
                 #MongoDB
                 time.sleep(2)
                 metadata = {'HostUsername':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}', 
                             'HostPassword':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "ordinal":20, "index":2}', 
                             'HostSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}', 
-                            'DBHost':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a MongoDB node", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
-                            'DBPort':'{"default": "27019", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "MongoDB database port", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}', 
+                            'DBHost':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the hostname/ipaddress of MongoDB node(For Sharded Cluster: 'mongos' node, for Replica Set: 'mongod' node)", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
+                            'DBPort':'{"default": "27017", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "Enter the MongoDB database port(For Sharded Cluster: 'mongos' port, for Replica Set: 'mongod' port)", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}', 
                             'DBUser':'{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "restore_option": "False", "group_name": "Database Settings", "ordinal":10, "index":1}', 
                             'DBPassword':'{"default": "", "display_name": "Database Password", "required": "False", "type": "string", "tooltip": "MongoDB password", "restore_option": "False", "group_name": "Database Settings", "ordinal":20, "index":2}',
                             'RunAsRoot':'{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "restore_option": "False", "group_name": "Database Settings", "ordinal":40, "index":4}', 
