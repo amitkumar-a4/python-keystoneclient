@@ -1469,7 +1469,7 @@ class VMwareVCDriver(VMwareESXDriver):
         try:
             LOG.info(_('Restore Options: %s') % str(instance_options))
             restore_obj = db.restore_get(cntx, restore['id'])
-            snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot.id)
+            snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
             instance['uuid']= instance_uuid = instance_options['id']
             if 'name' in instance_options and instance_options['name']: 
                 instance['name']= instance_name = instance_options['name']
