@@ -960,7 +960,6 @@ class VMwareVCDriver(VMwareESXDriver):
                         raise
 
                 extentsfile = None
-                import pdb;pdb.set_trace()
                 if (hasattr(dev.backing, 'thinProvisioned') and\
                       dev.backing.thinProvisioned == False) and\
                     parent_changeId is '*':
