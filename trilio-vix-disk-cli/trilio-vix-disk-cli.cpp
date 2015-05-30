@@ -102,6 +102,7 @@ static struct {
     char *localPath;
     char *extentfile;
     char *mountpointsfile;    
+    int  diskonlymount;
 
     char *transportModes;
     char *metaKey;
@@ -902,7 +903,7 @@ PrintUsage(void)
     printf("\tspecified I/O block size (in sectors). WARNING: This will\n");
     printf("\toverwrite the contents of the disk specified.\n");
     printf(" -mount mounts virtual disks specified in diskPath. Mountpoints will be written to the\n"
-    	   " file specified by -mountpointsfile\n");
+    	   " file specified by -mountpointsfile. -diskonly mounts disk but not volumes\n");
     printf(" -unmount unmounts a virtual disk that was previously mounted using -mount option.\n");
     printf(" -spaceforclone computes the space required for clone for the specified disk type.\n");
 
@@ -916,6 +917,7 @@ PrintUsage(void)
     printf(" -val byte : byte value to fill with for 'write' option (default=255)\n");
     printf(" -extentfile filename: file name that has all the extents the format (start, length)\n");
     printf(" -mountpointsfile filename: file name where all the mount points are listed after mount operation\n");
+    printf(" -diskonly : Mounts disk but not any volumes on the disk\n");
     printf(" -cap megabytes : capacity in MB for -create option (default=100)\n");
     printf(" -single : open file as single disk link (default=open entire chain)\n");
     printf(" -multithread n: start n threads and copy the file to n new files\n");
@@ -1255,6 +1257,8 @@ ParseArguments(int argc, char* argv[])
                 return PrintUsage();
             }
             appGlobals.mountpointsfile = argv[++i];            
+        } else if (!strcmp(argv[i], "-diskonly")) {
+            appGlobals.diskonlymount = 1;
         } else if (!strcmp(argv[i], "-parentPath")) {
             if (i >= argc - 2) {
                 return PrintUsage();
@@ -1840,7 +1844,7 @@ DoDownloadExtents(void)
 	    CHECK_AND_THROW(vixError);   	
    	}
     uint32 localFlags = appGlobals.openFlags & ~VIXDISKLIB_FLAG_OPEN_READ_ONLY;
-   	VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, localFlags);
+    VixDisk localDisk(appGlobals.localConnection, appGlobals.diskPath, localFlags);
     VixDisk remoteDisk(appGlobals.connection, appGlobals.remotePath, appGlobals.openFlags);
     uint8 buf[VIXDISKLIB_BUF_SIZE];
     VixDiskLibSectorType numSectors;
@@ -2664,85 +2668,91 @@ DoCheckRepair(Bool repair)
 static void
 DoMount()
 {
-	cout << "Enter DoMount" << endl;
-	cout << "Disk Paths File: " << appGlobals.diskPath << endl;
-	cout << "Mount Points File: " << appGlobals.mountpointsfile << endl;
-	
-	VixError err;
-	VixDiskSetHandle *handle;
-	VixVolumeHandle *volumeHandles;
-	size_t numberOfVolumes;
-	VixOsInfo *info = NULL;
-   
+      VixError err;
+      VixDiskSetHandle *handle;
+      VixVolumeHandle *volumeHandles;
+      size_t numberOfVolumes = 0;
+      VixOsInfo *info = NULL;
+      VixDiskSetInfo* diskSetInfo = NULL;
+  
+      cout << "Enter DoMount" << endl;
+      cout << "Disk Paths File: " << appGlobals.diskPath << endl;
+      cout << "Mount Points File: " << appGlobals.mountpointsfile << endl;
     
-	std::vector<std::string> lines;
-	std::ifstream diskpaths_file(appGlobals.diskPath);
-	std::ofstream mountpoints_file(appGlobals.mountpointsfile);
-	if(diskpaths_file.is_open())
-	{
-	    std::string line;
-	    while(getline(diskpaths_file, line))
-	    {
-	        lines.push_back(line);
-	    }
-	}    
-	diskpaths_file.close();
-	
-	char** diskPaths = (char**) calloc( lines.size()+1, sizeof(char*) );
-	if (diskPaths == NULL) 
-		exit(-1);
-
-	int i=0;
-	for (std::vector<std::string>::iterator it = lines.begin(); it != lines.end(); ++it)
-	{
-	    diskPaths[i] = (char*)((*it).c_str());	 
-	    cout <<  "diskPath: " << diskPaths[i] << endl;
-	    i++; 
-	}
-	
-	cout << "Mounting Disks" << endl;
-	VixDisks disks(appGlobals.connection, (const char**)diskPaths, 1, appGlobals.openFlags);
-	VixDiskSetInfo* diskSetInfo = NULL;
-	VixMntapi_GetDiskSetInfo(disks.Handle(), &diskSetInfo);
-	cout <<  "diskSetInfo->mountPath: " << diskSetInfo->mountPath << endl;
-	VixMntapi_FreeDiskSetInfo(diskSetInfo);
-	
-	cout << "Mounting Volumes" << endl;
-	err = VixMntapi_GetVolumeHandles(disks.Handle(), &numberOfVolumes, &volumeHandles);
-	CHECK_AND_THROW(err);
-	for (size_t i = 0; i < numberOfVolumes; i++) 
-	{
-		err = VixMntapi_MountVolume(volumeHandles[i], FALSE);
-		CHECK_AND_THROW(err);
-
-		VixVolumeInfo *volumeInfo = NULL;
-		err = VixMntapi_GetVolumeInfo(volumeHandles[i], &volumeInfo);
-		CHECK_AND_THROW(err);
-		
-		if (volumeInfo->symbolicLink != NULL)
-			mountpoints_file << volumeInfo->symbolicLink << "\n";
-			cout <<  "volumeInfo->symbolicLink: " << volumeInfo->symbolicLink << endl;
-		VixMntapi_FreeVolumeInfo(volumeInfo);
-		volumeInfo = NULL;
-	}
-	
-	mountpoints_file.close();
-	diskpaths_file.close();
-	printf("Pausing the process until it is resumed\n");
-	std::cout.flush();
-	
-	raise(SIGSTOP);	
-
-	cout << "Dismounting Volumes" << endl;
-	for (size_t i = 0; i < numberOfVolumes; i++) 
-	{	
-		err = VixMntapi_DismountVolume(volumeHandles[i], false);
-		CHECK_AND_THROW(err);		
-	}
-	VixMntapi_FreeVolumeHandles(volumeHandles);	
-	free(diskPaths);
-	cout << "Exit DoMount" << endl;
+      std::vector<std::string> lines;
+      std::ifstream diskpaths_file(appGlobals.diskPath);
+      std::ofstream mountpoints_file(appGlobals.mountpointsfile);
+      if(diskpaths_file.is_open())
+      {
+          std::string line;
+          while(getline(diskpaths_file, line))
+          {
+              lines.push_back(line);
+          }
+      }   
+      diskpaths_file.close();
+     
+      char** diskPaths = (char**) calloc( 2, sizeof(char*) );
+      if (diskPaths == NULL)
+            exit(-1);
+ 
+      for (std::vector<std::string>::iterator it = lines.begin(); it != lines.end(); ++it)
+      {
+          diskPaths[0] = (char*)((*it).c_str());     
+          cout << "Mounting Disk: " << diskPaths[0] << endl;
+          VixDisks disks(appGlobals.connection, (const char**)diskPaths, 1, appGlobals.openFlags);
+          VixMntapi_GetDiskSetInfo(disks.Handle(), &diskSetInfo);
+          mountpoints_file << diskPaths[0] << ": ";
+          cout <<  "diskSetInfo->mountPath: " << diskSetInfo->mountPath << endl;
+          mountpoints_file << diskSetInfo->mountPath;
+           
+          if (appGlobals.diskonlymount != 1) 
+          {
+              cout << "Mounting Volumes" << endl;
+              err = VixMntapi_GetVolumeHandles(disks.Handle(), &numberOfVolumes, &volumeHandles);
+              CHECK_AND_THROW(err);
+              for (size_t i = 0; i < numberOfVolumes; i++)
+              {
+                  err = VixMntapi_MountVolume(volumeHandles[i], FALSE);
+                  CHECK_AND_THROW(err);
+     
+                  VixVolumeInfo *volumeInfo = NULL;
+                  err = VixMntapi_GetVolumeInfo(volumeHandles[i], &volumeInfo);
+                  CHECK_AND_THROW(err);
+                 
+                  if (volumeInfo->symbolicLink != NULL)
+                        mountpoints_file << ";" << volumeInfo->symbolicLink;
+                        cout <<  "volumeInfo->symbolicLink: " << volumeInfo->symbolicLink << endl;
+                  VixMntapi_FreeVolumeInfo(volumeInfo);
+                  volumeInfo = NULL;
+              }
+          }
+          mountpoints_file << "\n";
+     
+          mountpoints_file.close();
+          diskpaths_file.close();
+          printf("Pausing the process until it is resumed\n");
+          std::cout.flush();
+     
+          raise(SIGSTOP);  
+ 
+          if (appGlobals.diskonlymount != 1) 
+          {
+              cout << "Dismounting Volumes" << endl;
+              for (size_t i = 0; i < numberOfVolumes; i++)
+              {    
+                    err = VixMntapi_DismountVolume(volumeHandles[i], false);
+                    CHECK_AND_THROW(err);        
+              }
+              VixMntapi_FreeVolumeHandles(volumeHandles);    
+          }
+          VixMntapi_FreeDiskSetInfo(diskSetInfo);
+          free(diskPaths);
+          cout << "Exit DoMount" << endl;
+          break; // TODO: For now we support only one disk mount. Fix it
+      }
 }
+ 
 
 /*
  *----------------------------------------------------------------------
