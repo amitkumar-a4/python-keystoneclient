@@ -711,7 +711,9 @@ class MongoDBWorkflow(workflow.Workflow):
                        "--port", self._store['HostSSHPort'],
                        "--username", self._store['HostUsername'],
                        "--password", "******",
-                       "--dbport", self._store["DBPort"],]
+                       "--dbport", self._store["DBPort"],
+                       "--dbuser", self._store["DBUser"],
+                       "--dbpassword", self._store["DBPassword"], ]
 
             if self._store.get('hostnames', None):
                 hosts = ""
