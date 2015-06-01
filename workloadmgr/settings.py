@@ -18,6 +18,11 @@ settings_file_name = 'workloadmgr-settings.conf'
 
 default_settings = {
 'cassandra_discovery_timeout' : '120',
+'mongodb_discovery_timeout' : '120',
+'smtp_email_enable' : 'no',
+'smtp_server_name' : 'localhost',
+'smtp_default_sender' : 'administrator@tvault.com',
+'smtp_default_to' : 'administrator@tvault.com',
 }
 
 def get_settings():                           

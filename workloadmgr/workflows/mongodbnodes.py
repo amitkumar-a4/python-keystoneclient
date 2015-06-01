@@ -116,7 +116,7 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes
 def pssh_exec_command(hosts, port, user, password, command, sudo=False):
     try:
         LOG.info(_("pssh_exec_command - hosts: %s") % (str(hosts)))
-        timeout = settings.get_settings().get('cassandra_discovery_timeout', '120')
+        timeout = settings.get_settings().get('mongodb_discovery_timeout', '120')
         client = ParallelSSHClient(hosts, user=user, password=password, port=int(port), timeout=int(timeout))
         LOG.info(_("pssh_exec_command: %s") % (command))
         output = client.run_command(command, sudo=sudo)

@@ -4,13 +4,13 @@
 # All Rights Reserved.
 
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.db.imports import import_workload_1_0_33
+from workloadmgr.db.imports import import_workload_1_0_105
 
 
 LOG = logging.getLogger(__name__)
 
 def import_workload(cntx, workload_url, new_version):
     """ Import workload and snapshot records from vault 
-    Versions Supported: 1.0.34
+    Versions Supported: 1.0.106
     """
-    return import_workload_1_0_33.import_workload(cntx, workload_url, new_version)
+    return import_workload_1_0_105.import_workload(cntx, workload_url, new_version)

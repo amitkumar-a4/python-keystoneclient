@@ -485,7 +485,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         
         snapshot = self.db.snapshot_get(context, snapshot_id)
 	
-        if settings.get_settings().get('email_enable') == 'yes':
+        if settings.get_settings().get('smtp_email_enable') == 'yes':
 	
            self.send_email(context,snapshot,'snapshot')
 		
@@ -705,7 +705,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             restore = self.db.restore_get(context, restore_id)
 
-            if settings.get_settings().get('email_enable') == 'yes':
+            if settings.get_settings().get('smtp_email_enable') == 'yes':
 
                self.send_email(context,restore,'restore')
 
@@ -747,24 +747,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         return _remove_data(snapshot)
 
     @autolog.log_method(logger=Logger)
-    def snapshot_mount(self, context, snapshot_id):
-        """
-        Mount an existing snapshot
-        """
-        snapshot = self.db.snapshot_get(context, snapshot_id) 
-        compute_driver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')   
-        return compute_driver.snapshot_mount(context, snapshot)
-    
-    @autolog.log_method(logger=Logger)
-    def snapshot_dismount(self, context, snapshot_id):
-        """
-        DisMount an existing snapshot
-        """
-        snapshot = self.db.snapshot_get(context, snapshot_id)    
-        compute_driver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')   
-        return compute_driver.snapshot_dismount(context, snapshot)   
-    
-    @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
         Delete an existing restore
@@ -782,75 +764,201 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
                 user = keystone.users.get(context.user_id)
+                if user.email == '':
+		   user.email = settings.get_settings().get('smtp_default_recipient')
             except:
-                   o = {'name':'admin','email':settings.get_settings().get('notification_email_to')}
+                   o = {'name':'admin','email':settings.get_settings().get('smtp_default_recipient')}
                    user = objectview(o)
                    pass
+
+            if type == 'snapshot':
+               workload = self.db.workload_get(context, object.workload_id)
+               workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+               snapshotvms = self.db.snapshot_vms_get(context, object.id)
+            elif type == 'restore':
+                  snapshot = self.db.snapshot_get(context, object.snapshot_id)
+                  workload = self.db.workload_get(context, snapshot.workload_id)
+                  workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+                  snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
+
+            for inst in snapshotvms:
+                size_kb = inst.size / 1024
+                vms_html = """\
+                            <tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; width: 90px;">
+                            VM Name</td><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; width: 80px;">
+                            VM Size</td></tr><tr style="height: 20px">
+                            <td style="padding-left: 5px; font-size:12px; color:black; border: 1px solid #999;">
+                            """+inst.vm_name+"""
+                            </td><td style="padding-left: 5px; font-size:12px; color:black; border: 1px solid #999; ">
+                            """+str(size_kb)+""" Kb or """+str(inst.size)+""" bytes </td></tr>
+                            """
             
             if type == 'snapshot':
             
                subject = 'Snapshot success'
+              
+               size_snap_kb = object.size / 1024
+
+               minutes = object.time_taken / 60
+               seconds = object.time_taken % 60
+               time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
                 
                html = """\
                <html>
                  <head></head>
                  <body>
-                    <p>Hi """+user.name+"""</p>
-                    <p>Snapshot operation successfully performed</p>
-                    <p>Below are snapshot details</p>
-                    <table border='1px solid black'>
-                    <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
-                    <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
-                    <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
-                    <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
-                    <tr><td>Time taken</td><td>"""+str(object.time_taken)+"""</td></tr>
-                    <tr><td>Type</td><td>"""+object.snapshot_type+"""</td></tr>
-                    </table>
+                    <table cellspacing="0" cellpadding="0px" style="width:600px; border: 1px solid gray; color: white; font-family:Arial; font-size:11px;">
+                    <tbody><tr style="background-color: green; height: 20px;"><td style="padding:5px;">
+                    <table cellspacing="0" cellpadding="0px" style="width:100%; color: white; font-family:Arial; font-size:11px;">
+                    <tbody><tr style="background-color: green; "><td style="font-size:25px; text-align:left; width:200px; ">
+                    """+workload.display_name+"""</td><td style="font-size:25px; text-align:left; width:200px;">
+                    """+workload_type.display_name+"""</td><td >&nbsp;</td><td style="font-size:25px; text-align:center;">
+                    Success</td></tr><tr style="background-color: green;">
+                    <td style="color:rgba(255, 255, 255, 0.8); vertical-align:top; font-size:11px; font-style:italic; text-align:left; ">
+                    (Workload Name)</td><td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; font-size:11px; font-style:italic; text-align:left; ">
+                    (Workload Type)</td><td >&nbsp;</td>
+                    <td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; width: 160px; font-size:11px; font-style:italic; text-align:center;
+                    word-break: normal;">
+                    (Snapshot operation performed)</td></tr></tbody></table></td></tr>
+                    <tr style="background-color: #eee;" ><td>
+                    <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                    <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                    Snapshot Details</td>
+                    <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;  vertical-align: middle;">&nbsp;
+                    </td></tr></table></td></tr><tr  style="background-color: #eee;"><td style="padding: 5px; ">
+                    <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align: 
+                    middle; width:100%;"><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; 
+                    width: 90px;"> Name</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+object.display_name+"""</td>
+                    <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; width: 80px;">
+                    Type</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                    """+object.snapshot_type+"""</td></tr><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; 
+                    font-weight:bold;">Size</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                    """+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes </td>
+                    <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; ">
+                    Time taken</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+time_unit+"""</td></tr><tr >
+                    <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;">
+                    Scheduled on</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">"""+object.host+"""</td>
+                    <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;">
+                    Description</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                    """+object.display_description+"""</td></tr></table></td></tr><tr style="background-color: #eee;"><td>
+                    <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                    <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                    VMs Details</td>
+                    <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666; 
+                    vertical-align: middle;"></td></tr></table></td></tr><tr style="background-color: #eee;"><td style="padding: 5px; ">
+                    <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                    middle; width:100%;">"""+vms_html+"""</table></td></tr></tbody></table>
                  </body>
                </html>
                """  
                 
                 
                if object.status == 'error':
-                  subject = 'Failure to take snapshot'
-            
+                  subject = 'Failure to take snapshot'                  
+ 
                   html = """\
                   <html>
                     <head></head>
-                    <body>
-                      <p>Hi """+user.name+"""</p>
-                      <p>There is some error taking snapshot</p>
-                      <p>Below are snapshot details</p>
-                      <table border='1px solid black'>
-                      <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
-                      <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
-                      <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
-                      <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
-                      <tr><td>Status</td><td>"""+object.status+"""</td></tr>
-                      <tr><td>Error message</td><td>"""+object.error_msg+"""</td></tr>
-                      </table>
+                    <body>                                        
+                      <table cellspacing="0" cellpadding="0px" style="width:600px; border: 1px solid gray; color: white; font-family:Arial; font-size:11px;">
+                      <tbody><tr style="background-color: red; height: 20px;"><td style="padding:5px;">
+                      <table cellspacing="0" cellpadding="0px" style="width:100%; color: white; font-family:Arial; font-size:11px;">
+                      <tbody><tr style="background-color: red; "><td style="font-size:25px; text-align:left; width:200px; ">
+                      """+workload.display_name+"""</td><td style="font-size:25px; text-align:left; width:200px;">
+                      """+workload_type.display_name+"""</td><td >&nbsp;</td><td style="font-size:25px; text-align:center;">
+                      Error</td></tr><tr style="background-color: red;">
+                      <td style="color:rgba(255, 255, 255, 0.8); vertical-align:top; font-size:11px; font-style:italic; text-align:left; ">
+                      (Workload Name)</td><td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; font-size:11px; font-style:italic;
+                      text-align:left; "> (Workload Type)</td><td >&nbsp;</td>
+                      <td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; width: 160px; font-size:11px; font-style:italic; text-align:center;
+                      word-break: normal;">
+                      (Error taking snapshot)</td></tr></tbody></table></td></tr>
+                      <tr style="background-color: #eee;" ><td>
+                      <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                      <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                      Snapshot Details</td>
+                      <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;  vertical-align: middle;">&nbsp;
+                      </td></tr></table></td></tr><tr  style="background-color: #eee;"><td style="padding: 5px; ">
+                      <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                      middle; width:100%;"><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;
+                      width: 90px;"> Name</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+object.display_name+"""</td>
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; width: 80px;">
+                      Description</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                      """+object.display_description+"""</td></tr><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999;
+                      font-weight:bold;">Size</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                      """+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes </td>
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; ">
+                      Scheduled on</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+object.host+"""</td></tr><tr >
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;">
+                      Error message</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999" colspan='3'>"""+object.error_msg+"""</td>
+                      </tr></table></td></tr><tr style="background-color: #eee;"><td>
+                      <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                      <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                      VMs Details</td>
+                      <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;
+                      vertical-align: middle;"></td></tr></table></td></tr><tr style="background-color: #eee;"><td style="padding: 5px; ">
+                      <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                      middle; width:100%;">"""+vms_html+"""</table></td></tr></tbody></table>
                     </body>
                   </html>
                   """
                 
             elif type == 'restore':
                  subject = 'Restore success'
+
+                 size_snap_kb = object.size / 1024
+
+                 minutes = object.time_taken / 60
+                 seconds = object.time_taken % 60
+                 time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
+
                 
                  html = """\
                  <html>
                    <head></head>
                    <body>
-                      <p>Hi """+user.name+"""</p>
-                      <p>Restore operation successfully performed</p>
-                      <p>Below are restore details</p>
-                      <table border='1px solid black'>
-                      <tr><td>Restore name</td><td>"""+object.display_name+"""</td></tr>
-                      <tr><td>Restore description</td><td>"""+object.display_description+"""</td></tr>
-                      <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
-                      <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
-                      <tr><td>Time taken</td><td>"""+str(object.time_taken)+"""</td></tr>
-                      <tr><td>Type</td><td>"""+object.restore_type+"""</td></tr>
-                      </table>
+                      <table cellspacing="0" cellpadding="0px" style="width:600px; border: 1px solid gray; color: white; font-family:Arial; font-size:11px;">
+                      <tbody><tr style="background-color: green; height: 20px;"><td style="padding:5px;">
+                      <table cellspacing="0" cellpadding="0px" style="width:100%; color: white; font-family:Arial; font-size:11px;">
+                      <tbody><tr style="background-color: green; "><td style="font-size:25px; text-align:left; width:200px; ">
+                      """+workload.display_name+"""</td><td style="font-size:25px; text-align:left; width:200px;">
+                      """+workload_type.display_name+"""</td><td >&nbsp;</td><td style="font-size:25px; text-align:center;">
+                      Success</td></tr><tr style="background-color: green;">
+                      <td style="color:rgba(255, 255, 255, 0.8); vertical-align:top; font-size:11px; font-style:italic; text-align:left; ">
+                      (Workload Name)</td><td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; font-size:11px; font-style:italic;
+                      text-align:left; ">
+                      (Workload Type)</td><td >&nbsp;</td>
+                      <td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; width: 160px; font-size:11px; font-style:italic; text-align:center;
+                      word-break: normal;">
+                      (Restore operation performed)</td></tr></tbody></table></td></tr>
+                      <tr style="background-color: #eee;" ><td>
+                      <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                      <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                      Restore Details</td>
+                      <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;  vertical-align: middle;">&nbsp;
+                      </td></tr></table></td></tr><tr  style="background-color: #eee;"><td style="padding: 5px; ">
+                      <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                      middle; width:100%;"><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;
+                      width: 90px;"> Name</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+object.display_name+"""</td>
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; width: 80px;">
+                      Type</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                      """+object.restore_type+"""</td></tr><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999;
+                      font-weight:bold;">Size</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                      """+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes </td>
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; ">
+                      Time taken</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+time_unit+"""</td></tr><tr >
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;">
+                      Scheduled on</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">"""+object.host+"""</td>
+                      <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;">
+                      Description</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                      """+object.display_description+"""</td></tr></table></td></tr><tr style="background-color: #eee;"><td>
+                      <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                      <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                      VMs Details</td>
+                      <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;
+                      vertical-align: middle;"></td></tr></table></td></tr><tr style="background-color: #eee;"><td style="padding: 5px; ">
+                      <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                      middle; width:100%;">"""+vms_html+"""</table></td></tr></tbody></table>
                    </body>
                  </html>
                  """
@@ -862,17 +970,46 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     <html>
                       <head></head>
                       <body>
-                        <p>Hi """+user.name+"""</p>
-                        <p>There is some error making restore</p>
-                        <p>Below are restore details</p>
-                        <table border='1x solid black'>
-                        <tr><td>Snapshot name</td><td>"""+object.display_name+"""</td></tr>
-                        <tr><td>Snapshot description</td><td>"""+object.display_description+"""</td></tr>
-                        <tr><td>Size</td><td>"""+str(object.size)+"""</td></tr>
-                        <tr><td>Scheduled on</td><td>"""+object.host+"""</td></tr>
-                        <tr><td>Status</td><td>"""+object.status+"""</td></tr>
-                        <tr><td>Error message</td><td>"""+object.error_msg+"""</td></tr>
-                        </table>
+                        <table cellspacing="0" cellpadding="0px" style="width:600px; border: 1px solid gray; color: white; font-family:Arial; 
+                        font-size:11px;">
+                        <tbody><tr style="background-color: red; height: 20px;"><td style="padding:5px;">
+                        <table cellspacing="0" cellpadding="0px" style="width:100%; color: white; font-family:Arial; font-size:11px;">
+                        <tbody><tr style="background-color: red; "><td style="font-size:25px; text-align:left; width:200px; ">
+                        """+workload.display_name+"""</td><td style="font-size:25px; text-align:left; width:200px;">
+                        """+workload_type.display_name+"""</td><td >&nbsp;</td><td style="font-size:25px; text-align:center;">
+                        Error</td></tr><tr style="background-color: red;">
+                        <td style="color:rgba(255, 255, 255, 0.8); vertical-align:top; font-size:11px; font-style:italic; text-align:left; ">
+                        (Workload Name)</td><td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; font-size:11px; font-style:italic;
+                        text-align:left; "> (Workload Type)</td><td >&nbsp;</td>
+                        <td style="color:rgba(255, 255, 255, 0.8);vertical-align:top; width: 160px; font-size:11px; font-style:italic; text-align:center;
+                        word-break: normal;">
+                        (Error making restore)</td></tr></tbody></table></td></tr>
+                        <tr style="background-color: #eee;" ><td>
+                        <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                        <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                        Restore Details</td>
+                        <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;  vertical-align: middle;">&nbsp;
+                        </td></tr></table></td></tr><tr  style="background-color: #eee;"><td style="padding: 5px; ">
+                        <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                        middle; width:100%;"><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;
+                        width: 90px;"> Name</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+object.display_name+"""</td>
+                        <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; width: 80px;">
+                        Description</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                        """+object.display_description+"""</td></tr><tr ><td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999;
+                        font-weight:bold;">Size</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999">
+                        """+str(size_snap_kb)+""" Kb or """+str(object.size)+""" bytes </td>
+                        <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold; ">
+                        Scheduled on</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999"> """+object.host+"""</td></tr><tr >
+                        <td style="font-size:13px; padding: 3px; color:black; border: 1px solid #999; font-weight:bold;">
+                        Error message</td><td style="padding-left: 5px; font-size:12px; border: 1px solid #999" colspan="3">"""+object.error_msg+"""</td>
+                        </tr></table></td></tr><tr style="background-color: #eee;"><td>
+                        <table cellspacing="0" cellpadding="0px" style="width:100%"><tr style="height: 30px;">
+                        <td style="padding-left: 5px; font-size:16px; color:#666; font-weight:bold; vertical-align: middle;">
+                        VMs Details</td>
+                        <td style="padding-right: 6px; font-style:italic; text-align:right; font-size:12px; color:#666;
+                        vertical-align: middle;"></td></tr></table></td></tr><tr style="background-color: #eee;"><td style="padding: 5px; ">
+                        <table cellspacing="0" cellpadding="0px" style="background-color: #fff;margin-top: -8px; text-align:left; vertical-align:
+                        middle; width:100%;">"""+vms_html+"""</table></td></tr></tbody></table>
                       </body>
                     </html>
                     """      
@@ -880,14 +1017,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
             msg = MIMEMultipart('alternative')
             msg['To'] = user.email
-            msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
-            #msg['From'] = 'administrator@vsphere'
-            msg['Subject'] = subject
-            
+            #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
+            msg['From'] = settings.get_settings().get('smtp_default_sender')
+            msg['Subject'] = subject        
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            
-            s = smtplib.SMTP(settings.get_settings().get('smtp_server'))
+            s = smtplib.SMTP(settings.get_settings().get('smtp_server_name'))
             #s.login(smtp_user,smtp_pass)
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
