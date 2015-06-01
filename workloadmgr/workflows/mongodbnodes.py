@@ -14,8 +14,36 @@ from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import flags
 from workloadmgr import settings
 
+import pymongo
+from pymongo import MongoClient
+from pymongo import MongoReplicaSetClient
+
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
+
+#
+def connect_server(host, port, user, password, verbose=False):
+    try:
+        connection = None
+        if user!='':
+            auth = 'mongodb://' + user + ':' + password + '@' + host + ':' + str(port)
+            connection = MongoClient(auth)
+        else:
+            auth=''
+            connection = MongoClient(host,int(port))
+
+        if verbose:
+            LOG.debug(_('Connected to ' + host +  ' on port ' + port +  '...'))
+
+    except Exception, e:
+        LOG.error(_('Oops!  There was an error.  Try again...'))
+        LOG.error(_(e))
+        raise e
+    return connection
+
+def isShardedCluster(conn):
+    status = conn.admin.command("ismaster")
+    return not ('primary' in status and 'secondary' in status)
 
 @autolog.log_method(Logger)
 def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes = None):
@@ -47,7 +75,9 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes
         raise
 
     except Exception as ex:
-        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") % ('mongo printjson(db.adminCommand("listDatabases")) status', str(addlnodes), str(ex))
+        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") %\
+                         ('mongo printjson(db.adminCommand("listDatabases")) status', str(addlnodes), str(ex))
+
         LOG.info(error_msg)
         nodes = addlnodes.split(";")
         if '' in nodes:
@@ -132,11 +162,42 @@ def get_databases(hosts, port, username, password, dbport):
         for line in output[host]['stdout']:
             clusterinfo=json.loads(line)
 
-        return clusterinfo['databases']
+        if clusterinfo['ok']:
+            return clusterinfo['databases']
+    if not clusterinfo['ok'] and "not master" in clusterinfo['errmsg']:
+        # We may have a secondary node. Find primary node and issue
+        # the request
 
-    msg = _("Failed to execute 'mongo --eval' successfully.")
-    LOG.error(msg)
-    raise exception.ErrorOccurred(msg)
+        # Need more info here
+        conn = connect_server(host, dbport, '', '', verbose=False)
+        isMongos = isShardedCluster(conn)
+        if isMongos:
+            msg = _("Internal Error: 'not a master' error should \
+                     not happen on sharded cluster")
+            LOG.error(msg)
+            raise exception.ErrorOccurred(msg)
+        else:
+            # Find the master for the replica set
+            output = pssh_exec_command([host], port, username, password,
+                          'mongo --quiet --port ' + dbport +
+                          ' --eval "JSON.stringify(rs.status())"');
+            rsstatus = json.loads(output[host]['stdout'][0])
+            for replica in rsstatus['members']:
+                if replica['stateStr'] == 'PRIMARY':
+                    primary_host = replica['name'].split(":")[0]
+                    primary_dbport = replica['name'].split(":")[1]
+                    if primary_host != host: # break the recursion
+                        clusterinfo = get_databases([primary_host], port,
+                                            username, password, primary_dbport)
+                    else:
+                        msg = _("Failed to execute 'mongo --eval' successfully. Error %s")  % (clusterinfo['errmsg'])
+                        LOG.error(msg)
+                        raise exception.ErrorOccurred(msg)
+                    break;
+    else:
+        msg = _("Failed to execute 'mongo --eval' successfully. Error %s")  % (clusterinfo['errmsg'])
+        LOG.error(msg)
+        raise exception.ErrorOccurred(msg)
 
 @autolog.log_method(Logger)
 def main(argv):

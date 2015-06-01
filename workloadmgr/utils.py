@@ -1495,10 +1495,17 @@ def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=N
         client.set_missing_host_key_policy(paramiko.WarningPolicy())
     else:
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(hostname, port=int(sshport), username=username, password=password, timeout=timeout)
+    client.connect(hostname, port=int(sshport), username=username,
+                   password=password, timeout=timeout)
 
     ifcfgcmd = "ifconfig | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}'"
     stdin, stdout, stderr = client.exec_command(ifcfgcmd, timeout=timeout)
-    for macline in stdout.read().strip().split('\n'):
+    exitcode = stdout.channel.recv_exit_status()
+    if exitcode:
+        raise exception.ProcessExecutionError(stdout=None, stderr=stderr.read(),
+                                exit_code=exitcode, cmd=ifcfgcmd,
+                                description=None)
+    else:
+        for macline in stdout.read().strip().split('\n'):
             mac_addresses.append(macline);
-    return mac_addresses
+        return mac_addresses

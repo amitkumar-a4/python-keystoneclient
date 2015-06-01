@@ -515,11 +515,12 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                                                     username=hostusername,
                                                     password=hostpassword, timeout=120)
             for mac in mac_addresses:
-                interfaces[mac] = hostname
+                interfaces[mac.lower()] = hostname
 
-        except:
+        except Exception as ex:
+            LOG.exception(ex)
             LOG.info(_( '"' + hostname +'" appears to be offline. Cannot exec ifconfig' ))
-            pass
+            raise
 
 
     # query VM by ethernet and get instance info here
@@ -539,7 +540,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         for addr in instance.addresses:
             ifs = instance.addresses[addr]
             for _if in ifs:
-                if _if['OS-EXT-IPS-MAC:mac_addr'] in interfaces:
+                if _if['OS-EXT-IPS-MAC:mac_addr'].lower() in interfaces:
                     #this is our vm
                     hypervisor_hostname = None
                     hypervisor_type = None
