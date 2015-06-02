@@ -38,6 +38,7 @@ from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
 from workloadmgr import exception
+from workloadmgr import settings
 
 import vmtasks
 import workflow
@@ -192,21 +193,42 @@ class PauseBalancer(task.Task):
     def execute(self, DBHost, DBPort, DBUser, DBPassword):
         LOG.debug(_('PauseBalancer'))
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
+
         # Pause the DB
+        dbmap = self.client.admin.command('getShardMap')
+        cfgsrvs = dbmap['map']['config'].split(',')
+
+        for cfgsrv in cfgsrvs:
+            cfghost = cfgsrv.split(':')[0]
+            cfgport = cfgsrv.split(':')[1]
+            break
+
+        self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
         db = self.client.config
 
+        timeout = settings.get_settings().get('mongodb_stop_balancer_timeout', '300')
+        currtime = time.time()
         db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
         balancer_info = db.locks.find_one({'_id': 'balancer'})
-        while int(str(balancer_info['state'])) > 0:
+        while int(str(balancer_info['state'])) > 0 and\
+              time.time() - currtime < timeout :
             time.sleep(5)
-            LOG.debug(_('\t\twaiting for migration'))
+            LOG.debug(_('\t\twaiting for balancer to stop...'))
             balancer_info = db.locks.find_one({'_id': 'balancer'})
+
+        if int(str(balancer_info['state'])) > 0:
+            LOG.error(_("Cannot stop the balancer with in the \
+                        mongodb_stop_balancer_timeout(%d) interval") %\
+                        mongodb_stop_balancer_timeout)
+            raise Exception(_("Cannot stop the balancer with in the \
+                        mongodb_stop_balancer_timeout(%d) interval") %\
+                        mongodb_stop_balancer_timeout)
 
     def revert(self, *args, **kwargs):
         try:
             # Resume DB
             db = self.client.config
-            db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}});
+            db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -217,6 +239,16 @@ class ResumeBalancer(task.Task):
         LOG.debug(_('ResumeBalancer'))
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
         # Resume DB
+        # Pause the DB
+        dbmap = self.client.admin.command('getShardMap')
+        cfgsrvs = dbmap['map']['config'].split(',')
+
+        for cfgsrv in cfgsrvs:
+            cfghost = cfgsrv.split(':')[0]
+            cfgport = cfgsrv.split(':')[1]
+            break
+
+        self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
 
         db = self.client.config
         db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
@@ -498,6 +530,16 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                 hostname = h.split(':')[0]
                 if not hostname in hostnames:
                     hostnames[hostname] = 1
+
+        # Add config servers to the mix
+        dbmap = connection.admin.command('getShardMap')
+        cfgsrvs = dbmap['map']['config'].split(',')
+
+        for cfgsrv in cfgsrvs:
+            cfghost = cfgsrv.split(':')[0]
+            cfgport = cfgsrv.split(':')[1]
+            if not cfghost in hostnames:
+                hostnames[cfghost] = 1
     else:
         # this is a replica set
         status = connection.admin.command('replSetGetStatus')
@@ -634,8 +676,9 @@ class MongoDBWorkflow(workflow.Workflow):
                                                    self._store['DBPassword'],
                                                    self._store['preferredgroup'])
 
-        # Filter the VMs based on the preferred secondary replica 
         self._store['instances'] = [];
+
+        # Filter the VMs based on the preferred secondary replica 
         for index, vm in enumerate(instances):
             for index, srep in enumerate(hosts_to_backup):
                 if srep['secondaryReplica'].split(':')[0] == vm['hostname']:
@@ -645,6 +688,37 @@ class MongoDBWorkflow(workflow.Workflow):
 
         for index, item in enumerate(hosts_to_backup):
             self._store['secondary_'+str(index)] = item
+
+        # Add config server if the server is not already part
+        # of the instances
+        if isMongos:
+            dbmap = connection.admin.command('getShardMap')
+            cfgsrvs = dbmap['map']['config'].split(',')
+
+            cfgincluded = False
+            for cfgsrv in cfgsrvs:
+                cfghost = cfgsrv.split(':')[0]
+                cfgport = cfgsrv.split(':')[1]
+                for inst in self._store['instances']:
+                    if inst['hostname'] == cfghost:
+                        cfgincluded = True
+                        break
+                if cfgincluded:
+                    break
+   
+            if not cfgincluded:
+                cfgadded = False
+                for index, vm in enumerate(instances):
+                    for cfgsrv in cfgsrvs:
+                        cfghost = cfgsrv.split(':')[0]
+                        cfgport = cfgsrv.split(':')[1]
+                        if cfghost == vm['hostname']:
+                            self._store['instance_'+vm['vm_id']] = vm
+                            self._store['instances'].append(vm);
+                            cfgadded = True
+                            break
+                    if cfgadded:
+                        break
 
         snapshotvms = lf.Flow('mongodbwf')
 

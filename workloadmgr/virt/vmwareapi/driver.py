@@ -52,6 +52,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr import autolog
+from workloadmgr import settings
 from workloadmgr.workflows import vmtasks
 
 
@@ -960,10 +961,12 @@ class VMwareVCDriver(VMwareESXDriver):
                         raise
 
                 extentsfile = None
+
+                turbo_thick_disk_backup = settings.get_settings().get('turbo_thick_disk_backup', False)
                 if (hasattr(dev.backing, 'thinProvisioned') and\
                       dev.backing.thinProvisioned == False) and\
-                    parent_changeId is '*':
-                    #CONF.vmware.turbo_thick_disk_backup is False:
+                    parent_changeId is '*' and\
+                    turbo_thick_disk_backup:
                     extentsfile, partitions, totalblocks,\
                            listfile, mntlist = thickcopyextents(self._session._host_ip,
                                                           self._session._host_username,
