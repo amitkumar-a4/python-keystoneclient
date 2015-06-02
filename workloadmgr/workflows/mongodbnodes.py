@@ -14,8 +14,36 @@ from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import flags
 from workloadmgr import settings
 
+import pymongo
+from pymongo import MongoClient
+from pymongo import MongoReplicaSetClient
+
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
+
+#
+def connect_server(host, port, user, password, verbose=False):
+    try:
+        connection = None
+        if user!='':
+            auth = 'mongodb://' + user + ':' + password + '@' + host + ':' + str(port)
+            connection = MongoClient(auth)
+        else:
+            auth=''
+            connection = MongoClient(host,int(port))
+
+        if verbose:
+            LOG.debug(_('Connected to ' + host +  ' on port ' + port +  '...'))
+
+    except Exception, e:
+        LOG.error(_('Oops!  There was an error.  Try again...'))
+        LOG.error(_(e))
+        raise e
+    return connection
+
+def isShardedCluster(conn):
+    status = conn.admin.command("ismaster")
+    return not ('primary' in status and 'secondary' in status)
 
 @autolog.log_method(Logger)
 def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes = None):
@@ -37,17 +65,21 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes
             nodes.remove('')
         s = set(nodes)
         nodes = list(s)
-        output = pssh_exec_command( nodes,
-                                    int(SSHPort),
-                                    Username,
-                                    Password,
-                                    'mongo --port ' + DBPort + ' --eval "printjson(db.adminCommand(\'listDatabases\'))"');
+        cmd = 'mongo --port ' + DBPort
+        if dbuser is not '':
+            cmd += " -u " + dbuser + " -p " + dbpassword
+            cmd += ' --authenticationDatabase admin'
+        cmd += ' --eval "printjson(db.adminCommand(\'listDatabases\'))"'
+        output = pssh_exec_command( nodes, int(SSHPort), Username,
+                                    Password, cmd)
         nodelist = nodes
     except AuthenticationException as ex:
         raise
 
     except Exception as ex:
-        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") % ('mongo printjson(db.adminCommand("listDatabases")) status', str(addlnodes), str(ex))
+        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") %\
+                         ('mongo printjson(db.adminCommand("listDatabases")) status', str(addlnodes), str(ex))
+
         LOG.info(error_msg)
         nodes = addlnodes.split(";")
         if '' in nodes:
@@ -119,24 +151,61 @@ def pssh_exec_command(hosts, port, user, password, command, sudo=False):
     return output
 
 @autolog.log_method(Logger)
-def get_databases(hosts, port, username, password, dbport):
-    output = pssh_exec_command(hosts, port, username, password,
-                     'mongo --quiet --port ' + dbport + ' --eval "JSON.stringify(db.adminCommand(\'listDatabases\'))"');
+def get_databases(hosts, port, username, password, dbport, dbuser, dbpassword):
+    cmd = 'mongo --quiet --port ' + dbport
+    if dbuser is not '':
+        cmd += " -u " + dbuser + " -p " + dbpassword
+        cmd += ' --authenticationDatabase admin'
+    cmd += ' --eval "JSON.stringify(db.adminCommand(\'listDatabases\'))"'
+    output = pssh_exec_command(hosts, port, username, password, cmd)
     for host in output:
         if output[host]['exit_code']:
-            LOG.warning(_("mongo --port " + dbport + " --eval " + 'JSON.stringify(db.adminCommand("listDatabases"))' +
-                       "on %s cannot be executed. Error %s" % (host, str(output[host]['exit_code']))))
+            LOG.warning(_(cmd +
+                       "on %s cannot be executed. Error %s. Error Msg: %s" %\
+                        (host, str(output[host]['exit_code'])),
+                        output[host]['stdout']))
             continue
 
         clusterinfo = {}
         for line in output[host]['stdout']:
             clusterinfo=json.loads(line)
 
-        return clusterinfo['databases']
+        if clusterinfo['ok']:
+            return clusterinfo['databases']
+    if not clusterinfo['ok'] and "not master" in clusterinfo['errmsg']:
+        # We may have a secondary node. Find primary node and issue
+        # the request
 
-    msg = _("Failed to execute 'mongo --eval' successfully.")
-    LOG.error(msg)
-    raise exception.ErrorOccurred(msg)
+        # Need more info here
+        conn = connect_server(host, dbport, dbuser, dbpassword, verbose=False)
+        isMongos = isShardedCluster(conn)
+        if isMongos:
+            msg = _("Internal Error: 'not a master' error should \
+                     not happen on sharded cluster")
+            LOG.error(msg)
+            raise exception.ErrorOccurred(msg)
+        else:
+            # Find the master for the replica set
+            output = pssh_exec_command([host], port, username, password,
+                          'mongo --quiet --port ' + dbport +
+                          ' --eval "JSON.stringify(rs.status())"');
+            rsstatus = json.loads(output[host]['stdout'][0])
+            for replica in rsstatus['members']:
+                if replica['stateStr'] == 'PRIMARY':
+                    primary_host = replica['name'].split(":")[0]
+                    primary_dbport = replica['name'].split(":")[1]
+                    if primary_host != host: # break the recursion
+                        clusterinfo = get_databases([primary_host], port,
+                                            username, password, primary_dbport)
+                    else:
+                        msg = _("Failed to execute 'mongo --eval' successfully. Error %s")  % (clusterinfo['errmsg'])
+                        LOG.error(msg)
+                        raise exception.ErrorOccurred(msg)
+                    break;
+    else:
+        msg = _("Failed to execute 'mongo --eval' successfully. Error %s")  % (clusterinfo['errmsg'])
+        LOG.error(msg)
+        raise exception.ErrorOccurred(msg)
 
 @autolog.log_method(Logger)
 def main(argv):
@@ -145,9 +214,18 @@ def main(argv):
         outfile = '/tmp/mongodbnodes_output.txt'
         addlnodes = None
         dbport = "27017"
+        dbuser = ''
+        dbpassword = ''
         port = "22"
+        defaultnode = ''
+        username = ''
+        password = ''
 
-        opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile=", "dbport=",])
+        opts, args = getopt.getopt(argv,"",["defaultnode=","port=",
+                              "username=","password=","addlnodes=",
+                              "preferredgroups=", "findpartitiontype=",
+                              "outfile=", "errfile=", "dbport=","dbuser=",
+                              "dbpassword=",])
         for opt, arg in opts:
             if opt == '--defaultnode':
                 defaultnode = arg
@@ -155,6 +233,10 @@ def main(argv):
                 port = arg
             elif opt == '--dbport':
                 dbport = arg
+            elif opt == '--dbuser':
+                dbuser = arg
+            elif opt == '--dbpassword':
+                dbpassword = arg
             elif opt == '--username':
                 username = arg
             elif opt == '--password':
@@ -172,7 +254,7 @@ def main(argv):
         alivenodes = find_alive_nodes(defaultnode, port, username, password, dbport, addlnodes)
 
         clusterinfo = {}
-        clusterinfo['databases'] = get_databases(alivenodes, port, username, password, dbport)
+        clusterinfo['databases'] = get_databases(alivenodes, port, username, password, dbport, dbuser, dbpassword)
 
         with open(outfile,'w') as outfilehandle:
             outfilehandle.write(json.dumps(clusterinfo))
@@ -182,6 +264,8 @@ def main(argv):
         usage = _("Usage: mongodbnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode mongodb1 "
                   "--port 22 --username ubuntu --password password "
                   "--dbport <mongos/mongodport> "
+                  "--dbuser <mongo admin> "
+                  "--dbpassword <password> "
                   "--addlnodes 'mongodb1;mongodb2;mongodb3' "
                   "--outfile /tmp/mongodbnodes.txt --errfile /tmp/mongodbnodes_error.txt")
         LOG.info(usage)

@@ -45,12 +45,14 @@ from workloadmgr.virt.vmwareapi import vm_util
 from workloadmgr.virt.vmwareapi import vmops
 from workloadmgr.virt.vmwareapi import volumeops
 from workloadmgr.virt.vmwareapi import read_write_util
+from workloadmgr.virt.vmwareapi.thickcopy import thickcopyextents
 from workloadmgr.vault import vault
 from workloadmgr.virt import qemuimages
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr import autolog
+from workloadmgr import settings
 from workloadmgr.workflows import vmtasks
 
 
@@ -880,6 +882,7 @@ class VMwareVCDriver(VMwareESXDriver):
         @autolog.log_method(Logger, 'VMwareVCDriver.upload_snapshot._upload_vmdk')
         def _upload_vmdk(dev):
             try:
+                totalBytesToTransfer = 0
                 snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
                 if snapshot_obj.snapshot_type == 'full':
                     parent_vault_service_url = None
@@ -956,34 +959,50 @@ class VMwareVCDriver(VMwareESXDriver):
                         LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
                         LOG.exception(ex)
                         raise
-            
-                totalBytesToTransfer = 0
-                with open(copy_to_file_path + "-ctk", 'w') as ctkfile:
-                    position = 0
-                    while position < dev.capacityInBytes:
-                        changes = self._session._call_method(
-                                                        self._session._get_vim(),
-                                                        "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                        snapshot=snapshot_data['snapshot_ref'],
-                                                        deviceKey=dev.key,
-                                                        startOffset=position,
-                                                        changeId=parent_changeId)
-                        if changes == []:
-                            changes = self._session._call_method(self._session._get_vim(),
-                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                         snapshot=snapshot_data['snapshot_ref'],
-                                                         deviceKey=dev['key'],
-                                                         startOffset=position,
-                                                         changeId=parent_changeId)
+
+                extentsfile = None
+
+                turbo_thick_disk_backup = settings.get_settings().get('turbo_thick_disk_backup', False)
+                if (hasattr(dev.backing, 'thinProvisioned') and\
+                      dev.backing.thinProvisioned == False) and\
+                    parent_changeId is '*' and\
+                    turbo_thick_disk_backup:
+                    extentsfile, partitions, totalblocks,\
+                           listfile, mntlist = thickcopyextents(self._session._host_ip,
+                                                          self._session._host_username,
+                                                          self._session._host_password, vmxspec,
+                                                          dev, copy_to_file_path)
+                if not extentsfile:
+                    with open(copy_to_file_path + "-ctk", 'w') as ctkfile:
+                        position = 0
+                        while position < dev.capacityInBytes:
+                            changes = self._session._call_method(
+                                                            self._session._get_vim(),
+                                                            "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                            snapshot=snapshot_data['snapshot_ref'],
+                                                            deviceKey=dev.key,
+                                                            startOffset=position,
+                                                            changeId=parent_changeId)
+                            if changes == []:
+                                changes = self._session._call_method(self._session._get_vim(),
+                                                             "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                             snapshot=snapshot_data['snapshot_ref'],
+                                                             deviceKey=dev['key'],
+                                                             startOffset=position,
+                                                             changeId=parent_changeId)
                    
-                        if 'changedArea' in changes:
-                            for extent in changes.changedArea:
-                                start = extent.start
-                                length = extent.length
+                            if 'changedArea' in changes:
+                                for extent in changes.changedArea:
+                                    start = extent.start
+                                    length = extent.length
                                 
-                                ctkfile.write(str(start) + "," + str(length)+"\n")
-                                totalBytesToTransfer += length
-                        position = changes.startOffset + changes.length;
+                                    ctkfile.write(str(start) + "," + str(length)+"\n")
+                                    totalBytesToTransfer += length
+                            position = changes.startOffset + changes.length;
+                    extentsfile = copy_to_file_path + "-ctk"
+                else:
+                    shutil.copyfile(extentsfile, copy_to_file_path + "-ctk")
+
                 if parent_vault_service_url:
                     cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
                                str(dev.backing.fileName),
@@ -1011,13 +1030,13 @@ class VMwareVCDriver(VMwareESXDriver):
                         break
 
                 process = subprocess.Popen(cmdspec,
-                                       stdin=subprocess.PIPE,
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       bufsize= -1,
-                                       env=vix_disk_lib_env,
-                                       close_fds=True,
-                                       shell=False)
+                                           stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           bufsize= -1,
+                                           env=vix_disk_lib_env,
+                                           close_fds=True,
+                                           shell=False)
                 
                 queue = Queue()
                 read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
@@ -1044,16 +1063,16 @@ class VMwareVCDriver(VMwareESXDriver):
                             previous_uploaded_size = uploaded_size                        
                     except Exception as ex:
                         LOG.exception(ex)
-                
+                    
                 process.stdin.close()
                 _returncode = process.returncode  # pylint: disable=E1101
                 if _returncode:
-                    LOG.debug(_('Result was %s') % _returncode)
-                    raise exception.ProcessExecutionError(
-                            exit_code=_returncode,
-                            stdout=output,
-                            stderr=process.stderr.read(),
-                            cmd=cmd)
+                     LOG.debug(_('Result was %s') % _returncode)
+                     raise exception.ProcessExecutionError(
+                                exit_code=_returncode,
+                                stdout=output,
+                                stderr=process.stderr.read(),
+                                cmd=cmd)
 
                 snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': (totalBytesToTransfer - uploaded_size)})
 
@@ -1068,7 +1087,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 except subprocess.CalledProcessError as ex:
                     LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
                     raise
-                                                
+
                 db.snapshot_update( cntx, snapshot['id'], 
                                     {'progress_msg': 'Uploaded '+ dev.deviceInfo.label + ' of VM:' + instance['vm_name'],
                                      'status': 'uploading'
