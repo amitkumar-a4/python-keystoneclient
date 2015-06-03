@@ -781,8 +781,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                   workload_type = self.db.workload_type_get(context, workload.workload_type_id)
                   snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
 
-         
-            with open('../templates/vms.html', 'r') as content_file:
+            with open('/opt/stack/workloadmgr/workloadmgr/templates/vms.html', 'r') as content_file:
                  vms_html = content_file.read()
 
 
@@ -807,7 +806,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                seconds = object.time_taken % 60
                time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
 
-               with open('../templates/snapshot_success.html', 'r') as content_file:
+               with open('/opt/stack/workloadmgr/workloadmgr/templates/snapshot_success.html', 'r') as content_file:
                     html = content_file.read()
                     html = html.replace('workload.display_name',workload.display_name)
                     html = html.replace('workload_type.display_name',workload_type.display_name)
@@ -825,7 +824,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                   subject = 'Failure to take snapshot'                  
                   
-                  with open('../templates/snapshot_error.html', 'r') as content_file:
+                  with open('/opt/stack/workloadmgr/workloadmgr/templates/snapshot_error.html', 'r') as content_file:
                        html = content_file.read()
                        html = html.replace('workload.display_name',workload.display_name)
                        html = html.replace('workload_type.display_name',workload_type.display_name)
@@ -848,7 +847,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                  seconds = object.time_taken % 60
                  time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
 
-                 with open('../templates/restore_success.html', 'r') as content_file:
+                 with open('/opt/stack/workloadmgr/workloadmgr/templates/restore_success.html', 'r') as content_file:
                       html = content_file.read()
                       html = html.replace('workload.display_name',workload.display_name)
                       html = html.replace('workload_type.display_name',workload_type.display_name)
@@ -866,7 +865,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                     subject = 'Failure to do restore'
                   
-                    with open('../templates/restore_error.html', 'r') as content_file:
+                    with open('/opt/stack/workloadmgr/workloadmgr/templates/restore_error.html', 'r') as content_file:
                          html = content_file.read()
                          html = html.replace('workload.display_name',workload.display_name)
                          html = html.replace('workload_type.display_name',workload_type.display_name)
@@ -895,8 +894,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
         
-        except:
-               pass
+        except Exception as ex:
+            LOG.exception(ex)
+            pass
                 
                
      
