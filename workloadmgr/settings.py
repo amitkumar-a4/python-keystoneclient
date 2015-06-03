@@ -21,8 +21,11 @@ default_settings = {
 'mongodb_discovery_timeout' : '120',
 'smtp_email_enable' : 'no',
 'smtp_server_name' : 'localhost',
+'smtp_default_recipient' : 'administrator@tvault.com',
 'smtp_default_sender' : 'administrator@tvault.com',
-'smtp_default_to' : 'administrator@tvault.com',
+'smtp_port' : '587',
+'smtp_server_username' : '',
+'smtp_server_password' : '',
 }
 
 def get_settings():                           
