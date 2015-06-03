@@ -466,38 +466,43 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
                         break
     else:
         status = connection.admin.command('replSetGetStatus')
+        preferredreplica = None
         if preferredgroup and len(pgroup) > 0:
-            preferredreplica = None
             for member in pgroup:
                 if member['replica'] == status['set']:
                     preferredreplica = member['name']
 
-            # Select a replica member only when user specifies a replica
-            if preferredreplica:
-                for m in status['members']:
-                    if m['name'] != preferredreplica:
+        # Select a replica member only when user specifies a replica
+        if preferredreplica:
+            for m in status['members']:
+                if m['name'] != preferredreplica:
                         continue
-                    if m['stateStr'] == 'SECONDARY':
-                        hosts_to_backup.append({'replicaSetName': status['set'],
-                                               'secondaryReplica': m['name']})
-                    else:
-                        LOG.error(_(preferredreplica + " state is " +
-                                    m['stateStr'] +
-                                    ". Will pick next secondary for backup"))
-                        for m in status['members']:
-                            if m['stateStr'] == 'SECONDARY':
-                                hosts_to_backup.append({'replicaSetName': status['set'],
-                                                            'secondaryReplica': m['name']})
-                                break
+                if m['stateStr'] == 'SECONDARY':
+                    hosts_to_backup.append({'replicaSetName': status['set'],
+                                            'secondaryReplica': m['name']})
+                else:
+                    LOG.error(_(preferredreplica + " state is " +
+                                m['stateStr'] +
+                                ". Will pick next secondary for backup"))
+                    for m in status['members']:
+                        if m['stateStr'] == 'SECONDARY':
+                            hosts_to_backup.append({'replicaSetName': status['set'],
+                                                    'secondaryReplica': m['name']})
                             break
-            else:
-                # if user did not specify preferred group, backup entire cluster
-                for m in status['members']:
-                    if m['stateStr'] == 'SECONDARY':
-                        hosts_to_backup.append({'replicaSetName': status['set'],
+                break
+        else:
+            # if user did not specify preferred group, backup entire cluster
+            for m in status['members']:
+                if m['stateStr'] == 'SECONDARY':
+                    hosts_to_backup.append({'replicaSetName': status['set'],
                                                 'secondaryReplica': m['name']})
-                        break
+                    break
 
+    if len(hosts_to_backup) == 0:
+        raise Exception(_("Could not identify any hosts to backup. \
+                           Please make sure mongodb cluster is in a stable \
+                           and try again"))
+     
     return hosts_to_backup
 
 def get_vms(cntx, dbhost, dbport, mongodbusername,
