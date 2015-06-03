@@ -161,8 +161,8 @@ def get_databases(hosts, port, username, password, dbport, dbuser, dbpassword):
     for host in output:
         if output[host]['exit_code']:
             LOG.warning(_(cmd +
-                       "on %s cannot be executed. Error %s. Error Msg: %s" %\
-                        (host, str(output[host]['exit_code'])),
+                       "on %s cannot be executed. Error %s. Error Msg: %s") %\
+                        (host, str(output[host]['exit_code']),
                         output[host]['stdout']))
             continue
 
