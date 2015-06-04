@@ -196,7 +196,7 @@ def get_databases(hosts, port, username, password, dbport, dbuser, dbpassword):
                     primary_dbport = replica['name'].split(":")[1]
                     if primary_host != host: # break the recursion
                         clusterinfo = get_databases([primary_host], port,
-                                            username, password, primary_dbport)
+                                            username, password, primary_dbport, dbuser, dbpassword)
                     else:
                         msg = _("Failed to execute 'mongo --eval' successfully. Error %s")  % (clusterinfo['errmsg'])
                         LOG.error(msg)
