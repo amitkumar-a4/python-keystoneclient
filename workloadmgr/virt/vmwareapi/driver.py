@@ -962,11 +962,11 @@ class VMwareVCDriver(VMwareESXDriver):
 
                 extentsfile = None
 
-                turbo_thick_disk_backup = settings.get_settings().get('turbo_thick_disk_backup', False)
+                turbo_thick_disk_backup = settings.get_settings().get('turbo_thick_disk_backup', 'False')
                 if (hasattr(dev.backing, 'thinProvisioned') and\
                       dev.backing.thinProvisioned == False) and\
                     parent_changeId is '*' and\
-                    turbo_thick_disk_backup:
+                    turbo_thick_disk_backup == 'True':
                     extentsfile, partitions, totalblocks,\
                            listfile, mntlist = thickcopyextents(self._session._host_ip,
                                                           self._session._host_username,
