@@ -294,7 +294,7 @@ def getfdisk_output(mountpath=None):
 def get_blockgroups(mountpath):
 
     # Read the superblock and read the blocksize
-    cmdspec = ["/home/stack/e2fsprogs-1.42.12/debugfs/debugfs",
+    cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
                "-R", "stats -h", mountpath]
     superblock, error = execute_debugfs(cmdspec)
 
@@ -304,7 +304,7 @@ def get_blockgroups(mountpath):
         if "Block size:" in line:
              blocksize = int(line.split(":")[1].strip())
 
-    cmdspec = ["/home/stack/e2fsprogs-1.42.12/debugfs/debugfs",
+    cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
                "-R", "stats", mountpath]
 
     blockgroups, error = execute_debugfs(cmdspec)
@@ -315,7 +315,7 @@ def get_usedblockslist(mountpath, usedblockfile, part, blocksize):
 
     totalblockscopied = 0
     try:
-        cmdspec = ["/home/stack/e2fsprogs-1.42.12/debugfs/debugfs",
+        cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
                    "-R", "stats -d", mountpath]
         usedblocks, error = execute_debugfs(cmdspec)
     except:
@@ -501,6 +501,7 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                                str(int(part['start'])*512), "--sizelimit",
                                part['blocks'] + "KiB"],
                                stderr=subprocess.STDOUT)
+                blocksize = partblockgroups[part['start']][0]
                 totalblocks += get_usedblockslist(freedev, extentsfile,
                                                   part, blocksize)
             finally:
@@ -546,7 +547,7 @@ def thickcopy(hostip, username, password, vmspec, dev, localvmdkpath):
                 subprocess.check_output(["losetup", freedev, mountpath, "-o",
                                str(int(part['start'])*512), "--sizelimit", part['blocks'] + "KiB"],
                                stderr=subprocess.STDOUT)
-                cmdspec = ["/home/stack/e2fsprogs-1.42.12/debugfs/debugfs",
+                cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
                            "-R", "ls", freedev]
                 ls, error = execute_debugfs(cmdspec)
                 LOG.info(_(ls))
