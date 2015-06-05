@@ -783,6 +783,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             with open('/opt/stack/workloadmgr/workloadmgr/templates/vms.html', 'r') as content_file:
                  vms_html = content_file.read()
+            
+            if object.display_description is None:
+               object.display_description = str()
 
 
             for inst in snapshotvms:
