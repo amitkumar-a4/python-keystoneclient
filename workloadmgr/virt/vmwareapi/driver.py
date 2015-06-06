@@ -966,7 +966,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 if (hasattr(dev.backing, 'thinProvisioned') and\
                       dev.backing.thinProvisioned == False) and\
                     parent_changeId is '*' and\
-                    turbo_thick_disk_backup == 'True':
+                    turbo_thick_disk_backup.lower() == 'true':
                     extentsfile, partitions, totalblocks,\
                            listfile, mntlist = thickcopyextents(self._session._host_ip,
                                                           self._session._host_username,
