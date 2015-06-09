@@ -286,7 +286,10 @@ def getfdisk_output(mountpath=None):
             index += 1
             partition["system"] = " ".join(fields[index:])
             index += 1
-            partitions.append(partition)
+            if len(re.findall(r'\d+', partition['start'])) and\
+               len(re.findall(r'\d+', partition['end'])) and\
+               len(re.findall(r'\d+', partition['blocks'])):
+                partitions.append(partition)
 
         if "Device" in line and "Boot" in line:
             parse = True
@@ -415,11 +418,13 @@ def get_usedblockslist(mountpath, usedblockfile, part, blocksize):
     except:
         ## we did not recognize a valid partition on the disk. Copy
         ## entire partition
+        LOG.info(_( "No valid ext fs found on partitin starting at:"
+                    + str(part['start']) ))
         startblk = 0
         length = (int(part['blocks']) * 1024)/blocksize
         usedblocks = "startblk " + str(startblk) + " length " + str(length)
 
-    partoff = int(part['start']) * 512/blocksize
+    partoff = int(part['start']) * 512
     with open(usedblockfile, 'a') as f:
         for line in usedblocks.split("\n"):
             if not "startblk" in line or not "length" in line:
@@ -429,7 +434,7 @@ def get_usedblockslist(mountpath, usedblockfile, part, blocksize):
             length = int(re.findall(r'\d+', line)[1])
             totalblockscopied += length
 
-            extoffsec = (partoff + extoff) * blocksize
+            extoffsec = partoff + extoff * blocksize
             lengthsec = length * blocksize
 
             f.write(str(extoffsec) + "," + str(lengthsec) + "\n")
@@ -444,9 +449,10 @@ def copy_free_bitmap(hostip, username, password, vmspec, dev,
                      blocksize, blockgroups):
     # Convert the start offset from 512 size into blocksize
     if int(startsector) * 512 % blocksize:
-        raise Exception("The partition start is not aligned to file system block size")
+        LOG.info(_("The partition start %s is not aligned to \
+                   file system block size") % startsector)
 
-    partoff = int(startsector) * 512/blocksize
+    partoff = int(startsector) * 512
     # copy bitmap blocks here
     index = 0;
     fileh, filename = mkstemp()
@@ -463,13 +469,13 @@ def copy_free_bitmap(hostip, username, password, vmspec, dev,
                     LOG.info(_( "copying bitmapblock: " + str(bitmapblock) ))
                     LOG.info(_( "copying inodeblock: " + str(bitmapblock)))
  
-                bitmapsec = (partoff + bitmapblock) * blocksize
-                inodesec = (partoff + inodeblock) * blocksize
+                bitmapsec = partoff + bitmapblock * blocksize
+                inodesec = partoff + inodeblock * blocksize
                 f.write(str(bitmapsec) + "," + str(blocksize) + "\n")
                 f.write(str(inodesec) + "," + str(blocksize) + "\n")
 
-    populate_extents(hostip, username, password, vmspec, dev['backing']['fileName'],
-                     mountpath, filename)
+    populate_extents(hostip, username, password, vmspec,
+                     dev['backing']['fileName'], mountpath, filename)
 
 ##
 # copy_used_blocks():
@@ -480,7 +486,6 @@ def copy_used_blocks(hostip, username, password, vmspec, dev,
 
      populate_extents(hostip, username, password, vmspec, dev['backing']['fileName'],
                      mountpath, usedblocksfile)
-
 
 def get_partitions(mountpath=None):
     partitions = getfdisk_output(mountpath)
@@ -594,8 +599,11 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
             except Exception as ex:
                 LOG.info(_(part['start'] + " has unrecognized file system"))
             finally:
-                subprocess.check_output(["losetup", "-d", freedev],
-                             stderr=subprocess.STDOUT)
+                try:
+                    subprocess.check_output(["losetup", "-d", freedev],
+                              stderr=subprocess.STDOUT)
+                except:
+                    pass
     finally:
         umount_local_vmdk(process)
 

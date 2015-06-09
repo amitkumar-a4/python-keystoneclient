@@ -1856,6 +1856,7 @@ DoDownloadExtents(void)
     string line;
     ifstream myfile(appGlobals.extentfile);
     size_t pos = 0;
+    size_t incr64mb = 1;
     std::string token;
     unsigned long num;
 
@@ -1891,8 +1892,9 @@ DoDownloadExtents(void)
                 startSector += nsec;
                 numSectors -= nsec;
                 totalBytesTransferred += nsec * VIXDISKLIB_SECTOR_SIZE;
-                if (totalBytesTransferred % (64 * 1024 * 1024) == 0)
+                if (totalBytesTransferred > (incr64mb * 64 * 1024 * 1024))
                 {
+                    incr64mb ++;
                     cout << "" << totalBytesTransferred << " Done" << endl;
                 }
             }
