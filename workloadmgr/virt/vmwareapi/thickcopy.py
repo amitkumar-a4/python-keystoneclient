@@ -235,13 +235,20 @@ def populate_extent(hostip, username, password, vmspec, remotepath,
         raise
 
 def populate_bootrecord(hostip, username, password, vmspec, remotepath,
-                        mountpath):
-     return populate_extent(hostip, username, password, vmspec, remotepath,
-                           mountpath, 0, 400)
+                        mountpath, diskCapacity):
+     diskCapacity = long(diskCapacity) - 400 * 512
+     populate_extent(hostip, username, password, vmspec, remotepath,
+                     mountpath, 0, 400)
+     # GPT disks has second boot record at the end of the disk
+     populate_extent(hostip, username, password, vmspec, remotepath,
+                     mountpath, diskCapacity/512, 400)
+ 
+     return
 
 ##
 # getfdisk_output():
 # if the underlying disk is fdisk, read the partition table from the mounted disk
+#
 ##
 def getfdisk_output(mountpath=None):
     partitions = []
@@ -291,6 +298,99 @@ def getfdisk_output(mountpath=None):
                 partitions.append(partition)
 
         if "Device" in line and "Boot" in line:
+            parse = True
+    return partitions
+
+##
+# getgptdisk_output():
+#    if the underlying disk is gptdisk, read the partition table from
+# the mounted disk
+#
+# Fdisk shows gpt partition as follows:
+# stack@openstack01:~/gptsupport$ fdisk -l 1t.img 
+# 
+# WARNING: GPT (GUID Partition Table) detected on '1t.img'! The util fdisk doesn't support GPT. Use GNU Parted.
+# 
+# 
+# Disk 1t.img: 1099.5 GB, 1099511627776 bytes
+# 256 heads, 63 sectors/track, 133152 cylinders, total 2147483648 sectors
+# Units = sectors of 1 * 512 = 512 bytes
+# Sector size (logical/physical): 512 bytes / 512 bytes
+# I/O size (minimum/optimal): 512 bytes / 512 bytes
+# Disk identifier: 0x00000000
+# 
+# Device Boot      Start         End      Blocks   Id  System
+# 1t.img1               1  2147483647  1073741823+  ee  GPT
+#
+#
+# A typical partition to support would be:
+#
+# stack@openstack01:~/gptsupport$ sgdisk -p 1t.img 
+# Disk 1t.img: 2147483648 sectors, 1024.0 GiB
+# Logical sector size: 512 bytes
+# Disk identifier (GUID): 006BE6CD-B6F1-4DBE-9CD5-8207D66A7BEE
+# Partition table holds up to 128 entries
+# First usable sector is 34, last usable sector is 2147483614
+# Partitions will be aligned on 2048-sector boundaries
+# Total free space is 900013290 sectors (429.2 GiB)
+# 
+# Number  Start (sector)    End (sector)  Size       Code  Name
+#   1            2048       147483614   70.3 GiB    8300  First
+#   2       147484672       157483614   4.8 GiB     8300  
+#   3       157485056       247483614   42.9 GiB    8300  Second
+#   4       247484416       347483614   47.7 GiB    8300  Third
+#   5       347484160       447483614   47.7 GiB    8300  Forth
+#   6       447483904       547483614   47.7 GiB    8300  Fifth
+#   7       547483648       647483614   47.7 GiB    8300  Sixth
+#   8       647485440       747483614   47.7 GiB    8300  Seventh
+#   9       747485184       847483614   47.7 GiB    8300  Eighth
+#  10       847484928       947483614   47.7 GiB    8300  
+#  11       947484672      1047483614   47.7 GiB    8300  Ninth
+#  12      1047484416      1147483614   47.7 GiB    8300  Tenth
+#  13      1147484160      1247483614   47.7 GiB    8300  Eleventh
+# 
+##
+def getgptdisk_output(mountpath=None):
+    partitions = []
+    cmdspec = ["sudo", "sgdisk", "-p",]
+    if mountpath:
+        cmdspec.append(str(mountpath))
+
+    LOG.info(_( " ".join(cmdspec) ))
+    process = subprocess.Popen(cmdspec,
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               bufsize= -1,
+                               close_fds=True,
+                               shell=False)
+                
+    stdout_value, stderr_value = process.communicate()
+    parse = False
+    for line in stdout_value.split("\n"):
+        if parse:
+            partition = {}
+            fields = line.split()
+            if (len(fields) == 0):
+                continue
+            index = 0;
+            partition["Number"] = fields[index]
+            index += 1
+            partition["start"] = fields[index]
+            index += 1
+            partition["end"] = fields[index]
+            index += 1
+            partition["blocks"] = str((int(partition['end']) - \
+                                   int(partition['start']) + 1)/2)
+            index += 2
+            partition["id"] = fields[index]
+            index += 1
+            partition["system"] = " ".join(fields[index:])
+            index += 1
+            partitions.append(partition)
+
+        if "Number" in line and "Start" in line and "End" in line and \
+            "Size" in line and "Code" in line and "Name" in line:
             parse = True
     return partitions
 
@@ -393,6 +493,14 @@ def copy_used_blocks(hostip, username, password, vmspec, dev,
      populate_extents(hostip, username, password, vmspec, dev['backing']['fileName'],
                      mountpath, usedblocksfile)
 
+def get_partitions(mountpath=None):
+    partitions = getfdisk_output(mountpath)
+    if len(partitions) == 1 and partitions[0]['id'] == 'ee':
+        # We found a gpt partition
+        partitions = getgptdisk_output(mountpath)
+
+    return partitions
+
 ##
 # Description:
 #    Start with regular partitioned disk now.
@@ -412,7 +520,8 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
    
     # Read the partition table from the file
     populate_bootrecord(hostip, username, password, vmspec,
-                        dev['backing']['fileName'], localvmdkpath)
+                        dev['backing']['fileName'], localvmdkpath,
+                        dev['capacityInBytes'])
 
     fileh, listfile = mkstemp()
     close(fileh)
@@ -425,16 +534,53 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
     process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
     try:
         for key, value in mountpaths.iteritems():
-            partitions = getfdisk_output(value[0].split(";")[0].strip())
+            partitions = get_partitions(value[0].split(";")[0].strip())
     finally:
         umount_local_vmdk(process)
+
+    # If there is an extended partition, make sure the extended partition
+    # logical partition table is populated
+    for part in partitions:
+        if part['id'] == '5':
+            extended_part = part
+            populate_extent(hostip, username, password, vmspec,
+                            dev['backing']['fileName'], localvmdkpath,
+                            str(extended_part['start']), 2048)
+            process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
+            try:
+                for key, value in mountpaths.iteritems():
+                    partitions = get_partitions(value[0].split(";")[0].strip())
+                    break
+            finally:
+                umount_local_vmdk(process)
+
+            oldpartitiontable = []
+            while len(oldpartitiontable) < len(partitions):
+                oldpartitiontable = partitions
+                for part in oldpartitiontable:
+                    if int(part['start']) > int(extended_part['start']) and \
+                       int(part['end']) + 2048 < int(extended_part['end']):
+                        populate_extent(hostip, username, password, vmspec,
+                                        dev['backing']['fileName'], localvmdkpath,
+                                        str(int(part['end']) + 1), 2048)
+                process, mountpaths = mount_local_vmdk(listfile,
+                                                       mntlist, diskonly=True)
+                try:
+                    for key, value in mountpaths.iteritems():
+                        partitions = get_partitions(
+                                           value[0].split(";")[0].strip())
+                        break
+                finally:
+                    umount_local_vmdk(process)
+            break
 
     # First copy super blocks of each partition
     #
     for part in partitions:
-        populate_extent(hostip, username, password, vmspec,
-                        dev['backing']['fileName'],
-                        localvmdkpath, str(part['start']), 400)
+        if part['id'] != 'ee' and part['id'] != '5':
+            populate_extent(hostip, username, password, vmspec,
+                            dev['backing']['fileName'],
+                            localvmdkpath, str(part['start']), 400)
 
 
     # If partition has ext2 or its variant of file system, read the
@@ -446,6 +592,8 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
         for key, value in mountpaths.iteritems():
             mountpath = value[0].split(";")[0].strip()
         for part in partitions:
+            if part['id'] == 'ee' or part['id'] == '5':
+                continue
             try:
                 freedev = subprocess.check_output(["losetup", "-f"],
                                             stderr=subprocess.STDOUT)
@@ -488,6 +636,9 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
     close(fileh)
     totalblocks = 0
     for part in partitions:
+
+        if part['id'] == 'ee' or part['id'] == '5':
+            continue
         # for each partition on the disk copy only allocated blocks
         # from remote disk
 
