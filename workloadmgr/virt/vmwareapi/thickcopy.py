@@ -235,9 +235,15 @@ def populate_extent(hostip, username, password, vmspec, remotepath,
         raise
 
 def populate_bootrecord(hostip, username, password, vmspec, remotepath,
-                        mountpath):
-     return populate_extent(hostip, username, password, vmspec, remotepath,
-                           mountpath, 0, 400)
+                        mountpath, diskCapacity):
+     diskCapacity = long(diskCapacity) - 400 * 512
+     populate_extent(hostip, username, password, vmspec, remotepath,
+                     mountpath, 0, 400)
+     # GPT disks has second boot record at the end of the disk
+     populate_extent(hostip, username, password, vmspec, remotepath,
+                     mountpath, diskCapacity/512, 400)
+ 
+     return
 
 ##
 # getfdisk_output():
@@ -514,7 +520,8 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
    
     # Read the partition table from the file
     populate_bootrecord(hostip, username, password, vmspec,
-                        dev['backing']['fileName'], localvmdkpath)
+                        dev['backing']['fileName'], localvmdkpath,
+                        dev['capacityInBytes'])
 
     fileh, listfile = mkstemp()
     close(fileh)
