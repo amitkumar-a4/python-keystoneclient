@@ -481,7 +481,8 @@ def get_usedblockslist_from_lv(mountpath, usedblockfile, lv, pvinfo,
                                    extoff * blocksize, length * blocksize)
 
             for extoff in extoffsec:
-                f.write(str(extoff['offset']) + "," + str(extoff['length']) + "\n")
+                eoff = int(extoff['offset']) + int(extoff['pv']['PV_DISK_OFFSET'])
+                f.write(str(eoff) + "," + str(extoff['length']) + "\n")
 
     return totalblockscopied
     
@@ -522,6 +523,9 @@ def copy_free_bitmap_from_part(hostip, username, password, vmspec, dev,
     populate_extents(hostip, username, password, vmspec,
                      dev['backing']['fileName'], mountpath, filename)
 
+    if os.path.isfile(filename):
+        os.remove(filename)
+
 ##
 # copy_free_bitmap_from_lv():
 #     Creates an empty bitmap vmdk file with the name specified by localvmdkpath
@@ -550,12 +554,17 @@ def copy_free_bitmap_from_lv(hostip, username, password, vmspec, dev,
                 inodesec = getlogicaladdrtopvaddr(lvinfo, pvlist,
                                    inodeblock * blocksize, blocksize)
                 for bsec in bitmapsec:
-                    f.write(str(bsec['offset']) + "," + str(blocksize) + "\n")
+                    boff = int(bsec['offset']) + int(bsec['pv']['PV_DISK_OFFSET'])
+                    f.write(str(boff) + "," + str(blocksize) + "\n")
                 for isec in bitmapsec:
-                    f.write(str(isec['offset']) + "," + str(blocksize) + "\n")
+                    ioff = int(isec['offset']) + int(isec['pv']['PV_DISK_OFFSET'])
+                    f.write(str(ioff) + "," + str(blocksize) + "\n")
 
     populate_extents(hostip, username, password, vmspec,
                      dev['backing']['fileName'], mountpath, filename)
+
+    if os.path.isfile(filename):
+        os.remove(filename)
 
 ##
 # copy_used_blocks():
@@ -647,7 +656,7 @@ def getvgs():
     subprocess.check_output(["vgscan"], stderr=subprocess.STDOUT)
 
     # Activate volume groups on the pv
-    subprocess.check_output(["vgchange", "-a", "y"], stderr=subprocess.STDOUT)
+    subprocess.check_output(["vgchange", "-ay"], stderr=subprocess.STDOUT)
 
     vgcmd = ["vgs", "--noheadings", "--nameprefixes",]
     vgoutput = subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
@@ -666,9 +675,9 @@ def getvgs():
 
     return vglist
 
-def deactivatevgs():
-    vgcmd = ["vgchange", "-a", "n"]
-    subprocess.check_output(["vgchange", "-a", "y"], stderr=subprocess.STDOUT)
+def deactivatevgs(vgname):
+    vgcmd = ["vgchange", "-an", vgname]
+    subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
 
 def getlvs(vgname):
     subprocess.check_output(["lvscan"], stderr=subprocess.STDOUT)
@@ -840,6 +849,9 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                         totalblocks += performlvthickcopy(hostip, username,
                                            password, vmspec, dev, mountpath,
                                            lv, [pvinfo], extentsfile)
+                    for vg in vgs:
+                        deactivatevgs(vg['LVM2_VG_NAME'])
+
             return extentsfile, partitions, totalblocks, listfile, mntlist
         finally:
             umount_local_vmdk(process)
@@ -975,6 +987,12 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                 totalblocks += performlvthickcopy(hostip, username,
                                            password, vmspec, dev, mountpath,
                                            lv, pvinfos, extentsfile)
+            for vg in vgs:
+                deactivatevgs(vg['LVM2_VG_NAME'])
+
+            for dev in pvdevices:
+                subprocess.check_output(["losetup", "-d", dev],
+                                  stderr=subprocess.STDOUT)
             return extentsfile, partitions, totalblocks, listfile, mntlist
     finally:
         umount_local_vmdk(process)
