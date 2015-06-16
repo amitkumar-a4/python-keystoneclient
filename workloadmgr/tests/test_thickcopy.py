@@ -724,7 +724,10 @@ def test_mbr_3_primary_1_logical_partitions():
 
             partitions = workloadmgr.virt.vmwareapi.thickcopy.get_partitions(vmdkfile)
             for part in partitions:
+                if part['id'] == '5' or part['id'] == 'f':
+                    continue
                 try:
+
                     freedev = subprocess.check_output(["losetup", "-f"],
                                                         stderr=subprocess.STDOUT)
                     freedev = freedev.strip("\n")
