@@ -46,25 +46,25 @@
     <div class="container">
         <!-- Example row of columns -->
         <div class="row">
-            <div>
-                <a href="/tvault/tvaultlogs" >Basic</a>
-            	<br><br>                       
-                <a href="/tvault/tvaultlogs_all" >Complete</a>
-            	<br>
-            	<br>                
+            <div >
+                <a href="/tvault/tvaultlogs" style="margin-left:20px; margin-right:auto; padding:20px" >Basic</a>
             </div>
         </div>
+        <div class="row">
+            <div >
+                <a href="/tvault/tvaultlogs_all" style="margin-left:20px; margin-right:auto; padding:20px">Complete</a>
+            </div>
+        </div>        
     </div>
+    <div style="margin-left:20px; margin-right:auto; padding:20px">
 	<div class="panel-group" id="accordion">
 		<div class="panel panel-default" id="panel1">
 		    <div class="panel-heading">
 		      <h4 class="panel-title">
-		        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">
-		          A La Carte
-		        </a>
+		        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">A La Carte</a>
 		      </h4>
 		    </div>
-	 	    <div id="collapseOne" class="panel-collapse collapse">
+	 	    <div id="collapseOne" class="panel-collapse collapse in">
 		      <div class="panel-body">
 				<a href="tvault/workloadmgr/workloadmgr-api.log">workloadmgr-api.log</a>
 				<br><br>   

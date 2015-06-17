@@ -162,6 +162,12 @@ def workload_vms_delete(context, vm_id, workload_id):
 
 def snapshot_mark_incomplete_as_error(context, host):
     return IMPL.snapshot_mark_incomplete_as_error(context, host)
+
+def get_snapshot_children(context, snapshot_id, children = None):
+    return IMPL.get_snapshot_children(context, snapshot_id, children)
+
+def get_snapshot_parents(context, snapshot_id, parents = None):
+    return IMPL.get_snapshot_parents(context, snapshot_id, parents)
     
 def snapshot_create(context, values):
     return IMPL.snapshot_create(context, values)

@@ -74,188 +74,211 @@ function taskfunction()
 	         //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 	         return;
 	      }
-		  // Call register_service api
-		  loadXMLDoc("register_service", function() {
-	   	   	 document.getElementById("register_service").children[0].classList.add("glyphicon-refresh");
-	      	 if (xmlhttp.readyState != 4) return;
-	      	 document.getElementById("register_service").children[0].classList.remove("glyphicon-refresh");
-		     if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		     {
-		        document.getElementById("register_service").classList.add("list-group-item-success");
-		        document.getElementById("register_service").children[0].classList.add("glyphicon-ok");
-		     }
-		     else
-		     {
-			 	$("#error_message").html(xmlhttp.responseText);
-			 	$("#alert").show();		     
-		        document.getElementById("register_service").classList.add("list-group-item-danger");
-		        document.getElementById("register_service").children[0].classList.add("glyphicon-remove");
-		        document.getElementById("final_status").classList.add("list-group-item-danger");
-		        //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		        return;
-		     }
-		     // Call configure_api
-		     loadXMLDoc("configure_api",function() {
-		   	   	document.getElementById("configure_api").children[0].classList.add("glyphicon-refresh");
-		      	if (xmlhttp.readyState != 4) return;
-		      	document.getElementById("configure_api").children[0].classList.remove("glyphicon-refresh");
-		        if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		        {
-		           document.getElementById("configure_api").classList.add("list-group-item-success");
-		           document.getElementById("configure_api").children[0].classList.add("glyphicon-ok");
-		        }
-		        else
-		        {
-			 	   $("#error_message").html(xmlhttp.responseText);
-			 	   $("#alert").show();		        
-		           document.getElementById("configure_api").classList.add("list-group-item-danger");
-		           document.getElementById("configure_api").children[0].classList.add("glyphicon-remove");
-		           document.getElementById("final_status").classList.add("list-group-item-danger");
-		           //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		           return;
-		        }
-		        // Call configure_scheduler
-		        loadXMLDoc("configure_scheduler",function() {
-		   	   	   document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-refresh");
-		      	   if (xmlhttp.readyState != 4) return;
-		      	   document.getElementById("configure_scheduler").children[0].classList.remove("glyphicon-refresh");
-		           if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		           {
-		              document.getElementById("configure_scheduler").classList.add("list-group-item-success");
-		              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-ok");
-		           }
-		           else
-		           {
-			 		  $("#error_message").html(xmlhttp.responseText);
-			 		  $("#alert").show();		           
-		              document.getElementById("configure_scheduler").classList.add("list-group-item-danger");
-		              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-remove");
-		              document.getElementById("final_status").classList.add("list-group-item-danger");
-		              //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		              return;
-		           }
-		           // Call configure_service
-		           loadXMLDoc("configure_service",function() {
-		   	   	      document.getElementById("configure_service").children[0].classList.add("glyphicon-refresh");
-		      	      if (xmlhttp.readyState != 4) return;
-		      	      document.getElementById("configure_service").children[0].classList.remove("glyphicon-refresh");
-		              if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		              {
-		                 document.getElementById("configure_service").classList.add("list-group-item-success");
-		                 document.getElementById("configure_service").children[0].classList.add("glyphicon-ok");
-		              }
-		              else
-		              {
-						 $("#error_message").html(xmlhttp.responseText);
-						 $("#alert").show();		              
-		                 document.getElementById("configure_service").classList.add("list-group-item-danger");
-		                 document.getElementById("configure_service").children[0].classList.add("glyphicon-remove");
-		                 document.getElementById("final_status").classList.add("list-group-item-danger");
-		                 //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                 return;
-		              }
-		              // Call start_api
-		              loadXMLDoc("start_api",function() {
-		   	   	         document.getElementById("start_api").children[0].classList.add("glyphicon-refresh");
-		      	         if (xmlhttp.readyState != 4) return;
-		      	         document.getElementById("start_api").children[0].classList.remove("glyphicon-refresh");
-		                 if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		                 {
-		                    document.getElementById("start_api").classList.add("list-group-item-success");
-		                    document.getElementById("start_api").children[0].classList.add("glyphicon-ok");
-		                 }
-		                 else
-		                 {
-			 				$("#error_message").html(xmlhttp.responseText);
-			 				$("#alert").show();		                 
-		                    document.getElementById("start_api").classList.add("list-group-item-danger");
-		                    document.getElementById("start_api").children[0].classList.add("glyphicon-remove");
-		                    document.getElementById("final_status").classList.add("list-group-item-danger");
-		                    //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                    return;
-		                 }
-		                 // Call start_scheduler
-		                 loadXMLDoc("start_scheduler",function() {
-		   	   	            document.getElementById("start_scheduler").children[0].classList.add("glyphicon-refresh");
-		      	            if (xmlhttp.readyState != 4) return;
-		      	            document.getElementById("start_scheduler").children[0].classList.remove("glyphicon-refresh");
-		                    if (xmlhttp.readyState==4 && xmlhttp.status==200)
-		                    {
-		                       document.getElementById("start_scheduler").classList.add("list-group-item-success");
-		                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-ok");
-		                    }
-		                    else
-		                    {
-			 				   $("#error_message").html(xmlhttp.responseText);
-			 				   $("#alert").show();		                    
-		                       document.getElementById("start_scheduler").classList.add("list-group-item-danger");
-		                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-remove");
-		                       document.getElementById("final_status").classList.add("list-group-item-danger");
-		                       //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                       return;
-		                    }
-		                    // Call start_service
-		                    loadXMLDoc("start_service",function() {
-								document.getElementById("start_service").children[0].classList.add("glyphicon-refresh");
-								if (xmlhttp.readyState != 4) return;
-								document.getElementById("start_service").children[0].classList.remove("glyphicon-refresh");
-								if (xmlhttp.readyState==4 && xmlhttp.status==200)
-								{
-									document.getElementById("start_service").classList.add("list-group-item-success");
-									document.getElementById("start_service").children[0].classList.add("glyphicon-ok");
-								}
-								else
-								{
-									$("#error_message").html(xmlhttp.responseText);
-									$("#alert").show();		                       
-									document.getElementById("start_service").classList.add("list-group-item-danger");
-									document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
-									document.getElementById("final_status").classList.add("list-group-item-danger");
-									//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-									return;
-								}
-		                       	loadXMLDoc("register_workloadtypes",function() {
-									document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
+		  // Call authenticate with swift
+		  loadXMLDoc("authenticate_with_swift", function() {
+		   	  document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-refresh");
+		      if (xmlhttp.readyState != 4) return;
+		      document.getElementById("authenticate_with_swift").children[0].classList.remove("glyphicon-refresh");
+		      if (xmlhttp.readyState != 4) return;
+		      if (xmlhttp.readyState==4 && xmlhttp.status==200)
+		      {
+		         document.getElementById("authenticate_with_swift").classList.add("list-group-item-success");
+		         document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-ok");
+		      }
+		      else
+		      {
+				 //$("#error_message").html(xmlhttp.responseText);
+				 $("#error_message").html(xmlhttp.responseText);
+				 $("#alert").show();	      
+		         document.getElementById("authenticate_with_swift").classList.add("list-group-item-danger");
+		         document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-remove");
+		         document.getElementById("final_status").classList.add("list-group-item-danger");
+		         //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+		         return;
+		      }
+			  // Call register_service api
+			  loadXMLDoc("register_service", function() {
+		   	   	 document.getElementById("register_service").children[0].classList.add("glyphicon-refresh");
+		      	 if (xmlhttp.readyState != 4) return;
+		      	 document.getElementById("register_service").children[0].classList.remove("glyphicon-refresh");
+			     if (xmlhttp.readyState==4 && xmlhttp.status==200)
+			     {
+			        document.getElementById("register_service").classList.add("list-group-item-success");
+			        document.getElementById("register_service").children[0].classList.add("glyphicon-ok");
+			     }
+			     else
+			     {
+				 	$("#error_message").html(xmlhttp.responseText);
+				 	$("#alert").show();		     
+			        document.getElementById("register_service").classList.add("list-group-item-danger");
+			        document.getElementById("register_service").children[0].classList.add("glyphicon-remove");
+			        document.getElementById("final_status").classList.add("list-group-item-danger");
+			        //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+			        return;
+			     }
+			     // Call configure_api
+			     loadXMLDoc("configure_api",function() {
+			   	   	document.getElementById("configure_api").children[0].classList.add("glyphicon-refresh");
+			      	if (xmlhttp.readyState != 4) return;
+			      	document.getElementById("configure_api").children[0].classList.remove("glyphicon-refresh");
+			        if (xmlhttp.readyState==4 && xmlhttp.status==200)
+			        {
+			           document.getElementById("configure_api").classList.add("list-group-item-success");
+			           document.getElementById("configure_api").children[0].classList.add("glyphicon-ok");
+			        }
+			        else
+			        {
+				 	   $("#error_message").html(xmlhttp.responseText);
+				 	   $("#alert").show();		        
+			           document.getElementById("configure_api").classList.add("list-group-item-danger");
+			           document.getElementById("configure_api").children[0].classList.add("glyphicon-remove");
+			           document.getElementById("final_status").classList.add("list-group-item-danger");
+			           //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+			           return;
+			        }
+			        // Call configure_scheduler
+			        loadXMLDoc("configure_scheduler",function() {
+			   	   	   document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-refresh");
+			      	   if (xmlhttp.readyState != 4) return;
+			      	   document.getElementById("configure_scheduler").children[0].classList.remove("glyphicon-refresh");
+			           if (xmlhttp.readyState==4 && xmlhttp.status==200)
+			           {
+			              document.getElementById("configure_scheduler").classList.add("list-group-item-success");
+			              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-ok");
+			           }
+			           else
+			           {
+				 		  $("#error_message").html(xmlhttp.responseText);
+				 		  $("#alert").show();		           
+			              document.getElementById("configure_scheduler").classList.add("list-group-item-danger");
+			              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-remove");
+			              document.getElementById("final_status").classList.add("list-group-item-danger");
+			              //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+			              return;
+			           }
+			           // Call configure_service
+			           loadXMLDoc("configure_service",function() {
+			   	   	      document.getElementById("configure_service").children[0].classList.add("glyphicon-refresh");
+			      	      if (xmlhttp.readyState != 4) return;
+			      	      document.getElementById("configure_service").children[0].classList.remove("glyphicon-refresh");
+			              if (xmlhttp.readyState==4 && xmlhttp.status==200)
+			              {
+			                 document.getElementById("configure_service").classList.add("list-group-item-success");
+			                 document.getElementById("configure_service").children[0].classList.add("glyphicon-ok");
+			              }
+			              else
+			              {
+							 $("#error_message").html(xmlhttp.responseText);
+							 $("#alert").show();		              
+			                 document.getElementById("configure_service").classList.add("list-group-item-danger");
+			                 document.getElementById("configure_service").children[0].classList.add("glyphicon-remove");
+			                 document.getElementById("final_status").classList.add("list-group-item-danger");
+			                 //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+			                 return;
+			              }
+			              // Call start_api
+			              loadXMLDoc("start_api",function() {
+			   	   	         document.getElementById("start_api").children[0].classList.add("glyphicon-refresh");
+			      	         if (xmlhttp.readyState != 4) return;
+			      	         document.getElementById("start_api").children[0].classList.remove("glyphicon-refresh");
+			                 if (xmlhttp.readyState==4 && xmlhttp.status==200)
+			                 {
+			                    document.getElementById("start_api").classList.add("list-group-item-success");
+			                    document.getElementById("start_api").children[0].classList.add("glyphicon-ok");
+			                 }
+			                 else
+			                 {
+				 				$("#error_message").html(xmlhttp.responseText);
+				 				$("#alert").show();		                 
+			                    document.getElementById("start_api").classList.add("list-group-item-danger");
+			                    document.getElementById("start_api").children[0].classList.add("glyphicon-remove");
+			                    document.getElementById("final_status").classList.add("list-group-item-danger");
+			                    //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+			                    return;
+			                 }
+			                 // Call start_scheduler
+			                 loadXMLDoc("start_scheduler",function() {
+			   	   	            document.getElementById("start_scheduler").children[0].classList.add("glyphicon-refresh");
+			      	            if (xmlhttp.readyState != 4) return;
+			      	            document.getElementById("start_scheduler").children[0].classList.remove("glyphicon-refresh");
+			                    if (xmlhttp.readyState==4 && xmlhttp.status==200)
+			                    {
+			                       document.getElementById("start_scheduler").classList.add("list-group-item-success");
+			                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-ok");
+			                    }
+			                    else
+			                    {
+				 				   $("#error_message").html(xmlhttp.responseText);
+				 				   $("#alert").show();		                    
+			                       document.getElementById("start_scheduler").classList.add("list-group-item-danger");
+			                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-remove");
+			                       document.getElementById("final_status").classList.add("list-group-item-danger");
+			                       //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+			                       return;
+			                    }
+			                    // Call start_service
+			                    loadXMLDoc("start_service",function() {
+									document.getElementById("start_service").children[0].classList.add("glyphicon-refresh");
 									if (xmlhttp.readyState != 4) return;
-									document.getElementById("register_workloadtypes").children[0].classList.remove("glyphicon-refresh");
+									document.getElementById("start_service").children[0].classList.remove("glyphicon-refresh");
 									if (xmlhttp.readyState==4 && xmlhttp.status==200)
 									{
-										document.getElementById("register_workloadtypes").classList.add("list-group-item-success");
-										document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-ok");
+										document.getElementById("start_service").classList.add("list-group-item-success");
+										document.getElementById("start_service").children[0].classList.add("glyphicon-ok");
 									}
 									else
 									{
 										$("#error_message").html(xmlhttp.responseText);
-										$("#alert").show();		                          
-										document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
-										document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
+										$("#alert").show();		                       
+										document.getElementById("start_service").classList.add("list-group-item-danger");
+										document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
 										document.getElementById("final_status").classList.add("list-group-item-danger");
 										//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 										return;
 									}
-			                       	loadXMLDoc("discover_vcenter",function() {
-										document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-refresh");
+			                       	loadXMLDoc("register_workloadtypes",function() {
+										document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
 										if (xmlhttp.readyState != 4) return;
-										document.getElementById("discover_vcenter").children[0].classList.remove("glyphicon-refresh");
+										document.getElementById("register_workloadtypes").children[0].classList.remove("glyphicon-refresh");
 										if (xmlhttp.readyState==4 && xmlhttp.status==200)
 										{
-											document.getElementById("discover_vcenter").classList.add("list-group-item-success");
-											document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-ok");
+											document.getElementById("register_workloadtypes").classList.add("list-group-item-success");
+											document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-ok");
 										}
 										else
 										{
 											$("#error_message").html(xmlhttp.responseText);
 											$("#alert").show();		                          
-											document.getElementById("discover_vcenter").classList.add("list-group-item-danger");
-											document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-remove");
+											document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
+											document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
 											document.getElementById("final_status").classList.add("list-group-item-danger");
 											//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 											return;
 										}
-				                        document.getElementById("final_status").classList.add("list-group-item-success");
-				                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-				                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
-				                   });
+				                       	loadXMLDoc("discover_vcenter",function() {
+											document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-refresh");
+											if (xmlhttp.readyState != 4) return;
+											document.getElementById("discover_vcenter").children[0].classList.remove("glyphicon-refresh");
+											if (xmlhttp.readyState==4 && xmlhttp.status==200)
+											{
+												document.getElementById("discover_vcenter").classList.add("list-group-item-success");
+												document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-ok");
+											}
+											else
+											{
+												$("#error_message").html(xmlhttp.responseText);
+												$("#alert").show();		                          
+												document.getElementById("discover_vcenter").classList.add("list-group-item-danger");
+												document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-remove");
+												document.getElementById("final_status").classList.add("list-group-item-danger");
+												//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+												return;
+											}
+					                        document.getElementById("final_status").classList.add("list-group-item-success");
+					                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+					                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
+					                   });
+					           	   });
 		                       });
 		                    });
 		                 });
@@ -303,7 +326,9 @@ $( document ).ready(function() {
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>
                 Configuring trilioVault host</li>  
     <li id="authenticate_with_vcenter" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with vCenter</li>                 
+                Authenticating with vCenter</li>   
+    <li id="authenticate_with_swift" class="list-group-item"><span class="glyphicon"></span>
+                Authenticating with Swift Object Store</li>                                
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
                 Registering trilioVault service</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>

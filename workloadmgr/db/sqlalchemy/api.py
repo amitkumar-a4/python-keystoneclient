@@ -577,7 +577,7 @@ def workload_get_all_by_project(context, project_id):
         workloads = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsNotFound()
+        raise exception.WorkloadsNotFound() 
     
     return workloads
     
@@ -589,12 +589,12 @@ def _workload_get(context, id, session):
                        .filter_by(id=id)\
 
         #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query.first()
+        workload = query.first()
 
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadNotFound(workload_id=id)
 
-    return workloads
+    return workload
 
 @require_context
 def workload_get(context, id):
@@ -970,7 +970,6 @@ def snapshot_type_time_size_update(context, snapshot_id):
     snapshot_type_incremental = False
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
     time_taken = 0
-    vault_service = vault.get_vault_service(context)
     snapshot_size = 0
     snapshot_restore_size = 0
     for snapshot_vm_resource in snapshot_vm_resources:
@@ -989,10 +988,10 @@ def snapshot_type_time_size_update(context, snapshot_id):
             snapshot_vm_resource_restore_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 if vm_disk_resource_snap.vault_service_url:
-                    vm_disk_resource_snap_size = vault_service.get_size(vm_disk_resource_snap.vault_service_url)
+                    vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_service_url)
                     disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-                    vm_disk_resource_snap_restore_size = vault_service.get_restore_size(vm_disk_resource_snap.vault_service_url,
-                                                                                        disk_format, disk_type)
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_service_url,
+                                                                                disk_format, disk_type)
                     vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
                                                                                      'restore_size' : vm_disk_resource_snap_restore_size}) 
                     snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
@@ -1031,6 +1030,50 @@ def snapshot_delete(context, snapshot_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+
+@require_context            
+def get_snapshot_children(context, snapshot_id, children):
+    grand_children = set()
+    snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+        vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+        for vm_disk_resource_snap in vm_disk_resource_snaps:
+            if vm_disk_resource_snap.vm_disk_resource_snap_child_id:
+                try:
+                    vm_disk_resource_snap_child = vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
+                    snapshot_vm_resource_child = snapshot_vm_resource_get(context,vm_disk_resource_snap_child.snapshot_vm_resource_id)
+                    grand_children.add(snapshot_vm_resource_child.snapshot_id)
+                    grand_children = get_snapshot_children(context, snapshot_vm_resource_child.snapshot_id, grand_children)
+                except Exception as ex:
+                    LOG.exception(ex)
+    if children:
+        return grand_children.union(children)
+    else:
+        return grand_children
+
+@require_context            
+def get_snapshot_parents(context, snapshot_id, parents):
+    grand_parents = set()
+    snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+        vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+        for vm_disk_resource_snap in vm_disk_resource_snaps:
+            if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
+                try:
+                    vm_disk_resource_snap_parent = vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                    snapshot_vm_resource_parent = snapshot_vm_resource_get(context, vm_disk_resource_snap_parent.snapshot_vm_resource_id)
+                    grand_parents.add(snapshot_vm_resource_parent.snapshot_id)
+                    grand_parents = get_snapshot_parents(context, snapshot_vm_resource_parent.snapshot_id, grand_parents)
+                except Exception as ex:
+                    LOG.exception(ex)
+    if parents:
+        return grand_parents.union(parents)
+    else:
+        return grand_parents    
 
 #### SnapshotVMs ################################################################
 """ snapshot_vms functions """
@@ -1363,7 +1406,9 @@ def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resou
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        snapshot_vm_resource = None
+        raise exception.SnapshotVMResourceWithNameNotFound(resource_name = resource_name, 
+                                                           snapshot_vm_id = vm_id, 
+                                                           snapshot_id = snapshot_id)
 
     return snapshot_vm_resource
 
@@ -1381,7 +1426,9 @@ def snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, res
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        snapshot_vm_resource = None
+        raise exception.SnapshotVMResourceWithNameNotFound(resource_pit_id = resource_pit_id, 
+                                                           snapshot_vm_id = vm_id, 
+                                                           snapshot_id = snapshot_id)
 
     return snapshot_vm_resource
 
@@ -1393,12 +1440,12 @@ def _snapshot_vm_resource_get(context, id, session):
                        .filter_by(id=id)
 
         #TODO(gbasava): filter out deleted snapshots if context disallows it
-        snapshot_vm_resources = query.first()
+        snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
         raise exception.SnapshotVMResourceNotFound(snapshot_vm_resource_id = id)
 
-    return snapshot_vm_resources
+    return snapshot_vm_resource
 
 @require_context
 def snapshot_vm_resource_get(context, id):
@@ -1538,7 +1585,7 @@ def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        vm_disk_resource_snap = None
+        raise exception.VMDiskResourceSnapTopNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
     
     return vm_disk_resource_snap
 
@@ -1553,7 +1600,7 @@ def _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session):
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        vm_disk_resource_snap = None
+        raise exception.VMDiskResourceSnapNotFound(vm_disk_resource_snap_id = vm_disk_resource_snap_id)
     
     return vm_disk_resource_snap
 

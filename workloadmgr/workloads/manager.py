@@ -56,6 +56,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr.openstack.common import timeutils
 from taskflow.exceptions import WrappedFailure
+from workloadmgr.workloads import workload_utils
 
 from workloadmgr import autolog
 from workloadmgr import settings
@@ -131,8 +132,8 @@ def synchronized(lock):
   
 
 class objectview(object):
-      def __init__(self, d):
-          self.__dict__ = d
+    def __init__(self, d):
+        self.__dict__ = d
 
     
 class WorkloadMgrManager(manager.SchedulerDependentManager):
@@ -145,7 +146,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def __init__(self, service_name=None, *args, **kwargs):
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
-       # self.scheduler.add_interval_job(self.job_def,args=['hello','there'],hours=1)
+        # self.scheduler.add_interval_job(self.job_def,args=['hello','there'],hours=1)
         self.scheduler.start()       
         self.driver = driver.load_compute_driver(None, None)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
@@ -167,8 +168,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             LOG.exception(ex)
             
-        vault_service = vault.get_vault_service(None)
-        vault_service.mount()
+        vault.mount_backup_media()
     
     @autolog.log_method(logger=Logger)    
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):
@@ -401,16 +401,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })       
             workflow.initflow()
             workflow.execute()
-            self.db.snapshot_update(context, 
-                                    snapshot_id, 
-                                    {'progress_percent': 100, 
-                                     'progress_msg': 'Snapshot of workload is complete',
-                                     'finished_at' : timeutils.utcnow(),
-                                     'status': 'available',
-                                     'metadata': snapshot_metadata})
-            self.db.snapshot_type_time_size_update(context, snapshot_id)               
 
-             
+            self.db.snapshot_type_time_size_update(context, snapshot_id)               
             # Update vms of the workload
             if  'instances' in workflow._store and workflow._store['instances']:
                 for vm in self.db.workload_vms_get(context, workload.id):
@@ -443,8 +435,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'metadata': snapshot_metadata})
 
             # Upload snapshot metadata to the vault
-            vmtasks.UploadSnapshotDBEntry(context, snapshot_id)
+            workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
+            
+            # upload the data to object store... this function will check if the object store is configured
+            vault.upload_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
 
+            self.db.snapshot_update(context, 
+                                    snapshot_id, 
+                                    {'progress_percent': 100, 
+                                     'progress_msg': 'Snapshot of workload is complete',
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': 'available',
+                                     'metadata': snapshot_metadata})
+            
         except WrappedFailure as ex:
             LOG.exception(ex)
             msg = _("Failed creating workload snapshot with following error(s):")
@@ -452,7 +455,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 for cause in ex._causes:
                     if cause._exception_str not in msg:
                         msg = msg + ' ' + cause._exception_str
-            LOG.error(msg)        
+            LOG.error(msg)  
+            
+            try:
+                # delete failed snapshot data
+                vault.snapshot_delete({'workload_id': workload.id, 'snapshot_id': snapshot.id}, staging = True)
+            except Exception as ex:
+                LOG.exception(ex)
+                  
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -465,11 +475,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
             except Exception as ex:
                 LOG.exception(ex)
-                      
+                
+                                      
         except Exception as ex:
             LOG.exception(ex)
             msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
             LOG.error(msg)
+            
+            try:
+                # delete failed snapshot data
+                vault.snapshot_delete({'workload_id': workload.id, 'snapshot_id': snapshot.id}, staging = True)
+            except Exception as ex:
+                LOG.exception(ex)   
+                            
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -481,16 +499,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
             except Exception as ex:
-                LOG.exception(ex)            
-        
+                LOG.exception(ex)  
+                
         snapshot = self.db.snapshot_get(context, snapshot_id)
-	
         if settings.get_settings().get('smtp_email_enable') == 'yes':
-	
-           self.send_email(context,snapshot,'snapshot')
-		
-        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            self.send_email(context,snapshot,'snapshot')
         
+        #unlock the workload
+        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
             
     @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
@@ -504,13 +520,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             raise wlm_exceptions.InvalidState(reason=msg)
             
         self.db.workload_delete(context, workload.id)
-        try:
-            LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
-                                                                    workload.id,
-                                                                    workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-            shutil.rmtree(vault.get_vault_service(context).get_workload_path({'workload_id': workload.id}))
-        except Exception as ex:
-            LOG.exception(ex)          
+        LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
+                                                                workload.id,
+                                                                workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
+        vault.workload_delete({'workload_id': workload.id})
+
         
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
@@ -584,6 +598,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
+            
+            vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
 
             target_platform = 'vmware'
             if hasattr(restore, 'pickle'):
@@ -703,94 +719,69 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'error'
                                     })
 
-            restore = self.db.restore_get(context, restore_id)
+        try:
+            vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})
+        except Exception as ex:
+            LOG.exception(ex)        
 
-            if settings.get_settings().get('smtp_email_enable') == 'yes':
+        restore = self.db.restore_get(context, restore_id)
+        if settings.get_settings().get('smtp_email_enable') == 'yes':
+            self.send_email(context,restore,'restore')        
 
-               self.send_email(context,restore,'restore')
-
-
-            return;
-        
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """
         Delete an existing snapshot
         """
-        def _remove_data(snapshot):
-            self.db.snapshot_update(context, snapshot.id, {'data_deleted':True})
-            try:
-                LOG.info(_('Deleting the data of snapshot %s %s %s') % (snapshot.display_name, 
-                                                                            snapshot.id,
-                                                                            snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S")))                            
-                
-                shutil.rmtree(vault.get_vault_service(context).get_snapshot_path({'workload_id': snapshot.workload_id,
-                                                                               'snapshot_id': snapshot.id}))
-            except Exception as ex:
-                LOG.exception(ex)            
-        
-        snapshot = self.db.snapshot_get(context, snapshot_id)    
-        self.db.snapshot_delete(context, snapshot.id)
-        if snapshot.status == 'error':
-            return _remove_data(snapshot)
-        try:
-            snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot.id)
-            for snapshot_vm_resource in snapshot_vm_resources:
-                if snapshot_vm_resource.resource_type != 'disk':
-                    continue
-                if snapshot_vm_resource.status != 'deleted':
-                    return
-        except wlm_exceptions.SnapshotVMResourcesNotFound as ex:
-            LOG.exception(ex)
-            return 
-                   
-        return _remove_data(snapshot)
-
+        workload_utils.snapshot_delete(context, snapshot_id)
+                    
+        #unlock the workload
+        snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+                    
+            
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
         Delete an existing restore
         """
         self.db.restore_delete(context, restore_id)		
-		
+
     @autolog.log_method(logger=Logger)
     def send_email(self,context,object,type):
         """
         Sends success email to administrator if snapshot/restore done
         else error email
         """  
-        
         try:
             try:
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
                 user = keystone.users.get(context.user_id)
                 if user.email == '':
-		   user.email = settings.get_settings().get('smtp_default_recipient')
+                    user.email = settings.get_settings().get('smtp_default_recipient')
             except:
-                   o = {'name':'admin','email':settings.get_settings().get('smtp_default_recipient')}
-                   user = objectview(o)
-                   pass
+                o = {'name':'admin','email':settings.get_settings().get('smtp_default_recipient')}
+                user = objectview(o)
+                pass
 
             if type == 'snapshot':
-               workload = self.db.workload_get(context, object.workload_id)
-               workload_type = self.db.workload_type_get(context, workload.workload_type_id)
-               snapshotvms = self.db.snapshot_vms_get(context, object.id)
+                workload = self.db.workload_get(context, object.workload_id)
+                workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+                snapshotvms = self.db.snapshot_vms_get(context, object.id)
             elif type == 'restore':
-                  snapshot = self.db.snapshot_get(context, object.snapshot_id)
-                  workload = self.db.workload_get(context, snapshot.workload_id)
-                  workload_type = self.db.workload_type_get(context, workload.workload_type_id)
-                  snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
+                snapshot = self.db.snapshot_get(context, object.snapshot_id)
+                workload = self.db.workload_get(context, snapshot.workload_id)
+                workload_type = self.db.workload_type_get(context, workload.workload_type_id)
+                snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
 
             with open('/opt/stack/workloadmgr/workloadmgr/templates/vms.html', 'r') as content_file:
-                 vms_html = content_file.read()
+                vms_html = content_file.read()
             
             if object.display_description is None:
-               object.display_description = str()
-
+                object.display_description = str()
 
             for inst in snapshotvms:
                 size_kb = inst.size / 1024
-
                 vms_html += """\
                             <tr style="height: 20px">
                             <td style="padding-left: 5px; font-size:12px; color:black; border: 1px solid #999;">
@@ -800,85 +791,77 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             """
             
             if type == 'snapshot':
-            
-               subject = 'Snapshot success'
-              
-               size_snap_kb = object.size / 1024
+                subject = workload.display_name + ' Snapshot finished successfully'
+                size_snap_kb = object.size / 1024
 
-               minutes = object.time_taken / 60
-               seconds = object.time_taken % 60
-               time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
+                minutes = object.time_taken / 60
+                seconds = object.time_taken % 60
+                time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
 
-               with open('/opt/stack/workloadmgr/workloadmgr/templates/snapshot_success.html', 'r') as content_file:
+                with open('/opt/stack/workloadmgr/workloadmgr/templates/snapshot_success.html', 'r') as content_file:
                     html = content_file.read()
+                    
+                html = html.replace('workload.display_name',workload.display_name)
+                html = html.replace('workload_type.display_name',workload_type.display_name)
+                html = html.replace('object.display_name',object.display_name)
+                html = html.replace('object.snapshot_type',object.snapshot_type)
+                html = html.replace('size_snap_kb',str(size_snap_kb))
+                html = html.replace('object.size',str(object.size))
+                html = html.replace('time_unit',str(time_unit))
+                html = html.replace('object.host',object.host)
+                html = html.replace('object.display_description',object.display_description)
+                html = html.replace('vms_html',vms_html)
+
+                
+                if object.status == 'error':
+                    subject = workload.display_name + ' Snapshot failed'                  
+                    with open('/opt/stack/workloadmgr/workloadmgr/templates/snapshot_error.html', 'r') as content_file:
+                        html = content_file.read()
                     html = html.replace('workload.display_name',workload.display_name)
                     html = html.replace('workload_type.display_name',workload_type.display_name)
                     html = html.replace('object.display_name',object.display_name)
-                    html = html.replace('object.snapshot_type',object.snapshot_type)
                     html = html.replace('size_snap_kb',str(size_snap_kb))
                     html = html.replace('object.size',str(object.size))
-                    html = html.replace('time_unit',str(time_unit))
+                    html = html.replace('object.error_msg',object.error_msg)
                     html = html.replace('object.host',object.host)
                     html = html.replace('object.display_description',object.display_description)
-                    html = html.replace('vms_html',vms_html)
-
-                
-               if object.status == 'error':
-
-                  subject = 'Failure to take snapshot'                  
-                  
-                  with open('/opt/stack/workloadmgr/workloadmgr/templates/snapshot_error.html', 'r') as content_file:
-                       html = content_file.read()
-                       html = html.replace('workload.display_name',workload.display_name)
-                       html = html.replace('workload_type.display_name',workload_type.display_name)
-                       html = html.replace('object.display_name',object.display_name)
-                       html = html.replace('size_snap_kb',str(size_snap_kb))
-                       html = html.replace('object.size',str(object.size))
-                       html = html.replace('object.error_msg',object.error_msg)
-                       html = html.replace('object.host',object.host)
-                       html = html.replace('object.display_description',object.display_description)
-                       html = html.replace('vms_html',vms_html) 
+                    html = html.replace('vms_html',vms_html) 
 
 
             elif type == 'restore':
+                subject = workload.display_name + ' Restored successfully'
 
-                 subject = 'Restore success'
+                size_snap_kb = object.size / 1024
+                minutes = object.time_taken / 60
+                seconds = object.time_taken % 60
+                time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
 
-                 size_snap_kb = object.size / 1024
-
-                 minutes = object.time_taken / 60
-                 seconds = object.time_taken % 60
-                 time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
-
-                 with open('/opt/stack/workloadmgr/workloadmgr/templates/restore_success.html', 'r') as content_file:
-                      html = content_file.read()
-                      html = html.replace('workload.display_name',workload.display_name)
-                      html = html.replace('workload_type.display_name',workload_type.display_name)
-                      html = html.replace('object.display_name',object.display_name)
-                      html = html.replace('object.restore_type',object.restore_type)
-                      html = html.replace('size_snap_kb',str(size_snap_kb))
-                      html = html.replace('object.size',str(object.size))
-                      html = html.replace('time_unit',str(time_unit))
-                      html = html.replace('object.host',object.host)
-                      html = html.replace('object.display_description',object.display_description)
-                      html = html.replace('vms_html',vms_html)
-
+                with open('/opt/stack/workloadmgr/workloadmgr/templates/restore_success.html', 'r') as content_file:
+                    html = content_file.read()
+                html = html.replace('workload.display_name',workload.display_name)
+                html = html.replace('workload_type.display_name',workload_type.display_name)
+                html = html.replace('object.display_name',object.display_name)
+                #html = html.replace('object.restore_type',object.restore_type)
+                html = html.replace('size_snap_kb',str(size_snap_kb))
+                html = html.replace('object.size',str(object.size))
+                html = html.replace('time_unit',str(time_unit))
+                html = html.replace('object.host',object.host)
+                html = html.replace('object.display_description',object.display_description)
+                html = html.replace('vms_html',vms_html)
                 
-                 if object.status == 'error':
-
-                    subject = 'Failure to do restore'
-                  
+                if object.status == 'error':
+                    subject = workload.display_name + ' Restore failed'
                     with open('/opt/stack/workloadmgr/workloadmgr/templates/restore_error.html', 'r') as content_file:
-                         html = content_file.read()
-                         html = html.replace('workload.display_name',workload.display_name)
-                         html = html.replace('workload_type.display_name',workload_type.display_name)
-                         html = html.replace('object.display_name',object.display_name)
-                         html = html.replace('size_snap_kb',str(size_snap_kb))
-                         html = html.replace('object.size',str(object.size))
-                         html = html.replace('object.error_msg',object.error_msg)
-                         html = html.replace('object.host',object.host)
-                         html = html.replace('object.display_description',object.display_description)
-                         html = html.replace('vms_html',vms_html)
+                        html = content_file.read()
+                    html = html.replace('workload.display_name',workload.display_name)
+                    html = html.replace('workload_type.display_name',workload_type.display_name)
+                    html = html.replace('object.display_name',object.display_name)
+                    html = html.replace('size_snap_kb',str(size_snap_kb))
+                    html = html.replace('object.size',str(object.size))
+                    html = html.replace('object.error_msg',object.error_msg)
+                    html = html.replace('object.host',object.host)
+                    html = html.replace('object.display_description',object.display_description)
+                    html = html.replace('vms_html',vms_html)
 
                 
             msg = MIMEMultipart('alternative')
@@ -890,10 +873,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg.attach(part2)
             s = smtplib.SMTP(settings.get_settings().get('smtp_server_name'),int(settings.get_settings().get('smtp_port')))
             if settings.get_settings().get('smtp_server_name') != 'localhost':
-               s.ehlo()
-               s.starttls()
-               s.ehlo
-               s.login(settings.get_settings().get('smtp_server_username'),settings.get_settings().get('smtp_server_password'))
+                s.ehlo()
+                s.starttls()
+                s.ehlo
+                s.login(settings.get_settings().get('smtp_server_username'),settings.get_settings().get('smtp_server_password'))
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
         

@@ -366,7 +366,36 @@ def authenticate_vcenter():
                                 userName=config_data['vcenter_username'],
                                 password=config_data['vcenter_password'])
         vim_obj.Logout(vim_obj.get_service_content().sessionManager)
-
+        
+def authenticate_swift():
+    if config_data['configuration_type'] == 'vmware':
+        if config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
+            from swiftclient.service import SwiftService, SwiftError
+            from swiftclient.exceptions import ClientException
+            _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
+                     'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': None, 'prefix': None, 'auth_version': '2.0', 
+                     'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
+                     'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
+                     'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                     'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
+                     'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
+                     'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
+                     'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
+                                    'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                                    'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                    'auth_token': None, 'project_domain_name': None}, 
+                     'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+            with SwiftService(options=_opts) as swift:
+                try:
+                    stats_parts_gen = swift.list()
+                    for stats in stats_parts_gen:
+                        if stats["success"]:
+                            pass
+                        else:
+                            raise stats["error"]                
+                except SwiftError as e:
+                    raise
+            
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
         #configure mysql server
@@ -466,7 +495,7 @@ def configure_keystone():
                         if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                             keystone.services.delete(service.id)
             #create service and endpoint
-            identity_service = keystone.services.create('keystone', 'identity', 'trilioVault Identity Service')
+            identity_service = keystone.services.create('keystone', 'identity', 'Trilio Vault Identity Service')
             public_url = 'http://' + config_data['tvault_primary_node'] + ':5000' + '/v2.0'
             admin_url = 'http://' + config_data['tvault_primary_node'] + ':35357' + '/v2.0'
             keystone.endpoints.create(config_data['region_name'], identity_service.id, public_url, admin_url, public_url)
@@ -596,11 +625,11 @@ def configure_nova():
                         if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                             keystone.services.delete(service.id)
             #create service and endpoint
-            compute_service_v2 = keystone.services.create('nova', 'compute', 'trilioVault Compute Service')
+            compute_service_v2 = keystone.services.create('nova', 'compute', 'Trilio Vault Compute Service')
             public_url = 'http://' + config_data['tvault_primary_node'] + ':8774' + '/v2/$(tenant_id)s'
             keystone.endpoints.create(config_data['region_name'], compute_service_v2.id, public_url, public_url, public_url)
             
-            compute_service_v3 = keystone.services.create('trilioVaultCS-V3', 'computev3', 'trilioVault Compute Service')
+            compute_service_v3 = keystone.services.create('trilioVaultCS-V3', 'computev3', 'Trilio Vault Compute Service')
             public_url = 'http://' + config_data['tvault_primary_node'] + ':8774' + '/v3/$(tenant_id)s'
             keystone.endpoints.create(config_data['region_name'], compute_service_v3.id, public_url, public_url, public_url)
         except Exception as exception:
@@ -715,7 +744,7 @@ def configure_neutron():
                         if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                             keystone.services.delete(service.id)
             #create service and endpoint
-            network_service = keystone.services.create('neutron', 'network', 'trilioVault Network Service')
+            network_service = keystone.services.create('neutron', 'network', 'Trilio Vault Network Service')
             public_url = 'http://' + config_data['tvault_primary_node'] + ':9696' + '/'
             keystone.endpoints.create(config_data['region_name'], network_service.id, public_url, public_url, public_url)
 
@@ -808,7 +837,7 @@ def configure_glance():
                         if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                             keystone.services.delete(service.id)
             #create service and endpoint
-            image_service = keystone.services.create('glance', 'image', 'trilioVault Image Service')
+            image_service = keystone.services.create('glance', 'image', 'Trilio Vault Image Service')
             public_url = 'http://' + config_data['tvault_primary_node'] + ':9292'
             keystone.endpoints.create(config_data['region_name'], image_service.id, public_url, public_url, public_url)
 
@@ -1007,7 +1036,7 @@ def troubleshooting_vmware():
         vcenter_username = config_data.get('vcenter_username', 'not_configured')
         vcenter_password = config_data.get('vcenter_password', 'not_configured')
         if config_status == 'not_configured':
-            raise Exception("trilioVault Appliance is not configured")
+            raise Exception("Trilio Vault Appliance is not configured")
                 
         from workloadmgr.virt.vmwareapi.driver import VMwareAPISession
         from workloadmgr.virt.vmwareapi import vim
@@ -1239,6 +1268,21 @@ def authenticate_with_vcenter():
            raise exception        
     time.sleep(1)
     return {'status':'Success'}
+
+@bottle.route('/authenticate_with_swift')
+@authorize()
+def authenticate_with_swift():
+    # Authenticate with Keystone
+    try:
+        authenticate_swift()
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           raise exception        
+    time.sleep(1)
+    return {'status':'Success'}
         
 @bottle.route('/authenticate_with_keystone')
 @authorize()
@@ -1428,7 +1472,7 @@ def register_service():
                         if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                             keystone.services.delete(service.id)
             #create service and endpoint
-            wlm_service = keystone.services.create('trilioVaultWLM', 'workloads', 'trilioVault Workload Manager Service')
+            wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
             wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
             keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
             
@@ -1568,7 +1612,14 @@ def configure_service():
         else:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = das')
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_das_device = ', 'wlm_vault_storage_das_device = ' + config_data['storage_local_device'])
-            
+       
+        if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = swift-s')
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['swift_auth_url'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_username = ', 'wlm_vault_swift_username = ' + config_data['swift_username'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_password = ', 'wlm_vault_swift_password = ' + config_data['swift_password'])            
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])            
+              
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
@@ -1831,6 +1882,12 @@ def configure_vmware():
             config_data['create_file_system'] = 'off'
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
+        
+        config_data['swift_auth_url'] = config_inputs['swift-auth-url']
+        config_data['swift_username'] = config_inputs['swift-username']
+        config_data['swift_password'] = config_inputs['swift-password']
+        config_data['swift_tenantname'] = config_inputs['swift-tenantname']
+        
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']
         if not config_data['ldap_server_url'] or  config_data['ldap_server_url'] == "ldap://localhost":
@@ -1888,6 +1945,8 @@ def configure_vmware():
         
         config_data['workloadmgr_user'] = config_data['vcenter_username']
         config_data['workloadmgr_user_password'] = config_data['vcenter_password']
+        
+        
         
         if 'import-workloads' in config_inputs:
             config_data['import_workloads'] = config_inputs['import-workloads']
