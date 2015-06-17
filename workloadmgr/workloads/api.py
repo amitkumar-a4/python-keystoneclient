@@ -369,8 +369,7 @@ class API(base.Base):
         if context.is_admin:
             workloads = self.db.workload_get_all(context)
         else:
-            workloads = self.db.workload_get_all_by_project(context,
-                                                        context.project_id)
+            workloads = self.db.workload_get_all_by_project(context, context.project_id)
 
         return workloads
     
@@ -573,10 +572,9 @@ class API(base.Base):
     def import_workloads(self, context):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         try:
-            vault_service = vault.get_vault_service(context)
             workloads = []
-            for workload_url in vault_service.get_workloads():
-                workload_values = json.loads(vault_service.get_object(workload_url['workload_url'] + '/workload_db'))
+            for workload_url in vault.get_workloads():
+                workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
                 """
                 try:
                     jobs = self._scheduler.get_jobs()
@@ -1056,11 +1054,21 @@ class API(base.Base):
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
             AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
-            workload = self.workload_get(context, snapshot['workload_id'])
-
+            
             if snapshot['status'] not in ['available', 'error']:
                 msg = _("Snapshot status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
+            
+            try:
+                workload_lock.acquire()
+                workload = self.workload_get(context, snapshot['workload_id'])
+                if workload['status'].lower() != 'available':
+                    msg = _("Workload must be in the 'available' state to delete a snapshot")
+                    raise wlm_exceptions.InvalidState(reason=msg)
+                self.db.workload_update(context, snapshot['workload_id'], {'status': 'locked'})
+            finally:
+                workload_lock.release()                    
+            
 
             restores = self.db.restore_get_all_by_project_snapshot(context, context.project_id, snapshot_id)
             for restore in restores:

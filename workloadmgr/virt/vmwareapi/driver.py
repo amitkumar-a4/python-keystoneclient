@@ -53,7 +53,7 @@ from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr import autolog
 from workloadmgr import settings
-from workloadmgr.workflows import vmtasks
+from workloadmgr.workloads import workload_utils
 
 
 LOG = logging.getLogger(__name__)
@@ -550,8 +550,9 @@ class VMwareVCDriver(VMwareESXDriver):
             cmdline.append('count=1024')
             check_output(cmdline, stderr=subprocess.STDOUT)
             with open(base_vmdk + '.des', "r") as base_descriptor_file:
-                base_descriptor =  base_descriptor_file.read() 
+                base_descriptor =  base_descriptor_file.read()
             baseCID = re.search('\nCID=(\w+)', base_descriptor).group(1)
+            os.remove(base_vmdk + '.des')
             
             cmdline = []
             cmdline.append('dd')
@@ -576,10 +577,61 @@ class VMwareVCDriver(VMwareESXDriver):
             cmdline.append('seek=512')
             cmdline.append('count=1024')
             check_output(cmdline, stderr=subprocess.STDOUT)
+            os.remove(top_vmdk + '.des')
         except subprocess.CalledProcessError as ex:
             LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
             raise       
         
+    @autolog.log_method(Logger, 'VMwareVCDriver._get_vmdk_content_id')
+    def _get_vmdk_content_id(self, vmdk):
+        try:            
+            cmdline = []
+            cmdline.append('dd')
+            cmdline.append('if=' + vmdk)
+            cmdline.append('of=' + vmdk + '.des')
+            cmdline.append('bs=1')
+            cmdline.append('skip=512')
+            cmdline.append('count=1024')
+            check_output(cmdline, stderr=subprocess.STDOUT)
+            with open(vmdk + '.des', "r") as descriptor_file:
+                descriptor =  descriptor_file.read() 
+            content_id = re.search('\nCID=(\w+)', descriptor).group(1)
+            os.remove(vmdk + '.des')
+            return content_id
+        except subprocess.CalledProcessError as ex:
+            LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+            raise    
+        
+    @autolog.log_method(Logger, 'VMwareVCDriver._set_parent_content_id')
+    def _set_parent_content_id(self, vmdk, content_id):
+        try:            
+            cmdline = []
+            cmdline.append('dd')
+            cmdline.append('if=' + vmdk)
+            cmdline.append('of=' + vmdk + '.des')
+            cmdline.append('bs=1')
+            cmdline.append('skip=512')
+            cmdline.append('count=1024')
+            check_output(cmdline, stderr=subprocess.STDOUT)
+            with open(vmdk + '.des', "r") as descriptor_file:
+                descriptor =  descriptor_file.read()
+            descriptor = re.sub(r'(parentCID=)(\w+)', "parentCID=%s"%content_id, descriptor)
+            with open(vmdk + '.des', "w") as descriptor_file:
+                descriptor_file.write("%s"%descriptor)
+            
+            cmdline = []
+            cmdline.append('dd')
+            cmdline.append('conv=notrunc,nocreat')
+            cmdline.append('if=' + vmdk + '.des')
+            cmdline.append('of=' + vmdk)
+            cmdline.append('bs=1')
+            cmdline.append('seek=512')
+            cmdline.append('count=1024')
+            check_output(cmdline, stderr=subprocess.STDOUT)
+            os.remove(vmdk + '.des')            
+        except subprocess.CalledProcessError as ex:
+            LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
+            raise       
         
     
     @autolog.log_method(Logger, 'VMwareVCDriver._rebase_vmdk')
@@ -804,8 +856,9 @@ class VMwareVCDriver(VMwareESXDriver):
                 snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, vm_id, snapshot.id, resource_pit_id)
                 changeId = db.get_metadata_value(snapshot_vm_resource.metadata, 'changeId', default='*')
                 vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,snapshot_vm_resource.id)
-                return vm_disk_resource_snap.vault_service_url, changeId                
-            return None,'*'
+                content_id = db.get_metadata_value(vm_disk_resource_snap.metadata, 'content_id', default='ffffffff')
+                return vm_disk_resource_snap.vault_service_url, changeId, content_id               
+            return None,'*', None
         except Exception as ex:
             LOG.exception(ex)
             return None,'*'
@@ -834,10 +887,10 @@ class VMwareVCDriver(VMwareESXDriver):
             if snapshot_obj.snapshot_type == 'full':
                 parent_changeId = '*'  
             else:              
-                parent_vault_service_url, parent_changeId = self.get_parent_changeId(cntx, db, 
-                                                                              snapshot['workload_id'],
-                                                                              instance['vm_id'], 
-                                                                              dev.backing.uuid)
+                parent_vault_service_url, parent_changeId, parent_content_id = self.get_parent_changeId(cntx, db, 
+                                                                                  snapshot['workload_id'],
+                                                                                  instance['vm_id'], 
+                                                                                  dev.backing.uuid)
             position = 0
             while position < dev.capacityInBytes:
                 changes = self._session._call_method(self._session._get_vim(),
@@ -887,11 +940,12 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot_obj.snapshot_type == 'full':
                     parent_vault_service_url = None
                     parent_changeId = '*'
+                    parent_content_id = None
                 else:
-                    parent_vault_service_url, parent_changeId = self.get_parent_changeId( cntx, db, 
-                                                         snapshot['workload_id'],
-                                                         instance['vm_id'], 
-                                                         dev.backing.uuid)
+                    parent_vault_service_url, parent_changeId, parent_content_id = self.get_parent_changeId( cntx, db, 
+                                                                                     snapshot['workload_id'],
+                                                                                     instance['vm_id'], 
+                                                                                     dev.backing.uuid)
     
                 vmdk_snap_size = self.get_vmdk_snap_size(cntx, db, instance, snapshot, snapshot_data, dev)
                 vm_disk_resource_snap_backing = self.get_top_vm_disk_resource_snap( cntx, db, 
@@ -941,7 +995,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                     {'progress_msg': 'Uploading '+ dev.deviceInfo.label + ' of VM:' + instance['vm_name'],
                                      'status': 'uploading'
                                     })            
-                copy_to_file_path = vault_service.get_snapshot_file_path(vault_metadata) 
+                copy_to_file_path = vault.get_snapshot_file_path(vault_metadata, staging = True) 
                 head, tail = os.path.split(copy_to_file_path)
                 fileutils.ensure_tree(head)
     
@@ -959,6 +1013,19 @@ class VMwareVCDriver(VMwareESXDriver):
                         LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
                         LOG.exception(ex)
                         raise
+                elif os.path.isfile(parent_vault_service_url) == False:
+                    try:
+                        head, tail = os.path.split(parent_vault_service_url)
+                        fileutils.ensure_tree(head)                        
+                        cmdline = "trilio-vix-disk-cli -create " 
+                        cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
+                        cmdline += " " + parent_vault_service_url
+                        check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                    except subprocess.CalledProcessError as ex:
+                        LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
+                        LOG.exception(ex)
+                        raise
+                    
 
                 extentsfile = None
 
@@ -1067,12 +1134,12 @@ class VMwareVCDriver(VMwareESXDriver):
                 process.stdin.close()
                 _returncode = process.returncode  # pylint: disable=E1101
                 if _returncode:
-                     LOG.debug(_('Result was %s') % _returncode)
-                     raise exception.ProcessExecutionError(
-                                exit_code=_returncode,
-                                stdout=output,
-                                stderr=process.stderr.read(),
-                                cmd=cmd)
+                    LOG.debug(_('Result was %s') % _returncode)
+                    raise exception.ProcessExecutionError(
+                               exit_code=_returncode,
+                               stdout=output,
+                               stderr=process.stderr.read(),
+                               cmd=cmd)
 
                 snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': (totalBytesToTransfer - uploaded_size)})
 
@@ -1087,7 +1154,11 @@ class VMwareVCDriver(VMwareESXDriver):
                 except subprocess.CalledProcessError as ex:
                     LOG.critical(_("cmd: %s resulted in error: %s") %(" ".join(cmdline), ex.output))
                     raise
-
+                
+                if parent_content_id:
+                    self._set_parent_content_id(copy_to_file_path, parent_content_id)
+                content_id = self._get_vmdk_content_id(copy_to_file_path)
+                
                 db.snapshot_update( cntx, snapshot['id'], 
                                     {'progress_msg': 'Uploaded '+ dev.deviceInfo.label + ' of VM:' + instance['vm_name'],
                                      'status': 'uploading'
@@ -1097,7 +1168,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 vm_disk_resource_snap_values = {'vault_service_url' : copy_to_file_path,
                                                 'vault_service_metadata' : 'None',
                                                 'finished_at' : timeutils.utcnow(),
-                                                'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()), 
+                                                'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),
+                                                'metadata' : {'content_id' : content_id },
                                                 'status': 'available'}
                 vm_disk_resource_snap = db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 if vm_disk_resource_snap_backing:
@@ -1106,7 +1178,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                     {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
                     # Upload snapshot metadata to the vault
                     snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                    vmtasks.UploadSnapshotDBEntry(cntx, snapshot_vm_resource_backing.snapshot_id)  
+                    workload_utils.upload_snapshot_db_entry(cntx, snapshot_vm_resource_backing.snapshot_id)  
   
                                     
                 snapshot_type = 'full' if parent_changeId == '*' else 'incremental'
@@ -1117,7 +1189,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 raise 
         try:
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
-            vault_service = vault.get_vault_service(cntx)
             # make sure the session cookies are upto data by calling the following api
             datacenter_name = self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['vmx_datastore_ref'])[1]
             cookies = self._session._get_vim().client.options.transport.cookiejar
@@ -1204,20 +1275,33 @@ class VMwareVCDriver(VMwareESXDriver):
     def repair_vm_disk_resource_snap(self, cntx, db, snapshot_vm_resource, current_snapshot):
         top_snapshot_vm_resource = None
         if current_snapshot:
-            top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, 
-                                                                                      snapshot_vm_resource.vm_id, 
-                                                                                      current_snapshot['id'], 
-                                                                                      snapshot_vm_resource.resource_pit_id) 
+            try:
+                top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, 
+                                                                                          snapshot_vm_resource.vm_id, 
+                                                                                          current_snapshot['id'], 
+                                                                                          snapshot_vm_resource.resource_pit_id)
+            except Exception as ex:
+                LOG.exception(ex)
+                
         if top_snapshot_vm_resource == None:
             snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, current_snapshot['workload_id'])
             for snapshot in snapshots:
                 if snapshot.status != "available":
                     continue
-                top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, 
-                                                                                          snapshot_vm_resource.vm_id, 
-                                                                                          snapshot.id, 
-                                                                                          snapshot_vm_resource.resource_pit_id)
+                try:
+                    top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx, 
+                                                                                              snapshot_vm_resource.vm_id, 
+                                                                                              snapshot.id, 
+                                                                                              snapshot_vm_resource.resource_pit_id)
+                    break
+                except Exception as ex:
+                    LOG.exception(ex)
+
+        if top_snapshot_vm_resource == None:
+            raise exception.ErrorOccurred(reason = 'Failed to identify the parent snapshot resource')
+                             
         vm_disk_resource_snap_chain = []
+        
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,top_snapshot_vm_resource.id)
         while vm_disk_resource_snap:
             vm_disk_resource_snap_chain.insert(0,vm_disk_resource_snap)
@@ -1297,13 +1381,10 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))
                             db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                            try:
-                                shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
-                            except Exception as ex:
-                                LOG.exception(ex)
+                            vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
             except Exception as ex:
                 LOG.exception(ex)
-            
+                
         try:
             db.snapshot_update(cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
             _delete_deleted_snap_chains(cntx, snapshot)
@@ -1332,7 +1413,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     snapshots_valid.append(snap)
  
             snapshot_to_commit = None
-            snapshots_to_delete = []
+            snapshots_to_delete = set()
             retained_snap_count = 0
             for idx, snap in enumerate(snapshots_valid):
                 if snapshots_to_keep['number'] == -1:
@@ -1341,7 +1422,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     else:
                         if snapshot_to_commit == None:
                             snapshot_to_commit = snapshots_valid[idx-1]
-                        snapshots_to_delete.append(snap)    
+                        snapshots_to_delete.add(snap)    
                 else:
                     if retained_snap_count < snapshots_to_keep['number']:
                         if snap.status == 'deleted':
@@ -1351,8 +1432,13 @@ class VMwareVCDriver(VMwareESXDriver):
                     else:
                         if snapshot_to_commit == None:
                             snapshot_to_commit = snapshots_valid[idx-1]
-                        snapshots_to_delete.append(snap) 
+                        snapshots_to_delete.add(snap)
             
+            if vault.commit_supported() == False:
+                workload_utils.delete_if_chain(cntx, snapshot, snapshots_to_delete)
+                #nothing more to do.
+                return
+               
             #if commited snapshot is full delete all snapshots below it             
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
                 for snap in snapshots_to_delete:
@@ -1364,7 +1450,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.id,
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
-                            shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
+                            
+                            vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                                 
@@ -1384,7 +1471,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                         snap.id,
                                                                                                         snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                         workload_obj.display_name ))                            
-                                shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id, 'snapshot_id': snap.id}))
+                                vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
                             except Exception as ex:
                                 LOG.exception(ex)    
                         continue
@@ -1434,8 +1521,12 @@ class VMwareVCDriver(VMwareESXDriver):
                             snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
                             if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
                                 affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
-                             
-                            vm_disk_resource_snap_child = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
+                            
+                            try: 
+                                vm_disk_resource_snap_child = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
+                            except Exception as ex:
+                                LOG.exception(ex)
+                                vm_disk_resource_snap_child = None
 
                             if vm_disk_resource_snap_child:   
                                 self._adjust_vmdk_content_id(vm_disk_resource_snap.vault_service_url, vm_disk_resource_snap_child.vault_service_url)
@@ -1456,14 +1547,13 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.id,
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
-                            shutil.rmtree(vault.get_vault_service(cntx).get_snapshot_path({'workload_id': snap.workload_id,
-                                                                                           'snapshot_id': snap.id}))
+                            vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                         
             # Upload snapshot metadata to the vault
             for snapshot_id in affected_snapshots:
-                vmtasks.UploadSnapshotDBEntry(cntx, snapshot_id)                                    
+                workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)                                    
             
         except Exception as ex:
             LOG.exception(ex)
@@ -1499,10 +1589,11 @@ class VMwareVCDriver(VMwareESXDriver):
             db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
             LOG.info(msg)
             
+            workload_utils.download_snapshot_vm_from_object_store(cntx, restore_obj.id, restore_obj.snapshot_id, instance_options['id'])
+            
             client_factory = self._session._get_vim().client.factory
             service_content = self._session._get_vim().get_service_content()
             cookies = self._session._get_vim().client.options.transport.cookiejar
-            vault_service = vault.get_vault_service(cntx)
             
 
             #get datacenter name and reference
@@ -1891,12 +1982,17 @@ class VMwareVCDriver(VMwareESXDriver):
             db.restore_update(cntx,restore_obj.id, 
                               {'progress_msg': 'Created VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
                                'status': 'executing'
-                              })        
+                              })  
 
             return restored_vm
         except Exception as ex:
             LOG.exception(ex)
             raise
+        finally:
+            try:
+                workload_utils.purge_snapshot_vm_from_staging_area(cntx, restore_obj.id, restore_obj.snapshot_id, instance_options['id'])
+            except Exception as ex:
+                LOG.exception(ex)                 
 
     @autolog.log_method(Logger, 'VMwareVCDriver.poweron_vm')
     def poweron_vm(self, cntx, instance, restore, restored_instance): 

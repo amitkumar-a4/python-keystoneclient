@@ -390,6 +390,8 @@ class SnapshotVMResourceNotFound(NotFound):
 class SnapshotVMResourceWithNameNotFound(NotFound):
     message = _("SnapshotVMResource %(resource_name)s of VM %(snapshot_vm_id)s Snapshot %(snapshot_id)s could not be found.")
 
+class SnapshotVMResourceWithPITNotFound(NotFound):
+    message = _("SnapshotVMResource %(resource_pit_id)s of VM %(snapshot_vm_id)s Snapshot %(snapshot_id)s could not be found.")
 
 class VMDiskResourceSnapsNotFound(NotFound):
     message = _("VMDiskResourceSnaps of SnapshotVMResource %(snapshot_vm_resource_id)s could not be found.")
@@ -397,6 +399,8 @@ class VMDiskResourceSnapsNotFound(NotFound):
 class VMDiskResourceSnapNotFound(NotFound):
     message = _("VMDiskResourceSnap %(vm_disk_resource_snap_id)s could not be found.")
 
+class VMDiskResourceSnapTopNotFound(NotFound):
+    message = _("Top VMDiskResourceSnap of Snapshot VM Resource %(snapshot_vm_resource_id)s could not be found.")
 
 class VMNetworkResourceSnapsNotFound(NotFound):
     message = _("VMNetworkResourceSnaps of SnapshotVMResource %(snapshot_vm_resource_id)s could not be found.")

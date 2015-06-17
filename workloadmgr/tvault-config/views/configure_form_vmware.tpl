@@ -141,32 +141,37 @@
 		</div>
 		
 		<div class="panel-group" id="accordion">
-		  <div class="panel panel-default" id="panel4">
+		  <div class="panel panel-default" id="panel5">
 		    <div class="panel-heading">
 		      <h4 class="panel-title">
-		        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour">
-		          Imports
+		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
+		          Swift Object Storage (Optional)
 		        </a>
 		      </h4>
 		    </div>
-		    <div id="collapseFour" class="panel-collapse collapse in">
+		    <div id="collapseFive" class="panel-collapse collapse">
 		      <div class="panel-body">
-				%if 'import_workloads' in locals() and import_workloads == 'on':
-					<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads
-				%elif 'import_workloads' not in locals():
-					<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads
-				%else:
-					<input name="import-workloads" id="import-workloads" type="checkbox" > Import Existing Workloads
-				%end    					
-		      
-				 
+			    <div class="input-group">
+			    	<label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+			    	<input name="swift-auth-url" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+			    </div><br>
+			    <div class="input-group">
+			    	<label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+			    	<input name="swift-username" type="text" required="" placeholder="admin" class="form-control"> <br>
+			    </div><br>
+			    <div class="input-group">
+			    	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+			    	<input name="swift-password" type="password" required="" class="form-control"> <br>
+			    </div><br>
+			    <div class="input-group">
+			    	<label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+			    	<input name="swift-tenantname" type="text" required="" placeholder="admin" class="form-control"> <br>
+			    </div><br>			    	
 	 	      </div>
 		    </div>
 		  </div>
 		</div>
 		
-	    
-	    
 		<div class="panel-group" id="accordion">
 		  <div class="panel panel-default" id="panel1">
 		    <div class="panel-heading">
@@ -233,6 +238,29 @@
 		    </div>
 		  </div>
 		</div>    
+
+		<div class="panel-group" id="accordion">
+		  <div class="panel panel-default" id="panel4">
+		    <div class="panel-heading">
+		      <h4 class="panel-title">
+		        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour">
+		          Imports
+		        </a>
+		      </h4>
+		    </div>
+		    <div id="collapseFour" class="panel-collapse collapse in">
+		      <div class="panel-body">
+				%if 'import_workloads' in locals() and import_workloads == 'on':
+					<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads
+				%elif 'import_workloads' not in locals():
+					<input name="import-workloads" id="import-workloads" type="checkbox" checked> Import Existing Workloads
+				%else:
+					<input name="import-workloads" id="import-workloads" type="checkbox" > Import Existing Workloads
+				%end    					
+	 	      </div>
+		    </div>
+		  </div>
+		</div>
 	    
 	    <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
 	</form>

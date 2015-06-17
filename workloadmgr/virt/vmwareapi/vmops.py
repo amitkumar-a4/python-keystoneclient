@@ -1647,12 +1647,16 @@ class VMwareVMOps(object):
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
                     #TODO(giri): the disk could have changed between the snapshots
-                    #TODO(giri): handle the snapshots created out side of WLM                    
-                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            cntx, 
-                                                            instance['vm_id'], 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk['label'])
+                    #TODO(giri): handle the snapshots created out side of WLM 
+                    try:                   
+                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                        cntx, 
+                                                                        instance['vm_id'], 
+                                                                        vm_recent_snapshot.snapshot_id, 
+                                                                        disk['label'])
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        previous_snapshot_vm_resource = None 
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
@@ -1785,11 +1789,15 @@ class VMwareVMOps(object):
                 if vm_recent_snapshot:
                     #TODO(giri): the disk colud have changed between the snapshots
                     #TODO(giri): handle the snapshots created out side of WLM
-                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            cntx, 
-                                                            instance['vm_id'], 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk['label'])
+                    try:
+                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                        cntx, 
+                                                                        instance['vm_id'], 
+                                                                        vm_recent_snapshot.snapshot_id, 
+                                                                        disk['label'])
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        previous_snapshot_vm_resource = None                         
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':

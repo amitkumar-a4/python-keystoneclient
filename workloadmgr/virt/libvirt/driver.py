@@ -483,11 +483,15 @@ class LibvirtDriver(driver.ComputeDriver):
             if snapshot['snapshot_type'] != 'full':
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
-                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            cntx, 
-                                                            instance['vm_id'], 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk_info['dev'])
+                    try:
+                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                        cntx, 
+                                                                        instance['vm_id'], 
+                                                                        vm_recent_snapshot.snapshot_id, 
+                                                                        disk_info['dev'])
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        previous_snapshot_vm_resource = None                         
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
@@ -541,11 +545,15 @@ class LibvirtDriver(driver.ComputeDriver):
                 #TODO(giri): the disk can be a new disk than the previous snapshot  
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
-                    previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                            cntx, 
-                                                            instance['vm_id'], 
-                                                            vm_recent_snapshot.snapshot_id, 
-                                                            disk_info['dev'])
+                    try:
+                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
+                                                                        cntx, 
+                                                                        instance['vm_id'], 
+                                                                        vm_recent_snapshot.snapshot_id, 
+                                                                        disk_info['dev'])
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        previous_snapshot_vm_resource = None                         
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':

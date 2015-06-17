@@ -48,12 +48,12 @@ LOG = logging.getLogger(__name__)
 lock = threading.Lock()
 
 wlm_vault_swift_opts = [
-    cfg.StrOpt('wlm_vault_swift_url',
-               default='http://localhost:8080/v1/AUTH_',
-               help='The URL of the Swift endpoint'),
-    cfg.StrOpt('wlm_vault_swift_container',
-               default='vast_snapshots',
-               help='The default Swift container to use for workload snapshots'),
+#    cfg.StrOpt('wlm_vault_swift_url',
+#               default='http://localhost:8080/v1/AUTH_',
+#               help='The URL of the Swift endpoint'),
+#    cfg.StrOpt('wlm_vault_swift_container',
+#               default='vast_snapshots',
+#               help='The default Swift container to use for workload snapshots'),
     cfg.IntOpt('wlm_vault_swift_object_size',
                default=2 * 1024 * 1024 * 1024,
                help='The size in bytes of Swift snapshot objects'),
