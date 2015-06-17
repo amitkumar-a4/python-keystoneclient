@@ -1002,6 +1002,9 @@ class VMwareVCDriver(VMwareESXDriver):
                     extentsfile = copy_to_file_path + "-ctk"
                 else:
                     shutil.copyfile(extentsfile, copy_to_file_path + "-ctk")
+                    os.remove(extentsfile)
+                    os.remove(listfile)
+                    os.remove(mntlist)
 
                 if parent_vault_service_url:
                     cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
