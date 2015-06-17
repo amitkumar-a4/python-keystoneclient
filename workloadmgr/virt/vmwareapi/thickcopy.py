@@ -517,6 +517,7 @@ def copy_free_bitmap_from_part(hostip, username, password, vmspec, dev,
  
                 bitmapsec = partoff + bitmapblock * blocksize
                 inodesec = partoff + inodeblock * blocksize
+
                 f.write(str(bitmapsec) + "," + str(blocksize) + "\n")
                 f.write(str(inodesec) + "," + str(blocksize) + "\n")
 
@@ -556,7 +557,8 @@ def copy_free_bitmap_from_lv(hostip, username, password, vmspec, dev,
                 for bsec in bitmapsec:
                     boff = int(bsec['offset']) + int(bsec['pv']['PV_DISK_OFFSET'])
                     f.write(str(boff) + "," + str(blocksize) + "\n")
-                for isec in bitmapsec:
+
+                for isec in inodesec:
                     ioff = int(isec['offset']) + int(isec['pv']['PV_DISK_OFFSET'])
                     f.write(str(ioff) + "," + str(blocksize) + "\n")
 
@@ -652,7 +654,7 @@ def getpvinfo(mountpath, startoffset = '0', length = None):
         except:
             pass
 
-def getvgs():
+def getvgs(pvinfos = None):
     subprocess.check_output(["vgscan"], stderr=subprocess.STDOUT)
 
     # Activate volume groups on the pv
@@ -684,7 +686,7 @@ def getlvs(vgname):
 
     # get the list of volumes
     lvs = subprocess.check_output(["lvs", "--noheadings",
-                               "--nameprefixes"], stderr=subprocess.STDOUT)
+                               "--nameprefixes", vgname], stderr=subprocess.STDOUT)
     lvnames = []
     for line in lvs.strip().split("\n"):
         lvinfo = {}
@@ -835,7 +837,7 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                     return None, None, None, None, None
                 else:
                     # explore VGs and volumes on the disk
-                    vgs = getvgs()
+                    vgs = getvgs([pvinfo])
                
                     if len(vgs) == 0:
                         return None, None, None, None, None
@@ -915,71 +917,79 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
             mountpath = value[0].split(";")[0].strip()
             break
 
+        exttype = "part"
+        pvdevices = []
+        pvinfos = []
+        devtopartmap = {}
+        # Mount all partitions found on the disk
         for part in partitions:
             if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
                 continue
             try:
                 freedev = subprocess.check_output(["losetup", "-f"],
-                                            stderr=subprocess.STDOUT)
+                                                stderr=subprocess.STDOUT)
                 freedev = freedev.strip("\n")
         
                 subprocess.check_output(["losetup", freedev, mountpath, "-o",
-                               str(int(part['start'])*512), "--sizelimit", part['blocks'] + "KiB"],
-                               stderr=subprocess.STDOUT)
-                partblockgroups[part['start']] = get_blockgroups(freedev)
-            except Exception as ex:
-                LOG.info(_(part['start'] + " has unrecognized file system"))
-                # Now check if the partition is part of LVM
-                exttype = None
-            finally:
-                try:
-                    subprocess.check_output(["losetup", "-d", freedev],
-                              stderr=subprocess.STDOUT)
-                except:
-                    pass
-
-        if not exttype:
-            # One or more partitions do not have ext file system.
-            # try for LVM based file systems
-            exttype = "LVM2"
-            pvdevices = []
-            pvinfos = []
-            for part in partitions:
-                if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
-                    continue
-                try:
-                    freedev = subprocess.check_output(["losetup", "-f"],
-                                                stderr=subprocess.STDOUT)
-                    freedev = freedev.strip("\n")
-        
-                    subprocess.check_output(["losetup", freedev, mountpath, "-o",
                                    str(int(part['start'])*512), "--sizelimit",
                                    part['blocks'] + "KiB"],
                                    stderr=subprocess.STDOUT)
 
-                    pvdevices.append(freedev)
+                pvdevices.append(freedev)
+                devtopartmap[freedev] = part
 
-                    pvinfo = _getpvinfo(freedev, str(int(part['start'])*512),
+            except Exception as ex:
+                LOG.info(_(part['start'] + " is not part of LVM. Cleaning up"))
+                # Now check if the partition is part of LVM
+                for freedev in pvdevices:
+                    subprocess.check_output(["losetup", "-d", freedev],
+                                  stderr=subprocess.STDOUT)
+
+                return None, None, None, None, None
+
+        for freedev in pvdevices:
+            try:
+                partblockgroups[devtopartmap[freedev]['start']] = get_blockgroups(freedev)
+            except Exception as ex:
+                exttype = None
+                break
+
+        if not exttype:
+            LOG.info(_(dev['backing']['fileName'] +
+              " partitions did not contain valid ext fs. Checking for LVM extents"))
+            exttype = "LVM2"
+            for freedev in pvdevices:
+                try:
+                    pvinfo = _getpvinfo(freedev,
+                                   str(int(devtopartmap[freedev]['start'])*512),
                                    part['blocks'] + "KiB")
                     pvinfos.append(pvinfo)
                 except Exception as ex:
-                    LOG.info(_(part['start'] + " is not part of LVM. Cleaning up"))
-                    # Now check if the partition is part of LVM
                     exttype = None
-                    for dev in pvdevices:
-                        subprocess.check_output(["losetup", "-d", dev],
-                                  stderr=subprocess.STDOUT)
+                    break
 
-                    return None, None, None, None, None
+            if not exttype:
+                for freedev in pvdevices:
+                    subprocess.check_output(["losetup", "-d", freedev],
+                                      stderr=subprocess.STDOUT)
+                LOG.info(_(dev['backing']['fileName'] + " does not have LVM pvs either"))
+                return None, None, None, None, None
 
             # explore VGs and volumes on the disk
-            vgs = getvgs()
+            vgs = getvgs(pvinfos)
                
             if len(vgs) == 0:
+                LOG.info(_(dev['backing']['fileName'] +
+                   " does not contain any volume groups. Defaulting to cbt"))
                 return None, None, None, None, None
  
-            lvs = getlvs(vgs[0]['LVM2_VG_NAME'])
+            lvs = []
+            for vg in vgs:
+                lvs += getlvs(vg['LVM2_VG_NAME'])
+
             if len(lvs) == 0:
+                LOG.info(_(dev['backing']['fileName'] +
+                   " does not contain any logical volumes. Defaulting to cbt"))
                 return None, None, None, None, None
          
             # for each LV, check if ext file system on the LV
@@ -990,10 +1000,16 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
             for vg in vgs:
                 deactivatevgs(vg['LVM2_VG_NAME'])
 
-            for dev in pvdevices:
-                subprocess.check_output(["losetup", "-d", dev],
+            for freedev in pvdevices:
+                subprocess.check_output(["losetup", "-d", freedev],
                                   stderr=subprocess.STDOUT)
             return extentsfile, partitions, totalblocks, listfile, mntlist
+        else:
+            # We may have exposure when we have mix of LVM partitions and disk partitions
+            # TODO: Fix the exposure 
+            for freedev in pvdevices:
+                subprocess.check_output(["losetup", "-d", freedev],
+                                   stderr=subprocess.STDOUT)
     finally:
         umount_local_vmdk(process)
 
