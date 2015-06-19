@@ -578,12 +578,69 @@ def copy_used_blocks(hostip, username, password, vmspec, dev,
      populate_extents(hostip, username, password, vmspec, dev['backing']['fileName'],
                      mountpath, usedblocksfile)
 
-def get_partitions(mountpath=None):
+def read_partition_table(mountpath=None):
     partitions = getfdisk_output(mountpath)
     if len(partitions) == 1 and partitions[0]['id'] == 'ee':
         # We found a gpt partition
         partitions = getgptdisk_output(mountpath)
 
+    return partitions
+
+def get_partition_table_from_vmdk(hostip, username, password, vmspec,
+                                  remotepath, localvmdkpath):
+    fileh, listfile = mkstemp()
+    close(fileh)
+    with open(listfile, 'w') as f:
+        f.write(localvmdkpath)
+
+    fileh, mntlist = mkstemp()
+    close(fileh)
+
+    process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
+    try:
+        for key, value in mountpaths.iteritems():
+            partitions = read_partition_table(value[0].split(";")[0].strip())
+    finally:
+        umount_local_vmdk(process)
+         
+    # If there is an extended partition, make sure the extended partition
+    # logical partition table is populated
+    for part in partitions:
+        if part['id'] == '5' or part['id'] == 'f':
+            extended_part = part
+            populate_extent(hostip, username, password, vmspec,
+                            remotepath, localvmdkpath,
+                            str(extended_part['start']), 2048)
+            process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
+            try:
+                for key, value in mountpaths.iteritems():
+                    partitions = read_partition_table(value[0].split(";")[0].strip())
+                    break
+            finally:
+                umount_local_vmdk(process)
+
+            oldpartitiontable = []
+            while len(oldpartitiontable) < len(partitions):
+                oldpartitiontable = partitions
+                for part in oldpartitiontable:
+                    if int(part['start']) > int(extended_part['start']) and \
+                       int(part['end']) + 2048 < int(extended_part['end']):
+                        populate_extent(hostip, username, password, vmspec,
+                                        remotepath, localvmdkpath,
+                                        str(int(part['end']) + 1), 2048)
+                process, mountpaths = mount_local_vmdk(listfile,
+                                                       mntlist, diskonly=True)
+                try:
+                    for key, value in mountpaths.iteritems():
+                        partitions = read_partition_table(
+                                           value[0].split(";")[0].strip())
+                        break
+                finally:
+                    umount_local_vmdk(process)
+            break
+
+    os.remove(listfile)
+    os.remove(mntlist)
     return partitions
 
 def _getpvinfo(mountpath, startoffset = '0', length = None):
@@ -629,7 +686,7 @@ def _getpvinfo(mountpath, startoffset = '0', length = None):
 
     return pvinfo
 
-def getpvinfo(mountpath, startoffset = '0', length = None):
+def mountpv(mountpath, startoffset = '0', length = None):
 
     options = []
     if length:
@@ -642,17 +699,16 @@ def getpvinfo(mountpath, startoffset = '0', length = None):
         subprocess.check_output(["losetup", freedev, mountpath,] + options,
                                stderr=subprocess.STDOUT)
         pvinfo = _getpvinfo(freedev, startoffset, length)
-        return pvinfo
+        return freedev, pvinfo
     except Exception as ex:
         LOG.exception(ex)
         LOG.info(_(mountpath + ":" + startoffset + " does not have lvm pv"))
-        return None
-    finally:
-        try:
-            subprocess.check_output(["losetup", "-d", freedev],
+        dismountpv(freedev)
+        raise
+
+def dismountpv(devpath):
+    subprocess.check_output(["losetup", "-d", devpath],
                               stderr=subprocess.STDOUT)
-        except:
-            pass
 
 def getvgs(pvinfos = None):
     subprocess.check_output(["vgscan"], stderr=subprocess.STDOUT)
@@ -767,23 +823,425 @@ def copylvextsuperblock(hostip, username, password, vmspec, dev,
                     str(pvseg['length']/512))
 
 def performlvthickcopy(hostip, username, password, vmspec, dev,
-                       mountpath, lv, pvinfo, extentsfile):
+                       localvmdkpath, lvsrc, srcpvlist, extentsfile):
+
+    fileh, listfile = mkstemp()
+    close(fileh)
+    with open(listfile, 'w') as f:
+        f.write(localvmdkpath)
+
+    fileh, mntlist = mkstemp()
+    close(fileh)
 
     copylvextsuperblock(hostip, username, password, vmspec,
-                        dev, mountpath, lv, pvinfo)
+                        dev, localvmdkpath, lvsrc, srcpvlist)
 
-    # get_blockgroups does not require any IO transfer
-    # from remote host
-    blocksize, blockgroups= get_blockgroups(lv['LVM2_LV_PATH'])
+    pvdevices = []
+    pvinfos = []
+    devtopartmap = {}
+    vgs = []
+    lvs = []
+
+    process, mountpaths = mount_local_vmdk(listfile,
+                                 mntlist, diskonly=True)
+    try:
+        for key, value in mountpaths.iteritems():
+            mountpath = value[0].split(";")[0].strip()
+            break
+
+        # Mount all partitions found on the disk
+        for part in srcpvlist:
+            freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+            freedev = freedev.strip("\n")
+        
+            subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                                   str(part['PV_DISK_OFFSET']), "--sizelimit",
+                                   str(int(part['LVM2_DEV_SIZE'])/1024) + "KiB"],
+                                   stderr=subprocess.STDOUT)
+
+            pvdevices.append(freedev)
+            devtopartmap[freedev] = part
+
+        for freedev in pvdevices:
+            pvinfo = _getpvinfo(freedev,
+                                str(devtopartmap[freedev]['PV_DISK_OFFSET']),
+                                str(int(part['LVM2_DEV_SIZE'])/1024) + "KiB")
+            pvinfos.append(pvinfo)
+
+        # explore VGs and volumes on the disk
+        vgs = getvgs(pvinfos)
+               
+        if len(vgs) == 0:
+                LOG.info(_(dev['backing']['fileName'] +
+                   " does not contain any volume groups. Defaulting to cbt"))
+                raise Exception(dev['backing']['fileName'] +
+                   " does not contain any volume groups. Defaulting to cbt")
+ 
+        for vg in vgs:
+            lvs += getlvs(vg['LVM2_VG_NAME'])
+
+        if len(lvs) == 0:
+            LOG.info(_(dev['backing']['fileName'] +
+                   " does not contain any logical volumes. Defaulting to cbt"))
+            raise Exception(dev['backing']['fileName'] +
+                   " does not contain any logical volumes. Defaulting to cbt")
+
+        blocksize, blockgroups= get_blockgroups(lvsrc['LVM2_LV_PATH'])
+    except Exception as ex:
+        if os.path.isfile(listfile):
+            os.remove(listfile)
+        if os.path.isfile(mntlist):
+            os.remove(mntlist)
+        raise
+    finally:
+        for freedev in pvdevices:
+            subprocess.check_output(["losetup", "-d", freedev],
+                                  stderr=subprocess.STDOUT)
+        for vg in vgs:
+            deactivatevgs(vg['LVM2_VG_NAME'])
+        umount_local_vmdk(process)
 
     copy_free_bitmap_from_lv(hostip, username, password, vmspec, dev,
-                             mountpath, lv, pvinfo, blocksize,
+                             localvmdkpath, lvsrc, srcpvlist, blocksize,
                              blockgroups)
+    pvdevices = []
+    pvinfos = []
+    devtopartmap = {}
+    vgs = []
+    lvs = []
 
-    totalblocks = get_usedblockslist_from_lv(lv['LVM2_LV_PATH'], extentsfile,
-                                            lv, pvinfo, blocksize)
-  
+    process, mountpaths = mount_local_vmdk(listfile,
+                                 mntlist, diskonly=True)
+    try:
+        for key, value in mountpaths.iteritems():
+            mountpath = value[0].split(";")[0].strip()
+            break
+
+        # Mount all partitions found on the disk
+        for part in srcpvlist:
+            freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+            freedev = freedev.strip("\n")
+        
+            subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                                   str(part['PV_DISK_OFFSET']), "--sizelimit",
+                                   str(int(part['LVM2_DEV_SIZE'])/1024) + "KiB"],
+                                   stderr=subprocess.STDOUT)
+
+            pvdevices.append(freedev)
+            devtopartmap[freedev] = part
+
+        for freedev in pvdevices:
+            pvinfo = _getpvinfo(freedev,
+                                str(devtopartmap[freedev]['PV_DISK_OFFSET']),
+                                str(int(part['LVM2_DEV_SIZE'])/1024) + "KiB")
+            pvinfos.append(pvinfo)
+
+        # explore VGs and volumes on the disk
+        vgs = getvgs(pvinfos)
+               
+        if len(vgs) == 0:
+                LOG.info(_(dev['backing']['fileName'] +
+                   " does not contain any volume groups. Defaulting to cbt"))
+                raise Exception(dev['backing']['fileName'] +
+                   " does not contain any volume groups. Defaulting to cbt")
+ 
+        for vg in vgs:
+            lvs += getlvs(vg['LVM2_VG_NAME'])
+
+        if len(lvs) == 0:
+            LOG.info(_(dev['backing']['fileName'] +
+                   " does not contain any logical volumes. Defaulting to cbt"))
+            raise Exception(dev['backing']['fileName'] +
+                   " does not contain any logical volumes. Defaulting to cbt")
+
+        totalblocks = get_usedblockslist_from_lv(lvsrc['LVM2_LV_PATH'], extentsfile,
+                                                 lvsrc, srcpvlist, blocksize)
+    finally:
+        for freedev in pvdevices:
+            subprocess.check_output(["losetup", "-d", freedev],
+                                  stderr=subprocess.STDOUT)
+        for vg in vgs:
+            deactivatevgs(vg['LVM2_VG_NAME'])
+        umount_local_vmdk(process)
+
+        if os.path.isfile(listfile):
+            os.remove(listfile)
+        if os.path.isfile(mntlist):
+            os.remove(mntlist)
+
     return totalblocks
+
+def wholedisklvm(hostip, username, password, vmspec, dev,
+                   localvmdkpath, partitions):
+
+    totalblocks = 0
+    fileh, listfile = mkstemp()
+    close(fileh)
+    with open(listfile, 'w') as f:
+        f.write(localvmdkpath)
+
+    fileh, mntlist = mkstemp()
+    close(fileh)
+
+    try:
+        process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
+        try:
+            for key, value in mountpaths.iteritems():
+
+                mountpath = value[0].split(";")[0].strip()
+                devpath, pvinfo = mountpv(mountpath)
+
+                if pvinfo is None:
+                    return None, None, None, None, None
+                else:
+                    # explore VGs and volumes on the disk
+                    vgs = getvgs([pvinfo])
+               
+                    if len(vgs) == 0:
+                        return None, None, None, None, None
+ 
+                    lvs = getlvs(vgs[0]['LVM2_VG_NAME'])
+                    if len(lvs) == 0:
+                        return None, None, None, None, None
+         
+                    dismountpv(devpath)
+                    for vg in vgs:
+                        deactivatevgs(vg['LVM2_VG_NAME'])
+
+                    # for each LV, check if ext file system on the LV
+                    # call this function with vmdk unmapped and any loop
+                    # devices detached
+                break
+
+        except Exception as ex:
+            LOG.exception(ex)
+            return None, None, None
+        finally:
+            if process:
+                umount_local_vmdk(process)
+
+        fileh, extentsfile = mkstemp()
+        close(fileh)
+        try:
+            for lv in lvs:
+                totalblocks += performlvthickcopy(hostip, username,
+                                               password, vmspec, dev, localvmdkpath,
+                                               lv, [pvinfo], extentsfile)
+            return extentsfile, partitions, totalblocks
+        except Exception as ex:
+            if os.path.isfile(extentsfile):
+                os.remove(extentsfile)
+            return None, None, None
+
+    finally:
+        if os.path.isfile(listfile):
+            os.remove(listfile)
+        if os.path.isfile(mntlist):
+            os.remove(mntlist)
+
+def lvmextents_in_partition(hostip, username, password, vmspec, dev, localvmdkpath,
+                             partitions):
+
+    fileh, listfile = mkstemp()
+    close(fileh)
+    with open(listfile, 'w') as f:
+        f.write(localvmdkpath)
+
+    fileh, mntlist = mkstemp()
+    close(fileh)
+
+    totalblocks = 0
+    exttype = "LVM2"
+    pvdevices = []
+    devtopartmap = {}
+    lvs = []
+    vgs = []
+
+    try:
+        process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
+        try:
+            for key, value in mountpaths.iteritems():
+                mountpath = value[0].split(";")[0].strip()
+                break
+
+            # Mount all partitions found on the disk
+            for part in partitions:
+                if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
+                    continue
+                try:
+                    devpath, pvinfo = mountpv(mountpath,
+                          str(int(part['start']) * 512),
+                          str(int(part['blocks']) * 1024))
+                    pvdevices.append(devpath)
+                    devtopartmap[devpath] = pvinfo
+                except Exception as ex:
+                    LOG.info(_(part['start'] +
+                               " unrecognized file system"))
+                    exttype = None
+                    break
+             
+            if exttype and exttype == "LVM2":
+                LOG.info(_(dev['backing']['fileName'] +
+                  " partitions valid LVM extentons."))
+
+                # explore VGs and volumes on the disk
+                vgs = getvgs(devtopartmap.values())
+               
+                if len(vgs) == 0:
+                    LOG.info(_(dev['backing']['fileName'] +
+                       " does not contain any volume groups. Defaulting to cbt"))
+                    return None, None, None
+ 
+                for vg in vgs:
+                    lvs += getlvs(vg['LVM2_VG_NAME'])
+
+                for vg in vgs:
+                    deactivatevgs(vg['LVM2_VG_NAME'])
+
+                if len(lvs) == 0:
+                    LOG.info(_(dev['backing']['fileName'] +
+                       " does not contain any logical volumes. Defaulting to cbt"))
+                    return None, None, None
+        finally:
+            for freedev in pvdevices:
+                 dismountpv(freedev)
+            if process:
+                umount_local_vmdk(process)
+
+        if exttype and exttype == "LVM2":
+            # for each LV, check if ext file system on the LV
+            fileh, extentsfile = mkstemp()
+            close(fileh)
+            try:
+                for lv in lvs:
+                    totalblocks += performlvthickcopy(hostip, username,
+                                                   password, vmspec, dev, localvmdkpath,
+                                                   lv, devtopartmap.values(), extentsfile)
+                return extentsfile, partitions, totalblocks
+            except Exception as ex:
+                if os.path.isfile(extentsfile):
+                    os.remove(extentsfile)
+                return None, None, None
+        else:
+            return None, None, None
+    finally:
+        if os.path.isfile(listfile):
+            os.remove(listfile)
+        if os.path.isfile(mntlist):
+            os.remove(mntlist)
+
+def process_partitions(hostip, username, password, vmspec, dev, localvmdkpath,
+                        partitions):
+    totalblocks = 0
+    # If partition has ext2 or its variant of file system, read the
+    # blocksize and all the block groups of the file system
+    partblockgroups = {}
+
+    # Check for regular partitions
+    fileh, listfile = mkstemp()
+    close(fileh)
+    with open(listfile, 'w') as f:
+        f.write(localvmdkpath)
+
+    fileh, mntlist = mkstemp()
+    close(fileh)
+
+    try:
+        process, mountpaths = mount_local_vmdk(listfile,
+                                 mntlist, diskonly=True)
+        try:
+            for key, value in mountpaths.iteritems():
+                mountpath = value[0].split(";")[0].strip()
+                break
+
+            # Mount all partitions found on the disk
+            for part in partitions:
+                if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
+                    continue
+                try:
+                    freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                    freedev = freedev.strip("\n")
+
+                    startoffset = str(int(part['start']) * 512)
+                    length = part['blocks'] + "KiB"
+                    options = ["-o", startoffset, "--sizelimit", length]
+                    subprocess.check_output(["losetup", freedev, mountpath,] + options,
+                                           stderr=subprocess.STDOUT)
+                    # display list of partitions that has ext file system
+                    partblockgroups[part['start']] = get_blockgroups(freedev)
+                finally:
+                    dismountpv(freedev)
+        finally:
+            umount_local_vmdk(process)
+
+        # copy bitmap blocks and inode blocks to empty vmdk 
+        for part in partitions:
+            if part['start'] in partblockgroups:
+                blocksize = partblockgroups[part['start']][0]
+                blockgroups = partblockgroups[part['start']][1]
+                copy_free_bitmap_from_part(hostip, username, password, vmspec, dev,
+                                 localvmdkpath, part['start'],
+                                 blocksize, blockgroups)
+
+        fileh, extentsfile = mkstemp()
+        close(fileh)
+
+        # Get the list of used blocks for each file system
+        process, mountpaths = mount_local_vmdk(listfile,
+                                 mntlist, diskonly=True)
+        for key, value in mountpaths.iteritems():
+            mountpath = value[0].split(";")[0].strip()
+            break
+
+        try:
+            for part in partitions:
+
+                if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
+                    continue
+                # for each partition on the disk copy only allocated blocks
+                # from remote disk
+
+                ##
+                # TODO: The used blocks can be pretty big. Make sure
+                # we are handling large lists correctly.
+                try:
+                    freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                    freedev = freedev.strip("\n")
+        
+                    subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                                   str(int(part['start'])*512), "--sizelimit",
+                                   part['blocks'] + "KiB"],
+                                   stderr=subprocess.STDOUT)
+                    if part['start'] in partblockgroups:
+                        blocksize = partblockgroups[part['start']][0]
+                    else:
+                        blocksize = 4096
+                    totalblocks += get_usedblockslist_from_part(freedev, extentsfile,
+                                                      part, blocksize)
+                finally:
+                    dismountpv(freedev)
+        except Exception as ex:
+            LOG.exception(ex)
+            if os.path.isfile(extentsfile):
+                os.remove(extentsfile)
+        finally:
+            umount_local_vmdk(process)
+
+        return extentsfile, partitions, totalblocks
+
+    except Exception as ex:
+        LOG.exception(ex)
+        LOG.info(_(mountpath + ": One or more partitions does not have ext fs"))
+        return None, None, None
+    finally:
+        if os.path.isfile(listfile):
+            os.remove(listfile)
+        if os.path.isfile(mntlist):
+            os.remove(mntlist)
 
 ##
 # Description:
@@ -807,95 +1265,14 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                         dev['backing']['fileName'], localvmdkpath,
                         dev['capacityInBytes'])
 
-    fileh, listfile = mkstemp()
-    close(fileh)
-    with open(listfile, 'w') as f:
-        f.write(localvmdkpath)
-
-    fileh, mntlist = mkstemp()
-    close(fileh)
-
-    fileh, extentsfile = mkstemp()
-    close(fileh)
-
-    totalblocks = 0
-    process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
-    try:
-        for key, value in mountpaths.iteritems():
-            partitions = get_partitions(value[0].split(";")[0].strip())
-    finally:
-        umount_local_vmdk(process)
+    partitions = get_partition_table_from_vmdk(hostip, username, password,
+                         vmspec, dev['backing']['fileName'], localvmdkpath)
 
     # if no partitions found, see if this is raw LVM PV
     if len(partitions) == 0:
-        process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
-        try:
-            for key, value in mountpaths.iteritems():
-                mountpath = value[0].split(";")[0].strip()
-                pvinfo = getpvinfo(mountpath)
-                if pvinfo is None:
-                    return None, None, None, None, None
-                else:
-                    # explore VGs and volumes on the disk
-                    vgs = getvgs([pvinfo])
-               
-                    if len(vgs) == 0:
-                        return None, None, None, None, None
- 
-                    lvs = getlvs(vgs[0]['LVM2_VG_NAME'])
-                    if len(lvs) == 0:
-                        return None, None, None, None, None
+        return wholedisklvm(hostip, username, password,
+                            vmspec, dev, localvmdkpath, partitions)
          
-                    # for each LV, check if ext file system on the LV
-                    for lv in lvs:
-                        totalblocks += performlvthickcopy(hostip, username,
-                                           password, vmspec, dev, mountpath,
-                                           lv, [pvinfo], extentsfile)
-                    for vg in vgs:
-                        deactivatevgs(vg['LVM2_VG_NAME'])
-
-            return extentsfile, partitions, totalblocks, listfile, mntlist
-        finally:
-            umount_local_vmdk(process)
-
-        return None, None, None, None, None
-         
-    # If there is an extended partition, make sure the extended partition
-    # logical partition table is populated
-    for part in partitions:
-        if part['id'] == '5' or part['id'] == 'f':
-            extended_part = part
-            populate_extent(hostip, username, password, vmspec,
-                            dev['backing']['fileName'], localvmdkpath,
-                            str(extended_part['start']), 2048)
-            process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
-            try:
-                for key, value in mountpaths.iteritems():
-                    partitions = get_partitions(value[0].split(";")[0].strip())
-                    break
-            finally:
-                umount_local_vmdk(process)
-
-            oldpartitiontable = []
-            while len(oldpartitiontable) < len(partitions):
-                oldpartitiontable = partitions
-                for part in oldpartitiontable:
-                    if int(part['start']) > int(extended_part['start']) and \
-                       int(part['end']) + 2048 < int(extended_part['end']):
-                        populate_extent(hostip, username, password, vmspec,
-                                        dev['backing']['fileName'], localvmdkpath,
-                                        str(int(part['end']) + 1), 2048)
-                process, mountpaths = mount_local_vmdk(listfile,
-                                                       mntlist, diskonly=True)
-                try:
-                    for key, value in mountpaths.iteritems():
-                        partitions = get_partitions(
-                                           value[0].split(";")[0].strip())
-                        break
-                finally:
-                    umount_local_vmdk(process)
-            break
-
     # First copy super blocks of each partition
     #
     for part in partitions:
@@ -904,183 +1281,27 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                             dev['backing']['fileName'],
                             localvmdkpath, str(part['start']), 400)
 
-
-    # If partition has ext2 or its variant of file system, read the
-    # blocksize and all the block groups of the file system
-    exttype = "part"
-
-    partblockgroups = {}
-    process, mountpaths = mount_local_vmdk(listfile,
-                                 mntlist, diskonly=True)
-    try:
-        for key, value in mountpaths.iteritems():
-            mountpath = value[0].split(";")[0].strip()
-            break
-
-        exttype = "part"
-        pvdevices = []
-        pvinfos = []
-        devtopartmap = {}
-        # Mount all partitions found on the disk
-        for part in partitions:
-            if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
-                continue
-            try:
-                freedev = subprocess.check_output(["losetup", "-f"],
-                                                stderr=subprocess.STDOUT)
-                freedev = freedev.strip("\n")
-        
-                subprocess.check_output(["losetup", freedev, mountpath, "-o",
-                                   str(int(part['start'])*512), "--sizelimit",
-                                   part['blocks'] + "KiB"],
-                                   stderr=subprocess.STDOUT)
-
-                pvdevices.append(freedev)
-                devtopartmap[freedev] = part
-
-            except Exception as ex:
-                LOG.info(_(part['start'] + " is not part of LVM. Cleaning up"))
-                # Now check if the partition is part of LVM
-                for freedev in pvdevices:
-                    subprocess.check_output(["losetup", "-d", freedev],
-                                  stderr=subprocess.STDOUT)
-
-                return None, None, None, None, None
-
-        for freedev in pvdevices:
-            try:
-                partblockgroups[devtopartmap[freedev]['start']] = get_blockgroups(freedev)
-            except Exception as ex:
-                exttype = None
-                break
-
-        if not exttype:
-            LOG.info(_(dev['backing']['fileName'] +
-              " partitions did not contain valid ext fs. Checking for LVM extents"))
-            exttype = "LVM2"
-            for freedev in pvdevices:
-                try:
-                    pvinfo = _getpvinfo(freedev,
-                                   str(int(devtopartmap[freedev]['start'])*512),
-                                   part['blocks'] + "KiB")
-                    pvinfos.append(pvinfo)
-                except Exception as ex:
-                    exttype = None
-                    break
-
-            if not exttype:
-                for freedev in pvdevices:
-                    subprocess.check_output(["losetup", "-d", freedev],
-                                      stderr=subprocess.STDOUT)
-                LOG.info(_(dev['backing']['fileName'] + " does not have LVM pvs either"))
-                return None, None, None, None, None
-
-            # explore VGs and volumes on the disk
-            vgs = getvgs(pvinfos)
-               
-            if len(vgs) == 0:
-                LOG.info(_(dev['backing']['fileName'] +
-                   " does not contain any volume groups. Defaulting to cbt"))
-                return None, None, None, None, None
+    extentsfile, rparts, totalblocks = lvmextents_in_partition(hostip,
+                   username, password, vmspec, dev, localvmdkpath,
+                   partitions)
  
-            lvs = []
-            for vg in vgs:
-                lvs += getlvs(vg['LVM2_VG_NAME'])
+    if extentsfile:
+        return extentsfile, rparts, totalblocks
 
-            if len(lvs) == 0:
-                LOG.info(_(dev['backing']['fileName'] +
-                   " does not contain any logical volumes. Defaulting to cbt"))
-                return None, None, None, None, None
-         
-            # for each LV, check if ext file system on the LV
-            for lv in lvs:
-                totalblocks += performlvthickcopy(hostip, username,
-                                           password, vmspec, dev, mountpath,
-                                           lv, pvinfos, extentsfile)
-            for vg in vgs:
-                deactivatevgs(vg['LVM2_VG_NAME'])
-
-            for freedev in pvdevices:
-                subprocess.check_output(["losetup", "-d", freedev],
-                                  stderr=subprocess.STDOUT)
-            return extentsfile, partitions, totalblocks, listfile, mntlist
-        else:
-            # We may have exposure when we have mix of LVM partitions and disk partitions
-            # TODO: Fix the exposure 
-            for freedev in pvdevices:
-                subprocess.check_output(["losetup", "-d", freedev],
-                                   stderr=subprocess.STDOUT)
-    finally:
-        umount_local_vmdk(process)
-
-    
-    # display list of partitions that has ext file system
-    for part in partitions:
-        if part['start'] in partblockgroups:
-            LOG.info(_(part['start'] + " has extx file system"))
-        else:
-            LOG.info(_(part['start'] + " unrecognized file system"))
-            LOG.info(_("Reverting to VMware CBT based  backup to detech changed blocks"))
-
-    # copy bitmap blocks and inode blocks to empty vmdk 
-    for part in partitions:
-        if part['start'] in partblockgroups:
-            blocksize = partblockgroups[part['start']][0]
-            blockgroups = partblockgroups[part['start']][1]
-            copy_free_bitmap_from_part(hostip, username, password, vmspec, dev,
-                             localvmdkpath, part['start'],
-                             blocksize, blockgroups)
-
-    for part in partitions:
-
-        if part['id'] == 'ee' or part['id'] == '5' or part['id'] == 'f':
-            continue
-        # for each partition on the disk copy only allocated blocks
-        # from remote disk
-
-        # Get the list of used blocks for each file system
-        process, mountpaths = mount_local_vmdk(listfile,
-                                 mntlist, diskonly=True)
-        try:
-            for key, value in mountpaths.iteritems():
-                mountpath = value[0].split(";")[0].strip()
-            ##
-            # TODO: The used blocks can be pretty big. Make sure
-            # we are handling large lists correctly.
-            try:
-                freedev = subprocess.check_output(["losetup", "-f"],
-                                            stderr=subprocess.STDOUT)
-                freedev = freedev.strip("\n")
-        
-                subprocess.check_output(["losetup", freedev, mountpath, "-o",
-                               str(int(part['start'])*512), "--sizelimit",
-                               part['blocks'] + "KiB"],
-                               stderr=subprocess.STDOUT)
-                if part['start'] in partblockgroups:
-                    blocksize = partblockgroups[part['start']][0]
-                else:
-                    blocksize = 4096
-                totalblocks += get_usedblockslist_from_part(freedev, extentsfile,
-                                                  part, blocksize)
-            finally:
-                subprocess.check_output(["losetup", "-d", freedev],
-                                        stderr=subprocess.STDOUT)
-        finally:
-            umount_local_vmdk(process)
-
-    return extentsfile, partitions, totalblocks, listfile, mntlist
+    import pdb;pdb.set_trace()
+    return process_partitions(hostip, username, password, vmspec, dev, localvmdkpath,
+                            partitions)
 
 def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
     try:
         extentsfile, partitions,\
-        totalblocks, listfile,\
-        mntlist = _thickcopyextents(hostip, username, password,
+        totalblocks = _thickcopyextents(hostip, username, password,
                          vmspec, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
     except Exception as ex:
         #LOG.exception(_(ex))
         raise
-        return None, None, None, None, None
+        return None, None, None
 
 """
 def thickcopy(hostip, username, password, vmspec, dev, localvmdkpath):

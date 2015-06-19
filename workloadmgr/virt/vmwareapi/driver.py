@@ -1035,7 +1035,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     parent_changeId is '*' and\
                     turbo_thick_disk_backup.lower() == 'true':
                     extentsfile, partitions, totalblocks,\
-                           listfile, mntlist = thickcopyextents(self._session._host_ip,
+                           = thickcopyextents(self._session._host_ip,
                                                           self._session._host_username,
                                                           self._session._host_password, vmxspec,
                                                           dev, copy_to_file_path)
@@ -1070,8 +1070,6 @@ class VMwareVCDriver(VMwareESXDriver):
                 else:
                     shutil.copyfile(extentsfile, copy_to_file_path + "-ctk")
                     os.remove(extentsfile)
-                    os.remove(listfile)
-                    os.remove(mntlist)
 
                 if parent_vault_service_url:
                     cmdspec = ["trilio-vix-disk-cli", "-downloadextents",

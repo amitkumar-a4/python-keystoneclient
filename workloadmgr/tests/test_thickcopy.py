@@ -86,24 +86,14 @@ def test_lv_entire_disk():
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
-        return mountpoint
-
-    def cleanup(mountpoint):
-        cmd = ["lvremove", "-f", "/dev/vg1/lv1"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        cmd = ["lvremove", "-f", "/dev/vg1/lv2"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        cmd = ["lvremove", "-f", "/dev/vg1/lv3"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        cmd = ["lvremove", "-f", "/dev/vg1/lv4"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-
-        cmd = ["vgremove", "vg1"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        cmd = ["pvremove", mountpoint]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         cmd = ["losetup", "-d", mountpoint]
         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        vgcmd = ["vgchange", "-an", "vg1"]
+        subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+        return 
+
+    def cleanup():
         deletepv("pvname1")
         if os.path.isfile("vmdk"):
             os.remove("vmdk")
@@ -146,7 +136,7 @@ def test_lv_entire_disk():
          
         except Exception as ex:
             LOG.exception(ex)
-            LOG.info(_(mountpath + ":" + startoffset + " does not have lvm pv"))
+            LOG.info(_(remotepath + " does not have lvm pv"))
             raise
         finally:
             try:
@@ -187,30 +177,26 @@ def test_lv_entire_disk():
     @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.mount_local_vmdk', side_effect=my_mount_disk)
     @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk', side_effect=create_empty_vmdk_mock)
     def test(method1, method2, method3, method4, method5):
-        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : mountpoint}}
+        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
         print "Running test_lv_entire_disk(): "
-        mountpoint = setup() 
+        setup() 
         print "\tSetup complete"
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblocks = test()
         print "\ttest() complete"
-        verify(mountpoint, extentsfile, "vmdk")
+        verify("pvname1", extentsfile, "vmdk")
         print "\t verified successfully"
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
     finally:
-        cleanup(mountpoint)
+        cleanup()
         print"\tcleanup done"
 
 ## 
@@ -408,16 +394,16 @@ def test_lv_on_partitions():
         dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
         print "Running test_lv_on_partitions():"
         setup() 
         print "\tSetup() complete"
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblocks = test()
         print "\ttest() done"
 
         # first clean up and then verify so the volume groups do not interfere
@@ -427,10 +413,6 @@ def test_lv_on_partitions():
 
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
 
     finally:
         deletepv("pvname1")
@@ -625,16 +607,16 @@ def test_lvs_on_two_partitions():
         dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
         print "Running test_lvs_on_two_partitions():"
         setup() 
         print "\tsetup() complete"
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblock = test()
         print "\ttest() done"
 
         # first clean up and then verify so the volume groups do not interfere
@@ -644,10 +626,6 @@ def test_lvs_on_two_partitions():
 
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
 
     finally:
         deletepv("pvname1")
@@ -841,16 +819,16 @@ def test_lvs_span_two_partitions():
         dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
         print "Running test_lvs_on_two_partitions():"
         setup() 
         print "\tsetup() complete"
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblocks = test()
         print "\ttest() done"
 
         # first clean up and then verify so the volume groups do not interfere
@@ -860,10 +838,6 @@ def test_lvs_span_two_partitions():
 
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
 
     finally:
         deletepv("pvname1")
@@ -967,7 +941,7 @@ def test_mbr_4_primary_partitions():
             my_populate_extents(None, None, None, None, remotepath,
                                 vmdkfile, extentsfile)
 
-            partitions = workloadmgr.virt.vmwareapi.thickcopy.get_partitions(vmdkfile)
+            partitions = workloadmgr.virt.vmwareapi.thickcopy.read_partition_table(vmdkfile)
             for part in partitions:
                 try:
                     freedev = subprocess.check_output(["losetup", "-f"],
@@ -1039,27 +1013,23 @@ def test_mbr_4_primary_partitions():
         dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
         print "Running test_mbr_4_primary_partitions():"
         setup() 
         print "\tSetup() done"
  
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblocks = test()
         print "\t test() done"
 
         verify("pvname1", extentsfile, "vmdk")
         print "\tverification done"
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
     finally:
         cleanup()
         print "\t cleanup done"
@@ -1165,7 +1135,7 @@ def test_mbr_3_primary_1_logical_partitions():
             my_populate_extents(None, None, None, None, remotepath,
                                 vmdkfile, extentsfile)
 
-            partitions = workloadmgr.virt.vmwareapi.thickcopy.get_partitions(vmdkfile)
+            partitions = workloadmgr.virt.vmwareapi.thickcopy.read_partition_table(vmdkfile)
             for part in partitions:
                 if part['id'] == '5' or part['id'] == 'f':
                     continue
@@ -1241,25 +1211,22 @@ def test_mbr_3_primary_1_logical_partitions():
         dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
+        import pdb;pdb.set_trace()
         print "Running test_mbr_3_primary_1_logical_partitions():"
         setup() 
         print "\tSetup done"
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblocks = test()
         print "\ttest() done."
         verify("pvname1", extentsfile, "vmdk")
         print "\tverification done."
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
     finally:
         cleanup()
         print "\tcleanup done"
@@ -1361,7 +1328,7 @@ def test_gpt_partitions():
             my_populate_extents(None, None, None, None, remotepath,
                                 vmdkfile, extentsfile)
 
-            partitions = workloadmgr.virt.vmwareapi.thickcopy.get_partitions(vmdkfile)
+            partitions = workloadmgr.virt.vmwareapi.thickcopy.read_partition_table(vmdkfile)
             for part in partitions:
                 try:
                     freedev = subprocess.check_output(["losetup", "-f"],
@@ -1434,36 +1401,223 @@ def test_gpt_partitions():
         dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
         localvmdkpath = "vmdk"
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
-        extentsfile, partitions, totalblocks, listfile, mntlist = \
+        extentsfile, partitions, totalblocks = \
               workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
                              None, None, None, dev, localvmdkpath)
-        return extentsfile, partitions, totalblocks, listfile, mntlist
+        return extentsfile, partitions, totalblocks
 
     try:
         print "Running test_gpt_partitions():"
         setup() 
         print "\tsetup done"
 
-        extentsfile, partitions, totalblocks, listfile, mntlist = test()
+        extentsfile, partitions, totalblocks = test()
         print "\ttest() done"
         verify("pvname1", extentsfile, "vmdk")
         print "\t verification done"
 
         if os.path.isfile(extentsfile):
             os.remove(extentsfile)
-        if os.path.isfile(listfile):
-            os.remove(listfile)
-        if os.path.isfile(mntlist):
-            os.remove(mntlist)
+    finally:
+        cleanup()
+        print "\t cleanup done"
+
+def test_raw_disk():
+
+    def createpv(pvname, capacity):
+        try:
+            cmd = ["dd", "if=/dev/zero", "of="+pvname, "bs=1", "count=1",
+                   "seek=" + str(capacity)]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        except Exception as ex:
+            print "Cannot create or mount pvname "
+            raise
+
+    def deletepv(pvname):
+        os.remove(pvname)
+
+    def setup():
+        mountpoint = createpv("pvname1", "1TiB")
+
+    def cleanup():
+        deletepv("pvname1")
+        if os.path.isfile("vmdk"):
+            os.remove("vmdk")
+
+    currentmodule = sys.modules[__name__]
+    # Following is the mock code to test the thick copy
+    def create_empty_vmdk_mock(filepath, capacity):
+        cmd = ["dd", "if=/dev/zero", "of="+filepath, "bs=1", "count=1", "seek=" + str(capacity)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_mount_disk(diskslist, mntlist, diskonly=False):
+        with open(diskslist, 'r') as f:
+            for line in f:
+                return None, {'disk1': [line + ";"]}
+
+    def my_populate_extent(hostip, username, password, vmspec, remotepath,
+                           mountpath, start, count):
+        cmd = ["dd", "if="+remotepath, "of="+mountpath, "bs=512", "count=" +
+               str(count), "seek=" + str(start), "skip="+str(start), "conv=notrunc"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_populate_extents(hostip, username, password, vmspec, remotepath,
+                           mountpath, extentsfile):
+        with open(extentsfile, 'r') as f:
+            for line in f:
+                start = int(line.split(",")[0])/512
+                count = int(line.split(",")[1])/512
+                my_populate_extent(hostip, username, password, vmspec,
+                                remotepath, mountpath, start, count)
+
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extents', side_effect=my_populate_extents)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extent', side_effect=my_populate_extent)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.umount_local_vmdk')
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.mount_local_vmdk', side_effect=my_mount_disk)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk', side_effect=create_empty_vmdk_mock)
+    def test(method1, method2, method3, method4, method5):
+        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
+        localvmdkpath = "vmdk"
+        workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
+        extentsfile, partitions, totalblocks = \
+              workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
+                             None, None, None, dev, localvmdkpath)
+        return extentsfile, partitions, totalblocks
+
+    try:
+        print "Running test_raw_disk():"
+        setup() 
+        print "\tsetup done"
+
+        extentsfile, partitions, totalblocks = test()
+        print "\ttest() done"
+        
+        verify("pvname1", extentsfile, "vmdk")
+        print "\t verification done"
+
+        if os.path.isfile(extentsfile):
+            os.remove(extentsfile)
+    finally:
+        cleanup()
+        print "\t cleanup done"
+
+# thick copy when the entire disk is partitioned into 4 primary partitions and 
+# formatted to ext4 file systems
+def test_raw_partition():
+
+    def createpv(pvname, capacity):
+        try:
+            cmd = ["dd", "if=/dev/zero", "of="+pvname, "bs=1", "count=1",
+                   "seek=" + str(capacity)]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-f"]
+            freedev = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            freedev = freedev.strip("\n")
+            cmd = ["losetup", freedev, pvname,]
+
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create or mount pvname "
+            raise
+
+    def deletepv(pvname):
+        os.remove(pvname)
+
+    def setup():
+        mountpoint = createpv("pvname1", "1TiB")
+        devices = []
+   
+        cmd = ["parted", mountpoint, "mklabel", "msdos"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["parted", mountpoint, "mkpart", "primary", "ext2", str(1024), str(10240)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["parted", mountpoint, "mkpart", "primary", "ext2", str(10240), str(2 * 10240)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["parted", mountpoint, "mkpart", "primary", "ext2", str(2 * 10240), str(10 * 10240)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["parted", mountpoint, "mkpart", "primary", "ext2", str(10 * 10240), str(100 * 10240)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["losetup", "-d", "/dev/loop0"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        return 
+
+    def cleanup():
+        deletepv("pvname1")
+        if os.path.isfile("vmdk"):
+            os.remove("vmdk")
+ 
+    currentmodule = sys.modules[__name__]
+    # Following is the mock code to test the thick copy
+    def create_empty_vmdk_mock(filepath, capacity):
+        cmd = ["dd", "if=/dev/zero", "of="+filepath, "bs=1", "count=1", "seek=" + str(capacity)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_mount_disk(diskslist, mntlist, diskonly=False):
+        with open(diskslist, 'r') as f:
+            for line in f:
+                return None, {'disk1': [line + ";"]}
+
+    def my_populate_extent(hostip, username, password, vmspec, remotepath,
+                           mountpath, start, count):
+        cmd = ["dd", "if="+remotepath, "of="+mountpath, "bs=512", "count=" +
+               str(count), "seek=" + str(start), "skip="+str(start), "conv=notrunc"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_populate_extents(hostip, username, password, vmspec, remotepath,
+                           mountpath, extentsfile):
+        with open(extentsfile, 'r') as f:
+            for line in f:
+                start = int(line.split(",")[0])/512
+                count = int(line.split(",")[1])/512
+                my_populate_extent(hostip, username, password, vmspec,
+                                remotepath, mountpath, start, count)
+
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extents', side_effect=my_populate_extents)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extent', side_effect=my_populate_extent)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.umount_local_vmdk')
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.mount_local_vmdk', side_effect=my_mount_disk)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk', side_effect=create_empty_vmdk_mock)
+    def test(method1, method2, method3, method4, method5):
+        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
+        localvmdkpath = "vmdk"
+        workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
+        extentsfile, partitions, totalblocks = \
+              workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
+                             None, None, None, dev, localvmdkpath)
+        return extentsfile, partitions, totalblocks
+
+    try:
+        print "Running test_raw_partition():"
+        setup() 
+        print "\tSetup() done"
+ 
+        extentsfile, partitions, totalblocks = test()
+        print "\t test() done"
+
+        if os.path.isfile(extentsfile):
+            os.remove(extentsfile)
     finally:
         cleanup()
         print "\t cleanup done"
 
 if __name__ == "__main__":
-    test_lv_entire_disk()
-    test_lv_on_partitions()
-    test_lvs_on_two_partitions()
-    test_lvs_span_two_partitions()
+    #test_lv_entire_disk()
+    #test_lv_on_partitions()
+    #test_lvs_on_two_partitions()
+    #test_lvs_span_two_partitions()
     test_mbr_4_primary_partitions()
-    test_mbr_3_primary_1_logical_partitions()
-    test_gpt_partitions()
+    #test_mbr_3_primary_1_logical_partitions()
+    #test_gpt_partitions()
+    #test_raw_disk()
+    #test_raw_partition()
+    
