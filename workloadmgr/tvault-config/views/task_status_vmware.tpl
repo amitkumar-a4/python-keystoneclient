@@ -326,9 +326,14 @@ $( document ).ready(function() {
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>
                 Configuring trilioVault host</li>  
     <li id="authenticate_with_vcenter" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with vCenter</li>   
-    <li id="authenticate_with_swift" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with Swift Object Store</li>                                
+                Authenticating with vCenter</li> 
+	%if 'swift_auth_url' in locals() and swift_auth_url.length > 0:
+    	<li id="authenticate_with_swift" class="list-group-item"><span class="glyphicon"></span>
+                Authenticating with Swift Object Store</li>     
+	%else:
+    	<li id="authenticate_with_swift" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+                Authenticating with Swift Object Store</li>     
+    %end      			
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
                 Registering trilioVault service</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>

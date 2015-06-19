@@ -561,9 +561,9 @@ class WorkloadMgrsController(wsgi.Controller):
             
             settings = None            
             if (body and 'settings' in body):
-                settings = settings_module.set_settings(body['settings'])
+                settings = settings_module.set_settings(context, body['settings'])
             if not settings:
-                settings = settings_module.get_settings()
+                settings = settings_module.get_settings(context)
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)

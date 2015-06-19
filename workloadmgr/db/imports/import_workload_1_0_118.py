@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright (c) 2014 TrilioData, Inc.
+# Copyright (c) 2015 TrilioData, Inc.
 # All Rights Reserved.
 
 import socket
@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 def import_workload(cntx, workload_url, new_version):
     """ Import workload and snapshot records from vault 
-    Versions Supported: 1.0.14
+    Versions Supported: 1.0.118
     """
     def _adjust_values(values):
         values['version'] = new_version

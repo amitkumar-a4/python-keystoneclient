@@ -502,7 +502,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)  
                 
         snapshot = self.db.snapshot_get(context, snapshot_id)
-        if settings.get_settings().get('smtp_email_enable') == 'yes':
+        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
             self.send_email(context,snapshot,'snapshot')
         
         #unlock the workload
@@ -725,7 +725,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             LOG.exception(ex)        
 
         restore = self.db.restore_get(context, restore_id)
-        if settings.get_settings().get('smtp_email_enable') == 'yes':
+        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
             self.send_email(context,restore,'restore')        
 
     @autolog.log_method(logger=Logger)
@@ -758,9 +758,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
                 user = keystone.users.get(context.user_id)
                 if user.email == '':
-                    user.email = settings.get_settings().get('smtp_default_recipient')
+                    user.email = settings.get_settings(context).get('smtp_default_recipient')
             except:
-                o = {'name':'admin','email':settings.get_settings().get('smtp_default_recipient')}
+                o = {'name':'admin','email':settings.get_settings(context).get('smtp_default_recipient')}
                 user = objectview(o)
                 pass
 
@@ -867,16 +867,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = MIMEMultipart('alternative')
             msg['To'] = user.email
             #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
-            msg['From'] = settings.get_settings().get('smtp_default_sender')
+            msg['From'] = settings.get_settings(context).get('smtp_default_sender')
             msg['Subject'] = subject        
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            s = smtplib.SMTP(settings.get_settings().get('smtp_server_name'),int(settings.get_settings().get('smtp_port')))
-            if settings.get_settings().get('smtp_server_name') != 'localhost':
+            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),int(settings.get_settings(context).get('smtp_port')))
+            if settings.get_settings(context).get('smtp_server_name') != 'localhost':
                 s.ehlo()
                 s.starttls()
                 s.ehlo
-                s.login(settings.get_settings().get('smtp_server_username'),settings.get_settings().get('smtp_server_password'))
+                s.login(settings.get_settings(context).get('smtp_server_username'),settings.get_settings(context).get('smtp_server_password'))
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
         

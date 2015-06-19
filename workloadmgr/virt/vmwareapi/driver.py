@@ -1029,7 +1029,7 @@ class VMwareVCDriver(VMwareESXDriver):
 
                 extentsfile = None
 
-                turbo_thick_disk_backup = settings.get_settings().get('turbo_thick_disk_backup', 'False')
+                turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')
                 if (hasattr(dev.backing, 'thinProvisioned') and\
                       dev.backing.thinProvisioned == False) and\
                     parent_changeId is '*' and\
