@@ -23,7 +23,7 @@ from workloadmgr.openstack.common import timeutils
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '1.0.108'
+DB_VERSION = '1.0.119'
 
 
 class WorkloadsBase(object):
@@ -534,7 +534,35 @@ class TaskStatusMessages(BASE, WorkloadsBase):
     task = relationship(Tasks, backref=backref('status_messages'))
     status_message = Column(Text)      
 
+class Settings(BASE, WorkloadsBase):
+    """Represents configurable settings."""
 
+    __tablename__ = 'settings'
+    key = Column(String(255), primary_key=True, nullable=False)
+    project_id = Column(String(255), primary_key=True, nullable=False)
+    
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.key
+
+    user_id = Column(String(255), nullable=False)
+    value = Column(String(255))
+    description = Column(String(255))
+    status =  Column(String(32), nullable=False)
+    
+class SettingMetadata(BASE, WorkloadsBase):
+    """Setting  metadata"""
+    __tablename__ = 'setting_metadata'
+    __table_args__ = (UniqueConstraint('settings_key', 'settings_project_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    settings_key = Column(String(255), ForeignKey('settings.key'), nullable=False)
+    settings_project_id = Column(String(255), nullable=False)
+    
+    settings = relationship(Settings, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)      
+    
         
 def register_models():
     """Register Models and create metadata.
@@ -570,6 +598,9 @@ def register_models():
               RestoredVMResources,
               RestoredVMResourceMetadata,
               Tasks,
+              TaskStatusMessages,
+              Settings,
+              SettingMetadata
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

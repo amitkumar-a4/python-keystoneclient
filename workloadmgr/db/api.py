@@ -372,6 +372,26 @@ def restored_vm_resource_get(context, id):
 def restored_vm_resource_delete(context, id, vm_id, restore_id):
     return IMPL.restored_vm_resource_delete(context, id, vm_id, restore_id)
 
+def setting_create(context, values):
+    return IMPL.setting_create(context, values)
+
+def setting_delete(context, setting_key):
+    """Destroy the setting or raise if it does not exist."""
+    return IMPL.setting_delete(context, setting_key)
+
+def setting_get(context, setting_key, **kwargs):
+    return IMPL.setting_get(context, setting_key, **kwargs)
+    
+def setting_get_all(context, **kwargs):
+    return IMPL.setting_get_all(context, **kwargs)    
+
+def setting_get_all_by_project(context, project_id, **kwargs):
+    """Get all settings belonging to a project."""
+    return IMPL.setting_get_all_by_project(context, project_id, **kwargs)
+    
+def setting_update(context, setting_key, values):
+    return IMPL.setting_update(context, setting_key, values)
+
 def purge_snapshot(context, id):
     return IMPL.purge_snapshot(context, id)
 

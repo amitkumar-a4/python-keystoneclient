@@ -1153,7 +1153,8 @@ def configure_form_openstack():
 @authorize()
 def task_status_vmware():
     bottle.request.environ['beaker.session']['error_message'] = ''
-    return {}
+    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']    
+    return config_data
 
 @bottle.route('/task_status_openstack')
 @bottle.view('task_status_openstack')

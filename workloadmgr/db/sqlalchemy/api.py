@@ -128,7 +128,9 @@ def model_query(context, *args, **kwargs):
             query to match the context's project_id.
     """
     session = kwargs.get('session') or get_session()
-    read_deleted = kwargs.get('read_deleted') or context.read_deleted
+    read_deleted = kwargs.get('read_deleted') 
+    if read_deleted == None and context != None:
+        read_deleted = context.read_deleted
     project_only = kwargs.get('project_only')
 
     query = session.query(*args)
@@ -142,8 +144,9 @@ def model_query(context, *args, **kwargs):
     else:
         raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
 
-    if project_only and is_user_context(context):
-        query = query.filter_by(project_id=context.project_id)
+    if context:
+        if project_only and is_user_context(context):
+            query = query.filter_by(project_id=context.project_id)
 
     return query
 
@@ -2544,6 +2547,168 @@ def task_delete(context, task_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+            
+            
+#### Setting ################################################################
+""" setting functions """
+def _set_metadata_for_setting(context, setting_ref, metadata,
+                                    purge_metadata, session):
+    """
+    Create or update a set of setting_metadata for a given setting
+
+    :param context: Request context
+    :param setting_ref: A setting object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in setting_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'settings_key': setting_ref.key,
+                           'settings_project_id' : setting_ref.project_id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _setting_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _setting_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _setting_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def _setting_metadata_create(context, values, session):
+    """Create a SettingMetadata object"""
+    metadata_ref = models.SettingMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _setting_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def setting_metadata_create(context, values, session):
+    """Create a SettingMetadata object"""
+    session = get_session()
+    return _setting_metadata_create(context, values, session)
+
+@require_context
+def _setting_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by setting_metadata_create and setting_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _setting_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by setting_metadata_create and setting_metadata_update
+    """
+    metadata_ref.delete(session=session)
+
+def _setting_update(context, values, setting_key, purge_metadata, session):
+    try:
+        lock.acquire()    
+        metadata = values.pop('metadata', {})
+        
+        if setting_key:
+            setting_ref = model_query(context, models.Settings, session=session, read_deleted="yes").\
+                                        filter_by(key=setting_key).\
+                                        filter_by(project_id=context.project_id).\
+                                        first()
+            if not setting_ref:
+                lock.release()
+                raise exception.SettingNotFound(setting_key = setting_key)
+                                                        
+        else:
+            setting_ref = models.Settings()
+            if not values.get('key'):
+                values['key'] = str(uuid.uuid4())
+                
+        setting_ref.update(values)
+        setting_ref.save(session)
+        
+        if metadata:
+            _set_metadata_for_setting(context, setting_ref, metadata, purge_metadata, session=session)  
+          
+        return setting_ref
+    finally:
+        lock.release()
+    return setting_ref               
+        
+@require_context
+def _setting_get(context, setting_key, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(   context, models.Settings, **kwargs).\
+                            options(sa_orm.joinedload(models.Settings.metadata)).\
+                            filter_by(key=setting_key).\
+                            filter_by(project_id=context.project_id).\
+                            first()
+
+    if not result:
+        raise exception.SettingNotFound(setting_key=setting_key)
+
+    return result
+
+@require_context
+def setting_get(context, setting_key, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()    
+    return _setting_get(context, setting_key, **kwargs) 
+
+#@require_admin_context
+def setting_get_all(context, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    
+    if context:
+        return model_query(context, models.Settings, **kwargs).\
+                            options(sa_orm.joinedload(models.Settings.metadata)).\
+                            filter_by(project_id=context.project_id).\
+                            order_by(models.Settings.created_at.desc()).all()  
+    else:       
+            
+        return model_query(context, models.Settings, **kwargs).\
+                            options(sa_orm.joinedload(models.Settings.metadata)).\
+                            order_by(models.Settings.created_at.desc()).all()        
+
+@require_context
+def setting_get_all_by_project(context, project_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    authorize_project_context(context, project_id)
+    return model_query(context, models.Settings, **kwargs).\
+                            options(sa_orm.joinedload(models.Settings.metadata)).\
+                            filter_by(project_id=project_id).all()
+        
+@require_context
+def setting_create(context, values):
+    session = get_session()
+    return _setting_update(context, values, None, False, session)
+
+@require_context
+def setting_update(context, setting_key, values, purge_metadata=False):
+    session = get_session()
+    return _setting_update(context, values, setting_key, purge_metadata, session)
+
+@require_context
+def setting_delete(context, setting_key):
+    session = get_session()
+    with session.begin():
+        session.query(models.Settings).\
+            filter_by(key=setting_key).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})            
 
 """
 Permanent Deletes
