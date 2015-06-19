@@ -151,22 +151,41 @@
 		    </div>
 		    <div id="collapseFive" class="panel-collapse collapse">
 		      <div class="panel-body">
-			    <div class="input-group">
-			    	<label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-			    	<input name="swift-auth-url" {{'value=' + swift_auth_url if defined('swift_auth_url') else ''}} type="url" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
-			    </div><br>
-			    <div class="input-group">
-			    	<label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-			    	<input name="swift-username" {{'value=' + swift_username if defined('swift_username') else ''}} type="text" placeholder="admin" class="form-control"> <br>
-			    </div><br>
-			    <div class="input-group">
-			    	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-			    	<input name="swift-password" type="password" class="form-control"> <br>
-			    </div><br>
-			    <div class="input-group">
-			    	<label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-			    	<input name="swift-tenantname" {{'value=' + swift_tenantname if defined('swift_tenantname') else ''}} type="text" placeholder="admin" class="form-control"> <br>
-			    </div><br>			    	
+                %if 'swift_auth_url' in locals() and len(swift_auth_url) > 0:
+                    <div class="input-group">
+                        <label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-auth-url" {{'value=' + swift_auth_url if defined('swift_auth_url') else ''}} type="text" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+                    </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-username" {{'value=' + swift_username if defined('swift_username') else ''}} type="text" placeholder="admin" class="form-control"> <br>
+                    </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                        <input name="swift-password" type="password" class="form-control"> <br>
+                    </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-tenantname" {{'value=' + swift_tenantname if defined('swift_tenantname') else ''}} type="text" placeholder="admin" class="form-control"> <br>
+                    </div><br>
+                %else:
+                    <div class="input-group">
+                        <label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-auth-url" type="text" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+                    </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-username" type="text" placeholder="admin" class="form-control"> <br>
+                    </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                        <input name="swift-password" type="password" class="form-control"> <br>
+                    </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-tenantname" type="text" placeholder="admin" class="form-control"> <br>
+                    </div><br>
+                %end
 	 	      </div>
 		    </div>
 		  </div>
