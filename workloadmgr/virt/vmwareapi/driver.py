@@ -861,7 +861,7 @@ class VMwareVCDriver(VMwareESXDriver):
             return None,'*', None
         except Exception as ex:
             LOG.exception(ex)
-            return None,'*'
+            return None,'*', None
         
  
     @autolog.log_method(Logger, 'VMwareVCDriver.get_top_vm_disk_resource_snap')
