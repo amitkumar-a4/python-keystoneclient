@@ -1217,7 +1217,6 @@ def test_mbr_3_primary_1_logical_partitions():
         return extentsfile, partitions, totalblocks
 
     try:
-        import pdb;pdb.set_trace()
         print "Running test_mbr_3_primary_1_logical_partitions():"
         setup() 
         print "\tSetup done"
@@ -1493,10 +1492,7 @@ def test_raw_disk():
         extentsfile, partitions, totalblocks = test()
         print "\ttest() done"
         
-        verify("pvname1", extentsfile, "vmdk")
-        print "\t verification done"
-
-        if os.path.isfile(extentsfile):
+        if extentsfile and os.path.isfile(extentsfile):
             os.remove(extentsfile)
     finally:
         cleanup()
@@ -1604,20 +1600,20 @@ def test_raw_partition():
         extentsfile, partitions, totalblocks = test()
         print "\t test() done"
 
-        if os.path.isfile(extentsfile):
+        if extentsfile and os.path.isfile(extentsfile):
             os.remove(extentsfile)
     finally:
         cleanup()
         print "\t cleanup done"
 
 if __name__ == "__main__":
-    #test_lv_entire_disk()
-    #test_lv_on_partitions()
-    #test_lvs_on_two_partitions()
-    #test_lvs_span_two_partitions()
+    test_lv_entire_disk()
+    test_lv_on_partitions()
+    test_lvs_on_two_partitions()
+    test_lvs_span_two_partitions()
     test_mbr_4_primary_partitions()
-    #test_mbr_3_primary_1_logical_partitions()
-    #test_gpt_partitions()
-    #test_raw_disk()
-    #test_raw_partition()
+    test_mbr_3_primary_1_logical_partitions()
+    test_gpt_partitions()
+    test_raw_disk()
+    test_raw_partition()
     

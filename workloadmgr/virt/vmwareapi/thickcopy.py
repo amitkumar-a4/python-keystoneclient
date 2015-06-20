@@ -1288,7 +1288,6 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
     if extentsfile:
         return extentsfile, rparts, totalblocks
 
-    import pdb;pdb.set_trace()
     return process_partitions(hostip, username, password, vmspec, dev, localvmdkpath,
                             partitions)
 
@@ -1299,8 +1298,7 @@ def thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                          vmspec, dev, localvmdkpath)
         return extentsfile, partitions, totalblocks
     except Exception as ex:
-        #LOG.exception(_(ex))
-        raise
+        LOG.exception(_(ex))
         return None, None, None
 
 """
