@@ -279,30 +279,35 @@ def get_cassandra_instances(store, findpartitiontype = 'False'):
         # call nova interface-list <instanceid> to build the list of instances ids
         # if node names are host names then lookup the VMid based on the
         for instance in instances:
-            ifs = instance.addresses
-            for addr in instance.addresses:
-                # IP Addresses
-                ifs = instance.addresses[addr]
-                for _if in ifs:
+            # The following logic helps for VMware VMs. For OpenStack instances,
+            # look at the instance interfaces.
+            hypervisor_hostname = None
+            hypervisor_type = None
+            for hypervisor in hypervisors:
+                if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
+                    hypervisor_hostname = hypervisor.hypervisor_hostname
+                    hypervisor_type = hypervisor.hypervisor_type
+                    break
+            if hypervisor_type == "VMware vCenter Server":
+                for addr in json.loads(instance.metadata['networks']):
+                    # IP Addresses
                     #this is our vm
-                    hypervisor_hostname = None
-                    hypervisor_type = None
-                    for hypervisor in hypervisors:
-                        if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
-                            hypervisor_hostname = hypervisor.hypervisor_hostname
-                            hypervisor_type = hypervisor.hypervisor_type
-                            break
-                    if _if['OS-EXT-IPS-MAC:mac_addr'].lower() in interfaces:
+                    if addr['macAddress'].lower() in interfaces:
                         utils.append_unique(vms, {'vm_id' : instance.id,
-                                                  'vm_name' : instance.name,
-                                                  'vm_metadata' : instance.metadata,
-                                                  'vm_flavor_id' : instance.flavor['id'],
-                                                  'hostname' : interfaces[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
-                                                  'root_partition_type' : root_partition_type[_if['OS-EXT-IPS-MAC:mac_addr'].lower()],
-                                                  'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
-                                                  'hypervisor_hostname' : hypervisor_hostname,
-                                                  'hypervisor_type' :  hypervisor_type},
-                                                  "vm_id")
+                                            'vm_name' : instance.name,
+                                            'vm_metadata' : instance.metadata,
+                                            'vm_flavor_id' : instance.flavor['id'],
+                                            'hostname' : interfaces[addr['macAddress'].lower()],
+                                            'root_partition_type' : root_partition_type[addr['macAddress'].lower()],
+                                            'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
+                                            'hypervisor_hostname' : hypervisor_hostname,
+                                            'hypervisor_type' :  hypervisor_type},
+                                            "vm_id")
+                        break;
+            else:
+                 LOG.info(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
+                 raise Exception(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
+
         LOG.info(_('Discovered Cassandra Virtual Machines: ' + str(vms)))
         return vms, cassandra_nodes, allnodes, clusterinfo
     except Exception as ex:
