@@ -606,6 +606,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                                             'hypervisor_hostname' : hypervisor_hostname,
                                             'hypervisor_type' :  hypervisor_type},
                                             "vm_id")
+                    break
         else:
             LOG.info(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
             raise Exception(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))

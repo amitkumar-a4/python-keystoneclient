@@ -398,10 +398,10 @@ def exec_cqlsh_command(hosts, port, user, password, cqlshcommand):
 
 @autolog.log_method(Logger)
 def get_keyspaces(alivenodes, port, username, password):
+    keyspaces = []
     for alive in alivenodes:
         output = exec_cqlsh_command([alive], port, username, password, 'SELECT * FROM system.schema_keyspaces')
 
-        keyspaces = []
         for host in output:
             if "Connection error" in output[host]['stdout'][0]:
                  continue
@@ -436,7 +436,7 @@ def get_keyspaces(alivenodes, port, username, password):
 
             return keyspaces
 
-    return None
+    return keyspaces
 
 @autolog.log_method(Logger)
 def main(argv):
