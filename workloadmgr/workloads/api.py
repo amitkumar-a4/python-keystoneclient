@@ -573,8 +573,9 @@ class API(base.Base):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         try:
             workloads = []
-            for workload_url in vault.get_workloads():
-                workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
+            import_workload_module = None
+            for workload_url in vault.get_workloads(context):
+                workload_values = json.loads(vault.get_object('/snapshots/' + workload_url['workload_url'] + '/workload_db'))
                 """
                 try:
                     jobs = self._scheduler.get_jobs()
@@ -592,8 +593,14 @@ class API(base.Base):
                     workloads.append(workload)
                 except Exception as ex:
                     LOG.exception(ex)
+            if not import_workload_module:
+                import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_1_0_118')
+            import_settings_method = getattr(import_workload_module, 'import_settings')
+            import_settings_method(context, models.DB_VERSION)
         except Exception as ex:
-            LOG.exception(ex)                
+            LOG.exception(ex)
+        finally:
+            vault.purge_staging_area(context)                
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
     
@@ -610,34 +617,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
-        def get_total_capacity():
-            stdout, stderr = utils.execute('df', FLAGS.wlm_vault_local_directory)
-            if stderr != '':
-                msg = _('Could not execute df command successfully. Error %s'), (stderr)
-                raise wlm_exceptions.ErrorOccurred(reason=msg)
-
-            # Filesystem     1K-blocks      Used Available Use% Mounted on
-            # /dev/sda1      464076568 248065008 192431096  57% /
-
-            fields = stdout.split('\n')[0].split()
-            values = stdout.split('\n')[1].split()
-            
-            total_capacity = int(values[1]) * 1024
-            total_utilization = int(values[2]) * 1024
-            try:
-                stdout, stderr = utils.execute('du', '-shb', FLAGS.wlm_vault_local_directory, run_as_root=True)
-                if stderr != '':
-                    msg = _('Could not execute du command successfully. Error %s'), (stderr)
-                    raise wlm_exceptions.ErrorOccurred(reason=msg)
-                #196022926557    /opt/stack/data/wlm
-                du_values = stdout.split()                
-                total_utilization = int(du_values[0])
-            except Exception as ex:
-                LOG.exception(ex)
-
-            return total_capacity,total_utilization 
-
-        total_capacity, total_utilization = get_total_capacity()
+        total_capacity, total_utilization = vault.get_total_capacity()
         storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
@@ -648,7 +628,6 @@ class API(base.Base):
                         else:
                             storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
             storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
-            
         except Exception as ex:
             LOG.exception(ex)
         return storage_usage

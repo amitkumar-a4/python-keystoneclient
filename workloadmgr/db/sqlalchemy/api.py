@@ -990,10 +990,10 @@ def snapshot_type_time_size_update(context, snapshot_id):
             snapshot_vm_resource_size = 0
             snapshot_vm_resource_restore_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
-                if vm_disk_resource_snap.vault_service_url:
-                    vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_service_url)
+                if vm_disk_resource_snap.vault_path:
+                    vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_path)
                     disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_service_url,
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
                                                                                 disk_format, disk_type)
                     vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
                                                                                      'restore_size' : vm_disk_resource_snap_restore_size}) 
@@ -1003,6 +1003,20 @@ def snapshot_type_time_size_update(context, snapshot_id):
                                                                            'restore_size' : snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
             snapshot_restore_size = snapshot_restore_size + snapshot_vm_resource_restore_size
+    
+        
+    snapshot_vms= snapshot_vms_get(context, snapshot_id)
+    for snapshot_vm in snapshot_vms:
+        snapshot_vm_size = 0
+        snapshot_vm_restore_size = 0
+        snapshot_vm_resources = snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot_id)
+        for snapshot_vm_resource in snapshot_vm_resources:
+            if snapshot_vm_resource.resource_type != 'disk':
+                continue
+            snapshot_vm_size = snapshot_vm_size +  snapshot_vm_resource.size
+            snapshot_vm_restore_size = snapshot_vm_restore_size + snapshot_vm_resource.restore_size
+        snapshot_vm_update(context, snapshot_vm.vm_id, snapshot_id, {'size' : snapshot_vm_size, 'restore_size' : snapshot_vm_restore_size})        
+               
     
     if snapshot.finished_at:
         time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
@@ -2710,6 +2724,164 @@ def setting_delete(context, setting_key):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})            
 
+#### VaultStorage ################################################################
+""" vault_storage functions """
+def _set_metadata_for_vault_storage(context, vault_storage_ref, metadata,
+                                    purge_metadata, session):
+    """
+    Create or update a set of vault_storage_metadata for a given vault_storage
+
+    :param context: Request context
+    :param vault_storage_ref: A vault_storage object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in vault_storage_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'vault_storage_id': vault_storage_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _vault_storage_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _vault_storage_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _vault_storage_metadata_delete(context, metadata_ref, session=session)
+
+@require_context
+def _vault_storage_metadata_create(context, values, session):
+    """Create a VaultStorageMetadata object"""
+    metadata_ref = models.VaultStorageMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())    
+    return _vault_storage_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def vault_storage_metadata_create(context, values, session):
+    """Create an VaultStorageMetadata object"""
+    session = get_session()
+    return _vault_storage_metadata_create(context, values, session)
+
+@require_context
+def _vault_storage_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by vault_storage_metadata_create and vault_storage_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _vault_storage_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by vault_storage_metadata_create and vault_storage_metadata_update
+    """
+    metadata_ref.delete(session=session)
+
+def _vault_storage_update(context, values, vault_storage_id, purge_metadata, session):
+    try:
+        lock.acquire()    
+        metadata = values.pop('metadata', {})
+        
+        if vault_storage_id:
+            vault_storage_ref = model_query(context, models.VaultStorages, session=session, read_deleted="yes").\
+                                            filter_by(id=vault_storage_id).first()
+            if not vault_storage_ref:
+                lock.release()
+                raise exception.VaultStorageNotFound(vault_storage_id = vault_storage_id)
+                                                        
+        else:
+            vault_storage_ref = models.VaultStorages()
+            if not values.get('id'):
+                values['id'] = str(uuid.uuid4())
+            if not values.get('capacity'):
+                values['capacity'] = 0
+            if not values.get('used'):
+                values['used'] = 0                
+                
+        vault_storage_ref.update(values)
+        vault_storage_ref.save(session)
+        
+        if metadata:
+            _set_metadata_for_vault_storage(context, vault_storage_ref, metadata, purge_metadata, session=session)  
+          
+        return vault_storage_ref
+    finally:
+        lock.release()
+    return vault_storage_ref               
+        
+@require_context
+def _vault_storage_get(context, vault_storage_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(   context, models.VaultStorages, **kwargs).\
+                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+                            filter_by(id=vault_storage_id).\
+                            first()
+
+    if not result:
+        raise exception.VaultStorageNotFound(vault_storage_id=vault_storage_id)
+
+    return result
+
+@require_context
+def vault_storage_get(context, vault_storage_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()    
+    return _vault_storage_get(context, vault_storage_id, **kwargs) 
+
+@require_admin_context
+def vault_storage_get_all(context, workload_id=None, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    if workload_id == None:
+        return model_query(context, models.VaultStorages, **kwargs).\
+                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+                            order_by(models.VaultStorages.created_at.desc()).all()        
+    else:
+        return model_query(context, models.VaultStorages, **kwargs).\
+                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+                            filter_by(workload_id=workload_id).\
+                            order_by(models.VaultStorages.created_at.desc()).all()
+@require_context
+def vault_storage_get_all_by_project(context, project_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    authorize_project_context(context, project_id)
+    return model_query(context, models.VaultStorages, **kwargs).\
+                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+                            filter_by(project_id=project_id).all()
+        
+@require_context
+def vault_storage_create(context, values):
+    session = get_session()
+    return _vault_storage_update(context, values, None, False, session)
+
+@require_context
+def vault_storage_update(context, vault_storage_id, values, purge_metadata=False):
+    session = get_session()
+    return _vault_storage_update(context, values, vault_storage_id, purge_metadata, session)
+
+@require_context
+def vault_storage_delete(context, vault_storage_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.VaultStorages).\
+            filter_by(id=vault_storage_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+            
 """
 Permanent Deletes
 """

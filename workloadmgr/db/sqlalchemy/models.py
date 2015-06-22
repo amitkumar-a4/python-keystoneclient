@@ -18,12 +18,13 @@ from workloadmgr.db.sqlalchemy.session import get_session
 from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import timeutils
+from workloadmgr.vault import vault
 
 
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '1.0.119'
+DB_VERSION = '1.0.120'
 
 
 class WorkloadsBase(object):
@@ -120,6 +121,38 @@ class WorkloadsNode(BASE, WorkloadsBase):
     id = Column(Integer, primary_key=True)
     service_id = Column(Integer, ForeignKey('services.id'), nullable=True)
     
+class VaultStorages(BASE, WorkloadsBase):
+    """Represents a vault storages."""
+
+    __tablename__ = 'vault_storages'
+    id = Column(String(255), primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    
+    type = Column(String(255), nullable=False)
+    display_name = Column(String(255))
+    display_description = Column(String(255))
+    capacity = Column(BigInteger)
+    used = Column(BigInteger)
+    status =  Column(String(32), nullable=False)
+    
+class VaultStorageMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for vault storage"""
+    __tablename__ = 'vault_storage_metadata'
+    __table_args__ = (UniqueConstraint('vault_storage_id', 'key'), {})
+
+    id = Column(Integer, primary_key=True)
+    vault_storage_id = Column(String(255), ForeignKey('vault_storages.id'), nullable=False)
+    vault_storage = relationship(VaultStorages, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)      
+        
+    
 class WorkloadTypes(BASE, WorkloadsBase):
     """Types of workloads"""
     __tablename__ = 'workload_types'
@@ -168,6 +201,7 @@ class Workloads(BASE, WorkloadsBase):
     workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
     source_platform = Column(String(255))
     jobschedule = Column(String(4096))
+    vault_storage_id = Column(String(255), ForeignKey('vault_storages.id'))
     status = Column(String(255)) 
   
 class WorkloadMetadata(BASE, WorkloadsBase):
@@ -252,6 +286,7 @@ class Snapshots(BASE, WorkloadsBase):
     data_deleted = Column(Boolean, default=False)
     pinned = Column(Boolean, default=False) 
     time_taken = Column(BigInteger, default=0)   
+    vault_storage_id = Column(String(255), ForeignKey('vault_storages.id'))
     status =  Column(String(32), nullable=False)
     
 class SnapshotMetadata(BASE, WorkloadsBase):
@@ -346,13 +381,17 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     @property
     def name(self):
         return FLAGS.workload_name_template % self.id
+    
+    @property
+    def vault_path(self):
+        return vault.get_vault_local_directory() + self.vault_url    
 
     snapshot_vm_resource_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'))
     vm_disk_resource_snap_backing_id = Column(String(255))
     vm_disk_resource_snap_child_id = Column(String(255))
     top = Column(Boolean, default=False)
-    vault_service_url = Column(String(4096))    
-    vault_service_metadata = Column(String(4096))
+    vault_url = Column(String(4096))    
+    vault_metadata = Column(String(4096))
     size = Column(BigInteger)
     restore_size = Column(BigInteger)    
     finished_at = Column(DateTime)
@@ -563,7 +602,6 @@ class SettingMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
     
-        
 def register_models():
     """Register Models and create metadata.
 
@@ -573,6 +611,8 @@ def register_models():
     """
     from sqlalchemy import create_engine
     models = (Service,
+              vault_storages,
+              vault_storage_metadata,
               WorkloadTypes,
               WorkloadTypeMetadata,
               Workloads,
@@ -600,7 +640,7 @@ def register_models():
               Tasks,
               TaskStatusMessages,
               Settings,
-              SettingMetadata
+              SettingMetadata             
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

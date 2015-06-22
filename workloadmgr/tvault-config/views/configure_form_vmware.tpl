@@ -168,6 +168,10 @@
                         <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                         <input name="swift-tenantname" {{'value=' + swift_tenantname if defined('swift_tenantname') else ''}} type="text" placeholder="admin" class="form-control"> <br>
                     </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Container&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-container" type="text" {{'value=' + swift_container if defined('swift_container') else ''}} placeholder="TrilioVault" class="form-control"> <br>
+                    </div><br>                    
                 %else:
                     <div class="input-group">
                         <label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
@@ -185,6 +189,10 @@
                         <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                         <input name="swift-tenantname" type="text" placeholder="admin" class="form-control"> <br>
                     </div><br>
+                    <div class="input-group">
+                        <label class="input-group-addon">Container&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input name="swift-container" type="text" value=TrilioVault placeholder="TrilioVault" class="form-control"> <br>
+                    </div><br>                    
                 %end
 	 	      </div>
 		    </div>

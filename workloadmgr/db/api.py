@@ -392,6 +392,30 @@ def setting_get_all_by_project(context, project_id, **kwargs):
 def setting_update(context, setting_key, values):
     return IMPL.setting_update(context, setting_key, values)
 
+def vault_storage_create(context, values):
+    return IMPL.vault_storage_create(context, values)
+
+def vault_storage_delete(context, vault_storage_id):
+    """Destroy the vault_storage or raise if it does not exist."""
+    return IMPL.vault_storage_delete(context, vault_storage_id)
+
+def vault_storage_get(context, vault_storage_id, **kwargs):
+    return IMPL.vault_storage_get(context, vault_storage_id, **kwargs)
+    
+def vault_storage_get_all(context, workload_id=None, **kwargs):
+    return IMPL.vault_storage_get_all(context, workload_id, **kwargs)    
+
+def vault_storage_get_all_by_project(context, project_id, **kwargs):
+    """Get all vault_storages belonging to a project."""
+    return IMPL.vault_storage_get_all_by_project(context, project_id, **kwargs)
+    
+def vault_storage_show(context, vault_storage_id):
+    """Get more details of the  vault_storage or raise if it does not exist."""
+    return IMPL.vault_storage_show(context, vault_storage_id)
+
+def vault_storage_update(context, vault_storage_id, values):
+    return IMPL.vault_storage_update(context, vault_storage_id, values)
+
 def purge_snapshot(context, id):
     return IMPL.purge_snapshot(context, id)
 
