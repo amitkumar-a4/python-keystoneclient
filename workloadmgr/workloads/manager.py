@@ -438,7 +438,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
             
             # upload the data to object store... this function will check if the object store is configured
-            vault.upload_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
+            vault.upload_snapshot_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -457,12 +457,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         msg = msg + ' ' + cause._exception_str
             LOG.error(msg)  
             
-            try:
-                # delete failed snapshot data
-                vault.snapshot_delete({'workload_id': workload.id, 'snapshot_id': snapshot.id}, staging = True)
-            except Exception as ex:
-                LOG.exception(ex)
-                  
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -482,12 +476,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
             LOG.error(msg)
             
-            try:
-                # delete failed snapshot data
-                vault.snapshot_delete({'workload_id': workload.id, 'snapshot_id': snapshot.id}, staging = True)
-            except Exception as ex:
-                LOG.exception(ex)   
-                            
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -499,7 +487,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
             except Exception as ex:
-                LOG.exception(ex)  
+                LOG.exception(ex) 
+                
+        try:
+            vault.purge_staging_area(context)
+        except Exception as ex:
+            LOG.exception(ex)                  
                 
         snapshot = self.db.snapshot_get(context, snapshot_id)
         if settings.get_settings(context).get('smtp_email_enable') == 'yes':
@@ -720,7 +713,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })
 
         try:
-            vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})
+            vault.purge_staging_area(context)
         except Exception as ex:
             LOG.exception(ex)        
 

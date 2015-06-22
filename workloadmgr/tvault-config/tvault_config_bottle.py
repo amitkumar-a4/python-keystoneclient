@@ -1617,9 +1617,12 @@ def configure_service():
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = swift-s')
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['swift_auth_url'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_auth_url = ', 'wlm_vault_swift_auth_url = ' + config_data['swift_auth_url'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_username = ', 'wlm_vault_swift_username = ' + config_data['swift_username'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_password = ', 'wlm_vault_swift_password = ' + config_data['swift_password'])            
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])            
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_container = ', 'wlm_vault_swift_container = ' + config_data['swift_container'])
+                        
               
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
@@ -1888,6 +1891,7 @@ def configure_vmware():
         config_data['swift_username'] = config_inputs['swift-username']
         config_data['swift_password'] = config_inputs['swift-password']
         config_data['swift_tenantname'] = config_inputs['swift-tenantname']
+        config_data['swift_container'] = config_inputs['swift-container']
         
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']
