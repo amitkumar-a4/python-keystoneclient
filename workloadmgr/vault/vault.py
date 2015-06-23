@@ -55,6 +55,9 @@ wlm_vault_opts = [
     cfg.StrOpt('wlm_vault_storage_das_device',
                default='none',
                help='das device /dev/sdb'),
+    cfg.StrOpt('wlm_vault_swift_auth_version',
+               default='KEYSTONE_V2',
+               help='KEYSTONE_V2 KEYSTONE_V3 TEMPAUTH'),                  
     cfg.StrOpt('wlm_vault_swift_auth_url',
                default='http://localhost:5000/v2.0',
                help='Keystone Authorization URL'),
@@ -289,24 +292,50 @@ def download_snapshot_vm_from_object_store(context, snapshot_vm_metadata):
 @autolog.log_method(logger=Logger)         
 def swift_upload_files(files, context = None): 
     """ upload a files or directories to swift """
-    options = { 'use_slo': False, 'verbose': 1, 'os_username': FLAGS.wlm_vault_swift_username, 'os_user_domain_name': None, 
-                'os_cacert': None, 'os_tenant_name': FLAGS.wlm_vault_swift_tenant, 'os_user_domain_id': None, 'header': [], 
-                'auth_version': '2.0', 'ssl_compression': True, 'os_password': FLAGS.wlm_vault_swift_password, 'os_user_id': None, 
-                'skip_identical': True, 'segment_container': None, 'os_project_id': None, 'snet': False, 
-                'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
-                'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
-                'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
-                'auth': FLAGS.wlm_vault_swift_auth_url, 'os_auth_url': FLAGS.wlm_vault_swift_auth_url, 
-                'user': FLAGS.wlm_vault_swift_username, 'key': FLAGS.wlm_vault_swift_password, 'os_region_name': None, 
-                'info': False, 'retries': 5, 'os_project_domain_id': None, 'checksum': True, 
-                'changed': True, 'leave_segments': False, 'os_auth_token': None, 
-                'os_options': {'project_name': None, 'region_name': None, 'tenant_name': FLAGS.wlm_vault_swift_tenant, 
-                               'user_domain_name': None, 'endpoint_type': None, 'object_storage_url': None, 
-                               'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
-                               'tenant_id': None, 'service_type': None, 'project_id': None, 
-                               'auth_token': None, 'project_domain_name': None}, 
-                'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None,
-                'verbose': 1}
+    options = {}
+    
+    if FLAGS.wlm_vault_swift_auth_version == 'TEMPAUTH':
+        options = {'use_slo': False, 'verbose': 1, 'os_username': None, 'os_user_domain_name': None, 
+                   'os_cacert': None, 'os_tenant_name': None, 'os_user_domain_id': None, 'header': [], 
+                   'auth_version': '1.0', 'ssl_compression': True, 'os_password': None, 'os_user_id': None, 
+                   'skip_identical': False, 'segment_container': None, 'os_project_id': None, 'snet': False, 
+                   'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
+                   'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
+                   'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
+                   'auth': FLAGS.wlm_vault_swift_auth_url, 'os_auth_url': None, 
+                   'user': FLAGS.wlm_vault_swift_username, 'key': FLAGS.wlm_vault_swift_password, 'os_region_name': None, 
+                   'info': False, 'retries': 5, 'os_project_domain_id': None, 'checksum': True, 
+                   'changed': False, 'leave_segments': False, 'os_auth_token': None, 
+                   'os_options': {'project_name': None, 'region_name': None, 'tenant_name': None, 
+                                  'user_domain_name': None, 'endpoint_type': None, 'object_storage_url': None, 
+                                  'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
+                                  'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                  'auth_token': None, 'project_domain_name': None}, 
+                   'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+        
+    else:
+        if FLAGS.wlm_vault_swift_auth_version == 'KEYSTONE_V2':
+            auth_version = '2.0'
+        else:
+            auth_version =  '3'
+        options = { 'use_slo': False, 'verbose': 1, 'os_username': FLAGS.wlm_vault_swift_username, 'os_user_domain_name': None, 
+                    'os_cacert': None, 'os_tenant_name': FLAGS.wlm_vault_swift_tenant, 'os_user_domain_id': None, 'header': [], 
+                    'auth_version': auth_version, 'ssl_compression': True, 'os_password': FLAGS.wlm_vault_swift_password, 'os_user_id': None, 
+                    'skip_identical': True, 'segment_container': None, 'os_project_id': None, 'snet': False, 
+                    'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
+                    'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
+                    'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
+                    'auth': FLAGS.wlm_vault_swift_auth_url, 'os_auth_url': FLAGS.wlm_vault_swift_auth_url, 
+                    'user': FLAGS.wlm_vault_swift_username, 'key': FLAGS.wlm_vault_swift_password, 'os_region_name': None, 
+                    'info': False, 'retries': 5, 'os_project_domain_id': None, 'checksum': True, 
+                    'changed': True, 'leave_segments': False, 'os_auth_token': None, 
+                    'os_options': {'project_name': None, 'region_name': None, 'tenant_name': FLAGS.wlm_vault_swift_tenant, 
+                                   'user_domain_name': None, 'endpoint_type': None, 'object_storage_url': None, 
+                                   'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
+                                   'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                   'auth_token': None, 'project_domain_name': None}, 
+                    'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None,
+                    'verbose': 1}
     
 
     if options['object_name'] is not None:
@@ -421,28 +450,87 @@ def swift_upload_files(files, context = None):
             raise  
         except Exception as ex:
             LOG.exception(ex)
-            raise                                              
-
-@autolog.log_method(logger=Logger) 
-def swift_delete_folder(folder, context = None):
-    cmd = ["swift",
-           "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
-           "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
-           "--os-username", FLAGS.wlm_vault_swift_username,
-           "--os-password", "******"]
-    
+            raise 
+        
+@autolog.log_method(logger=Logger)        
+def get_swift_cmd(context, command):
+    if FLAGS.wlm_vault_swift_auth_version == 'TEMPAUTH':
+        cmd = ["swift",
+               "-A", FLAGS.wlm_vault_swift_auth_url,
+               "-U", FLAGS.wlm_vault_swift_username,
+               "-K", "******"]        
+    else:
+        if FLAGS.wlm_vault_swift_auth_version == 'KEYSTONE_V2':
+            cmd = ["swift",
+                   "--auth-version", "2",
+                   "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
+                   "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
+                   "--os-username", FLAGS.wlm_vault_swift_username,
+                   "--os-password", "******"]
+        else:
+            cmd = ["swift",
+                   "--auth-version", "3",
+                   "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
+                   "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
+                   "--os-username", FLAGS.wlm_vault_swift_username,
+                   "--os-password", "******"]
+                
     cmd_list = cmd + [ "list", FLAGS.wlm_vault_swift_container]
     cmd_list_str = " ".join(cmd_list)
     for idx, opt in enumerate(cmd_list):
         if opt == "--os-password":
             cmd_list[idx+1] = FLAGS.wlm_vault_swift_password
-            break    
+            break
+        if opt == "-K":
+            cmd_list[idx+1] = FLAGS.wlm_vault_swift_password
+            break                           
+
+@autolog.log_method(logger=Logger)        
+def get_swift_base_cmd(context):
+    if FLAGS.wlm_vault_swift_auth_version == 'TEMPAUTH':
+        cmd = ["swift",
+               "-A", FLAGS.wlm_vault_swift_auth_url,
+               "-U", FLAGS.wlm_vault_swift_username,
+               "-K", "******"]        
+    else:
+        if FLAGS.wlm_vault_swift_auth_version == 'KEYSTONE_V2':
+            cmd = ["swift",
+                   "--auth-version", "2",
+                   "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
+                   "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
+                   "--os-username", FLAGS.wlm_vault_swift_username,
+                   "--os-password", "******"]
+        else:
+            cmd = ["swift",
+                   "--auth-version", "3",
+                   "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
+                   "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
+                   "--os-username", FLAGS.wlm_vault_swift_username,
+                   "--os-password", "******"]
+    return cmd
+                      
+@autolog.log_method(logger=Logger)        
+def swift_list_all(context):
+    cmd = get_swift_base_cmd(context)
+    cmd_list = cmd + [ "list", FLAGS.wlm_vault_swift_container]
+    cmd_list_str = " ".join(cmd_list)
+    for idx, opt in enumerate(cmd_list):
+        if opt == "--os-password":
+            cmd_list[idx+1] = FLAGS.wlm_vault_swift_password
+            break
+        if opt == "-K":
+            cmd_list[idx+1] = FLAGS.wlm_vault_swift_password
+            break              
     if os.path.isfile('/tmp/swift.out'):
-        os.remove('/tmp/swift.out')
+        os.remove('/tmp/swift.out')    
     with open('/tmp/swift.out', "w") as f:
         LOG.debug(cmd_list_str)   
-        subprocess.call(cmd_list, shell=False, stdout=f)  
-        
+        subprocess.call(cmd_list, shell=False, stdout=f)                                              
+
+@autolog.log_method(logger=Logger) 
+def swift_delete_folder(folder, context = None):
+    swift_list_all(context)
+    cmd = get_swift_base_cmd(context)    
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
@@ -453,31 +541,18 @@ def swift_delete_folder(folder, context = None):
                 for idx, opt in enumerate(cmd_delete):
                     if opt == "--os-password":
                         cmd_delete[idx+1] = FLAGS.wlm_vault_swift_password
-                        break                     
+                        break
+                    if opt == "-K":
+                        cmd_delete[idx+1] = FLAGS.wlm_vault_swift_password
+                        break                                             
                 LOG.debug(cmd_delete_str)                                  
                 subprocess.call(cmd_delete, shell=False, cwd=get_vault_local_directory())                 
 
 
 @autolog.log_method(logger=Logger) 
 def swift_download_folder(folder, context = None):
-    cmd = ["swift",
-           "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
-           "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
-           "--os-username", FLAGS.wlm_vault_swift_username,
-           "--os-password", "******"]
-    
-    cmd_list = cmd + [ "list", FLAGS.wlm_vault_swift_container]
-    cmd_list_str = " ".join(cmd_list)
-    for idx, opt in enumerate(cmd_list):
-        if opt == "--os-password":
-            cmd_list[idx+1] = FLAGS.wlm_vault_swift_password
-            break    
-    if os.path.isfile('/tmp/swift.out'):
-        os.remove('/tmp/swift.out')
-    with open('/tmp/swift.out', "w") as f:
-        LOG.debug(cmd_list_str)   
-        subprocess.call(cmd_list, shell=False, stdout=f)  
-        
+    swift_list_all(context)
+    cmd = get_swift_base_cmd(context) 
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
@@ -488,7 +563,10 @@ def swift_download_folder(folder, context = None):
                 for idx, opt in enumerate(cmd_download):
                     if opt == "--os-password":
                         cmd_download[idx+1] = FLAGS.wlm_vault_swift_password
-                        break                     
+                        break
+                    if opt == "-K":
+                        cmd_download[idx+1] = FLAGS.wlm_vault_swift_password
+                        break                                           
                 LOG.debug(cmd_download_str)                                  
                 subprocess.call(cmd_download, shell=False, cwd=get_vault_local_directory())                 
 
@@ -577,24 +655,8 @@ def get_restore_size(vault_path, disk_format, disk_type):
 
 @autolog.log_method(logger=Logger) 
 def swift_download_metadata_from_object_store(context):
-    cmd = ["swift",
-           "--os-auth-url", FLAGS.wlm_vault_swift_auth_url,
-           "--os-tenant-name", FLAGS.wlm_vault_swift_tenant,
-           "--os-username", FLAGS.wlm_vault_swift_username,
-           "--os-password", "******"]
-    
-    cmd_list = cmd + [ "list", FLAGS.wlm_vault_swift_container]
-    cmd_list_str = " ".join(cmd_list)
-    for idx, opt in enumerate(cmd_list):
-        if opt == "--os-password":
-            cmd_list[idx+1] = FLAGS.wlm_vault_swift_password
-            break    
-    if os.path.isfile('/tmp/swift.out'):
-        os.remove('/tmp/swift.out')
-    with open('/tmp/swift.out', "w") as f:
-        LOG.debug(cmd_list_str)   
-        subprocess.call(cmd_list, shell=False, stdout=f)  
-        
+    swift_list_all(context)
+    cmd = get_swift_base_cmd(context)
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
@@ -613,7 +675,10 @@ def swift_download_metadata_from_object_store(context):
                     for idx, opt in enumerate(cmd_download):
                         if opt == "--os-password":
                             cmd_download[idx+1] = FLAGS.wlm_vault_swift_password
-                            break                     
+                            break
+                        if opt == "-K":
+                            cmd_download[idx+1] = FLAGS.wlm_vault_swift_password
+                            break                                                  
                     LOG.debug(cmd_download_str)                                  
                     subprocess.call(cmd_download, shell=False, cwd=get_vault_local_directory())                 
                     

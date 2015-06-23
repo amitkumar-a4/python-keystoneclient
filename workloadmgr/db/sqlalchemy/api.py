@@ -995,6 +995,18 @@ def snapshot_type_time_size_update(context, snapshot_id):
                     disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
                     vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
                                                                                 disk_format, disk_type)
+                    if vm_disk_resource_snap_restore_size == 0:
+                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
+                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
+                        while vm_disk_resource_snap_backing_id:
+                            vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                            if vm_disk_resource_snap_backing.restore_size > 0:
+                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
+                            else:
+                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                                
+                             
                     vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
                                                                                      'restore_size' : vm_disk_resource_snap_restore_size}) 
                     snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
