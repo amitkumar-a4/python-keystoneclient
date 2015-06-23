@@ -57,10 +57,10 @@
   	<div style="margin-left:auto; margin-right:auto; padding:20px">	
 	<form role="form" class="form-configure" action="/configure_vmware" method="post">
 		%if 'nodetype' in locals() and nodetype == 'additional':
-			<input name = "nodetype" type="radio"  value="controller" >  Controller Node
+			<input name = "nodetype" type="radio"  value="controller" >  Controller Node&nbsp;&nbsp;
 			<input name = "nodetype" type="radio"  value="additional" checked>   Additional Node <br> <br>		
 		%else:
-			<input name = "nodetype" type="radio"  value="controller" checked>  Controller Node
+			<input name = "nodetype" type="radio"  value="controller" checked>  Controller Node&nbsp;&nbsp;
 			<input name = "nodetype" type="radio"  value="additional" >   Additional Node <br> <br>		
 		%end  
 	      
@@ -84,10 +84,10 @@
 	    </div><br>
 		<div class="input-group" >
 	    	<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-	    	<input name="name-server" {{'value=' + name_server if defined('name_server') else ''}} type="text" placeholder="192.168.2.1" class="form-control">
+	    	<input name="name-server" {{'value=' + name_server if (defined('name_server') and len(name_server)) else ''}} type="text" placeholder="192.168.2.1" class="form-control">
 	    	
 	    	<label class="input-group-addon">Domain Search Order</label>
-	    	<input name="domain-search-order" {{'value=' + domain_search_order if defined('domain_search_order') else ''}} type="text" placeholder="example.com example.net" class="form-control">
+	    	<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
 		</div><br>   	      
 	    
 		<div class="panel-group" id="accordion">
@@ -151,49 +151,39 @@
 		    </div>
 		    <div id="collapseFive" class="panel-collapse collapse">
 		      <div class="panel-body">
-                %if 'swift_auth_url' in locals() and len(swift_auth_url) > 0:
-                    <div class="input-group">
-                        <label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-auth-url" {{'value=' + swift_auth_url if defined('swift_auth_url') else ''}} type="text" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-username" {{'value=' + swift_username if defined('swift_username') else ''}} type="text" placeholder="admin" class="form-control"> <br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-                        <input name="swift-password" type="password" class="form-control"> <br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-tenantname" {{'value=' + swift_tenantname if defined('swift_tenantname') else ''}} type="text" placeholder="admin" class="form-control"> <br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Container&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-container" type="text" {{'value=' + swift_container if defined('swift_container') else ''}} placeholder="TrilioVault" class="form-control"> <br>
-                    </div><br>                    
+                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE_V2" >  KEYSTONE_V2 &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE_V3" >  KEYSTONE_V3 &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" checked>  TEMPAUTH <br> <br>                       
+                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE_V3':
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE_V2" >  KEYSTONE_V2 &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE_V3" checked>  KEYSTONE_V3 &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" >  TEMPAUTH <br> <br>                                
                 %else:
-                    <div class="input-group">
-                        <label class="input-group-addon">Auth Url (V2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-auth-url" type="text" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-username" type="text" placeholder="admin" class="form-control"> <br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-                        <input name="swift-password" type="password" class="form-control"> <br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-tenantname" type="text" placeholder="admin" class="form-control"> <br>
-                    </div><br>
-                    <div class="input-group">
-                        <label class="input-group-addon">Container&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input name="swift-container" type="text" value=TrilioVault placeholder="TrilioVault" class="form-control"> <br>
-                    </div><br>                    
-                %end
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE_V2" checked>  KEYSTONE_V2 &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE_V3" >  KEYSTONE_V3 &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" >  TEMPAUTH <br> <br>      	
+                %end  
+                <div class="input-group">
+                    <label class="input-group-addon">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+                </div><br>
+                <div class="input-group">
+                    <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="admin" class="form-control"> <br>
+                </div><br>
+                <div class="input-group">
+                    <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                    <input name="swift-password" type="password" class="form-control"> <br>
+                </div><br>
+                <div class="input-group">
+                    <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-tenantname" {{'value=' + swift_tenantname if (defined('swift_tenantname') and len(swift_tenantname)) else ''}} type="text" placeholder="admin" class="form-control"> <br>
+                </div><br>
+                <div class="input-group">
+                    <label class="input-group-addon">Container&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-container" type="text" {{'value=' + swift_container if (defined('swift_container') and len(swift_container)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
+                </div><br>                    
 	 	      </div>
 		    </div>
 		  </div>
