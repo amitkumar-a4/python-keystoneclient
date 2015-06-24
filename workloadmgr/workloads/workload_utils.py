@@ -12,11 +12,22 @@ db = WorkloadMgrDB().db
 
 def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
     db = WorkloadMgrDB().db
+    
+    settings_db = db.setting_get_all(cntx)
+    for setting in settings_db:
+        if 'password' in setting.key.lower():
+            setting.value = '******'
+        for kvpair in setting.metadata:
+            if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
+                kvpair['value'] = '******'
+    settings_jason = jsonutils.dumps(settings_db)            
+    path = vault.get_vault_local_directory() + "/settings_db"
+    vault.put_object(path, settings_jason)
 
     snapshot = db.snapshot_get(cntx, snapshot_id, read_deleted='yes')
     if snapshot['data_deleted']:
         return
-    parent = vault.get_workload_path({'workload_id': snapshot['workload_id']}, staging = True)
+    parent = vault.get_workload_path({'workload_id': snapshot['workload_id']})
 
     workload_db = db.workload_get(cntx, snapshot['workload_id'])
     for kvpair in workload_db.metadata:
@@ -35,7 +46,7 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
     if snapshot_status:
         snapshot_db.status = snapshot_status 
     snapshot_json = jsonutils.dumps(snapshot_db)
-    parent = vault.get_snapshot_path({'workload_id': snapshot['workload_id'], 'snapshot_id': snapshot['id']}, staging = True)
+    parent = vault.get_snapshot_path({'workload_id': snapshot['workload_id'], 'snapshot_id': snapshot['id']})
     path = parent + "/snapshot_db"
     # Add to the vault
     vault.put_object(path, snapshot_json)
@@ -165,7 +176,8 @@ def delete_if_chain(context, snapshot, snapshots_to_delete):
             if snap_chain.issubset(snapshots_to_delete_ids):
                 for snap in snap_chain:
                     db.snapshot_delete(context, snap)
-                    _remove_data(context, snap)
+                for snap in snap_chain:
+                    _remove_data(context, snap)                    
                     
     except Exception as ex:
         LOG.exception(ex)                            
@@ -195,8 +207,8 @@ def purge_snapshot_vm_from_staging_area(context, restore_id, snapshot_id, snapsh
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
 
     vault.purge_snapshot_vm_from_staging_area(context, {'workload_id': snapshot.workload_id,
-                                                   'snapshot_id': snapshot_id,
-                                                   'snapshot_vm_id': snapshot_vm_id})
+                                                        'snapshot_id': snapshot_id,
+                                                        'snapshot_vm_id': snapshot_vm_id})
     
     parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
    
@@ -205,7 +217,7 @@ def purge_snapshot_vm_from_staging_area(context, restore_id, snapshot_id, snapsh
         for parent_snapshot_vm in parent_snapshot_vms:
             if  parent_snapshot_vm.vm_id == snapshot_vm_id:
                 vault.purge_snapshot_vm_from_staging_area(context, {'workload_id': snapshot.workload_id,
-                                                               'snapshot_id': parent_snapshot_id,
-                                                               'snapshot_vm_id': snapshot_vm_id})                               
+                                                                    'snapshot_id': parent_snapshot_id,
+                                                                    'snapshot_vm_id': snapshot_vm_id})                               
                
     

@@ -372,19 +372,52 @@ def authenticate_swift():
         if config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             from swiftclient.service import SwiftService, SwiftError
             from swiftclient.exceptions import ClientException
-            _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
-                     'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': None, 'prefix': None, 'auth_version': '2.0', 
-                     'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
-                     'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
-                     'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
-                     'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
-                     'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
-                     'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
-                     'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
-                                    'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
-                                    'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
-                                    'auth_token': None, 'project_domain_name': None}, 
-                     'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+            
+            _opts = {}
+            if config_data['swift_auth_version'] == 'KEYSTONE_V2':
+                _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
+                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': None, 'prefix': None, 'auth_version': '2.0', 
+                         'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
+                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
+                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
+                         'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
+                         'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
+                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
+                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                                        'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                        'auth_token': None, 'project_domain_name': None}, 
+                         'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+            elif config_data['swift_auth_version'] == 'KEYSTONE_V3':
+                _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
+                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': None, 'prefix': None, 'auth_version': '3', 
+                         'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
+                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
+                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
+                         'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
+                         'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
+                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
+                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                                        'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                        'auth_token': None, 'project_domain_name': None}, 
+                         'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+
+            elif config_data['swift_auth_version'] == 'TEMPAUTH':
+                _opts = {'verbose': 1, 'os_username': None, 'os_user_domain_name': None, 'os_cacert': None, 
+                         'os_tenant_name': None, 'os_user_domain_id': None, 'prefix': None, 'auth_version': '1.0', 
+                         'ssl_compression': True, 'os_password': None, 'os_user_id': None, 'os_project_id': None, 
+                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
+                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
+                         'os_auth_url': None, 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
+                         'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
+                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': None, 'user_domain_name': None, 
+                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                                        'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                        'auth_token': None, 'project_domain_name': None}, 
+                         'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+                
             with SwiftService(options=_opts) as swift:
                 try:
                     stats_parts_gen = swift.list()
@@ -1153,7 +1186,8 @@ def configure_form_openstack():
 @authorize()
 def task_status_vmware():
     bottle.request.environ['beaker.session']['error_message'] = ''
-    return {}
+    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']    
+    return config_data
 
 @bottle.route('/task_status_openstack')
 @bottle.view('task_status_openstack')
@@ -1616,9 +1650,13 @@ def configure_service():
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = swift-s')
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['swift_auth_url'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_auth_version = ', 'wlm_vault_swift_auth_version = ' + config_data['swift_auth_version'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_auth_url = ', 'wlm_vault_swift_auth_url = ' + config_data['swift_auth_url'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_username = ', 'wlm_vault_swift_username = ' + config_data['swift_username'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_password = ', 'wlm_vault_swift_password = ' + config_data['swift_password'])            
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])            
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_container = ', 'wlm_vault_swift_container = ' + config_data['swift_container'])
+                        
               
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
@@ -1883,10 +1921,12 @@ def configure_vmware():
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
         
+        config_data['swift_auth_version'] = config_inputs['swift-auth-version']
         config_data['swift_auth_url'] = config_inputs['swift-auth-url']
         config_data['swift_username'] = config_inputs['swift-username']
         config_data['swift_password'] = config_inputs['swift-password']
         config_data['swift_tenantname'] = config_inputs['swift-tenantname']
+        config_data['swift_container'] = config_inputs['swift-container']
         
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']

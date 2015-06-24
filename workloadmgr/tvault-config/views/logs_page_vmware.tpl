@@ -46,17 +46,17 @@
     <div class="container">
         <!-- Example row of columns -->
         <div class="row">
-            <div >
-                <a href="/tvault/tvaultlogs" style="margin-left:20px; margin-right:auto; padding:20px" >Basic</a>
+            <div style="margin-left:auto; margin-right:auto; padding:20px; text-align:left;">
+                <a href="/tvault/tvaultlogs">Basic</a>
             </div>
         </div>
         <div class="row">
-            <div >
-                <a href="/tvault/tvaultlogs_all" style="margin-left:20px; margin-right:auto; padding:20px">Complete</a>
-            </div>
-        </div>        
+	        <div style="margin-left:auto; margin-right:auto; padding:20px; text-align:left;">
+	                <a href="/tvault/tvaultlogs_all">Complete</a>
+	        </div>
+	    </div>        
     </div>
-    <div style="margin-left:20px; margin-right:auto; padding:20px">
+    <div style="margin-left:auto; margin-right:auto; padding:20px">
 	<div class="panel-group" id="accordion">
 		<div class="panel panel-default" id="panel1">
 		    <div class="panel-heading">
@@ -80,5 +80,6 @@
 		    </div>
 		</div>
 	</div>
+	
 </body>
 </html>

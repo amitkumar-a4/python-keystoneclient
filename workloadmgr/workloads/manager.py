@@ -438,7 +438,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
             
             # upload the data to object store... this function will check if the object store is configured
-            vault.upload_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
+            vault.upload_snapshot_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -457,12 +457,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         msg = msg + ' ' + cause._exception_str
             LOG.error(msg)  
             
-            try:
-                # delete failed snapshot data
-                vault.snapshot_delete({'workload_id': workload.id, 'snapshot_id': snapshot.id}, staging = True)
-            except Exception as ex:
-                LOG.exception(ex)
-                  
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -482,12 +476,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
             LOG.error(msg)
             
-            try:
-                # delete failed snapshot data
-                vault.snapshot_delete({'workload_id': workload.id, 'snapshot_id': snapshot.id}, staging = True)
-            except Exception as ex:
-                LOG.exception(ex)   
-                            
             self.db.snapshot_update(context, 
                                     snapshot_id, 
                                     {'progress_percent': 100, 
@@ -499,10 +487,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
             except Exception as ex:
-                LOG.exception(ex)  
+                LOG.exception(ex) 
+                
+        try:
+            vault.purge_staging_area(context)
+        except Exception as ex:
+            LOG.exception(ex)                  
                 
         snapshot = self.db.snapshot_get(context, snapshot_id)
-        if settings.get_settings().get('smtp_email_enable') == 'yes':
+        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
             self.send_email(context,snapshot,'snapshot')
         
         #unlock the workload
@@ -720,12 +713,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })
 
         try:
-            vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})
+            vault.purge_staging_area(context)
         except Exception as ex:
             LOG.exception(ex)        
 
         restore = self.db.restore_get(context, restore_id)
-        if settings.get_settings().get('smtp_email_enable') == 'yes':
+        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
             self.send_email(context,restore,'restore')        
 
     @autolog.log_method(logger=Logger)
@@ -758,9 +751,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
                 user = keystone.users.get(context.user_id)
                 if user.email == '':
-                    user.email = settings.get_settings().get('smtp_default_recipient')
+                    user.email = settings.get_settings(context).get('smtp_default_recipient')
             except:
-                o = {'name':'admin','email':settings.get_settings().get('smtp_default_recipient')}
+                o = {'name':'admin','email':settings.get_settings(context).get('smtp_default_recipient')}
                 user = objectview(o)
                 pass
 
@@ -867,16 +860,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = MIMEMultipart('alternative')
             msg['To'] = user.email
             #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
-            msg['From'] = settings.get_settings().get('smtp_default_sender')
+            msg['From'] = settings.get_settings(context).get('smtp_default_sender')
             msg['Subject'] = subject        
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            s = smtplib.SMTP(settings.get_settings().get('smtp_server_name'),int(settings.get_settings().get('smtp_port')))
-            if settings.get_settings().get('smtp_server_name') != 'localhost':
+            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),int(settings.get_settings(context).get('smtp_port')))
+            if settings.get_settings(context).get('smtp_server_name') != 'localhost':
                 s.ehlo()
                 s.starttls()
                 s.ehlo
-                s.login(settings.get_settings().get('smtp_server_username'),settings.get_settings().get('smtp_server_password'))
+                s.login(settings.get_settings(context).get('smtp_server_username'),settings.get_settings(context).get('smtp_server_password'))
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
         

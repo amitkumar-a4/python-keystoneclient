@@ -476,3 +476,6 @@ class InstancePowerOffFailure(Invalid):
     
 class DatacenterNotFound(NotFound):
     message = _("Could not find the Datacenter.")       
+    
+class SettingNotFound(NotFound):
+    message = _("Snapshot %(setting_key)s could not be found.")     

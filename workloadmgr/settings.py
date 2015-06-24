@@ -9,9 +9,11 @@
 import os
 import ConfigParser
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 
 LOG = logging.getLogger(__name__)
+db = WorkloadMgrDB().db
 
 settings_file_dir = '/opt/stack/data/wlm/settings/'
 settings_file_name = 'workloadmgr-settings.conf'
@@ -28,32 +30,40 @@ default_settings = {
 'smtp_server_password' : '',
 }
 
-def get_settings():                           
+def get_settings(context=None):                           
     """get settings"""
     try:
-        Config = ConfigParser.RawConfigParser()
-        Config.read(settings_file_dir + settings_file_name)
-        persisted_settings = dict(Config._defaults)
+        persisted_settings = {}
+        persisted_setting_objs = db.setting_get_all(context)
+        for persisted_setting in persisted_setting_objs:
+            persisted_settings[persisted_setting.key] = persisted_setting.value
         for setting, value in default_settings.iteritems():
             if setting not in persisted_settings:
                 persisted_settings[setting] = value
         return persisted_settings
+            
     except Exception as ex:
         LOG.exception(ex)
         return default_settings
 
-def set_settings(new_settings):                           
+def set_settings(context, new_settings):                           
     """set settings"""
     try:
-        Config = ConfigParser.RawConfigParser()
-        Config.read(settings_file_dir + settings_file_name)
+        persisted_setting_objs = db.setting_get_all(context)
         for key, value in new_settings.iteritems():
-            Config.set(None, key, value)
-        if not os.path.exists(settings_file_dir):
-            os.makedirs(settings_file_dir)                      
-        with open(settings_file_dir + settings_file_name, 'wb') as configfile:
-            Config.write(configfile)                
-        return get_settings()
+            key_found = False
+            for persisted_setting in persisted_setting_objs:
+                if persisted_setting.key == key:
+                    db.setting_update(context, key, {'value' : value})
+                    key_found = True
+                    break
+            if key_found == False:
+                db.setting_create(context, {'key' : key, 
+                                            'value' : value,
+                                            'user_id': context.user_id,
+                                            'project_id': context.project_id,                                             
+                                            'status': 'available'})
+        return get_settings() 
     except Exception as ex:
         LOG.exception(ex)
         return default_settings

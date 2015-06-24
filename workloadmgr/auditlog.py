@@ -57,6 +57,9 @@ class AuditLog(object):
             auditlogmsg = auditlogmsg + ',' + user.name + ',' + context.user_id
             auditlogmsg = auditlogmsg + ',' +  object.get('display_name', 'NA') + ',' + object.get('id', 'NA')  
             auditlogmsg = auditlogmsg + ',' + message + '\n'
+
+            head, tail = os.path.split(self._filepath)
+            fileutils.ensure_tree(head)
             with open(self._filepath, 'a') as auditlogfile:   
                 auditlogfile.write(auditlogmsg, *args, **kwargs)
         finally:
@@ -64,6 +67,8 @@ class AuditLog(object):
             
     def get_records(self, time_in_minutes, time_from, time_to):
         records = []
+        head, tail = os.path.split(self._filepath)
+        fileutils.ensure_tree(head)        
         
         if time_in_minutes:
             now = timeutils.utcnow()
