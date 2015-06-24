@@ -940,7 +940,6 @@ def test_part_lv_mixed_with_tvault_vg():
         deletepv("pvname1")
         if os.path.isfile("vmdk"):
             os.remove("vmdk")
-        import pdb;pdb.set_trace()
         cleanup()
         print "\t cleanup done"
 
@@ -2131,16 +2130,16 @@ def test_raw_partition():
         print "\t cleanup done"
 
 if __name__ == "__main__":
-    #test_lv_entire_disk()
-    #test_lv_on_partitions()
-    #test_lvs_on_two_partitions()
-    #test_lvs_span_two_partitions()
-    #test_mbr_4_primary_partitions()
-    #test_mbr_3_primary_1_logical_partitions()
-    #test_gpt_partitions()
-    #test_raw_disk()
-    #test_raw_partition()
-    #test_lv_part_mixed()
-    #test_part_lv_mixed()
+    test_lv_entire_disk()
+    test_lv_on_partitions()
+    test_lvs_on_two_partitions()
+    test_lvs_span_two_partitions()
+    test_mbr_4_primary_partitions()
+    test_mbr_3_primary_1_logical_partitions()
+    test_gpt_partitions()
+    test_raw_disk()
+    test_raw_partition()
+    test_lv_part_mixed()
+    test_part_lv_mixed()
     test_part_lv_mixed_with_tvault_vg()
     

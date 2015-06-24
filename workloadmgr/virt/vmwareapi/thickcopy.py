@@ -728,7 +728,6 @@ def getvgs(pvinfos = None):
                 vginfo[attr.split("=")[0]] =\
                      attr.split("=")[1].strip("\'").strip("B")
 
-        import pdb;pdb.set_trace()
         if len(vginfo) and 'LVM2_VG_NAME' in vginfo and vginfo['LVM2_VG_NAME'] != "tvault-appliance-vg":
             vglist.append(vginfo)
 
