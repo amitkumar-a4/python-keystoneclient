@@ -861,7 +861,7 @@ class VMwareVCDriver(VMwareESXDriver):
             return None,'*', None
         except Exception as ex:
             LOG.exception(ex)
-            return None,'*'
+            return None,'*', None
         
  
     @autolog.log_method(Logger, 'VMwareVCDriver.get_top_vm_disk_resource_snap')
@@ -1068,6 +1068,7 @@ class VMwareVCDriver(VMwareESXDriver):
                             position = changes.startOffset + changes.length;
                     extentsfile = copy_to_file_path + "-ctk"
                 else:
+                    totalBytesToTransfer += totalblocks * 4096 # Use blocksize later
                     shutil.copyfile(extentsfile, copy_to_file_path + "-ctk")
                     os.remove(extentsfile)
 
