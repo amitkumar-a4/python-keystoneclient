@@ -422,6 +422,529 @@ def test_lv_on_partitions():
 
 ## 
 # LVM PV is carved out of 
+def test_lv_part_mixed():
+
+    def createpv(pvname, capacity):
+        try:
+            cmd = ["dd", "if=/dev/zero", "of="+pvname, "bs=1", "count=1", "seek=" + str(capacity)]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-f"]
+            freedev = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            freedev = freedev.strip("\n")
+            cmd = ["losetup", freedev, pvname,]
+
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create or mount pvname "
+            raise
+
+    def deletepv(pvname):
+        os.remove(pvname)
+
+    def assigndevice(mountpath, start, end):
+        try:
+            freedev = subprocess.check_output(["losetup", "-f"],
+                                               stderr=subprocess.STDOUT)
+            freedev = freedev.strip("\n")
+            subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                               str(int(start)*512), "--sizelimit",
+                               str((int(end) - int(start) + 1)/2) + "KiB"],
+                               stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create loop device"
+
+    def setup():
+        mountpoint = createpv("pvname1", "1TiB")
+   
+        cmd = ["parted", mountpoint, "mklabel", "gpt"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices = []
+        cmd = ["parted", mountpoint, "mkpart", "P1", "ext2", str(1024), str("500GB")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        cmd = ["parted", mountpoint, "mkpart", "P2", "ext2", str("500GB"), str("1000GB")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices.append(assigndevice(mountpoint, 2000896, 976562175))
+        devices.append(assigndevice(mountpoint, 976562176, 1953124351))
+
+        for dev in devices[1:]:
+            cmd = ["pvcreate", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "vg1", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    
+            # create multiple volumes
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["lvcreate", "-L", "1G", "vg1", "-n", lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            # Format each volume to a filesystem
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mkfs", "-t", "ext4", "/dev/vg1/" + lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            tempdir = mkdtemp()
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", "/dev/vg1/"+lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+            vgcmd = ["vgchange", "-an", "vg1"]
+            subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+            vgcmd = ["vgexport", "vg1"]
+            #subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+            cmd = ["losetup", "-d", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        for dev in devices[0:1]:
+            cmd = ["mkfs", "-t", "ext4", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-d", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["losetup", "-d", mountpoint]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        return 
+
+    currentmodule = sys.modules[__name__]
+    # Following is the mock code to test the thick copy
+    def create_empty_vmdk_mock(filepath, capacity):
+        cmd = ["dd", "if=/dev/zero", "of="+filepath, "bs=1", "count=1", "seek=" + str(capacity)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_mount_disk(diskslist, mntlist, diskonly=False):
+        with open(diskslist, 'r') as f:
+            for line in f:
+                return None, {'disk1': [line + ";"]}
+
+    def my_populate_extent(hostip, username, password, vmspec, remotepath,
+                           mountpath, start, count):
+        cmd = ["dd", "if="+remotepath, "of="+mountpath, "bs=512", "count=" +
+               str(count), "seek=" + str(start), "skip="+str(start), "conv=notrunc"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_populate_extents(hostip, username, password, vmspec, remotepath,
+                           mountpath, extentsfile):
+        with open(extentsfile, 'r') as f:
+            for line in f:
+                start = int(line.split(",")[0])/512
+                count = int(line.split(",")[1])/512
+                my_populate_extent(hostip, username, password, vmspec,
+                                remotepath, mountpath, start, count)
+
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extents', side_effect=my_populate_extents)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extent', side_effect=my_populate_extent)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.umount_local_vmdk')
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.mount_local_vmdk', side_effect=my_mount_disk)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk', side_effect=create_empty_vmdk_mock)
+    def test(method1, method2, method3, method4, method5):
+        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
+        localvmdkpath = "vmdk"
+        workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
+        extentsfile, partitions, totalblocks = \
+              workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
+                             None, None, None, dev, localvmdkpath)
+        return extentsfile, partitions, totalblocks
+
+    try:
+        print "Running test_lv_part_mixed():"
+        setup()
+        print "\tSetup() complete"
+        extentsfile, partitions, totalblocks = test()
+        print "\ttest() done"
+
+        # first clean up and then verify so the volume groups do not interfere
+        # with existing volume groups
+        assert extentsfile == None
+        print "\tverification done"
+
+    finally:
+        deletepv("pvname1")
+        if os.path.isfile("vmdk"):
+            os.remove("vmdk")
+        print "\t cleanup done"
+
+## 
+# LVM PV is carved out of 
+def test_part_lv_mixed():
+
+    def createpv(pvname, capacity):
+        try:
+            cmd = ["dd", "if=/dev/zero", "of="+pvname, "bs=1", "count=1", "seek=" + str(capacity)]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-f"]
+            freedev = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            freedev = freedev.strip("\n")
+            cmd = ["losetup", freedev, pvname,]
+
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create or mount pvname "
+            raise
+
+    def deletepv(pvname):
+        os.remove(pvname)
+
+    def assigndevice(mountpath, start, end):
+        try:
+            freedev = subprocess.check_output(["losetup", "-f"],
+                                               stderr=subprocess.STDOUT)
+            freedev = freedev.strip("\n")
+            subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                               str(int(start)*512), "--sizelimit",
+                               str((int(end) - int(start) + 1)/2) + "KiB"],
+                               stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create loop device"
+
+    def setup():
+        mountpoint = createpv("pvname1", "1TiB")
+   
+        cmd = ["parted", mountpoint, "mklabel", "gpt"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices = []
+        cmd = ["parted", mountpoint, "mkpart", "P1", "ext2", str(1024), str("500GB")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        cmd = ["parted", mountpoint, "mkpart", "P2", "ext2", str("500GB"), str("1000GB")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices.append(assigndevice(mountpoint, 2000896, 976562175))
+        devices.append(assigndevice(mountpoint, 976562176, 1953124351))
+
+        for dev in devices[0:1]:
+            cmd = ["pvcreate", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "vg1", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    
+            # create multiple volumes
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["lvcreate", "-L", "1G", "vg1", "-n", lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            # Format each volume to a filesystem
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mkfs", "-t", "ext4", "/dev/vg1/" + lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            tempdir = mkdtemp()
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", "/dev/vg1/"+lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+            vgcmd = ["vgchange", "-an", "vg1"]
+            subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+            vgcmd = ["vgexport", "vg1"]
+            #subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+            cmd = ["losetup", "-d", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        for dev in devices[1:]:
+            cmd = ["mkfs", "-t", "ext4", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-d", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["losetup", "-d", mountpoint]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        return 
+
+    currentmodule = sys.modules[__name__]
+    # Following is the mock code to test the thick copy
+    def create_empty_vmdk_mock(filepath, capacity):
+        cmd = ["dd", "if=/dev/zero", "of="+filepath, "bs=1", "count=1", "seek=" + str(capacity)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_mount_disk(diskslist, mntlist, diskonly=False):
+        with open(diskslist, 'r') as f:
+            for line in f:
+                return None, {'disk1': [line + ";"]}
+
+    def my_populate_extent(hostip, username, password, vmspec, remotepath,
+                           mountpath, start, count):
+        cmd = ["dd", "if="+remotepath, "of="+mountpath, "bs=512", "count=" +
+               str(count), "seek=" + str(start), "skip="+str(start), "conv=notrunc"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_populate_extents(hostip, username, password, vmspec, remotepath,
+                           mountpath, extentsfile):
+        with open(extentsfile, 'r') as f:
+            for line in f:
+                start = int(line.split(",")[0])/512
+                count = int(line.split(",")[1])/512
+                my_populate_extent(hostip, username, password, vmspec,
+                                remotepath, mountpath, start, count)
+
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extents', side_effect=my_populate_extents)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extent', side_effect=my_populate_extent)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.umount_local_vmdk')
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.mount_local_vmdk', side_effect=my_mount_disk)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk', side_effect=create_empty_vmdk_mock)
+    def test(method1, method2, method3, method4, method5):
+        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
+        localvmdkpath = "vmdk"
+        workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
+        extentsfile, partitions, totalblocks = \
+              workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
+                             None, None, None, dev, localvmdkpath)
+        return extentsfile, partitions, totalblocks
+
+    try:
+        print "Running test_part_lv_mixed():"
+        setup()
+        print "\tSetup() complete"
+        extentsfile, partitions, totalblocks = test()
+        print "\ttest() done"
+
+        # first clean up and then verify so the volume groups do not interfere
+        # with existing volume groups
+        assert extentsfile == None
+        print "\tverification done"
+
+    finally:
+        deletepv("pvname1")
+        if os.path.isfile("vmdk"):
+            os.remove("vmdk")
+        print "\t cleanup done"
+
+## 
+# LVM PV is carved out of 
+def test_part_lv_mixed_with_tvault_vg():
+
+    def createpv(pvname, capacity):
+        try:
+            cmd = ["dd", "if=/dev/zero", "of="+pvname, "bs=1", "count=1", "seek=" + str(capacity)]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-f"]
+            freedev = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            freedev = freedev.strip("\n")
+            cmd = ["losetup", freedev, pvname,]
+
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create or mount pvname "
+            raise
+
+    def deletepv(pvname):
+        os.remove(pvname)
+
+    def assigndevice(mountpath, start, end):
+        try:
+            freedev = subprocess.check_output(["losetup", "-f"],
+                                               stderr=subprocess.STDOUT)
+            freedev = freedev.strip("\n")
+            subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                               str(int(start)*512), "--sizelimit",
+                               str((int(end) - int(start) + 1)/2) + "KiB"],
+                               stderr=subprocess.STDOUT)
+            return freedev
+        except Exception as ex:
+            print "Cannot create loop device"
+
+    def setup():
+        tvaultmount = createpv("tvault-root", "1TiB")
+        cmd = ["parted", tvaultmount, "mklabel", "gpt"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices = []
+        cmd = ["parted", tvaultmount, "mkpart", "P1", "ext2", str(1024), str("1000G")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices.append(assigndevice(tvaultmount, 2000896, 1953124351))
+
+        for dev in devices:
+            cmd = ["pvcreate", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "tvault-appliance-vg", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    
+            # create multiple volumes
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["lvcreate", "-L", "1G", "tvault-appliance-vg", "-n", lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            # Format each volume to a filesystem
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mkfs", "-t", "ext4", "/dev/tvault-appliance-vg/" + lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            tempdir = mkdtemp()
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mount", "-t", "ext4", "/dev/tvault-appliance-vg/"+lv, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", "/dev/tvault-appliance-vg/"+lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+
+        mountpoint = createpv("pvname1", "1TiB")
+   
+        cmd = ["parted", mountpoint, "mklabel", "gpt"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices = []
+        cmd = ["parted", mountpoint, "mkpart", "P1", "ext2", str(1024), str("500GB")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        cmd = ["parted", mountpoint, "mkpart", "P2", "ext2", str("500GB"), str("1000GB")]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        devices.append(assigndevice(mountpoint, 2000896, 976562175))
+        devices.append(assigndevice(mountpoint, 976562176, 1953124351))
+
+        for dev in devices[0:1]:
+            cmd = ["pvcreate", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "vg1", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    
+            # create multiple volumes
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["lvcreate", "-L", "1G", "vg1", "-n", lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            # Format each volume to a filesystem
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mkfs", "-t", "ext4", "/dev/vg1/" + lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            tempdir = mkdtemp()
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", "/dev/vg1/"+lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+            vgcmd = ["vgchange", "-an", "vg1"]
+            subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+            vgcmd = ["vgexport", "vg1"]
+            #subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+            cmd = ["losetup", "-d", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        for dev in devices[1:]:
+            cmd = ["mkfs", "-t", "ext4", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["losetup", "-d", dev]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["losetup", "-d", mountpoint]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        return 
+
+    def cleanup():
+        vgcmd = ["vgchange", "-an", "tvault-appliance-vg"]
+        subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+        vgcmd = ["vgexport", "tvault-appliance-vg"]
+        #subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+        cmd = ["losetup", "-d", "/dev/loop1"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["losetup", "-d", "/dev/loop0"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        deletepv("tvault-root")
+
+    currentmodule = sys.modules[__name__]
+    # Following is the mock code to test the thick copy
+    def create_empty_vmdk_mock(filepath, capacity):
+        cmd = ["dd", "if=/dev/zero", "of="+filepath, "bs=1", "count=1", "seek=" + str(capacity)]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_mount_disk(diskslist, mntlist, diskonly=False):
+        with open(diskslist, 'r') as f:
+            for line in f:
+                return None, {'disk1': [line + ";"]}
+
+    def my_populate_extent(hostip, username, password, vmspec, remotepath,
+                           mountpath, start, count):
+        cmd = ["dd", "if="+remotepath, "of="+mountpath, "bs=512", "count=" +
+               str(count), "seek=" + str(start), "skip="+str(start), "conv=notrunc"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def my_populate_extents(hostip, username, password, vmspec, remotepath,
+                           mountpath, extentsfile):
+        with open(extentsfile, 'r') as f:
+            for line in f:
+                start = int(line.split(",")[0])/512
+                count = int(line.split(",")[1])/512
+                my_populate_extent(hostip, username, password, vmspec,
+                                remotepath, mountpath, start, count)
+
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extents', side_effect=my_populate_extents)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.populate_extent', side_effect=my_populate_extent)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.umount_local_vmdk')
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.mount_local_vmdk', side_effect=my_mount_disk)
+    @mock.patch('workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk', side_effect=create_empty_vmdk_mock)
+    def test(method1, method2, method3, method4, method5):
+        dev = {'capacityInBytes': 1099511627776L, 'backing' : {'fileName' : "pvname1"}}
+        localvmdkpath = "vmdk"
+        workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(localvmdkpath, dev['capacityInBytes'])
+        extentsfile, partitions, totalblocks = \
+              workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
+                             None, None, None, dev, localvmdkpath)
+        return extentsfile, partitions, totalblocks
+
+    try:
+        print "Running test_part_lv_mixed_with_tvault_vg():"
+        setup()
+        print "\tSetup() complete"
+        extentsfile, partitions, totalblocks = test()
+        print "\ttest() done"
+
+        # first clean up and then verify so the volume groups do not interfere
+        # with existing volume groups
+        assert extentsfile == None
+        print "\tverification done"
+
+    finally:
+        deletepv("pvname1")
+        if os.path.isfile("vmdk"):
+            os.remove("vmdk")
+        cleanup()
+        print "\t cleanup done"
+
+## 
+# LVM PV is carved out of 
 def test_lvs_on_two_partitions():
 
     def createpv(pvname, capacity):
@@ -1616,4 +2139,7 @@ if __name__ == "__main__":
     test_gpt_partitions()
     test_raw_disk()
     test_raw_partition()
+    test_lv_part_mixed()
+    test_part_lv_mixed()
+    test_part_lv_mixed_with_tvault_vg()
     

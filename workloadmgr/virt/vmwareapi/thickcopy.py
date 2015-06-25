@@ -728,14 +728,15 @@ def getvgs(pvinfos = None):
                 vginfo[attr.split("=")[0]] =\
                      attr.split("=")[1].strip("\'").strip("B")
 
-        if len(vginfo):
+        if len(vginfo) and 'LVM2_VG_NAME' in vginfo and vginfo['LVM2_VG_NAME'] != "tvault-appliance-vg":
             vglist.append(vginfo)
 
     return vglist
 
 def deactivatevgs(vgname):
-    vgcmd = ["vgchange", "-an", vgname]
-    subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+    if vgname != "tvault-appliance-vg":
+        vgcmd = ["vgchange", "-an", vgname]
+        subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
 
 def getlvs(vgname):
     subprocess.check_output(["lvscan"], stderr=subprocess.STDOUT)
@@ -1053,11 +1054,13 @@ def lvmextents_in_partition(hostip, username, password, vmspec, dev, localvmdkpa
     close(fileh)
 
     totalblocks = 0
-    exttype = "LVM2"
     pvdevices = []
     devtopartmap = {}
     lvs = []
     vgs = []
+    partcount = 0
+    lvmpvcount = 0
+    mixed = True
 
     try:
         process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
@@ -1076,13 +1079,14 @@ def lvmextents_in_partition(hostip, username, password, vmspec, dev, localvmdkpa
                           str(int(part['blocks']) * 1024))
                     pvdevices.append(devpath)
                     devtopartmap[devpath] = pvinfo
+                    lvmpvcount += 1
                 except Exception as ex:
                     LOG.info(_(part['start'] +
                                " unrecognized file system"))
-                    exttype = None
-                    break
+                    partcount += 1
              
-            if exttype and exttype == "LVM2":
+            mixed = lvmpvcount != 0 and partcount != 0
+            if lvmpvcount:
                 LOG.info(_(dev['backing']['fileName'] +
                   " partitions valid LVM extentons."))
 
@@ -1092,7 +1096,7 @@ def lvmextents_in_partition(hostip, username, password, vmspec, dev, localvmdkpa
                 if len(vgs) == 0:
                     LOG.info(_(dev['backing']['fileName'] +
                        " does not contain any volume groups. Defaulting to cbt"))
-                    return None, None, None
+                    return None, None, None, mixed
  
                 for vg in vgs:
                     lvs += getlvs(vg['LVM2_VG_NAME'])
@@ -1103,14 +1107,14 @@ def lvmextents_in_partition(hostip, username, password, vmspec, dev, localvmdkpa
                 if len(lvs) == 0:
                     LOG.info(_(dev['backing']['fileName'] +
                        " does not contain any logical volumes. Defaulting to cbt"))
-                    return None, None, None
+                    return None, None, None, mixed
         finally:
             for freedev in pvdevices:
                  dismountpv(freedev)
             if process:
                 umount_local_vmdk(process)
 
-        if exttype and exttype == "LVM2":
+        if lvmpvcount and not partcount:
             # for each LV, check if ext file system on the LV
             fileh, extentsfile = mkstemp()
             close(fileh)
@@ -1119,13 +1123,13 @@ def lvmextents_in_partition(hostip, username, password, vmspec, dev, localvmdkpa
                     totalblocks += performlvthickcopy(hostip, username,
                                                    password, vmspec, dev, localvmdkpath,
                                                    lv, devtopartmap.values(), extentsfile)
-                return extentsfile, partitions, totalblocks
+                return extentsfile, partitions, totalblocks, False
             except Exception as ex:
                 if os.path.isfile(extentsfile):
                     os.remove(extentsfile)
-                return None, None, None
+                return None, None, None, False
         else:
-            return None, None, None
+            return None, None, None, mixed
     finally:
         if os.path.isfile(listfile):
             os.remove(listfile)
@@ -1281,12 +1285,15 @@ def _thickcopyextents(hostip, username, password, vmspec, dev, localvmdkpath):
                             dev['backing']['fileName'],
                             localvmdkpath, str(part['start']), 400)
 
-    extentsfile, rparts, totalblocks = lvmextents_in_partition(hostip,
+    extentsfile, rparts, totalblocks, mixed = lvmextents_in_partition(hostip,
                    username, password, vmspec, dev, localvmdkpath,
                    partitions)
  
     if extentsfile:
         return extentsfile, rparts, totalblocks
+
+    if mixed:
+        return None, None, None
 
     return process_partitions(hostip, username, password, vmspec, dev, localvmdkpath,
                             partitions)
