@@ -366,6 +366,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         
         try:
+            try:
+                import gc
+                gc.collect()
+            except Exception as ex:
+                LOG.exception(ex)  
+                
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
                                                 {'host': self.host,
@@ -487,20 +493,34 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
             except Exception as ex:
+                LOG.exception(ex)
+                
+        finally:
+            try:
+                vault.purge_staging_area(context)
+            except Exception as ex:
                 LOG.exception(ex) 
                 
-        try:
-            vault.purge_staging_area(context)
-        except Exception as ex:
-            LOG.exception(ex)                  
-                
-        snapshot = self.db.snapshot_get(context, snapshot_id)
-        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
-            self.send_email(context,snapshot,'snapshot')
-        
-        #unlock the workload
-        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            try:
+                import gc
+                gc.collect() 
+            except Exception as ex:
+                LOG.exception(ex)
             
+            try:                
+                snapshot = self.db.snapshot_get(context, snapshot_id)
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes':
+                    self.send_email(context,snapshot,'snapshot')
+            except Exception as ex:
+                LOG.exception(ex)
+                        
+            #unlock the workload
+            try:                
+                snapshot = self.db.snapshot_get(context, snapshot_id)            
+                self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            except Exception as ex:
+                LOG.exception(ex)
+                            
     @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
         """
@@ -588,6 +608,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         restore_type = 'restore'
         try:
+            try:
+                import gc
+                gc.collect() 
+            except Exception as ex:
+                LOG.exception(ex)
+                            
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
@@ -711,15 +737,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })
-
-        try:
-            vault.purge_staging_area(context)
-        except Exception as ex:
-            LOG.exception(ex)        
-
-        restore = self.db.restore_get(context, restore_id)
-        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
-            self.send_email(context,restore,'restore')        
+        finally:
+            try:
+                vault.purge_staging_area(context)
+            except Exception as ex:
+                LOG.exception(ex)  
+            
+            try:
+                import gc
+                gc.collect() 
+            except Exception as ex:
+                LOG.exception(ex)
+            
+            try:
+                restore = self.db.restore_get(context, restore_id)
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes':
+                    self.send_email(context,restore,'restore')       
+            except Exception as ex:
+                LOG.exception(ex)                     
 
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):

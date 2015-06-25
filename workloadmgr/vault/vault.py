@@ -245,13 +245,40 @@ def upload_snapshot_to_object_store(context, snapshot_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
         pass
     if FLAGS.wlm_vault_storage_type == 'swift-s': 
-        WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Uploading snapshot to object store'}) 
         workload_path = get_workload_path(snapshot_metadata)
         snapshot_path = get_snapshot_path(snapshot_metadata)
-        swift_upload_files([snapshot_path], context = None)
-        swift_upload_files([workload_path + '/workload_db'], context = None)
-        swift_upload_files([workload_path + '/workload_vms_db'], context = None)
-        swift_upload_files([get_vault_local_directory() + "/settings_db"], context = None)                
+        try:
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Uploading snapshot metadata to object store'}) 
+            swift_upload_files([get_vault_local_directory() + "/settings_db"],context = None)
+            swift_upload_files([workload_path + '/workload_db'], context = None)
+            swift_upload_files([workload_path + '/workload_vms_db'], context = None)
+            for dirName, subdirList, fileList in os.walk(snapshot_path):
+                for fname in fileList:
+                    file_path = dirName + '/' + fname
+                    if  "/snapshot_db" in file_path or \
+                        "/snapshot_vms_db" in file_path or \
+                        "/resources_db" in file_path or \
+                        "/network_db" in file_path or \
+                        "/security_group_db" in file_path or \
+                        "/disk_db"  in file_path:      
+                            swift_upload_files([file_path], context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Retrying to upload snapshot metadata to object store'}) 
+            swift_upload_files([get_vault_local_directory() + "/settings_db"],context = None)
+            swift_upload_files([workload_path + '/workload_db'], context = None)
+            swift_upload_files([workload_path + '/workload_vms_db'], context = None)
+            for dirName, subdirList, fileList in os.walk(snapshot_path):
+                for fname in fileList:
+                    file_path = dirName + '/' + fname
+                    if  "/snapshot_db" in file_path or \
+                        "/snapshot_vms_db" in file_path or \
+                        "/resources_db" in file_path or \
+                        "/network_db" in file_path or \
+                        "/security_group_db" in file_path or \
+                        "/disk_db"  in file_path:      
+                            swift_upload_files([file_path], context = None)
+                    
         purge_workload_from_staging_area(context, snapshot_metadata)        
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass
@@ -263,7 +290,12 @@ def upload_snapshot_vm_to_object_store(context, snapshot_vm_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-s': 
         WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_metadata['snapshot_id'], {'progress_msg': 'Uploading virtual machine snapshot to object store'}) 
         snapshot_vm_path = get_snapshot_vm_path(snapshot_vm_metadata)
-        swift_upload_files([snapshot_vm_path], context = None)
+        try:
+            swift_upload_files([snapshot_vm_path], context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_metadata['snapshot_id'], {'progress_msg': 'Retrying to upload virtual machine snapshot to object store'})
+            swift_upload_files([snapshot_vm_path], context = None)
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass    
     
