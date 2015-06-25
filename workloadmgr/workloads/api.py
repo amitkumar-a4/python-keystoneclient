@@ -91,18 +91,21 @@ def _snapshot_create_callback(*args, **kwargs):
     # the last full snapshot
     # if the last full snapshot is over policy based number of days, do a full backup
     snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
-                                project_id, workload_id)
+                                                                       project_id, workload_id)
     jobscheduler = workload['jobschedule']
 
     snapshot_type = "incremental"
     if int(jobscheduler['fullbackup_interval']) > 0:
         # check full backup policy here
-        for snap in sorted(snapshots, key=lambda x: x.created_at, reverse=True):
-            if snap.snapshot_type == "full":
-                delta = datetime.now() - snap.created_at
-                if delta.days >= int(jobscheduler['fullbackup_interval']):
-                    snapshot_type = "full"
-                break
+        num_of_incr_in_current_chain = 0
+        for snap in snapshots:
+            if snap.snapshot_type == 'full':
+                break;
+            else:
+                num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
+                
+        if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+            snapshot_type = "full"
 
     try:
         snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
@@ -481,9 +484,6 @@ class API(base.Base):
         Make the RPC call to modify a workload.
         """
         AUDITLOG.log(context,'Workload Modify Requested', None)
-        workload_paused = self._is_workload_paused(context, workload_id)
-        if workload_paused == False:
-            self.workload_pause(context, workload_id)
         
         purge_metadata = False
         options = {}
@@ -518,8 +518,7 @@ class API(base.Base):
                 vm = self.db.workload_vms_create(context, values)                                       
 
         workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
-        if workload_paused == False:
-            self.workload_resume(context, workload_id)
+            
         AUDITLOG.log(context,'Workload Modified', workload_obj)
             
     @autolog.log_method(logger=Logger)
