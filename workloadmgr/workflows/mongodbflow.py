@@ -79,7 +79,8 @@ def connect_server(host, port, user, password, verbose=False):
     except Exception, e:
         LOG.error(_('Oops!  There was an error.  Try again...'))
         LOG.error(_(e))
-        raise e
+        raise exception.ErrorOccurred(reason='Failed to connect MongoDB node')
+
     return connection
 
 def isShardedCluster(conn):
@@ -654,7 +655,7 @@ class MongoDBWorkflow(workflow.Workflow):
                 except:
                     LOG.debug(_( '"' + host +'" appears to be offline'))
                     pass
-        LOG.warning(_( 'MongoDB cluster appears to be offline'))
+        #LOG.warning(_( 'MongoDB cluster appears to be offline'))
 
     #
     # MongoDB flow is an directed acyclic flow.
