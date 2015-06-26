@@ -1073,8 +1073,9 @@ def get_snapshot_children(context, snapshot_id, children):
                 try:
                     vm_disk_resource_snap_child = vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
                     snapshot_vm_resource_child = snapshot_vm_resource_get(context,vm_disk_resource_snap_child.snapshot_vm_resource_id)
-                    grand_children.add(snapshot_vm_resource_child.snapshot_id)
-                    grand_children = get_snapshot_children(context, snapshot_vm_resource_child.snapshot_id, grand_children)
+                    if snapshot_vm_resource_child.snapshot_id not in grand_children:
+                        grand_children.add(snapshot_vm_resource_child.snapshot_id)
+                        grand_children = get_snapshot_children(context, snapshot_vm_resource_child.snapshot_id, grand_children)
                 except Exception as ex:
                     LOG.exception(ex)
     if children:
@@ -1095,8 +1096,9 @@ def get_snapshot_parents(context, snapshot_id, parents):
                 try:
                     vm_disk_resource_snap_parent = vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
                     snapshot_vm_resource_parent = snapshot_vm_resource_get(context, vm_disk_resource_snap_parent.snapshot_vm_resource_id)
-                    grand_parents.add(snapshot_vm_resource_parent.snapshot_id)
-                    grand_parents = get_snapshot_parents(context, snapshot_vm_resource_parent.snapshot_id, grand_parents)
+                    if snapshot_vm_resource_parent.snapshot_id not in grand_parents:
+                        grand_parents.add(snapshot_vm_resource_parent.snapshot_id)
+                        grand_parents = get_snapshot_parents(context, snapshot_vm_resource_parent.snapshot_id, grand_parents)
                 except Exception as ex:
                     LOG.exception(ex)
     if parents:
