@@ -899,7 +899,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg['Subject'] = subject        
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),int(settings.get_settings(context).get('smtp_port')))
+            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),
+                             int(settings.get_settings(context).get('smtp_port')),
+                             timeout= int(settings.get_settings(context).get('smtp_timeout')))
             if settings.get_settings(context).get('smtp_server_name') != 'localhost':
                 s.ehlo()
                 s.starttls()

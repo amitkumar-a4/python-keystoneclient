@@ -1171,6 +1171,7 @@ def configure_form_vmware():
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
+    config_data['create_file_system'] = 'off'
     config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_data
 

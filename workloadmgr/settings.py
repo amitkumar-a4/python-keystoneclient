@@ -28,6 +28,7 @@ default_settings = {
 'smtp_port' : '587',
 'smtp_server_username' : '',
 'smtp_server_password' : '',
+'smtp_timeout' : '10',
 }
 
 def get_settings(context=None):                           
