@@ -76,10 +76,17 @@ def connect_server(host, port, user, password, verbose=False):
         if verbose:
             LOG.debug(_('Connected to ' + host +  ' on port ' + port +  '...'))
 
-    except Exception, e:
+    except Exception as ex:
         LOG.error(_('Oops!  There was an error.  Try again...'))
-        LOG.error(_(e))
-        raise exception.ErrorOccurred(reason='Failed to connect MongoDB node')
+        LOG.error(_(ex))
+        if ex.__class__.__name__ == 'ConnectionFailure':
+           error = _('Failed to connect MongoDB node %s') % (str(host))
+        elif ex.__class__.__name__ == 'ConfigurationError':
+             error = _('Wrong username/password entered for MongoDB node  %s') % (str(host))
+        else:
+             error = _('Failed to connect MongoDB node %s') % (str(host))
+
+        raise exception.ErrorOccurred(reason=error)
 
     return connection
 
