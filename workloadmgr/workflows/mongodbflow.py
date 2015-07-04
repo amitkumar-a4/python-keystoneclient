@@ -577,9 +577,6 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
     hypervisors = compute_service.get_hypervisors(cntx)
 
     vms = []
-    if len(instances) == 0:
-        LOG.info(_("No instances are discovered in the nova. Please run discover and try again"))
-        raise Exception(_("No instances are discovered in the nova. Please run discover and try again"))
 
     # call nova interface-list <instanceid> to build the list of instances ids
     for instance in instances:
@@ -610,6 +607,10 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         else:
             LOG.info(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
             raise Exception(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
+
+    if len(vms) == 0:
+        LOG.info(_("No VMs are discovered in tvault inventory. Please run discover and try again"))
+        raise Exception(_("No instances are discovered in tvault inventory. Please run discover and try again"))
     return vms
 
 """

@@ -272,10 +272,6 @@ def get_cassandra_instances(store, findpartitiontype = 'False'):
         hypervisors = compute_service.get_hypervisors(cntx)
         vms = []
 
-        if len(instances) == 0:
-            LOG.info(_("No instances are discovered in the nova. Please run discover and try again"))
-            raise Exception(_("No instances are discovered in the nova. Please run discover and try again"))
-
         # call nova interface-list <instanceid> to build the list of instances ids
         # if node names are host names then lookup the VMid based on the
         for instance in instances:
@@ -308,8 +304,14 @@ def get_cassandra_instances(store, findpartitiontype = 'False'):
                  LOG.info(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
                  raise Exception(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
 
+        if len(vms) == 0:
+            LOG.info(_("No VMs are discovered in tvault inventory. Please run discover and try again"))
+            raise Exception(_("No instances are discovered in tvault inventory. Please run discover and try again"))
+
         LOG.info(_('Discovered Cassandra Virtual Machines: ' + str(vms)))
+
         return vms, cassandra_nodes, allnodes, clusterinfo
+
     except Exception as ex:
         LOG.exception(ex)
         raise
