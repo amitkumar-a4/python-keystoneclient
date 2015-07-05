@@ -569,7 +569,7 @@ def upgrade(migrate_engine):
         Column('user_id', String(length=255)),
         Column('project_id', String(length=255), primary_key=True, nullable= False),
         Column('key', String(length=255), primary_key=True, nullable= False),
-        Column('value', String(length=255)),         
+        Column('value',  Text()),         
         Column('description', String(length=255)),
         Column('status', String(length=32), nullable=False),
         UniqueConstraint('key', 'project_id'),

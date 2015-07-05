@@ -31,6 +31,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.apscheduler import job
 from workloadmgr.vault import vault
+from workloadmgr.openstack.common.gettextutils import _
 
 
 FLAGS = flags.FLAGS
@@ -992,6 +993,9 @@ def snapshot_type_time_size_update(context, snapshot_id):
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 if vm_disk_resource_snap.vault_path:
                     vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_path)
+                    if vm_disk_resource_snap_size == 0:
+                        vm_disk_resource_snap_size = vm_disk_resource_snap.size
+                    
                     disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
                     vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
                                                                                 disk_format, disk_type)
@@ -1000,13 +1004,12 @@ def snapshot_type_time_size_update(context, snapshot_id):
                         vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
                         while vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                            if vm_disk_resource_snap_backing.restore_size > 0:
-                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
-                            else:
+                            if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
                                 vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                            else:
+                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
                             vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                 
-                             
                     vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
                                                                                      'restore_size' : vm_disk_resource_snap_restore_size}) 
                     snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size

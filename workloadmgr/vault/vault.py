@@ -158,14 +158,18 @@ def get_snapshot_path(snapshot_metadata):
 def get_snapshot_vm_path(snapshot_vm_metadata):                 
     snapshot_path = get_snapshot_path(snapshot_vm_metadata)
     snapshot_vm_path = snapshot_path + '/vm_id_%s' % (snapshot_vm_metadata['snapshot_vm_id'])    
-    return snapshot_vm_path   
+    return snapshot_vm_path
+
+def get_snapshot_vm_resource_path(snapshot_vm_resource_metadata):                 
+    snapshot_vm_path = get_snapshot_vm_path(snapshot_vm_resource_metadata)
+    snapshot_vm_resource_path = snapshot_vm_path + '/vm_res_id_%s_%s' % (snapshot_vm_resource_metadata['snapshot_vm_resource_id'], 
+                                                                         snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ',''))
+    return snapshot_vm_resource_path    
             
-def get_snapshot_file_path(snapshot_file_metadata):
-    snapshot_vm_path = get_snapshot_vm_path(snapshot_file_metadata)
-    snapshot_file_path = snapshot_vm_path + '/vm_res_id_%s_%s' % (snapshot_file_metadata['snapshot_vm_resource_id'], 
-                                                                    snapshot_file_metadata['resource_name'].replace(' ',''))
-    snapshot_file_path = snapshot_file_path + '/' + snapshot_file_metadata['vm_disk_resource_snap_id']
-    return snapshot_file_path
+def get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata):
+    snapshot_vm_resource_path = get_snapshot_vm_resource_path(snapshot_vm_disk_resource_metadata)
+    snapshot_vm_disk_resource_path = snapshot_vm_resource_path + '/' + snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id']
+    return snapshot_vm_disk_resource_path
 
 @autolog.log_method(logger=Logger) 
 def workload_delete(workload_metadata):
@@ -300,6 +304,24 @@ def upload_snapshot_vm_to_object_store(context, snapshot_vm_metadata):
         pass    
     
 @autolog.log_method(logger=Logger) 
+def upload_snapshot_vm_resource_to_object_store(context, snapshot_vm_resource_metadata):
+    if FLAGS.wlm_vault_storage_type == 'swift-i': 
+        pass
+    if FLAGS.wlm_vault_storage_type == 'swift-s': 
+        progress_msg = "Uploading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' to object store"
+        WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_resource_metadata['snapshot_id'], {'progress_msg': progress_msg}) 
+        snapshot_vm_resource_path = get_snapshot_vm_path(snapshot_vm_resource_metadata)
+        try:
+            swift_upload_files([snapshot_vm_resource_path], context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            progress_msg = "Retrying to upload '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' to object store"
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_resource_metadata['snapshot_id'], {'progress_msg': progress_msg})
+            swift_upload_files([snapshot_vm_resource_path], context = None)
+    elif FLAGS.wlm_vault_storage_type == 's3':
+        pass       
+    
+@autolog.log_method(logger=Logger) 
 def download_metadata_from_object_store(context):
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
         pass
@@ -319,7 +341,25 @@ def download_snapshot_vm_from_object_store(context, snapshot_vm_metadata):
         snapshot_vm_folder = get_snapshot_vm_path(snapshot_vm_metadata)
         swift_download_folder(snapshot_vm_folder, context = None)       
     elif FLAGS.wlm_vault_storage_type == 's3':
-        pass    
+        pass
+    
+@autolog.log_method(logger=Logger)     
+def download_snapshot_vm_resource_from_object_store(context, snapshot_vm_resource_metadata):
+    if FLAGS.wlm_vault_storage_type == 'swift-i':
+        pass
+    if FLAGS.wlm_vault_storage_type == 'swift-s':
+        progress_msg = "Downloading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
+        WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+        snapshot_vm_resource_folder = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
+        try:
+            swift_download_folder(snapshot_vm_resource_folder, context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            progress_msg = "Retrying to download '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
+            WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+            swift_download_folder(snapshot_vm_resource_folder, context = None)                           
+    elif FLAGS.wlm_vault_storage_type == 's3':
+        pass          
 
 @autolog.log_method(logger=Logger)         
 def swift_upload_files(files, context = None): 
@@ -330,20 +370,20 @@ def swift_upload_files(files, context = None):
         options = {'use_slo': False, 'verbose': 1, 'os_username': None, 'os_user_domain_name': None, 
                    'os_cacert': None, 'os_tenant_name': None, 'os_user_domain_id': None, 'header': [], 
                    'auth_version': '1.0', 'ssl_compression': True, 'os_password': None, 'os_user_id': None, 
-                   'skip_identical': False, 'segment_container': None, 'os_project_id': None, 'snet': False, 
+                   'skip_identical': True, 'segment_container': None, 'os_project_id': None, 'snet': False, 
                    'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
                    'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
                    'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
                    'auth': FLAGS.wlm_vault_swift_auth_url, 'os_auth_url': None, 
                    'user': FLAGS.wlm_vault_swift_username, 'key': FLAGS.wlm_vault_swift_password, 'os_region_name': None, 
                    'info': False, 'retries': 5, 'os_project_domain_id': None, 'checksum': True, 
-                   'changed': False, 'leave_segments': False, 'os_auth_token': None, 
+                   'changed': True, 'leave_segments': False, 'os_auth_token': None, 
                    'os_options': {'project_name': None, 'region_name': None, 'tenant_name': None, 
                                   'user_domain_name': None, 'endpoint_type': None, 'object_storage_url': None, 
                                   'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
                                   'tenant_id': None, 'service_type': None, 'project_id': None, 
                                   'auth_token': None, 'project_domain_name': None}, 
-                   'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+                   'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None, 'verbose': 1}
         
     else:
         if FLAGS.wlm_vault_swift_auth_version == 'KEYSTONE_V2':
@@ -366,8 +406,7 @@ def swift_upload_files(files, context = None):
                                    'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
                                    'tenant_id': None, 'service_type': None, 'project_id': None, 
                                    'auth_token': None, 'project_domain_name': None}, 
-                    'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None,
-                    'verbose': 1}
+                    'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None, 'verbose': 1}
     
 
     if options['object_name'] is not None:
@@ -655,6 +694,20 @@ def purge_snapshot_vm_from_staging_area(context, snapshot_vm_metadata):
             pass                      
     except Exception as ex:
         LOG.exception(ex)  
+        
+@autolog.log_method(logger=Logger)                 
+def purge_snapshot_vm_resource_from_staging_area(context, snapshot_vm_resource_metadata):
+    try:
+        snapshot_vm_resource_path  = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
+        if FLAGS.wlm_vault_storage_type == 'swift-i':
+            pass
+        elif FLAGS.wlm_vault_storage_type == 'swift-s':
+            if os.path.isdir(snapshot_vm_resource_path):
+                shutil.rmtree(snapshot_vm_resource_path)     
+        elif FLAGS.wlm_vault_storage_type == 's3':
+            pass                      
+    except Exception as ex:
+        LOG.exception(ex)          
 
 @autolog.log_method(logger=Logger)         
 def get_size(vault_path):
