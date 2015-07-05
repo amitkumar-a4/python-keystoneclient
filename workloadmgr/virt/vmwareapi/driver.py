@@ -985,18 +985,14 @@ class VMwareVCDriver(VMwareESXDriver):
                                                      
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values) 
         
-                vault_metadata = {'workload_id': snapshot['workload_id'],
-                                  'snapshot_id': snapshot['id'],
-                                  'snapshot_vm_id': instance['vm_id'],
-                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                  'resource_name':  dev.deviceInfo.label,
-                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
+                snapshot_vm_disk_resource_metadata = {'workload_id': snapshot['workload_id'],
+                                                      'snapshot_id': snapshot['id'],
+                                                      'snapshot_vm_id': instance['vm_id'],
+                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                      'snapshot_vm_resource_name':  dev.deviceInfo.label,
+                                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
                 
-                db.snapshot_update( cntx, snapshot['id'], 
-                                    {'progress_msg': 'Uploading '+ dev.deviceInfo.label + ' of VM:' + instance['vm_name'],
-                                     'status': 'uploading'
-                                    })            
-                copy_to_file_path = vault.get_snapshot_file_path(vault_metadata) 
+                copy_to_file_path = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata) 
                 head, tail = os.path.split(copy_to_file_path)
                 fileutils.ensure_tree(head)
     
@@ -1162,11 +1158,6 @@ class VMwareVCDriver(VMwareESXDriver):
                     self._set_parent_content_id(copy_to_file_path, parent_content_id)
                 content_id = self._get_vmdk_content_id(copy_to_file_path)
                 
-                db.snapshot_update( cntx, snapshot['id'], 
-                                    {'progress_msg': 'Uploaded '+ dev.deviceInfo.label + ' of VM:' + instance['vm_name'],
-                                     'status': 'uploading'
-                                    })
-    
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_url' : copy_to_file_path.replace(vault.get_vault_local_directory(), '', 1),
                                                 'vault_service_metadata' : 'None',
@@ -1242,8 +1233,25 @@ class VMwareVCDriver(VMwareESXDriver):
                                                'status': 'creating'
                                               }
         
-                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
+                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)       
+                db.snapshot_update( cntx, snapshot_obj.id, 
+                                    {'progress_msg': "Uploading '" + dev.deviceInfo.label + "' of '" + instance['vm_name'] + "'",
+                                     'status': 'uploading'
+                                    })                                                           
                 vmdk_size, snapshot_type = _upload_vmdk(dev)
+                vault.upload_snapshot_vm_resource_to_object_store(cntx,{'workload_id': snapshot_obj.workload_id,
+                                                                        'snapshot_id': snapshot_obj.id,
+                                                                        'snapshot_vm_id': instance['vm_id'],
+                                                                        'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                                        'snapshot_vm_resource_name':  dev.deviceInfo.label,
+                                                                        'snapshot_vm_name': instance['vm_name']})
+                workload_utils.purge_snapshot_vm_resource_from_staging_area(cntx, snapshot_obj.id, snapshot_vm_resource.id)                     
+                
+                db.snapshot_update( cntx, snapshot_obj.id, 
+                                    {'progress_msg': "Uploaded '" + dev.deviceInfo.label + "' of '" + instance['vm_name'] + "'",
+                                     'status': 'uploading'
+                                    })
+                
                 snapshot_vm_resource = db.snapshot_vm_resource_update(cntx, 
                                                                       snapshot_vm_resource.id, 
                                                                       {'status': 'available', 
@@ -1252,10 +1260,6 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                        'finished_at' : timeutils.utcnow(),
                                                                        'time_taken' : int((timeutils.utcnow() - snapshot_vm_resource.created_at).total_seconds()),
                                                                        })
-            vault.upload_snapshot_vm_to_object_store(cntx,{'workload_id': snapshot_obj.workload_id,
-                                                           'snapshot_id': snapshot_obj.id,
-                                                           'snapshot_vm_id': instance['vm_id']})                
-
         except Exception as ex:
             LOG.exception(ex)      
             raise 
@@ -1593,8 +1597,6 @@ class VMwareVCDriver(VMwareESXDriver):
             db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
             LOG.info(msg)
             
-            workload_utils.download_snapshot_vm_from_object_store(cntx, restore_obj.id, restore_obj.snapshot_id, instance_options['id'])
-            
             client_factory = self._session._get_vim().client.factory
             service_content = self._session._get_vim().get_service_content()
             cookies = self._session._get_vim().client.options.transport.cookiejar
@@ -1786,10 +1788,12 @@ class VMwareVCDriver(VMwareESXDriver):
                                 {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
                     
             #restore, rebase, commit & upload
-            LOG.info(_('Uploading disks'))
+            LOG.info(_('Processing disks'))
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
+                workload_utils.download_snapshot_vm_resource_from_object_store(cntx, restore_obj.id, restore_obj.snapshot_id, snapshot_vm_resource.id)
+                
                 for vdisk in instance_options['vdisks']:
                     if vdisk['label'] == snapshot_vm_resource.resource_name:
                         vdisk_datastore_name = vdisk['datastore']
@@ -1840,9 +1844,9 @@ class VMwareVCDriver(VMwareESXDriver):
                                                    unit_number = unit_number, 
                                                    device_name = device_name)            
     
-                LOG.info('Uploading disks of ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id)        
+                LOG.info("Uploading '" + device_name + "' of '" + instance['vm_name'] + "'" + " from snapshot " + snapshot_obj.id)        
                 db.restore_update(cntx,  restore['id'], 
-                                  {'progress_msg': 'Uploading disks of ' + instance['vm_name'],
+                                  {'progress_msg': "Uploading '" + device_name + "' of '" + instance['vm_name'] + "'",
                                    'status': 'uploading' 
                                   })
                 
@@ -1957,8 +1961,10 @@ class VMwareVCDriver(VMwareESXDriver):
                     'progress_percent': str(restore_obj.progress_percent),
                     'normal_color': autolog.NORMAL,
                     }) 
-                LOG.debug( progress)    
+                LOG.debug( progress)
+                workload_utils.purge_snapshot_vm_resource_from_staging_area(cntx, restore_obj.snapshot_id, snapshot_vm_resource.id)                     
                 # End of for loop for devices
+                
             restored_instance_id = self._session._call_method(vim_util,"get_dynamic_property", vm_ref,
                                                               "VirtualMachine", "config.instanceUuid")
             
@@ -1993,7 +1999,7 @@ class VMwareVCDriver(VMwareESXDriver):
             raise
         finally:
             try:
-                workload_utils.purge_snapshot_vm_from_staging_area(cntx, restore_obj.id, restore_obj.snapshot_id, instance_options['id'])
+                workload_utils.purge_snapshot_vm_from_staging_area(cntx, restore_obj.snapshot_id, instance_options['id'])
             except Exception as ex:
                 LOG.exception(ex)                 
 

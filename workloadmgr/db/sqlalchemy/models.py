@@ -585,7 +585,7 @@ class Settings(BASE, WorkloadsBase):
         return FLAGS.workload_name_template % self.key
 
     user_id = Column(String(255), nullable=False)
-    value = Column(String(255))
+    value = Column(Text)
     description = Column(String(255))
     status =  Column(String(32), nullable=False)
     

@@ -1000,13 +1000,12 @@ def snapshot_type_time_size_update(context, snapshot_id):
                         vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
                         while vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                            if vm_disk_resource_snap_backing.restore_size > 0:
-                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
-                            else:
+                            if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
                                 vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                            else:
+                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
                             vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                 
-                             
                     vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
                                                                                      'restore_size' : vm_disk_resource_snap_restore_size}) 
                     snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
