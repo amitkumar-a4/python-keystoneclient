@@ -1158,12 +1158,24 @@ class VMwareVCDriver(VMwareESXDriver):
                     self._set_parent_content_id(copy_to_file_path, parent_content_id)
                 content_id = self._get_vmdk_content_id(copy_to_file_path)
                 
+                vm_disk_resource_snap_size = vault.get_size(copy_to_file_path)
+                if getattr(dev.backing, 'thinProvisioned', False):
+                    disk_type = "thin"
+                else:
+                    if getattr(dev.backing, 'eagerlyScrub', False):
+                        disk_type = "eagerZeroedThick"
+                    else:
+                        disk_type = "preallocated"
+                vm_disk_resource_snap_restore_size = vault.get_restore_size(copy_to_file_path,'vmdk', disk_type)                
+                
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_url' : copy_to_file_path.replace(vault.get_vault_local_directory(), '', 1),
                                                 'vault_service_metadata' : 'None',
                                                 'finished_at' : timeutils.utcnow(),
                                                 'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),
                                                 'metadata' : {'content_id' : content_id },
+                                                'size' : vm_disk_resource_snap_size,
+                                                'restore_size' : vm_disk_resource_snap_restore_size,
                                                 'status': 'available'}
                 vm_disk_resource_snap = db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 if vm_disk_resource_snap_backing:
@@ -1176,7 +1188,7 @@ class VMwareVCDriver(VMwareESXDriver):
   
                                     
                 snapshot_type = 'full' if parent_changeId == '*' else 'incremental'
-                return vmdk_snap_size, snapshot_type            
+                return vm_disk_resource_snap_size, snapshot_type            
                 # END of inner function _upload_vmdk
             except Exception as ex:
                 LOG.exception(ex)      
