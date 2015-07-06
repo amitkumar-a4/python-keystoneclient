@@ -26,6 +26,7 @@ from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
 from workloadmgr import exception
 from workloadmgr import flags
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import uuidutils
