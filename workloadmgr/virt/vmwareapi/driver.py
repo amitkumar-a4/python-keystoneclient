@@ -1195,6 +1195,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 raise 
         try:
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+            workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
             # make sure the session cookies are upto data by calling the following api
             datacenter_name = self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['vmx_datastore_ref'])[1]
             cookies = self._session._get_vim().client.options.transport.cookiejar
@@ -1252,6 +1253,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                     })                                                           
                 vmdk_size, snapshot_type = _upload_vmdk(dev)
                 vault.upload_snapshot_vm_resource_to_object_store(cntx,{'workload_id': snapshot_obj.workload_id,
+                                                                        'workload_name': workload_obj.display_name,
                                                                         'snapshot_id': snapshot_obj.id,
                                                                         'snapshot_vm_id': instance['vm_id'],
                                                                         'snapshot_vm_resource_id': snapshot_vm_resource.id,
@@ -1401,7 +1403,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))
                             db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
+                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
             except Exception as ex:
                 LOG.exception(ex)
                 
@@ -1471,7 +1473,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
                             
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
+                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                                 
@@ -1491,7 +1493,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                         snap.id,
                                                                                                         snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                         workload_obj.display_name ))                            
-                                vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
+                                vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                             except Exception as ex:
                                 LOG.exception(ex)    
                         continue
@@ -1567,7 +1569,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.id,
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'snapshot_id': snap.id})
+                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                         

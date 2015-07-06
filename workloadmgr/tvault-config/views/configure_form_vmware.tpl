@@ -177,12 +177,12 @@
                     <input name="swift-password" type="password" class="form-control"> <br>
                 </div><br>
                 <div class="input-group">
-                    <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <label class="input-group-addon">Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                     <input name="swift-tenantname" {{'value=' + swift_tenantname if (defined('swift_tenantname') and len(swift_tenantname)) else ''}} type="text" placeholder="admin" class="form-control"> <br>
                 </div><br>
                 <div class="input-group">
-                    <label class="input-group-addon">Container&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                    <input name="swift-container" type="text" {{'value=' + swift_container if (defined('swift_container') and len(swift_container)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
+                    <label class="input-group-addon">Container Prefix&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-container-prefix" type="text" {{'value=' + swift_container_prefix if (defined('swift_container_prefix') and len(swift_container_prefix)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
                 </div><br>                    
 	 	      </div>
 		    </div>
@@ -202,7 +202,7 @@
 		      <div class="panel-body">
 				%if 'ldap_server_url' in locals() and ldap_server_url != 'ldap://localhost':
 					<div class="input-group">
-						<label class="input-group-addon">Server URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">Server URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-server-url" {{'value=' + ldap_server_url if defined('ldap_server_url') else ''}} type="text" placeholder="ldap://example.com" class="form-control"><br>
 					</div><br>
 					<div class="input-group">
@@ -210,24 +210,24 @@
 						<input name="ldap-domain-name-suffix" {{'value=' + ldap_domain_name_suffix if defined('ldap_domain_name_suffix') else ''}} type="text" placeholder="dc=example,dc=com" class="form-control"> <br>
 					</div><br>
 					<div class="input-group">
-						<label class="input-group-addon">Base DN for users&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">Base DN for users&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-user-tree-dn" {{'value=' + ldap_user_tree_dn if defined('ldap_user_tree_dn') else ''}} type="text" placeholder="cn=users,dc=example,dc=com" class="form-control"><br>
 					</div><br>
 					<div class="input-group">
-						<label class="input-group-addon">Username(DN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">Username(DN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-user-dn" {{'value=' + ldap_user_dn if defined('ldap_user_dn') else ''}} type="text" placeholder="cn=triliovault,cn=users,dc=example,dc=com" class="form-control"> <br>
 					</div><br>
 					<div class="input-group">
-						<label class="input-group-addon">User Object Class&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">User Object Class&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-user-objectclass" {{'value=' + ldap_user_objectclass if defined('ldap_user_objectclass') else ''}} type="text" placeholder="inetOrgPerson OR Person" class="form-control"> <br>
 					</div><br>	
 					<div class="input-group">
-						<label class="input-group-addon">Username Attribute&nbsp;</label>
+						<label class="input-group-addon">Username Attribute&nbsp;&nbsp;</label>
 						<input name="ldap-user-name-attribute" {{'value=' + ldap_user_name_attribute if defined('ldap_user_name_attribute') else ''}} type="text" placeholder="sn OR cn" class="form-control"> <br>
 					</div><br>
 				%else:
 					<div class="input-group">
-						<label class="input-group-addon">Server URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">Server URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-server-url" type="text" placeholder="ldap://example.com" class="form-control"><br>
 					</div><br>
 					<div class="input-group">
@@ -235,19 +235,19 @@
 						<input name="ldap-domain-name-suffix" type="text" placeholder="dc=example,dc=com" class="form-control"> <br>
 					</div><br>
 					<div class="input-group">
-						<label class="input-group-addon">Base DN for users&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">Base DN for users&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-user-tree-dn" type="text" placeholder="cn=users,dc=example,dc=com" class="form-control"><br>
 					</div><br>
 					<div class="input-group">
-						<label class="input-group-addon">Username(DN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">Username(DN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-user-dn" type="text" placeholder="cn=triliovault,cn=users,dc=example,dc=com" class="form-control"> <br>
 					</div><br>
 					<div class="input-group">
-						<label class="input-group-addon">User Object Class&nbsp;&nbsp;&nbsp;</label>
+						<label class="input-group-addon">User Object Class&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input name="ldap-user-objectclass" type="text" placeholder="inetOrgPerson OR Person" class="form-control"> <br>
 					</div><br>	
 					<div class="input-group">
-						<label class="input-group-addon">Username Attribute&nbsp;</label>
+						<label class="input-group-addon">Username Attribute&nbsp;&nbsp;</label>
 						<input name="ldap-user-name-attribute" type="text" placeholder="sn OR cn" class="form-control"> <br>
 					</div><br>			
 				%end  																	
