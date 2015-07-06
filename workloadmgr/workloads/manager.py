@@ -444,7 +444,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
             
             # upload the data to object store... this function will check if the object store is configured
-            vault.upload_snapshot_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
+            vault.upload_snapshot_metatdata_to_object_store(context, {'workload_id': workload.id, 'workload_name': workload.display_name, 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -536,7 +536,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete({'workload_id': workload.id})
+        vault.workload_delete({'workload_id': workload.id, 'workload_name': workload.display_name,})
 
         
     @autolog.log_method(logger=Logger)

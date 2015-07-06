@@ -574,7 +574,11 @@ class API(base.Base):
             workloads = []
             import_workload_module = None
             for workload_url in vault.get_workloads(context):
-                workload_values = json.loads(vault.get_object('/snapshots/' + workload_url['workload_url'] + '/workload_db'))
+                try:
+                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
+                except Exception as ex:
+                    LOG.exception(ex)
+                    continue                    
                 """
                 try:
                     jobs = self._scheduler.get_jobs()

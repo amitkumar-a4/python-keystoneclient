@@ -49,7 +49,7 @@ def import_workload(cntx, workload_url, new_version):
     """
     db = WorkloadMgrDB().db
     
-    workload_values = json.loads(vault.get_object('/snapshots/' + workload_url['workload_url'] + '/workload_db'))
+    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
     workload_values = _adjust_values(cntx, new_version, workload_values)
     if workload_values['status'] == 'locked':
         workload_values['status'] = 'available'
@@ -58,7 +58,7 @@ def import_workload(cntx, workload_url, new_version):
         workload_api = workloadAPI.API()
         workload_api.workload_add_scheduler_job(pickle.loads(str(workload_values['jobschedule'])), workload)                                       
                 
-    workload_vms = json.loads(vault.get_object('/snapshots/' + workload_url['workload_url'] + '/workload_vms_db'))
+    workload_vms = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_vms_db'))
     for workload_vm_values in workload_vms:
         workload_vm_values = _adjust_values(cntx, new_version, workload_vm_values)
         db.workload_vms_create(cntx, workload_vm_values)
@@ -66,7 +66,7 @@ def import_workload(cntx, workload_url, new_version):
     snapshot_values_list = []
     for snapshot_url in workload_url['snapshot_urls']:
         try:
-            snapshot_values = json.loads(vault.get_object('/snapshots/' + snapshot_url + '/snapshot_db'))
+            snapshot_values = json.loads(vault.get_object(snapshot_url + '/snapshot_db'))
             snapshot_values['snapshot_url'] = snapshot_url
             snapshot_values_list.append(snapshot_values)
         except Exception as ex:
@@ -77,11 +77,11 @@ def import_workload(cntx, workload_url, new_version):
         snapshot_values = _adjust_values(cntx, new_version, snapshot_values)
         snapshot = db.snapshot_create(cntx, snapshot_values)
         try:
-            snapshot_vms = json.loads(vault.get_object('/snapshots/' + snapshot_values['snapshot_url'] + '/snapshot_vms_db'))
+            snapshot_vms = json.loads(vault.get_object(snapshot_values['snapshot_url'] + '/snapshot_vms_db'))
             for snapshot_vm_values in snapshot_vms:
                 snapshot_vm_values = _adjust_values(cntx, new_version, snapshot_vm_values)
                 db.snapshot_vm_create(cntx, snapshot_vm_values)
-            snapshot_vm_resources = json.loads(vault.get_object('/snapshots/' + snapshot_values['snapshot_url'] + '/resources_db'))
+            snapshot_vm_resources = json.loads(vault.get_object(snapshot_values['snapshot_url'] + '/resources_db'))
             for snapshot_vm_resource_values in snapshot_vm_resources:
                 snapshot_vm_resource_values = _adjust_values(cntx, new_version, snapshot_vm_resource_values)
                 db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
@@ -101,7 +101,7 @@ def import_workload(cntx, workload_url, new_version):
                            "/snapshot_" + snapshot['id'] + \
                            "/network" + vm_res_id +\
                            "/network_db"
-                    vm_network_resource_snaps = json.loads(vault.get_object('/snapshots/' + path))
+                    vm_network_resource_snaps = json.loads(vault.get_object(path))
                     for vm_network_resource_snap_vaules in vm_network_resource_snaps:
                         vm_network_resource_snap_vaules = _adjust_values(cntx, new_version, vm_network_resource_snap_vaules)
                         db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_vaules)
@@ -111,7 +111,7 @@ def import_workload(cntx, workload_url, new_version):
                            "/snapshot_" + snapshot['id'] + \
                            "/vm_id_" + res.vm_id + vm_res_id.replace(' ','') + \
                            "/disk_db"
-                    vm_disk_resource_snaps = json.loads(vault.get_object('/snapshots/' + path))
+                    vm_disk_resource_snaps = json.loads(vault.get_object(path))
                     vm_disk_resource_snaps_sorted = sorted(vm_disk_resource_snaps, key=itemgetter('created_at'))
                     for vm_disk_resource_snap_vaules in vm_disk_resource_snaps_sorted:
                         vm_disk_resource_snap_vaules = _adjust_values(cntx, new_version, vm_disk_resource_snap_vaules)
@@ -121,7 +121,7 @@ def import_workload(cntx, workload_url, new_version):
                            "/snapshot_" + snapshot['id'] + \
                            "/securty_group" + vm_res_id +\
                            "/security_group_db"
-                    vm_security_group_rule_snaps= json.loads(vault.get_object('/snapshots/' + path))
+                    vm_security_group_rule_snaps= json.loads(vault.get_object(path))
                     for vm_security_group_rule_snap_vaules in vm_security_group_rule_snaps:
                         vm_security_group_rule_snap_vaules = _adjust_values(cntx, new_version, vm_security_group_rule_snap_vaules)
                         db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_vaules)            
