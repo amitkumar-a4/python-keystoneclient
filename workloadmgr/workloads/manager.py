@@ -575,7 +575,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 metavalue = json.loads(meta.value)
                 if meta.key == 'cluster':
                     optionsinst['computeresource'] = {'moid': metavalue[0]['value'], 'name': metavalue[0]['name']}
-                elif meta.key == 'parent':
+                elif meta.key == 'parent' and metavalue:
                     optionsinst['vmfolder'] = {'moid': metavalue['value'], 'name': metavalue['name']}
                 elif meta.key == 'networks':
                     optionsinst['networks'] = []
@@ -591,7 +591,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     optionsinst['vdisks'] = metavalue
                 elif meta.key == 'vmxpath':
                     optionsinst['vmxpath'] = metavalue
-                elif 'datastores':
+                elif meta.key == 'datastores':
                     optionsinst['datastores'] = []
                     for ds in metavalue:
                         optionsinst['datastores'].append({'moid': ds['value'],
