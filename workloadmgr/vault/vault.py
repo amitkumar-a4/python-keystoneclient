@@ -357,7 +357,7 @@ def download_metadata_from_object_store(context):
                 content = f.readlines()
             for container in content:
                 if container.startswith(FLAGS.wlm_vault_swift_container_prefix):
-                    swift_download_metadata_from_object_store(context, container)
+                    swift_download_metadata_from_object_store(context, container.replace('\n', ''))
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass
     

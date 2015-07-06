@@ -45,7 +45,7 @@ def import_settings(cntx, new_version):
 
 def import_workload(cntx, workload_url, new_version):
     """ Import workload and snapshot records from vault 
-    Versions Supported: 1.0.118
+    Versions Supported: 1.0.125
     """
     db = WorkloadMgrDB().db
     
@@ -130,103 +130,3 @@ def import_workload(cntx, workload_url, new_version):
             db.snapshot_update(cntx,snapshot.id,{'status': 'error'})
     return workload
     
-    """
-    workloads = vault_service.conn.get_account()
-    for workload in workloads[1]:
-        if not workload['name'].startswith("workload_"):
-            continue
-        container = vault_service.conn.get_container(workload['name'])
-        wl = vault_service.conn.get_object(workload['name'], workload['name'] + "/workload_db")[1]
-        workload_values = json.loads(wl)
-        workload_values['created_at'] = timeutils.parse_isotime(workload_values['created_at'])
-        workload_values['updated_at'] = timeutils.parse_isotime(workload_values['updated_at'])
-        wl_meta = {}
-        for meta in workload_values['metadata']:
-            wl_meta[meta['key']] = meta['value']
-        workload_values['metadata'] = wl_meta
-        db.workload_create(cntx, workload_values)
-
-        wl_vms = vault_service.conn.get_object(workload['name'],
-                                               workload['name'] + "/workload_vms_db")[1]
-        workload_vms_values = json.loads(wl_vms)
-        for wl_vm in workload_vms_values:
-            wl_vm['created_at'] = timeutils.parse_isotime(wl_vm['created_at'])
-            vm_meta = {}
-            for meta in wl_vm['metadata']:
-                vm_meta[meta['key']] = meta['value']
-            wl_vm['metadata'] = vm_meta
-            db.workload_vms_create(cntx, wl_vm)
-            
-        # Two passes here, one for snapshot and then for snapshot_vms
-        for snap in container[1]:
-            if "snapshot_db" in snap['name']:
-                snapshot = vault_service.conn.get_object(workload['name'], snap['name'])[1]
-                snapshot_values = json.loads(snapshot)
-                snapshot_values['created_at'] = timeutils.parse_isotime(snapshot_values['created_at'])
-                if snapshot_values['updated_at']:
-                    snapshot_values['updated_at'] = timeutils.parse_isotime(snapshot_values['updated_at'])
-                db.snapshot_create(cntx, snapshot_values)
-                snapshotdb = db.snapshot_get(cntx, snapshot_values['id'])
-            elif "resources_db" in snap['name']:
-                resources = vault_service.conn.get_object(workload['name'], snap['name'])[1]
-                resource_values = json.loads(resources)
-                for res in resource_values:
-                    res['created_at'] = timeutils.parse_isotime(res['created_at'])
-                    if res['updated_at']:
-                        res['updated_at'] = timeutils.parse_isotime(res['updated_at'])
-                    res_meta = {}
-                    for meta in res['metadata']:
-                        res_meta[meta['key']] = meta['value']
-                    res['metadata'] = res_meta
-                    snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, res)                                                
-            elif "disk_db" in snap['name']:
-                disks = vault_service.conn.get_object(workload['name'], snap['name'])[1]
-                disk_values = json.loads(disks)
-                for disk in disk_values:
-                    disk['created_at'] = timeutils.parse_isotime(disk['created_at'])
-                    if disk['updated_at']:
-                        disk['updated_at'] = timeutils.parse_isotime(disk['updated_at'])
-                    disk_meta = {}
-                    for meta in disk['metadata']:
-                        disk_meta[meta['key']] = meta['value']
-                    disk['metadata'] = disk_meta
-                    db.vm_disk_resource_snap_create(cntx, disk)
-            elif "network_db" in snap['name']:
-                networks = vault_service.conn.get_object(workload['name'], snap['name'])[1]
-                network_values = json.loads(networks)
-                for network in network_values:
-                    network['created_at'] = timeutils.parse_isotime(network['created_at'])
-                    if network['updated_at']:
-                        network['updated_at'] = timeutils.parse_isotime(network['updated_at'])
-                    network_meta = {}
-                    for meta in network['metadata']:
-                        network_meta[meta['key']] = meta['value']
-                    network['metadata'] = network_meta
-                    db.vm_network_resource_snap_create(cntx, network)
-            elif "security_group_db" in snap['name']:
-                secgroups = vault_service.conn.get_object(workload['name'], snap['name'])[1]
-                secgroup_values = json.loads(secgroups)
-                for secgroup in secgroup_values:
-                    secgroup['created_at'] = timeutils.parse_isotime(secgroup['created_at'])
-                    if secgroup['updated_at']:
-                        secgroup['updated_at'] = timeutils.parse_isotime(secgroup['updated_at'])
-                    secgroup_meta = {}
-                    for meta in secgroup['metadata']:
-                        secgroup_meta[meta['key']] = meta['value']
-                    secgroup['metadata'] = secgroup_meta
-                    db.vm_security_group_rule_snap_create(cntx, secgroup)
-            elif "snapshot_vms_db" in snap['name']:
-                snapshot_vms = vault_service.conn.get_object(workload['name'],
-                                                             snap['name'])[1]
-                snapshot_vms_values = json.loads(snapshot_vms)
-                for vm in snapshot_vms_values:
-                    vm['created_at'] = timeutils.parse_isotime(vm['created_at'])
-                    if vm['updated_at']:
-                        vm['updated_at'] = timeutils.parse_isotime(vm['updated_at'])
-                    vm_meta = {}
-                    for meta in vm['metadata']:
-                        vm_meta[meta['key']] = meta['value']
-                    vm['metadata'] = vm_meta
-                    db.snapshot_vm_create(cntx, vm)
-    """
-
