@@ -385,8 +385,13 @@ class Service(object):
 
     def _create_service_ref(self, context):
         zone = FLAGS.storage_availability_zone
+        ip_addresses_str = ''
+        ip_addresses = utils.get_ip_addresses()
+        for ip_address in ip_addresses:
+            ip_addresses_str = ip_addresses_str +  ip_address + ';'
         service_ref = db.service_create(context,
                                         {'host': self.host,
+                                         'ip_addresses': ip_addresses_str,
                                          'binary': self.binary,
                                          'topic': self.topic,
                                          'report_count': 0,
@@ -439,7 +444,7 @@ class Service(object):
         """Destroy the service object in the datastore."""
         self.stop()
         try:
-            db.service_destroy(context.get_admin_context(), self.service_id)
+            db.service_delete(context.get_admin_context(), self.service_id)
         except exception.NotFound:
             LOG.warn(_('Service killed that has no database entry'))
 
@@ -487,6 +492,12 @@ class Service(object):
             if zone != service_ref['availability_zone']:
                 state_catalog['availability_zone'] = zone
 
+            ip_addresses_str = ''
+            ip_addresses = utils.get_ip_addresses()
+            for ip_address in ip_addresses:
+               ip_addresses_str = ip_addresses_str +  ip_address + ';'
+            state_catalog['ip_addresses'] = ip_addresses_str
+               
             db.service_update(ctxt,
                               self.service_id, state_catalog)
 

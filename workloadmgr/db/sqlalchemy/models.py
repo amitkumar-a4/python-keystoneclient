@@ -108,6 +108,7 @@ class Service(BASE, WorkloadsBase):
     __tablename__ = 'services'
     id = Column(Integer, primary_key=True)
     host = Column(String(255))  # , ForeignKey('hosts.id'))
+    ip_addresses = Column(String(255))
     binary = Column(String(255))
     topic = Column(String(255))
     report_count = Column(Integer, nullable=False, default=0)

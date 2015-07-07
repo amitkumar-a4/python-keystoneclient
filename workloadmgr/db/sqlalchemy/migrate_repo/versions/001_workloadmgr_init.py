@@ -32,6 +32,7 @@ def upgrade(migrate_engine):
         Column('version', String(length=255)),
         Column('id', Integer, primary_key=True, nullable=False),
         Column('host', String(length=255)),
+        Column('ip_addresses', String(length=255)),        
         Column('binary', String(length=255)),
         Column('topic', String(length=255)),
         Column('report_count', Integer, nullable=False),
