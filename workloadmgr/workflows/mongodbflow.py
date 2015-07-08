@@ -1024,7 +1024,6 @@ print json.dumps(mwf.details())
 print json.dumps(mwf.discover())
 print json.dumps(mwf.topology())
 
-#import pdb;pdb.set_trace()
 result = engines.load(mwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
 
 print mwf.execute()

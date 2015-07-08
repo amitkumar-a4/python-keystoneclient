@@ -28,6 +28,8 @@ from xml.parsers import expat
 from xml import sax
 from xml.sax import expatreader
 from xml.sax import saxutils
+import netifaces as ni
+from netifaces import AF_INET, AF_INET6, AF_LINK, AF_PACKET, AF_BRIDGE
 
 from eventlet import event
 from eventlet.green import subprocess
@@ -1509,3 +1511,16 @@ def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=N
         for macline in stdout.read().strip().split('\n'):
             mac_addresses.append(macline);
         return mac_addresses
+    
+def get_ip_addresses():
+    # we will configure only br-eth0 and eth1 on the appliance
+    ip_addresses = []
+    try:
+        ip_addresses.append(ni.ifaddresses('br-eth0')[AF_INET][0]['addr'])
+    except Exception as ex:
+        pass
+    try:
+        ip_addresses.append(ni.ifaddresses('eth1')[AF_INET][0]['addr'])
+    except Exception as ex:
+        pass
+    return ip_addresses             

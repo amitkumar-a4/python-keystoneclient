@@ -43,12 +43,12 @@ class WorkloadMgrTrigger(object):
         # immediately
 
         #if self.schedule_now:
-           #self.schedule_now = False
-           #return start_date + timedelta(seconds=5)
+            #self.schedule_now = False
+            #return start_date + timedelta(seconds=5)
 
         if self.end_date:
-           if self.end_date < self.start_date:
-              return None
+            if self.end_date < self.start_date:
+                return None
 
         if start_date < self.start_date:
             return self.start_date
@@ -70,7 +70,6 @@ class WorkloadMgrTrigger(object):
 
 """
 #Unit Tests
-#import pdb;pdb.set_trace()
 trigger = WorkloadMgrTrigger(u'{"start_date":"Now","end_date":"No End","start_time":"12:00am","interval":"1 hr","snapshots_to_keep":"10"}')
 print trigger
 print trigger.get_next_fire_time(datetime.now())

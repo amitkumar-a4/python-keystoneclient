@@ -1223,8 +1223,6 @@ def configure_host():
             fh, abs_path = mkstemp()
             new_file = open(abs_path,'w')
             new_file.write('nameserver ' + config_data['name_server'] + '\n')
-            new_file.write('nameserver 8.8.8.8\n')
-            new_file.write('nameserver 8.8.4.4\n')
             if len(config_data['domain_search_order']):
                 new_file.write('search ' + config_data['domain_search_order'] + '\n')
                 

@@ -61,7 +61,7 @@ class FilterScheduler(driver.Scheduler):
 
         # context is not serializable
         if filter_properties:
-           filter_properties.pop('context', None)
+            filter_properties.pop('context', None)
 
         self.workloads_rpcapi.workload_snapshot(context, host, snapshot_id)
 
