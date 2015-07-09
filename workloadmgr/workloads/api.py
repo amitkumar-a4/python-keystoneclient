@@ -620,7 +620,7 @@ class API(base.Base):
                     nodes.append({'node':node_record.host, 
                                   'version':node_record.version, 
                                   'ipaddress': ipaddress})
-                except:
+                except Exception as ex:
                     LOG.exception(ex)                      
         except Exception as ex:
             LOG.exception(ex)

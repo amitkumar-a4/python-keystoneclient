@@ -103,9 +103,9 @@ def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):
         return vm_data_size
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.upload_snapshot')
-def upload_snapshot(cntx, db, instance, snapshot, snapshot_data):
+def upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex):
     with vmwaresessionpool.item() as vmsession:
-        vmsession.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)  
+        vmsession.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)  
     
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_snapshot')
 def post_snapshot(cntx, db, instance, snapshot, snapshot_data):

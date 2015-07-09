@@ -921,22 +921,128 @@ class VMwareVCDriver(VMwareESXDriver):
             
     @autolog.log_method(Logger, 'VMwareVCDriver.get_snapshot_data_size')
     def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data): 
-        vm_data_size = 0
+        snapshot_data['vm_data_size'] = 0
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        
+        
+        """ MODIFY THE BELOW BLOCK OF CODE TO SEND ALL THE DISKS to evaluate for TURBO THICK COPY """
+        
+        turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')        
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
-            vm_data_size += self.get_vmdk_snap_size(cntx, db, instance, snapshot, snapshot_data, dev)
-        return vm_data_size            
+            dev['disk_data_size'] = 0
+            dev['extentsfile'] = None
+            dev['totalblocks'] = 0
+            dev['partitions'] = 0
+            
+            try:
+                if snapshot_obj.snapshot_type == 'full':
+                    parent_vault_path = None
+                    parent_changeId = '*'
+                    parent_content_id = None
+                else:
+                    parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId( 
+                                                                                     cntx, 
+                                                                                     db, 
+                                                                                     snapshot['workload_id'],
+                                                                                     instance['vm_id'], 
+                                                                                     dev.backing.uuid)   
+                
+                        
+                if (hasattr(dev.backing, 'thinProvisioned') and dev.backing.thinProvisioned == False) and\
+                    parent_changeId is '*' and\
+                    parent_vault_path == None and\
+                    turbo_thick_disk_backup.lower() == 'true':
+                    
+                    vmxspec = 'moref=' + snapshot_data['vm_ref'].value
+                    vix_disk_lib_env = os.environ.copy()
+                    vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+                    # Create empty vmdk file
+                    fileh, copy_to_file_path = mkstemp()
+                    close(fileh)                  
+                    try:
+                        cmdline = "trilio-vix-disk-cli -create " 
+                        cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
+                        cmdline += " " + copy_to_file_path
+                        check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                    except subprocess.CalledProcessError as ex:
+                        LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
+                        LOG.exception(ex)
+                        raise
+                    dev['extentsfile'], dev['partitions'], dev['totalblocks'],\
+                           = thickcopyextents(self._session._host_ip,
+                                              self._session._host_username,
+                                              self._session._host_password, vmxspec,
+                                              dev, copy_to_file_path)
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                try:
+                    os.remove(copy_to_file_path)
+                except:
+                    pass
+
+        """ MODIFY THE ABOVE BLOCK OF CODE TO SEND ALL THE DISKS to evaluate for TURBO THICK COPY """
+        
+        for idx, dev in enumerate(snapshot_data['snapshot_devices']):                       
+            if not dev['extentsfile']:
+                if snapshot_obj.snapshot_type == 'full':
+                    parent_vault_path = None
+                    parent_changeId = '*'
+                    parent_content_id = None
+                else:
+                    parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId( 
+                                                                                     cntx, 
+                                                                                     db, 
+                                                                                     snapshot['workload_id'],
+                                                                                     instance['vm_id'], 
+                                                                                     dev.backing.uuid)                   
+                fileh, dev['extentsfile'] = mkstemp()
+                close(fileh)                    
+                with open(dev['extentsfile'], 'w') as ctkfile:
+                    position = 0
+                    while position < dev.capacityInBytes:
+                        changes = self._session._call_method(
+                                                        self._session._get_vim(),
+                                                        "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                        snapshot=snapshot_data['snapshot_ref'],
+                                                        deviceKey=dev.key,
+                                                        startOffset=position,
+                                                        changeId=parent_changeId)
+                        if changes == []:
+                            changes = self._session._call_method(self._session._get_vim(),
+                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
+                                                         snapshot=snapshot_data['snapshot_ref'],
+                                                         deviceKey=dev['key'],
+                                                         startOffset=position,
+                                                         changeId=parent_changeId)
+               
+                        if 'changedArea' in changes:
+                            for extent in changes.changedArea:
+                                start = extent.start
+                                length = extent.length
+                            
+                                ctkfile.write(str(start) + "," + str(length)+"\n")
+                                dev['disk_data_size'] += length
+                        position = changes.startOffset + changes.length;
+            else:
+                dev['disk_data_size'] += dev['totalblocks'] * 4096 # Use blocksize later
+                
+        for idx, dev in enumerate(snapshot_data['snapshot_devices']):
+            snapshot_data['vm_data_size'] += dev['disk_data_size']
+                             
+        return snapshot_data            
 
     @autolog.log_method(Logger, 'VMwareVCDriver.get_snapshot_disk_info')
     def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
         return snapshot_data
     
     @autolog.log_method(Logger, 'VMwareVCDriver.upload_snapshot')
-    def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
+    def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
         
         @autolog.log_method(Logger, 'VMwareVCDriver.upload_snapshot._upload_vmdk')
         def _upload_vmdk(dev):
             try:
-                totalBytesToTransfer = 0
+                totalBytesToTransfer = dev['disk_data_size']
                 snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
                 if snapshot_obj.snapshot_type == 'full':
                     parent_vault_path = None
@@ -948,7 +1054,6 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                      instance['vm_id'], 
                                                                                      dev.backing.uuid)
     
-                vmdk_snap_size = self.get_vmdk_snap_size(cntx, db, instance, snapshot, snapshot_data, dev)
                 vm_disk_resource_snap_backing = self.get_top_vm_disk_resource_snap( cntx, db, 
                                                                                     snapshot['workload_id'],
                                                                                     instance['vm_id'], 
@@ -980,7 +1085,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                  'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
                                                  'metadata': vm_disk_resource_snap_metadata,       
                                                  'top': True,
-                                                 'size': vmdk_snap_size,                                             
+                                                 'size': dev['disk_data_size'],                                             
                                                  'status': 'creating'}     
                                                      
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values) 
@@ -996,7 +1101,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 head, tail = os.path.split(copy_to_file_path)
                 fileutils.ensure_tree(head)
     
-                vmxspec = 'moref=' + snapshot_data['vm_ref'].value
+                vmxspec = 'moref=' + snapshot_data_ex['vm_ref'].value
                 vix_disk_lib_env = os.environ.copy()
                 vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                 # Create empty vmdk file
@@ -1024,50 +1129,8 @@ class VMwareVCDriver(VMwareESXDriver):
                         raise
                     
 
-                extentsfile = None
-
-                turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')
-                if (hasattr(dev.backing, 'thinProvisioned') and\
-                      dev.backing.thinProvisioned == False) and\
-                    parent_changeId is '*' and\
-                    turbo_thick_disk_backup.lower() == 'true':
-                    extentsfile, partitions, totalblocks,\
-                           = thickcopyextents(self._session._host_ip,
-                                                          self._session._host_username,
-                                                          self._session._host_password, vmxspec,
-                                                          dev, copy_to_file_path)
-                if not extentsfile:
-                    with open(copy_to_file_path + "-ctk", 'w') as ctkfile:
-                        position = 0
-                        while position < dev.capacityInBytes:
-                            changes = self._session._call_method(
-                                                            self._session._get_vim(),
-                                                            "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                            snapshot=snapshot_data['snapshot_ref'],
-                                                            deviceKey=dev.key,
-                                                            startOffset=position,
-                                                            changeId=parent_changeId)
-                            if changes == []:
-                                changes = self._session._call_method(self._session._get_vim(),
-                                                             "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                             snapshot=snapshot_data['snapshot_ref'],
-                                                             deviceKey=dev['key'],
-                                                             startOffset=position,
-                                                             changeId=parent_changeId)
-                   
-                            if 'changedArea' in changes:
-                                for extent in changes.changedArea:
-                                    start = extent.start
-                                    length = extent.length
-                                
-                                    ctkfile.write(str(start) + "," + str(length)+"\n")
-                                    totalBytesToTransfer += length
-                            position = changes.startOffset + changes.length;
-                    extentsfile = copy_to_file_path + "-ctk"
-                else:
-                    totalBytesToTransfer += totalblocks * 4096 # Use blocksize later
-                    shutil.copyfile(extentsfile, copy_to_file_path + "-ctk")
-                    os.remove(extentsfile)
+                shutil.copyfile(dev['extentsfile'], copy_to_file_path + "-ctk")
+                os.remove(dev['extentsfile'])
                     
                 if parent_vault_path:
                     cmdspec = ["trilio-vix-disk-cli", "-downloadextents",
@@ -1197,35 +1260,35 @@ class VMwareVCDriver(VMwareESXDriver):
             snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
             workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
             # make sure the session cookies are upto data by calling the following api
-            datacenter_name = self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['vmx_datastore_ref'])[1]
+            datacenter_name = self._get_datacenter_ref_and_name(snapshot_data_ex['vmx_file']['vmx_datastore_ref'])[1]
             cookies = self._session._get_vim().client.options.transport.cookiejar
             #vmx file 
             vmx_file_handle = read_write_util.VMwareHTTPReadFile(
                                                     self._session._host_ip,
-                                                    self._get_datacenter_ref_and_name(snapshot_data['vmx_file']['vmx_datastore_ref'])[1],
-                                                    snapshot_data['vmx_file']['vmx_datastore_name'],
+                                                    self._get_datacenter_ref_and_name(snapshot_data_ex['vmx_file']['vmx_datastore_ref'])[1],
+                                                    snapshot_data_ex['vmx_file']['vmx_datastore_name'],
                                                     cookies,
-                                                    snapshot_data['vmx_file']['vmx_file_name'])
+                                                    snapshot_data_ex['vmx_file']['vmx_file_name'])
             vmx_file_size = int(vmx_file_handle.get_size())
             #TODO(giri): throw exception if the size is more than 65536
             vmx_file_data = vmx_file_handle.read(vmx_file_size)
             vmx_file_handle.close()
-            metadata = snapshot_data['vmx_file']
+            metadata = snapshot_data_ex['vmx_file']
             metadata['vmx_file_data'] = vmx_file_data
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': instance['vm_id'],
                                            'snapshot_id': snapshot_obj.id,
                                            'resource_type': 'vmx',
-                                           'resource_name':  snapshot_data['vmx_file']['vmx_file_name'],
+                                           'resource_name':  snapshot_data_ex['vmx_file']['vmx_file_name'],
                                            'metadata': metadata,
                                            'status': 'creating'}
     
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
             db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vmx_file_size})
                 
-            for idx, dev in enumerate(snapshot_data['snapshot_devices']):
+            for idx, dev in enumerate(snapshot_data_ex['snapshot_devices']):
                 vm_disk_size = 0
-                disk = snapshot_data['disks'][idx]
+                disk = snapshot_data_ex['disks'][idx]
     
                 snapshot_vm_resource_metadata = {}
                 snapshot_vm_resource_metadata['vmdk_controler_key'] = disk['vmdk_controler_key']

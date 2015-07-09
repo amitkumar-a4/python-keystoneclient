@@ -520,7 +520,7 @@ class LibvirtDriver(driver.ComputeDriver):
         return vm_data_size
     
     @autolog.log_method(Logger, 'libvirt.driver..upload_snapshot')
-    def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
+    def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
                 
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         compute_service = nova.API(production=True)
