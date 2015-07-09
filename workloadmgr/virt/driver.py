@@ -182,7 +182,7 @@ def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data):
 def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
     raise NotImplementedError()    
 
-def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data):
+def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
     raise NotImplementedError()
 
 def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
