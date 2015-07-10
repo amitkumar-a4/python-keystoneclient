@@ -28,13 +28,14 @@ default_settings = {
 'smtp_port' : '587',
 'smtp_server_username' : '',
 'smtp_server_password' : '',
+'smtp_timeout' : '10',
 }
 
 def get_settings(context=None):                           
     """get settings"""
     try:
         persisted_settings = {}
-        persisted_setting_objs = db.setting_get_all(context)
+        persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no')
         for persisted_setting in persisted_setting_objs:
             persisted_settings[persisted_setting.key] = persisted_setting.value
         for setting, value in default_settings.iteritems():

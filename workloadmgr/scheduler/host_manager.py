@@ -242,10 +242,10 @@ class HostManager(object):
           {'192.168.1.100': HostState(), ...}
         """
 
-        # Get resource usage across the available volume nodes:
+        # Get resource usage across the available workloadmanager nodes:
         topic = FLAGS.workloads_topic
-        volume_services = db.service_get_all_by_topic(context, topic)
-        for service in volume_services:
+        wlm_services = db.service_get_all_by_topic(context, topic)
+        for service in wlm_services:
             if not utils.service_is_up(service) or service['disabled']:
                 LOG.warn(_("service is down or disabled."))
                 continue

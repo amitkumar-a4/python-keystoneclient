@@ -574,7 +574,11 @@ class API(base.Base):
             workloads = []
             import_workload_module = None
             for workload_url in vault.get_workloads(context):
-                workload_values = json.loads(vault.get_object('/snapshots/' + workload_url['workload_url'] + '/workload_db'))
+                try:
+                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
+                except Exception as ex:
+                    LOG.exception(ex)
+                    continue                    
                 """
                 try:
                     jobs = self._scheduler.get_jobs()
@@ -608,8 +612,16 @@ class API(base.Base):
         nodes = []
         try:
             for node_record in self.db.service_get_all_by_topic(context, topic='workloadmgr-workloads'):
-                nodes.append({'node':node_record.host, 'version':node_record.version, 
-                              'ipaddress': socket.gethostbyname(node_record.host)})
+                try:
+                    ipaddress = ''
+                    ip_addresses = node_record.ip_addresses.split(';')
+                    if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
+                        ipaddress = ip_addresses[0]
+                    nodes.append({'node':node_record.host, 
+                                  'version':node_record.version, 
+                                  'ipaddress': ipaddress})
+                except Exception as ex:
+                    LOG.exception(ex)                      
         except Exception as ex:
             LOG.exception(ex)
         return dict(nodes=nodes)

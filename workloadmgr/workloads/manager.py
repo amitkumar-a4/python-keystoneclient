@@ -366,6 +366,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         
         try:
+            try:
+                import gc
+                gc.collect()
+            except Exception as ex:
+                LOG.exception(ex)  
+                
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
                                                 {'host': self.host,
@@ -438,7 +444,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
             
             # upload the data to object store... this function will check if the object store is configured
-            vault.upload_snapshot_to_object_store(context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
+            vault.upload_snapshot_metatdata_to_object_store(context, {'workload_id': workload.id, 'workload_name': workload.display_name, 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -487,20 +493,34 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
             except Exception as ex:
+                LOG.exception(ex)
+                
+        finally:
+            try:
+                vault.purge_staging_area(context)
+            except Exception as ex:
                 LOG.exception(ex) 
                 
-        try:
-            vault.purge_staging_area(context)
-        except Exception as ex:
-            LOG.exception(ex)                  
-                
-        snapshot = self.db.snapshot_get(context, snapshot_id)
-        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
-            self.send_email(context,snapshot,'snapshot')
-        
-        #unlock the workload
-        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            try:
+                import gc
+                gc.collect() 
+            except Exception as ex:
+                LOG.exception(ex)
             
+            try:                
+                snapshot = self.db.snapshot_get(context, snapshot_id)
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes':
+                    self.send_email(context,snapshot,'snapshot')
+            except Exception as ex:
+                LOG.exception(ex)
+                        
+            #unlock the workload
+            try:                
+                snapshot = self.db.snapshot_get(context, snapshot_id)            
+                self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            except Exception as ex:
+                LOG.exception(ex)
+                            
     @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
         """
@@ -516,7 +536,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete({'workload_id': workload.id})
+        vault.workload_delete({'workload_id': workload.id, 'workload_name': workload.display_name,})
 
         
     @autolog.log_method(logger=Logger)
@@ -588,6 +608,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         restore_type = 'restore'
         try:
+            try:
+                import gc
+                gc.collect() 
+            except Exception as ex:
+                LOG.exception(ex)
+                            
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
@@ -711,15 +737,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error'
                                     })
-
-        try:
-            vault.purge_staging_area(context)
-        except Exception as ex:
-            LOG.exception(ex)        
-
-        restore = self.db.restore_get(context, restore_id)
-        if settings.get_settings(context).get('smtp_email_enable') == 'yes':
-            self.send_email(context,restore,'restore')        
+        finally:
+            try:
+                vault.purge_staging_area(context)
+            except Exception as ex:
+                LOG.exception(ex)  
+            
+            try:
+                import gc
+                gc.collect() 
+            except Exception as ex:
+                LOG.exception(ex)
+            
+            try:
+                restore = self.db.restore_get(context, restore_id)
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes':
+                    self.send_email(context,restore,'restore')       
+            except Exception as ex:
+                LOG.exception(ex)                     
 
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
@@ -864,7 +899,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg['Subject'] = subject        
             part2 = MIMEText(html, 'html')          
             msg.attach(part2)
-            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),int(settings.get_settings(context).get('smtp_port')))
+            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),
+                             int(settings.get_settings(context).get('smtp_port')),
+                             timeout= int(settings.get_settings(context).get('smtp_timeout')))
             if settings.get_settings(context).get('smtp_server_name') != 'localhost':
                 s.ehlo()
                 s.starttls()

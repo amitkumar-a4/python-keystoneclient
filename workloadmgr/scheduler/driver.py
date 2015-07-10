@@ -61,7 +61,6 @@ class Scheduler(object):
 
     def hosts_up(self, context, topic):
         """Return the list of hosts that have a running service for topic."""
-
         services = db.service_get_all_by_topic(context, topic)
         return [service['host']
                 for service in services
@@ -71,6 +70,11 @@ class Scheduler(object):
         """Must override schedule method for scheduler to work."""
         raise NotImplementedError(_("Must implement a fallback schedule"))
 
-    def schedule_create_volume(self, context, request_spec, filter_properties):
+    def schedule_snapshot(self, context, request_spec, filter_properties):
         """Must override schedule method for scheduler to work."""
-        raise NotImplementedError(_("Must implement schedule_create_volume"))
+        raise NotImplementedError(_("Must implement schedule_snapshot"))
+    
+    def schedule_restore(self, context, request_spec, filter_properties):
+        """Must override schedule method for scheduler to work."""
+        raise NotImplementedError(_("Must implement schedule_restore"))    
+    

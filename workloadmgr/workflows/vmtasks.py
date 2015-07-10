@@ -624,13 +624,13 @@ class SnapshotDataSize(task.Task):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
         if source_platform == 'openstack':
-            vm_data_size = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+            snapshot_data_ex = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         else:
-            vm_data_size = vmtasks_vcloud.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
+            snapshot_data_ex = vmtasks_vcloud.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         
-        db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': vm_data_size,})
+        db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': snapshot_data_ex['vm_data_size'],})
         
-        return vm_data_size        
+        return snapshot_data_ex        
     @autolog.log_method(Logger, 'GetSnapshotDataSize.revert')    
     def revert_with_log(self, *args, **kwargs):
         try:
@@ -644,14 +644,14 @@ class SnapshotDataSize(task.Task):
             
 class UploadSnapshot(task.Task):
 
-    def execute(self, context, source_platform, instance, snapshot, snapshot_data):
-        return self.execute_with_log(context, source_platform, instance, snapshot, snapshot_data)
+    def execute(self, context, source_platform, instance, snapshot, snapshot_data_ex):
+        return self.execute_with_log(context, source_platform, instance, snapshot, snapshot_data_ex)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'UploadSnapshot.execute')    
-    def execute_with_log(self, context, source_platform, instance, snapshot, snapshot_data):
+    def execute_with_log(self, context, source_platform, instance, snapshot, snapshot_data_ex):
         # Upload snapshot data to swift endpoint
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
@@ -664,9 +664,9 @@ class UploadSnapshot(task.Task):
         db.snapshot_update(cntx, snapshot_obj.id, {'size': snapshot_data_size,})
         
         if source_platform == 'openstack':
-            ret_val = vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+            ret_val = vmtasks_openstack.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
         else:
-            ret_val = vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+            ret_val = vmtasks_vcloud.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
         
         db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'status': 'available',})  
         
@@ -829,7 +829,8 @@ def UnorderedSnapshotDataSize(instances):
     flow = uf.Flow("snapshotdatasizeuf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
-        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict,
+                                  provides='snapshot_data_ex_' + str(item['vm_id'])))
     
     return flow
 
@@ -837,14 +838,15 @@ def LinearSnapshotDataSize(instances):
     flow = lf.Flow("snapshotdatasizelf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
-        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict,
+                                  provides='snapshot_data_ex_' + str(item['vm_id'])))
     
     return flow
 
 def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("uploadsnapshotuf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
         flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
@@ -852,7 +854,7 @@ def UnorderedUploadSnapshot(instances):
 def LinearUploadSnapshot(instances):
     flow = lf.Flow("uploadsnapshotlf")
     for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
+        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
         flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow

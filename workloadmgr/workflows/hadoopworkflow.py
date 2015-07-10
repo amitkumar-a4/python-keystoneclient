@@ -391,7 +391,6 @@ hwf = HadoopWorkflow("testflow", store)
 #print json.dumps(hwf.details())
 print json.dumps(hwf.topology())
 
-#import pdb;pdb.set_trace()
 #result = engines.load(hwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
 
 #print hwf.execute()

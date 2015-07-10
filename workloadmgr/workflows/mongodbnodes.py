@@ -77,8 +77,9 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes
         raise
 
     except Exception as ex:
-        error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") %\
-                         ('mongo printjson(db.adminCommand("listDatabases")) status', str(addlnodes), str(ex))
+        #error_msg = _("Failed to execute '%s' on host(s) '%s' with error: %s") %\
+        #                 ('mongo printjson(db.adminCommand("listDatabases")) status', str(addlnodes), str(ex))
+        error_msg = _("Failed to authenticate on host %s with host username/password") % (str(addlnodes))
 
         LOG.info(error_msg)
         nodes = addlnodes.split(";")
@@ -98,10 +99,12 @@ def find_alive_nodes(defaultnode, SSHPort, Username, Password, DBPort, addlnodes
                 LOG.info(_("Selected '" + host + "' for MongoDB mongo"))
                 nodelist.append(host)
             except AuthenticationException as ex:
-                error_msg = _("Failed to execute '%s' on host '%s' with error: %s") % ('mongo printjson(db.adminCommand("listDatabases"))', host, str(ex))
+                #error_msg = _("Failed to execute '%s' on host '%s' with error: %s") % ('mongo printjson(db.adminCommand("listDatabases"))', host, str(ex))
+                error_msg = _("Failed to authenticate on host %s with host username/password") % (host)
                 raise exception.ErrorOccurred(reason=error_msg)
             except Exception as ex:
-                error_msg = _("Failed to execute '%s' on host '%s' with error: %s") % ('mongo printjson(db.adminCommand("listDatabases"))', host, str(ex))
+                #error_msg = _("Failed to execute '%s' on host '%s' with error: %s") % ('mongo printjson(db.adminCommand("listDatabases"))', host, str(ex))
+                error_msg = _("Failed to authenticate on host %s with host username/password") % (host)
                 LOG.info(error_msg)
                 pass
 

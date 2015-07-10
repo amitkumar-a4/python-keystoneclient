@@ -1171,6 +1171,7 @@ def configure_form_vmware():
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
+    config_data['create_file_system'] = 'off'
     config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_data
 
@@ -1222,8 +1223,6 @@ def configure_host():
             fh, abs_path = mkstemp()
             new_file = open(abs_path,'w')
             new_file.write('nameserver ' + config_data['name_server'] + '\n')
-            new_file.write('nameserver 8.8.8.8\n')
-            new_file.write('nameserver 8.8.4.4\n')
             if len(config_data['domain_search_order']):
                 new_file.write('search ' + config_data['domain_search_order'] + '\n')
                 
@@ -1655,7 +1654,7 @@ def configure_service():
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_username = ', 'wlm_vault_swift_username = ' + config_data['swift_username'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_password = ', 'wlm_vault_swift_password = ' + config_data['swift_password'])            
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_container = ', 'wlm_vault_swift_container = ' + config_data['swift_container'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_container_prefix = ', 'wlm_vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
                         
               
 
@@ -1926,7 +1925,7 @@ def configure_vmware():
         config_data['swift_username'] = config_inputs['swift-username']
         config_data['swift_password'] = config_inputs['swift-password']
         config_data['swift_tenantname'] = config_inputs['swift-tenantname']
-        config_data['swift_container'] = config_inputs['swift-container']
+        config_data['swift_container_prefix'] = config_inputs['swift-container-prefix']
         
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']

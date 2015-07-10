@@ -384,14 +384,14 @@ def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):
     return vm_data_size
         
 @autolog.log_method(Logger, 'vmtasks_openstack.upload_snapshot')
-def upload_snapshot(cntx, db, instance, snapshot, snapshot_data):
+def upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex):
 
     if instance['hypervisor_type'] == 'QEMU': 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)
+        virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
     else: 
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data)     
+        virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)     
 
 @autolog.log_method(Logger, 'vmtasks_openstack.post_snapshot')
 def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
@@ -517,7 +517,8 @@ def get_restore_data_size(cntx, db, restore):
         instance_options = utils.get_instance_restore_options(restore_options, vm.vm_id, restore_options['type'])
         if instance_options and instance_options.get('include', True) == False:  
             continue
-        restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
+        #restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
+        restore_size = restore_size + vm.restore_size        
 
     return restore_size
 

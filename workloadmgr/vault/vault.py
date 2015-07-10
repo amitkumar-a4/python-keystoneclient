@@ -70,9 +70,9 @@ wlm_vault_opts = [
     cfg.StrOpt('wlm_vault_swift_password',
                default='password',
                help='Swift password'),                                                         
-    cfg.StrOpt('wlm_vault_swift_container',
-               default='TrilioVault',
-               help='NFS Export'), 
+    cfg.StrOpt('wlm_vault_swift_container_prefix',
+               default='Trilio',
+               help='Swift Container Prefix'), 
     cfg.StrOpt('wlm_vault_swift_segment_size',
                default='5368709120',
                help='Default segment size 5GB'),                     
@@ -145,9 +145,10 @@ def mount_backup_media():
             subprocess.check_call(command, shell=False) 
             
 def get_workload_path(workload_metadata):
-    workload_path = 'snapshots'
-    workload_path = os.path.join(get_vault_local_directory() + "/" + workload_path) 
-    workload_path = workload_path + '/workload_%s' % (workload_metadata['workload_id'])
+    #workload_path = 'snapshots'
+    #workload_path = os.path.join(get_vault_local_directory() + "/" + workload_path)
+    #workload_path = workload_path + '/workload_%s' % (workload_metadata['workload_id'])
+    workload_path = os.path.join(get_vault_local_directory() + '/workload_%s' % (workload_metadata['workload_id']))
     return workload_path   
 
 def get_snapshot_path(snapshot_metadata):                 
@@ -158,15 +159,35 @@ def get_snapshot_path(snapshot_metadata):
 def get_snapshot_vm_path(snapshot_vm_metadata):                 
     snapshot_path = get_snapshot_path(snapshot_vm_metadata)
     snapshot_vm_path = snapshot_path + '/vm_id_%s' % (snapshot_vm_metadata['snapshot_vm_id'])    
-    return snapshot_vm_path   
-            
-def get_snapshot_file_path(snapshot_file_metadata):
-    snapshot_vm_path = get_snapshot_vm_path(snapshot_file_metadata)
-    snapshot_file_path = snapshot_vm_path + '/vm_res_id_%s_%s' % (snapshot_file_metadata['snapshot_vm_resource_id'], 
-                                                                    snapshot_file_metadata['resource_name'].replace(' ',''))
-    snapshot_file_path = snapshot_file_path + '/' + snapshot_file_metadata['vm_disk_resource_snap_id']
-    return snapshot_file_path
+    return snapshot_vm_path
 
+def get_snapshot_vm_resource_path(snapshot_vm_resource_metadata):                 
+    snapshot_vm_path = get_snapshot_vm_path(snapshot_vm_resource_metadata)
+    snapshot_vm_resource_path = snapshot_vm_path + '/vm_res_id_%s_%s' % (snapshot_vm_resource_metadata['snapshot_vm_resource_id'], 
+                                                                         snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ',''))
+    return snapshot_vm_resource_path    
+            
+def get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata):
+    snapshot_vm_resource_path = get_snapshot_vm_resource_path(snapshot_vm_disk_resource_metadata)
+    snapshot_vm_disk_resource_path = snapshot_vm_resource_path + '/' + snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id']
+    return snapshot_vm_disk_resource_path
+
+def get_swift_container(workload_metadata, context = None):
+    swift_list_all(context, container = None)
+    if os.path.isfile('/tmp/swift.out'):
+        with open("/tmp/swift.out") as f:
+            content = f.readlines()
+        for container in content:
+            if container.endswith('_' + workload_metadata['workload_id']):
+                return container    
+    
+    if len(FLAGS.wlm_vault_swift_container_prefix):
+        container = FLAGS.wlm_vault_swift_container_prefix + '_'
+    else:
+        container = ''
+    container = container + workload_metadata['workload_name'] + '_' + workload_metadata['workload_id']
+    return container
+    
 @autolog.log_method(logger=Logger) 
 def workload_delete(workload_metadata):
     try:
@@ -180,9 +201,12 @@ def workload_delete(workload_metadata):
         elif FLAGS.wlm_vault_storage_type == 'swift-i':
                 pass
         elif FLAGS.wlm_vault_storage_type == 'swift-s':
+            container = get_swift_container(workload_metadata)
             if os.path.isdir(workload_path):
                 shutil.rmtree(workload_path)            
-            swift_delete_folder(workload_path)  
+            swift_delete_folder(workload_path, container)
+            swift_delete_container(container)
+            swift_delete_container(container + '_segments')  
         elif FLAGS.wlm_vault_storage_type == 's3':
                 pass                      
     except Exception as ex:
@@ -203,7 +227,7 @@ def snapshot_delete(snapshot_metadata):
         elif FLAGS.wlm_vault_storage_type == 'swift-s':
                 if os.path.isdir(snapshot_path):
                     shutil.rmtree(snapshot_path)
-                swift_delete_folder(snapshot_path)  
+                swift_delete_folder(snapshot_path, get_swift_container(snapshot_metadata))  
         elif FLAGS.wlm_vault_storage_type == 's3':
                 pass     
     except Exception as ex:
@@ -219,14 +243,14 @@ def put_object(path, json_data):
 
 @autolog.log_method(logger=Logger)     
 def get_object(path):
-    path = get_vault_local_directory() + path
+    path = get_vault_local_directory() + '/' + path
     with open(path, 'r') as json_file:
         return json_file.read()
  
 @autolog.log_method(logger=Logger)     
 def get_workloads(context):
     download_metadata_from_object_store(context)
-    parent_path = get_vault_local_directory() + '/snapshots/'
+    parent_path = get_vault_local_directory()
     workload_urls = []
     try:
         for name in os.listdir(parent_path):
@@ -241,17 +265,45 @@ def get_workloads(context):
     return workload_urls  
 
 @autolog.log_method(logger=Logger) 
-def upload_snapshot_to_object_store(context, snapshot_metadata):
+def upload_snapshot_metatdata_to_object_store(context, snapshot_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
         pass
     if FLAGS.wlm_vault_storage_type == 'swift-s': 
-        WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Uploading snapshot to object store'}) 
         workload_path = get_workload_path(snapshot_metadata)
         snapshot_path = get_snapshot_path(snapshot_metadata)
-        swift_upload_files([snapshot_path], context = None)
-        swift_upload_files([workload_path + '/workload_db'], context = None)
-        swift_upload_files([workload_path + '/workload_vms_db'], context = None)
-        swift_upload_files([get_vault_local_directory() + "/settings_db"], context = None)                
+        container = get_swift_container(snapshot_metadata)
+        try:
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Uploading snapshot metadata to object store'}) 
+            swift_upload_files([get_vault_local_directory() + "/settings_db"], container, context = None)
+            swift_upload_files([workload_path + '/workload_db'], container, context = None)
+            swift_upload_files([workload_path + '/workload_vms_db'], container, context = None)
+            for dirName, subdirList, fileList in os.walk(snapshot_path):
+                for fname in fileList:
+                    file_path = dirName + '/' + fname
+                    if  "/snapshot_db" in file_path or \
+                        "/snapshot_vms_db" in file_path or \
+                        "/resources_db" in file_path or \
+                        "/network_db" in file_path or \
+                        "/security_group_db" in file_path or \
+                        "/disk_db"  in file_path:      
+                            swift_upload_files([file_path], container, context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Retrying to upload snapshot metadata to object store'}) 
+            swift_upload_files([get_vault_local_directory() + "/settings_db"], container, context = None)
+            swift_upload_files([workload_path + '/workload_db'], container, context = None)
+            swift_upload_files([workload_path + '/workload_vms_db'], container, context = None)
+            for dirName, subdirList, fileList in os.walk(snapshot_path):
+                for fname in fileList:
+                    file_path = dirName + '/' + fname
+                    if  "/snapshot_db" in file_path or \
+                        "/snapshot_vms_db" in file_path or \
+                        "/resources_db" in file_path or \
+                        "/network_db" in file_path or \
+                        "/security_group_db" in file_path or \
+                        "/disk_db"  in file_path:      
+                            swift_upload_files([file_path], container, context = None)
+                    
         purge_workload_from_staging_area(context, snapshot_metadata)        
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass
@@ -263,9 +315,34 @@ def upload_snapshot_vm_to_object_store(context, snapshot_vm_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-s': 
         WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_metadata['snapshot_id'], {'progress_msg': 'Uploading virtual machine snapshot to object store'}) 
         snapshot_vm_path = get_snapshot_vm_path(snapshot_vm_metadata)
-        swift_upload_files([snapshot_vm_path], context = None)
+        container = get_swift_container(snapshot_vm_metadata)
+        try:
+            swift_upload_files([snapshot_vm_path], container, context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_metadata['snapshot_id'], {'progress_msg': 'Retrying to upload virtual machine snapshot to object store'})
+            swift_upload_files([snapshot_vm_path], container, context = None)
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass    
+    
+@autolog.log_method(logger=Logger) 
+def upload_snapshot_vm_resource_to_object_store(context, snapshot_vm_resource_metadata):
+    if FLAGS.wlm_vault_storage_type == 'swift-i': 
+        pass
+    if FLAGS.wlm_vault_storage_type == 'swift-s': 
+        progress_msg = "Uploading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' to object store"
+        WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_resource_metadata['snapshot_id'], {'progress_msg': progress_msg}) 
+        snapshot_vm_resource_path = get_snapshot_vm_path(snapshot_vm_resource_metadata)
+        container = get_swift_container(snapshot_vm_resource_metadata)
+        try:
+            swift_upload_files([snapshot_vm_resource_path], container, context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            progress_msg = "Retrying to upload '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' to object store"
+            WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_resource_metadata['snapshot_id'], {'progress_msg': progress_msg})
+            swift_upload_files([snapshot_vm_resource_path], container, context = None)
+    elif FLAGS.wlm_vault_storage_type == 's3':
+        pass       
     
 @autolog.log_method(logger=Logger) 
 def download_metadata_from_object_store(context):
@@ -273,7 +350,14 @@ def download_metadata_from_object_store(context):
         pass
     if FLAGS.wlm_vault_storage_type == 'swift-s':
         purge_staging_area(context) 
-        swift_download_metadata_from_object_store(context)
+        swift_list_all(context, container = None)
+        cmd = get_swift_base_cmd(context)    
+        if os.path.isfile('/tmp/swift.out'):
+            with open("/tmp/swift.out") as f:
+                content = f.readlines()
+            for container in content:
+                if container.startswith(FLAGS.wlm_vault_swift_container_prefix):
+                    swift_download_metadata_from_object_store(context, container.replace('\n', ''))
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass
     
@@ -285,12 +369,32 @@ def download_snapshot_vm_from_object_store(context, snapshot_vm_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-s': 
         WorkloadMgrDB().db.restore_update(context, snapshot_vm_metadata['restore_id'], {'progress_msg': 'Downloading virtual machine snapshot from object store'})  
         snapshot_vm_folder = get_snapshot_vm_path(snapshot_vm_metadata)
-        swift_download_folder(snapshot_vm_folder, context = None)       
+        container = get_swift_container(snapshot_vm_metadata)
+        swift_download_folder(snapshot_vm_folder, container, context = None)       
     elif FLAGS.wlm_vault_storage_type == 's3':
-        pass    
+        pass
+    
+@autolog.log_method(logger=Logger)     
+def download_snapshot_vm_resource_from_object_store(context, snapshot_vm_resource_metadata):
+    if FLAGS.wlm_vault_storage_type == 'swift-i':
+        pass
+    if FLAGS.wlm_vault_storage_type == 'swift-s':
+        progress_msg = "Downloading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
+        WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+        snapshot_vm_resource_folder = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
+        container = get_swift_container(snapshot_vm_resource_metadata)
+        try:
+            swift_download_folder(snapshot_vm_resource_folder, container, context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            progress_msg = "Retrying to download '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
+            WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+            swift_download_folder(snapshot_vm_resource_folder, container, context = None)                           
+    elif FLAGS.wlm_vault_storage_type == 's3':
+        pass          
 
 @autolog.log_method(logger=Logger)         
-def swift_upload_files(files, context = None): 
+def swift_upload_files(files, container, context = None): 
     """ upload a files or directories to swift """
     options = {}
     
@@ -298,20 +402,20 @@ def swift_upload_files(files, context = None):
         options = {'use_slo': False, 'verbose': 1, 'os_username': None, 'os_user_domain_name': None, 
                    'os_cacert': None, 'os_tenant_name': None, 'os_user_domain_id': None, 'header': [], 
                    'auth_version': '1.0', 'ssl_compression': True, 'os_password': None, 'os_user_id': None, 
-                   'skip_identical': False, 'segment_container': None, 'os_project_id': None, 'snet': False, 
+                   'skip_identical': True, 'segment_container': None, 'os_project_id': None, 'snet': False, 
                    'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
                    'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
                    'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
                    'auth': FLAGS.wlm_vault_swift_auth_url, 'os_auth_url': None, 
                    'user': FLAGS.wlm_vault_swift_username, 'key': FLAGS.wlm_vault_swift_password, 'os_region_name': None, 
                    'info': False, 'retries': 5, 'os_project_domain_id': None, 'checksum': True, 
-                   'changed': False, 'leave_segments': False, 'os_auth_token': None, 
+                   'changed': True, 'leave_segments': False, 'os_auth_token': None, 
                    'os_options': {'project_name': None, 'region_name': None, 'tenant_name': None, 
                                   'user_domain_name': None, 'endpoint_type': None, 'object_storage_url': None, 
                                   'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
                                   'tenant_id': None, 'service_type': None, 'project_id': None, 
                                   'auth_token': None, 'project_domain_name': None}, 
-                   'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+                   'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None, 'verbose': 1}
         
     else:
         if FLAGS.wlm_vault_swift_auth_version == 'KEYSTONE_V2':
@@ -334,8 +438,7 @@ def swift_upload_files(files, context = None):
                                    'project_domain_id': None, 'user_id': None, 'user_domain_id': None, 
                                    'tenant_id': None, 'service_type': None, 'project_id': None, 
                                    'auth_token': None, 'project_domain_name': None}, 
-                    'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None,
-                    'verbose': 1}
+                    'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None, 'verbose': 1}
     
 
     if options['object_name'] is not None:
@@ -402,7 +505,7 @@ def swift_upload_files(files, context = None):
                     ) for d in dir_markers
                 ]                
 
-            for r in swift.upload(FLAGS.wlm_vault_swift_container, objs + dir_markers):
+            for r in swift.upload(container, objs + dir_markers):
                 if r['success']:
                     if options['verbose']:
                         if 'attempts' in r and r['attempts'] > 1:
@@ -434,8 +537,8 @@ def swift_upload_files(files, context = None):
                                 msg = ': %s' % msg
                         else:
                             msg = ': %s' % error
-                        LOG.warning('Warning: failed to create container %r%s', FLAGS.wlm_vault_swift_container, msg )
-                        raise exception.ErrorOccurred(reason = ('Warning: failed to create container %r%s', FLAGS.wlm_vault_swift_container, msg))
+                        LOG.warning('Warning: failed to create container %r%s', container, msg )
+                        raise exception.ErrorOccurred(reason = ('Warning: failed to create container %r%s', container, msg))
                     else:
                         LOG.warning("%s" % error)
                         too_large = (isinstance(error, ClientException) and
@@ -453,7 +556,7 @@ def swift_upload_files(files, context = None):
             raise 
         
 @autolog.log_method(logger=Logger)        
-def get_swift_cmd(context, command):
+def get_swift_cmd(context, container, command):
     if FLAGS.wlm_vault_swift_auth_version == 'TEMPAUTH':
         cmd = ["swift",
                "-A", FLAGS.wlm_vault_swift_auth_url,
@@ -475,7 +578,7 @@ def get_swift_cmd(context, command):
                    "--os-username", FLAGS.wlm_vault_swift_username,
                    "--os-password", "******"]
                 
-    cmd_list = cmd + [ "list", FLAGS.wlm_vault_swift_container]
+    cmd_list = cmd + [ "list", container]
     cmd_list_str = " ".join(cmd_list)
     for idx, opt in enumerate(cmd_list):
         if opt == "--os-password":
@@ -508,11 +611,14 @@ def get_swift_base_cmd(context):
                    "--os-username", FLAGS.wlm_vault_swift_username,
                    "--os-password", "******"]
     return cmd
-                      
+
 @autolog.log_method(logger=Logger)        
-def swift_list_all(context):
+def swift_list_all(context, container):
     cmd = get_swift_base_cmd(context)
-    cmd_list = cmd + [ "list", FLAGS.wlm_vault_swift_container]
+    if container:
+        cmd_list = cmd + [ "list", container]
+    else:
+        cmd_list = cmd + [ "list" ]
     cmd_list_str = " ".join(cmd_list)
     for idx, opt in enumerate(cmd_list):
         if opt == "--os-password":
@@ -528,15 +634,30 @@ def swift_list_all(context):
         subprocess.call(cmd_list, shell=False, stdout=f)                                              
 
 @autolog.log_method(logger=Logger) 
-def swift_delete_folder(folder, context = None):
-    swift_list_all(context)
+def swift_delete_container(container, context = None):
+    cmd = get_swift_base_cmd(context)    
+    cmd_delete = cmd + [ "delete", container]
+    cmd_delete_str = " ".join(cmd_delete)
+    for idx, opt in enumerate(cmd_delete):
+        if opt == "--os-password":
+            cmd_delete[idx+1] = FLAGS.wlm_vault_swift_password
+            break
+        if opt == "-K":
+            cmd_delete[idx+1] = FLAGS.wlm_vault_swift_password
+            break                                             
+    LOG.debug(cmd_delete_str)                                  
+    subprocess.call(cmd_delete, shell=False, cwd=get_vault_local_directory())         
+                
+@autolog.log_method(logger=Logger) 
+def swift_delete_folder(folder, container, context = None):
+    swift_list_all(context, container)
     cmd = get_swift_base_cmd(context)    
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
         for line in content:
             if folder.replace(get_vault_local_directory() + '/', '', 1) in line:
-                cmd_delete = cmd + [ "delete", FLAGS.wlm_vault_swift_container, line.replace('\n', '')]
+                cmd_delete = cmd + [ "delete", container, line.replace('\n', '')]
                 cmd_delete_str = " ".join(cmd_delete)
                 for idx, opt in enumerate(cmd_delete):
                     if opt == "--os-password":
@@ -550,15 +671,15 @@ def swift_delete_folder(folder, context = None):
 
 
 @autolog.log_method(logger=Logger) 
-def swift_download_folder(folder, context = None):
-    swift_list_all(context)
+def swift_download_folder(folder, container, context = None):
+    swift_list_all(context, container)
     cmd = get_swift_base_cmd(context) 
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
         for line in content:
             if folder.replace(get_vault_local_directory() + '/', '', 1) in line:
-                cmd_download = cmd + [ "download", FLAGS.wlm_vault_swift_container, line.replace('\n', '')]
+                cmd_download = cmd + [ "download", container, line.replace('\n', '')]
                 cmd_download_str = " ".join(cmd_download)
                 for idx, opt in enumerate(cmd_download):
                     if opt == "--os-password":
@@ -623,6 +744,20 @@ def purge_snapshot_vm_from_staging_area(context, snapshot_vm_metadata):
             pass                      
     except Exception as ex:
         LOG.exception(ex)  
+        
+@autolog.log_method(logger=Logger)                 
+def purge_snapshot_vm_resource_from_staging_area(context, snapshot_vm_resource_metadata):
+    try:
+        snapshot_vm_resource_path  = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
+        if FLAGS.wlm_vault_storage_type == 'swift-i':
+            pass
+        elif FLAGS.wlm_vault_storage_type == 'swift-s':
+            if os.path.isdir(snapshot_vm_resource_path):
+                shutil.rmtree(snapshot_vm_resource_path)     
+        elif FLAGS.wlm_vault_storage_type == 's3':
+            pass                      
+    except Exception as ex:
+        LOG.exception(ex)          
 
 @autolog.log_method(logger=Logger)         
 def get_size(vault_path):
@@ -654,8 +789,8 @@ def get_restore_size(vault_path, disk_format, disk_type):
     return restore_size          
 
 @autolog.log_method(logger=Logger) 
-def swift_download_metadata_from_object_store(context):
-    swift_list_all(context)
+def swift_download_metadata_from_object_store(context, container):
+    swift_list_all(context, container)
     cmd = get_swift_base_cmd(context)
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
@@ -670,7 +805,7 @@ def swift_download_metadata_from_object_store(context):
                 "/network_db" in line or \
                 "/security_group_db" in line or \
                 "/disk_db"  in line:
-                    cmd_download = cmd + [ "download", FLAGS.wlm_vault_swift_container, line.replace('\n', '')]
+                    cmd_download = cmd + [ "download", container, line.replace('\n', '')]
                     cmd_download_str = " ".join(cmd_download)
                     for idx, opt in enumerate(cmd_download):
                         if opt == "--os-password":

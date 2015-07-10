@@ -24,7 +24,7 @@ from workloadmgr.vault import vault
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '1.0.121'
+DB_VERSION = '1.0.127'
 
 
 class WorkloadsBase(object):
@@ -108,6 +108,7 @@ class Service(BASE, WorkloadsBase):
     __tablename__ = 'services'
     id = Column(Integer, primary_key=True)
     host = Column(String(255))  # , ForeignKey('hosts.id'))
+    ip_addresses = Column(String(255))
     binary = Column(String(255))
     topic = Column(String(255))
     report_count = Column(Integer, nullable=False, default=0)
@@ -585,7 +586,7 @@ class Settings(BASE, WorkloadsBase):
         return FLAGS.workload_name_template % self.key
 
     user_id = Column(String(255), nullable=False)
-    value = Column(String(255))
+    value = Column(Text)
     description = Column(String(255))
     status =  Column(String(32), nullable=False)
     
