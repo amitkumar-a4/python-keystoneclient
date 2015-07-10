@@ -582,39 +582,36 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
     # call nova list
     compute_service = nova.API(production=True)
     instances = compute_service.get_servers(cntx, admin=True)
-    hypervisors = compute_service.get_hypervisors(cntx)
-
     vms = []
 
     # call nova interface-list <instanceid> to build the list of instances ids
     for instance in instances:
         # The following logic helps for VMware VMs. For OpenStack instances,
         # look at the instance interfaces.
-        hypervisor_hostname = None
-        hypervisor_type = None
-        for hypervisor in hypervisors:
-            if hypervisor.hypervisor_hostname == instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
-                hypervisor_hostname = hypervisor.hypervisor_hostname
-                hypervisor_type = hypervisor.hypervisor_type
+        for addr in json.loads(instance.metadata['networks']):
+            # IP Addresses
+            #this is our vm
+            if addr['macAddress'].lower() in interfaces:
+                hypervisor_hostname = None
+                hypervisor_type = "VMware vCenter Server"
+                clustername = "Unknown"
+
+                if 'cluster' in instance.metadata and instance.metadata['cluster']:
+                    if json.loads(instance.metadata['cluster']):
+                        clusprop = json.loads(instance.metadata['cluster'])[0]
+                        clustername = clusprop['name']
+
+                hypervisor_hostname = clustername
+                utils.append_unique(vms, {'vm_id' : instance.id,
+                                          'vm_name' : instance.name,
+                                          'vm_metadata' : instance.metadata,
+                                          'vm_flavor_id' : instance.flavor['id'],
+                                          'hostname' : interfaces[addr['macAddress'].lower()],
+                                          'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
+                                          'hypervisor_hostname' : hypervisor_hostname,
+                                          'hypervisor_type' :  hypervisor_type},
+                                          "vm_id")
                 break
-        if hypervisor_type == "VMware vCenter Server":
-            for addr in json.loads(instance.metadata['networks']):
-                # IP Addresses
-                #this is our vm
-                if addr['macAddress'].lower() in interfaces:
-                    utils.append_unique(vms, {'vm_id' : instance.id,
-                                            'vm_name' : instance.name,
-                                            'vm_metadata' : instance.metadata,
-                                            'vm_flavor_id' : instance.flavor['id'],
-                                            'hostname' : interfaces[addr['macAddress'].lower()],
-                                            'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
-                                            'hypervisor_hostname' : hypervisor_hostname,
-                                            'hypervisor_type' :  hypervisor_type},
-                                            "vm_id")
-                    break
-        else:
-            LOG.info(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
-            raise Exception(_("Hypervisor type is not VMware. Contact the vendor for the hypervisor type support"))
 
     if len(vms) == 0:
         LOG.info(_("No VMs are discovered in tvault inventory. Please run discover and try again"))
