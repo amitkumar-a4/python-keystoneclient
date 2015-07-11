@@ -573,7 +573,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     continue
 
                 metavalue = json.loads(meta.value)
-                if meta.key == 'cluster':
+                if meta.key == 'cluster' and metavalue:
                     optionsinst['computeresource'] = {'moid': metavalue[0]['value'], 'name': metavalue[0]['name']}
                 elif meta.key == 'parent' and metavalue:
                     optionsinst['vmfolder'] = {'moid': metavalue['value'], 'name': metavalue['name']}
