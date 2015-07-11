@@ -1025,12 +1025,13 @@ def lvmextents_in_partition(hostip, username, password, vmspec,
     # for each LV, check if ext file system on the LV
     for pvs, vgs, lvs, mountinfo in mountlvmvgs(hostip, username, password,
                                                     vmspec, devmap):
+        pass
 
-        # TODO: we need to take care of the situation when vg is partially present
-        for lv in lvs:
-            totalblocks += performlvthickcopy(hostip, username,
-                                              password, vmspec, devmap,
-                                              lv, pvs, extentsfiles)
+    # TODO: we need to take care of the situation when vg is partially present
+    for lv in lvs:
+        totalblocks += performlvthickcopy(hostip, username,
+                                          password, vmspec, devmap,
+                                          lv, pvs, extentsfiles)
     return totalblocks
 
 def process_partitions(hostip, username, password, vmspec, devmap,

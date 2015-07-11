@@ -2512,7 +2512,7 @@ def test_multiple_vgs_multiple_disk():
 
     def setup():
         mountpoints = []
-        for i in range(1,5):
+        for i in range(1,6):
             mountpoints.append(createpv("pvname" + str(i), "1TiB"))
 
         devices = []
@@ -2529,74 +2529,101 @@ def test_multiple_vgs_multiple_disk():
             cmd = ["pvcreate", dev]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-        cmd = ["vgcreate", "vg1", ] + devices
+        cmd = ["vgcreate", "vg1", ] + devices[0:2]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["vgcreate", "vg2", ] + devices[2:4]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        cmd = ["vgcreate", "tvault-appliance-vg", ] + devices[4:5]
         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
     
         # create multiple volumes
-        cmd = ["lvcreate", "-L", "1G", "vg1", "-n", "lv1"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        for vg in ["vg1", "vg2", "tvault-appliance-vg"]:
+            cmd = ["lvcreate", "-L", "1G", vg, "-n", "lv1"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-        cmd = ["lvcreate", "-L", "2G", "vg1", "-n", "lv2"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            cmd = ["lvcreate", "-L", "2G", vg, "-n", "lv2"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-        cmd = ["lvcreate", "-L", "3G", "vg1", "-n", "lv3"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            cmd = ["lvcreate", "-L", "3G", vg, "-n", "lv3"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-        cmd = ["lvcreate", "-L", "4G", "vg1", "-n", "lv4"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            cmd = ["lvcreate", "-L", "4G", vg, "-n", "lv4"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
         # Format each volume to a filesystem
-        for lv in ["lv1", "lv2", "lv3", "lv4"]:
-            cmd = ["mkfs", "-t", "ext4", "/dev/vg1/" + lv]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-
         tempdir = mkdtemp()
-        for lv in ["lv1", "lv2", "lv3", "lv4"]:
-            cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                   "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        for vg in ["vg1", "vg2", "tvault-appliance-vg"]:
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mkfs", "-t", "ext4", "/dev/" + vg + "/" + lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+                cmd = ["mount", "-t", "ext4", "/dev/" + vg + "/" + lv, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                       "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", "/dev/" + vg + "/" + lv]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
-        vgcmd = ["vgchange", "-an", "vg1"]
-        subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+        for vg in ["vg1", "vg2", "tvault-appliance-vg"]:
+            vgcmd = ["vgchange", "-an", vg]
+            subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
 
         for mountpoint in mountpoints:
             cmd = ["losetup", "-d", mountpoint]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
+        # mount tvaultvg
+        freedev = subprocess.check_output(["losetup", "-f"],
+                                          stderr=subprocess.STDOUT)
+        freedev = freedev.strip("\n")
+
+        subprocess.check_output(["losetup", freedev, "pvname5",],
+                                 stderr=subprocess.STDOUT)
         return 
 
     def cleanup():
-        for i in range(1, 5):
+        for i in range(1, 6):
             deletepv("pvname" + str(i))
             if os.path.isfile("vmdk" + str(i)):
                 os.remove("vmdk" + str(i))
  
-    def verify(remotepath, extentsfile, vmdkfile):
+    def verify(extentsinfo):
         try:
-            my_populate_extents(None, None, None, None, remotepath,
-                                vmdkfile, extentsfile)
-            freedev = subprocess.check_output(["losetup", "-f"],
-                                                stderr=subprocess.STDOUT)
-            freedev = freedev.strip("\n")
+            freedevs = []
+            vgs = []
+            partdev = []
 
-            subprocess.check_output(["losetup", freedev, vmdkfile,],
-                                   stderr=subprocess.STDOUT)
-            pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev, '0', '1099511627776L')
-            # explore VGs and volumes on the disk
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                my_populate_extents(None, None, None, None, key,
+                                    "vmdk" + key.split("pvname")[1], value)
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                if key == "pvname5":
+                    continue
+
+                freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                freedev = freedev.strip("\n")
+
+                subprocess.check_output(["losetup", freedev, "vmdk" + key.split("pvname")[1],],
+                                        stderr=subprocess.STDOUT)
+
+                freedevs.append(freedev)
+                pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev + "p1")
+
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
-               
+
             if len(vgs) == 0:
                raise Exception("No VGs found on VMDK. Test failed")
  
-            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs[0]['LVM2_VG_NAME'])
-            if len(lvs) != 4:
-               raise Exception("Number of LVs found is not 4. Test Failed")
+            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
+            if len(lvs) != 8:
+                raise Exception("Number of LVs found is not 8. Test Failed")
 
             tempdir = mkdtemp()
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
@@ -2610,28 +2637,32 @@ def test_multiple_vgs_multiple_disk():
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
-            for vg in vgs:
-                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
-         
         except Exception as ex:
             LOG.exception(ex)
             LOG.info(_("Verification failed"))
             raise
         finally:
-            try:
-                subprocess.check_output(["losetup", "-d", freedev],
-                                  stderr=subprocess.STDOUT)
-            except:
-                pass
+            for vg in vgs:
+                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
+         
+            for freedev in freedevs:
+                try:
+                    subprocess.check_output(["losetup", "-d", freedev],
+                                      stderr=subprocess.STDOUT)
+                except:
+                    pass
 
     try:
-        print "Running test_lvm_on_single_partition(): "
+        print "Running test_multiple_vgs_multiple_disk(): "
+
         setup() 
         print "\tSetup complete"
+
         extentsinfo = test(4)
         print "\ttest() complete"
-        #verify("pvname1", extentsfile, "vmdk")
-        #print "\t verified successfully"
+
+        verify(extentsinfo)
+        print "\t verified successfully"
 
     finally:
         cleanup()
@@ -2658,7 +2689,7 @@ if __name__ == "__main__":
     #test_mix_of_lvm_and_partitions()
     #test_mix_of_lvm_and_partitions_with_unformatted()
     #test_mix_of_lvm_and_partitions_with_unformatted_raw_disks()
-    test_mix_of_lvm_and_regular_partitions_on_same_disk()
-    #test_multiple_vgs_multiple_disk()
+    #test_mix_of_lvm_and_regular_partitions_on_same_disk()
+    test_multiple_vgs_multiple_disk()
     #smaller disk with large number of disks and create stripped lv
     #to really test logical to physical mapping
