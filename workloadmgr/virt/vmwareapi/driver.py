@@ -925,13 +925,15 @@ class VMwareVCDriver(VMwareESXDriver):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
         turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')        
+        for idx, dev in enumerate(snapshot_data['snapshot_devices']):
+            dev['disk_data_size'] = 0
+            dev['extentsfile'] = None
+            dev['totalblocks'] = 0
+
         if turbo_thick_disk_backup.lower() == 'true':
             try:
                 devicemap = []
                 for idx, dev in enumerate(snapshot_data['snapshot_devices']):
-                    dev['disk_data_size'] = 0
-                    dev['extentsfile'] = None
-                    dev['totalblocks'] = 0
 
                     vmxspec = 'moref=' + snapshot_data['vm_ref'].value
                     vix_disk_lib_env = os.environ.copy()
@@ -939,6 +941,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     # Create empty vmdk file
                     fileh, copy_to_file_path = mkstemp()
                     close(fileh)                  
+                    os.remove(copy_to_file_path)
                     try:
                         cmdline = "trilio-vix-disk-cli -create " 
                         cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
@@ -957,8 +960,10 @@ class VMwareVCDriver(VMwareESXDriver):
                                                devicemap)
                 if extentsinfo:
                     extentsfiles = extentsinfo['extentsfiles']
+                    totalblocks = extentsinfo['totalblocks']
                     for idx, dev in enumerate(snapshot_data['snapshot_devices']):
                         dev['extentsfile'] = extentsfiles[dev['backing']['fileName']]
+                        dev['totalblocks'] = totalblocks[dev['backing']['fileName']]
 
             except Exception as ex:
                 LOG.exception(ex)
@@ -970,7 +975,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         pass
 
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):                       
-            if not dev['extentsfile']:
+            if not 'extentsfile' in dev or not dev['extentsfile']:
                 if snapshot_obj.snapshot_type == 'full':
                     parent_vault_path = None
                     parent_changeId = '*'

@@ -451,7 +451,7 @@ def get_usedblockslist_from_part(mountpath, usedblockfile, part, blocksize):
 def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
                                blocksize):
 
-    totalblockscopied = 0
+    totalblockscopied = {}
     try:
         cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
                    "-R", "stats -d", "/dev/" + lv['LVM2_VG_NAME'] +
@@ -471,6 +471,7 @@ def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
     filehandles = {}
     for key, value in usedblockfiles.iteritems():
         filehandles[key] = open(value, "a")
+        totalblockscopied[key] = 0
 
     lvoffset = 0
     for line in usedblocks.split("\n"):
@@ -479,7 +480,6 @@ def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
 
         extoff = int(re.findall(r'\d+', line)[0])
         length = int(re.findall(r'\d+', line)[1])
-        totalblockscopied += length
 
         extoffsec = getlogicaladdrtopvaddr(lv, pvinfo,
                                    extoff * blocksize, length * blocksize)
@@ -488,6 +488,7 @@ def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
             eoff = int(extoff['offset']) + int(extoff['pv']['PV_DISK_OFFSET'])
             filehandles[extoff['pv']['filename']].write(str(eoff) +
                       "," + str(extoff['length']) + "\n")
+            totalblockscopied[extoff['pv']['filename']] += int(extoff['length'])/blocksize
 
     for key, value in usedblockfiles.iteritems():
         filehandles[key].close()
@@ -950,13 +951,27 @@ def mountlvmvgs(hostip, username, password, vmspec, devmap):
     mountinfo = {}
     vgs = []
     pvs = []
-
+    lvs = []
     try:
         process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
         try:
             for key, value in mountpaths.iteritems():
                 mountpath = value[0].split(";")[0].strip()
                 devpath = mountdevice(mountpath)
+
+                # Add partition mappings here
+                try:
+                    cmd = ["partx", "-d", devpath]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                except:
+                    pass
+
+                try:
+                    cmd = ["partx", "-a", devpath]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                except:
+                    pass
+
                 for dmap in devmap:
                     if dmap['localvmdkpath'] == key:
                         mountinfo[key] = {'mountpath': mountpath,
@@ -1028,18 +1043,29 @@ def lvmextents_in_partition(hostip, username, password, vmspec,
         pass
 
     # TODO: we need to take care of the situation when vg is partially present
+    totalblocks = {}
+    for key, value in extentsfiles.iteritems():
+        totalblocks[key] = 0
     for lv in lvs:
-        totalblocks += performlvthickcopy(hostip, username,
+        lvtotalblocks = performlvthickcopy(hostip, username,
                                           password, vmspec, devmap,
                                           lv, pvs, extentsfiles)
+
+        for key, value in lvtotalblocks.iteritems():
+            totalblocks[key] += lvtotalblocks[key]
+
     return totalblocks
 
 def process_partitions(hostip, username, password, vmspec, devmap,
                        logicalobjects, extentsfiles):
-    totalblocks = 0
+    totalblocks = {}
+
     # If partition has ext2 or its variant of file system, read the
     # blocksize and all the block groups of the file system
     partblockgroups = {}
+ 
+    for key, value in extentsfiles.iteritems():
+        totalblocks[key] = 0
 
     for partinfo in logicalobjects['regularpartitions']:
         try:
@@ -1125,8 +1151,9 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                                        partition['blocks'] + "KiB"],
                                        stderr=subprocess.STDOUT)
                    blocksize = partblockgroups[0]
-                   totalblocks += get_usedblockslist_from_part(freedev, extentsfiles[filename],
+                   totalblocks[filename] += get_usedblockslist_from_part(freedev, extentsfiles[filename],
                                                                partition, blocksize)
+                   
                finally:
                    dismountpv(freedev)
             except Exception as ex:
@@ -1263,9 +1290,12 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
         totalblocks = lvmextents_in_partition(hostip, username, password,
                                              vmspec, devmap, extentsfiles)
 
-        totalblocks += process_partitions(hostip, username, password,
+        parttotalblocks = process_partitions(hostip, username, password,
                                           vmspec, devmap, logicalobjects,
                                           extentsfiles)
+
+        for key, value in parttotalblocks.iteritems():
+            totalblocks[key] += parttotalblocks[key]
 
         return {'extentsfiles': extentsfiles, 'totalblocks': totalblocks,
                 'partitions': partitions}

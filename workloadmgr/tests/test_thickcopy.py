@@ -9,6 +9,7 @@ from tempfile import mkstemp
 from tempfile import mkdtemp
 import time
 import shutil
+import logging
 
 import workloadmgr
 from workloadmgr import exception
@@ -158,7 +159,7 @@ def test_lv_entire_disk():
             cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -189,10 +190,12 @@ def test_lv_entire_disk():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs[0]['LVM2_VG_NAME'])
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -203,7 +206,7 @@ def test_lv_entire_disk():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -211,8 +214,7 @@ def test_lv_entire_disk():
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(remotepath + " does not have lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -275,7 +277,7 @@ def test_lv_on_partitions():
                 cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -329,10 +331,12 @@ def test_lv_on_partitions():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs[0]['LVM2_VG_NAME'])
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             # this test is assuming one partition per disk. We need additional tests for multiple 
@@ -345,7 +349,7 @@ def test_lv_on_partitions():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir] 
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -353,8 +357,7 @@ def test_lv_on_partitions():
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(vmdkfile + " does not have lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -427,7 +430,7 @@ def test_lv_part_mixed():
                 cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -511,7 +514,7 @@ def test_part_lv_mixed():
                 cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -591,7 +594,7 @@ def test_part_lv_mixed_with_tvault_vg():
                 cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/tvault-appliance-vg/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -636,7 +639,7 @@ def test_part_lv_mixed_with_tvault_vg():
                        tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -735,8 +738,7 @@ def test_lvs_on_two_partitions():
                 cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1" +
-                       dev.split("/")[2] + "/" + dev.split("/")[2] + lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -773,12 +775,14 @@ def test_lvs_on_two_partitions():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = []
             for vg in vgs:
                 lvs += workloadmgr.virt.vmwareapi.thickcopy.getlvs(vg['LVM2_VG_NAME'])
             if len(lvs) != 8:
+               print "Number of LVs found is not 8. Test Failed"
                raise Exception("Number of LVs found is not 8. Test Failed")
 
             # this test is assuming one partition per disk. We need additional tests for multiple 
@@ -791,7 +795,7 @@ def test_lvs_on_two_partitions():
                            tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
-                    cmd = ["umount", lv['LVM2_LV_PATH']]
+                    cmd = ["umount", tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -799,8 +803,7 @@ def test_lvs_on_two_partitions():
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(vmdkfile + " does not have lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -875,7 +878,7 @@ def test_lvs_span_two_partitions():
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/" + lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -912,12 +915,14 @@ def test_lvs_span_two_partitions():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = []
             for vg in vgs:
                 lvs += workloadmgr.virt.vmwareapi.thickcopy.getlvs(vg['LVM2_VG_NAME'])
             if len(lvs) != 3:
+               print "Number of LVs found is not 3. Test Failed"
                raise Exception("Number of LVs found is not 3. Test Failed")
 
             # this test is assuming one partition per disk. We need additional tests for multiple 
@@ -930,7 +935,7 @@ def test_lvs_span_two_partitions():
                            tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
-                    cmd = ["umount", lv['LVM2_LV_PATH']]
+                    cmd = ["umount", tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -938,8 +943,7 @@ def test_lvs_span_two_partitions():
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(vmdkfile + " does not have lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -1048,7 +1052,7 @@ def test_mbr_4_primary_partitions():
                            tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
-                    cmd = ["umount", freedev]
+                    cmd = ["umount", tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     shutil.rmtree(tempdir)
                 finally:
@@ -1057,8 +1061,7 @@ def test_mbr_4_primary_partitions():
                         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(vmdkfile + " does not have lvm pvs"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -1169,7 +1172,7 @@ def test_mbr_3_primary_1_logical_partitions():
                            tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
-                    cmd = ["umount", freedev]
+                    cmd = ["umount", tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     shutil.rmtree(tempdir)
                 finally:
@@ -1178,8 +1181,7 @@ def test_mbr_3_primary_1_logical_partitions():
                         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(vmdkfile + " does not have lvm pvs"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -1291,8 +1293,7 @@ def test_gpt_partitions():
                         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(vmdkfile + " does not have lvm pvs"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -1433,7 +1434,7 @@ def test_lv_entire_disks():
             cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -1455,6 +1456,10 @@ def test_lv_entire_disks():
     def verify(extentsinfo):
         try:
             freedevs = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
                                     "vmdk" + key.split("pvname")[1], value)
@@ -1474,10 +1479,12 @@ def test_lv_entire_disks():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -1488,7 +1495,7 @@ def test_lv_entire_disks():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -1496,8 +1503,7 @@ def test_lv_entire_disks():
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("This test did not discover lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             for freedev in freedevs:
@@ -1574,7 +1580,7 @@ def test_lv_entire_disks_with_one_disk_missing():
             cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -1599,11 +1605,16 @@ def test_lv_entire_disks_with_one_disk_missing():
  
     def verify(extentsinfo):
         try:
-            if extentsinfo['totalblocks']:
-                raise Exception("Total blocks should be zero") 
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
+            for key, value in extentsinfo['totalblocks'].iteritems():
+                if extentsinfo['totalblocks'][key]:
+                    print "Total blocks should be zero"
+                    raise Exception("Total blocks should be zero") 
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_(" These set of disks do not have lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             try:
@@ -1681,7 +1692,7 @@ def test_lvm_on_single_partition():
             cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -1703,6 +1714,10 @@ def test_lvm_on_single_partition():
     def verify(extentsinfo):
         try:
             freedevs = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
                                     "vmdk" + key.split("pvname")[1], value)
@@ -1721,6 +1736,7 @@ def test_lvm_on_single_partition():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = []
@@ -1728,6 +1744,7 @@ def test_lvm_on_single_partition():
             lvs += workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
 
             if len(lvs) != 4:
+                   print "Number of LVs found is not 4. Test Failed"
                    raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -1738,7 +1755,7 @@ def test_lvm_on_single_partition():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -1746,8 +1763,7 @@ def test_lvm_on_single_partition():
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("These set of VMDK do not have lvm pv"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             for freedev in freedevs:
@@ -1844,7 +1860,7 @@ def test_mix_of_lvm_and_partitions():
                 cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -1856,7 +1872,7 @@ def test_mix_of_lvm_and_partitions():
                      cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                      subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                      time.sleep(1)
-                     cmd = ["umount", mountpoint+"p"+str(part)]
+                     cmd = ["umount", tempdir]
                      subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -1881,6 +1897,11 @@ def test_mix_of_lvm_and_partitions():
             freedevs = []
             partdevs = []
             vgs = []
+
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
                                     "vmdk" + key.split("pvname")[1], value)
@@ -1903,10 +1924,12 @@ def test_mix_of_lvm_and_partitions():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -1917,7 +1940,7 @@ def test_mix_of_lvm_and_partitions():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -1926,17 +1949,17 @@ def test_mix_of_lvm_and_partitions():
                 for part in [1, 2, 3, 4, 5]:
                      cmd = ["mount", "-t", "ext4", mountpoint+"p"+str(part), tempdir]
                      subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                     cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                time.sleep(1)
-                cmd = ["umount", mountpoint+"p"+str(part)]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                     time.sleep(1)
+                     cmd = ["umount", tempdir]
+                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("Exception while verifying the test"))
+            logging.exception("Exception in verification. Verification failed")
+            raise
         finally:
             for vg in vgs:
                 workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
@@ -2024,7 +2047,7 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
             cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -2037,6 +2060,7 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
                    tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
+            cmd = ["umount", tempdir]
             cmd = ["umount", "/dev/"+part]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
@@ -2061,6 +2085,10 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
             freedevs = []
             partdevs = []
             vgs = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
                                     "vmdk" + key.split("pvname")[1], value)
@@ -2083,10 +2111,12 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -2097,7 +2127,7 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -2110,13 +2140,12 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", mountpoint+"p"+str(part)]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("Verification failed"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             for vg in vgs:
@@ -2211,7 +2240,7 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
                    tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -2225,7 +2254,7 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
                        tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", mountpoint+"p"+str(part)]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -2250,6 +2279,10 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
             freedevs = []
             vgs = []
             partdev = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
                                     "vmdk" + key.split("pvname")[1], value)
@@ -2272,10 +2305,12 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -2287,7 +2322,7 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -2300,13 +2335,12 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", mountpoint+"p"+str(part)]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("Verify failed"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             for vg in vgs:
@@ -2388,7 +2422,7 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
                          "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
-            cmd = ["umount", "/dev/vg1/"+lv]
+            cmd = ["umount", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -2401,7 +2435,7 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
                              "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", mountpoint + "p" + str(part)]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -2425,6 +2459,10 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
             freedevs = []
             vgs = []
             partdev = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
                                     "vmdk" + key.split("pvname")[1], value)
@@ -2443,10 +2481,12 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
             if len(vgs) == 0:
+                print "No VGs found on VMDK. Test failed"
                 raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
 
             tempdir = mkdtemp()
@@ -2458,7 +2498,7 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
@@ -2471,13 +2511,12 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
                                  "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
-                    cmd = ["umount", mountpoint + "p" + str(part)]
+                    cmd = ["umount", tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
          
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("Verification failed"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             for vg in vgs:
@@ -2565,7 +2604,7 @@ def test_multiple_vgs_multiple_disk():
                        "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/" + vg + "/" + lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
@@ -2597,6 +2636,10 @@ def test_multiple_vgs_multiple_disk():
             freedevs = []
             vgs = []
             partdev = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
 
             for key, value in extentsinfo['extentsfiles'].iteritems():
                 my_populate_extents(None, None, None, None, key,
@@ -2619,10 +2662,12 @@ def test_multiple_vgs_multiple_disk():
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
 
             if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
                raise Exception("No VGs found on VMDK. Test failed")
  
             lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 8:
+                print "Number of LVs found is not 8. Test Failed"
                 raise Exception("Number of LVs found is not 8. Test Failed")
 
             tempdir = mkdtemp()
@@ -2633,13 +2678,12 @@ def test_multiple_vgs_multiple_disk():
                        tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
-                cmd = ["umount", "/dev/vg1/"+lv]
+                cmd = ["umount", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
         except Exception as ex:
-            LOG.exception(ex)
-            LOG.info(_("Verification failed"))
+            print "Exception in verification. Verification failed"
             raise
         finally:
             for vg in vgs:
@@ -2686,10 +2730,10 @@ if __name__ == "__main__":
     #test_lv_entire_disks()
     #test_lv_entire_disks_with_one_disk_missing()
     #test_lvm_on_single_partition()
-    #test_mix_of_lvm_and_partitions()
+    test_mix_of_lvm_and_partitions()
     #test_mix_of_lvm_and_partitions_with_unformatted()
     #test_mix_of_lvm_and_partitions_with_unformatted_raw_disks()
     #test_mix_of_lvm_and_regular_partitions_on_same_disk()
-    test_multiple_vgs_multiple_disk()
+    #test_multiple_vgs_multiple_disk()
     #smaller disk with large number of disks and create stripped lv
     #to really test logical to physical mapping
