@@ -973,9 +973,19 @@ class VMwareVCDriver(VMwareESXDriver):
                         os.remove(dmap['localvmdkpath'])
                     except:
                         pass
-
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):                       
-            if not 'extentsfile' in dev or not dev['extentsfile']:
+            if not 'extentsfile' in dev or not dev['extentsfile'] or \
+                 (hasattr(dev.backing, 'thinProvisioned') and \
+                  dev.backing.thinProvisioned == True) or \
+                 snapshot_obj.snapshot_type == 'incremental':
+
+                try:
+                    if 'extentsfile' in dev and  dev['extentsfile'] and \
+                        os.path.isfile(dev['extentsfile']):
+                        os.remove(dev['extentsfile'])
+                except:
+                    pass
+
                 if snapshot_obj.snapshot_type == 'full':
                     parent_vault_path = None
                     parent_changeId = '*'

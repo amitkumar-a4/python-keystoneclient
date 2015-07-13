@@ -650,7 +650,7 @@ def read_partition_table(mountpath=None):
     return partitions
 
 def get_partition_table_from_vmdk(hostip, username, password, vmspec,
-                                  remotepath, localvmdkpath):
+                                  remotepath, localvmdkpath, extentsfile):
     fileh, listfile = mkstemp()
     close(fileh)
     with open(listfile, 'w') as f:
@@ -674,6 +674,11 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
             populate_extent(hostip, username, password, vmspec,
                             remotepath, localvmdkpath,
                             str(extended_part['start']), 2048)
+
+            with open(extentsfile, "a") as f:
+                f.write(str(int(extended_part['start']) * 512) + ","
+                        + str(2048 * 512) + "\n")
+
             process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
             try:
                 for key, value in mountpaths.iteritems():
@@ -691,6 +696,11 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
                         populate_extent(hostip, username, password, vmspec,
                                         remotepath, localvmdkpath,
                                         str(int(part['end']) + 1), 2048)
+
+                        with open(extentsfile, "a") as f:
+                            f.write(str(int(part['end'] + 1) * 512) + ","
+                                    + str(2048 * 512) + "\n")
+
                 process, mountpaths = mount_local_vmdk(listfile,
                                                        mntlist, diskonly=True)
                 try:
@@ -1094,6 +1104,7 @@ def lvmextents_in_partition(hostip, username, password, vmspec,
 def process_partitions(hostip, username, password, vmspec, devmap,
                        logicalobjects, extentsfiles):
     totalblocks = {}
+    process = None
 
     # If partition has ext2 or its variant of file system, read the
     # blocksize and all the block groups of the file system
@@ -1106,6 +1117,11 @@ def process_partitions(hostip, username, password, vmspec, devmap,
         try:
             localvmdkpath = None
             partition = partinfo['partition']
+
+            if partition['id'] == 'ee' or partition['id'] == '5' \
+                or partition['id'] == 'f':
+                continue
+
             filename = partinfo['filename']
             for dmap in devmap:
                 if partinfo['filename'] == dmap['dev']['backing']['fileName']:
@@ -1131,10 +1147,6 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                     mountpath = value[0].split(";")[0].strip()
                     break
 
-                # Mount all partitions found on the disk
-                if partition['id'] == 'ee' or partition['id'] == '5' \
-                   or partition['id'] == 'f':
-                    continue
                 try:
                     freedev = subprocess.check_output(["losetup", "-f"],
                                                         stderr=subprocess.STDOUT)
@@ -1167,16 +1179,12 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                 break
 
             try:
-               if partition['id'] == 'ee' or partition['id'] == '5' or \
-                  partition['id'] == 'f':
-                   continue
-               # for each partition on the disk copy only allocated blocks
-               # from remote disk
 
                ##
                # TODO: The used blocks can be pretty big. Make sure
                # we are handling large lists correctly.
                try:
+                   freedev = None
                    freedev = subprocess.check_output(["losetup", "-f"],
                                                     stderr=subprocess.STDOUT)
                    freedev = freedev.strip("\n")
@@ -1190,16 +1198,18 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                                                                partition, blocksize)
                    
                finally:
-                   dismountpv(freedev)
+                   if freedev:
+                       dismountpv(freedev)
             except Exception as ex:
                 LOG.exception(ex)
             finally:
-                umount_local_vmdk(process)
+                if process:
+                    umount_local_vmdk(process)
 
         except Exception as ex:
             LOG.exception(ex)
-            LOG.info(_(mountpath + ":" + str(partition) + "partition does not have ext fs. Ignoring now"))
-            #TODO: Consider the entire partition to copy
+            LOG.info(_(partinfo['filename'] + ":" + str(partition) +
+                       "partition does not have ext fs. Ignoring now"))
         finally:
             if os.path.isfile(listfile):
                 os.remove(listfile)
@@ -1288,15 +1298,24 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
         extentsinfo = {}
         extentsfiles = {}
 
+        # for each LV, check if ext file system on the LV
+        for dmap in devmap:
+            fileh, extentsfiles[dmap['dev']['backing']['fileName']] = mkstemp()
+            close(fileh)
+
         for dmap in devmap:
             filename = dmap['dev']['backing']['fileName']
             capacity = dmap['dev']['capacityInBytes']
             populate_bootrecord(hostip, username, password, vmspec,
                                 filename, dmap['localvmdkpath'], capacity)
 
+            with open(extentsfiles[filename], "a") as f:
+                f.write(str(0) + "," + str(400 * 512) + "\n")
+
             partitions[filename] = get_partition_table_from_vmdk(hostip, username,
                                                  password, vmspec, filename,
-                                                 dmap['localvmdkpath'])
+                                                 dmap['localvmdkpath'],
+                                                 extentsfiles[filename])
 
             # if no partitions found, see if this is raw LVM PV
             if len(partitions[filename]) > 0:
@@ -1308,6 +1327,9 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
                         populate_extent(hostip, username, password, vmspec,
                                         filename, dmap['localvmdkpath'],
                                         str(part['start']), 400)
+                        with open(extentsfiles[filename], "a") as f:
+                            f.write(str(int(part['start']) * 512) + "," +
+                                    str(400 * 512) + "\n")
 
         # mount all devices here
         # do vg scan
@@ -1315,11 +1337,6 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
         # sort lvs and partitions into ext fs and not ext fs
         logicalobjects = discover_lvs_and_partitions(hostip, username, password,
                                                     vmspec, devmap, partitions)
-
-        # for each LV, check if ext file system on the LV
-        for dmap in devmap:
-            fileh, extentsfiles[dmap['dev']['backing']['fileName']] = mkstemp()
-            close(fileh)
 
         # identify rest of partitions that were not part of LVM configuration
         totalblocks = lvmextents_in_partition(hostip, username, password,
