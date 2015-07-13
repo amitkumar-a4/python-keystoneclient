@@ -149,6 +149,11 @@ def model_query(context, *args, **kwargs):
     if context:
         if project_only and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
+    
+    
+    if 'get_hidden' in kwargs:     
+        if kwargs.get('get_hidden', False) == False:
+            query = query.filter_by(hidden=False)
 
     return query
 
@@ -2645,24 +2650,26 @@ def _setting_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
-def _setting_update(context, values, setting_key, purge_metadata, session):
+def _setting_update(context, values, setting_name, purge_metadata, session):
     try:
         lock.acquire()    
         metadata = values.pop('metadata', {})
         
-        if setting_key:
+        if setting_name:
             setting_ref = model_query(context, models.Settings, session=session, read_deleted="yes").\
-                                        filter_by(key=setting_key).\
+                                        filter_by(name=setting_name).\
                                         filter_by(project_id=context.project_id).\
                                         first()
             if not setting_ref:
                 lock.release()
-                raise exception.SettingNotFound(setting_key = setting_key)
+                raise exception.SettingNotFound(setting_name = setting_name)
                                                         
         else:
             setting_ref = models.Settings()
-            if not values.get('key'):
-                values['key'] = str(uuid.uuid4())
+            if not values.get('status'):
+                values['status'] = 'available'
+            if not values.get('project_id'):
+                values['project_id'] = context.project_id                
                 
         setting_ref.update(values)
         setting_ref.save(session)
@@ -2676,31 +2683,32 @@ def _setting_update(context, values, setting_key, purge_metadata, session):
     return setting_ref               
         
 @require_context
-def _setting_get(context, setting_key, **kwargs):
+def _setting_get(context, setting_name, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
+    get_hidden = kwargs.get('get_hidden', False)         
     result = model_query(   context, models.Settings, **kwargs).\
+                            filter_by(hidden=get_hidden).\
                             options(sa_orm.joinedload(models.Settings.metadata)).\
-                            filter_by(key=setting_key).\
+                            filter_by(name=setting_name).\
                             filter_by(project_id=context.project_id).\
                             first()
 
     if not result:
-        raise exception.SettingNotFound(setting_key=setting_key)
+        raise exception.SettingNotFound(setting_name=setting_name)
 
     return result
 
 @require_context
-def setting_get(context, setting_key, **kwargs):
+def setting_get(context, setting_name, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()    
-    return _setting_get(context, setting_key, **kwargs) 
+    return _setting_get(context, setting_name, **kwargs) 
 
 #@require_admin_context
 def setting_get_all(context, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    
     if context:
         return model_query(context, models.Settings, **kwargs).\
                             options(sa_orm.joinedload(models.Settings.metadata)).\
@@ -2727,20 +2735,18 @@ def setting_create(context, values):
     return _setting_update(context, values, None, False, session)
 
 @require_context
-def setting_update(context, setting_key, values, purge_metadata=False):
+def setting_update(context, setting_name, values, purge_metadata=False):
     session = get_session()
-    return _setting_update(context, values, setting_key, purge_metadata, session)
+    return _setting_update(context, values, setting_name, purge_metadata, session)
 
 @require_context
-def setting_delete(context, setting_key):
+def setting_delete(context, setting_name):
     session = get_session()
-    with session.begin():
-        session.query(models.Settings).\
-            filter_by(key=setting_key).\
-            update({'status': 'deleted',
-                    'deleted': True,
-                    'deleted_at': timeutils.utcnow(),
-                    'updated_at': literal_column('updated_at')})            
+    setting = _setting_get(context, setting_name, session = session)
+    for metadata_ref in setting.metadata:
+        metadata_ref.purge(session=session)
+    setting.purge(session=session)
+     
 
 #### VaultStorage ################################################################
 """ vault_storage functions """

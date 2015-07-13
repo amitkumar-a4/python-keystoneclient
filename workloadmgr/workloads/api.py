@@ -778,7 +778,7 @@ class API(base.Base):
             auditlog = AUDITLOG.get_records(time_in_minutes, time_from, time_to)
         except Exception as ex:
             LOG.exception(ex)
-        return dict(auditlog=auditlog)        
+        return dict(auditlog=auditlog)
     
     @autolog.log_method(logger=Logger)
     def workload_get_workflow(self, context, workload_id):
@@ -1330,3 +1330,46 @@ class API(base.Base):
         self.db.restore_delete(context, restore_id)
         AUDITLOG.log(context,'Restore Deleted', restore_details)
         
+    @autolog.log_method(logger=Logger)
+    def settings_create(self, context, settings):
+        created_settings = []
+        try:
+            for setting in settings:
+                created_settings.append(self.db.setting_create(context, setting))
+        except Exception as ex:
+            LOG.exception(ex)
+        return created_settings 
+    
+    @autolog.log_method(logger=Logger)
+    def settings_update(self, context, settings):
+        updated_settings = []
+        try:
+            for setting in settings:
+                updated_settings.append(self.db.setting_update(context, setting['name'], setting))
+        except Exception as ex:
+            LOG.exception(ex)
+        return updated_settings
+    
+    @autolog.log_method(logger=Logger)
+    def setting_delete(self, context, name):
+        self.db.setting_delete(context,name)
+                
+    @autolog.log_method(logger=Logger)
+    def setting_get(self, context, name, get_hidden = False):
+        try:
+            return self.db.setting_get(context, name, get_hidden = get_hidden)
+        except Exception as ex:
+            LOG.exception(ex)
+        return None
+        
+    @autolog.log_method(logger=Logger)
+    def settings_get(self, context, get_hidden = False):
+        settings = []
+        try:
+            return self.db.setting_get_all(context, get_hidden = get_hidden)
+        except Exception as ex:
+            LOG.exception(ex)
+        return settings 
+    
+
+      

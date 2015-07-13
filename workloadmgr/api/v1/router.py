@@ -16,6 +16,7 @@ from workloadmgr.api.v1 import snapshots
 from workloadmgr.api.v1 import restores
 from workloadmgr.api.v1 import testbubbles
 from workloadmgr.api.v1 import workloadtypes
+from workloadmgr.api.v1 import settings
 
 LOG = logging.getLogger(__name__)
 
@@ -114,12 +115,12 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='import_workloads',
                        conditions={"method": ['POST']})  
         
-        #import workloads
+        #workload settings
         mapper.connect("workloads_settings",
                        "/{project_id}/workloads/settings",
                        controller=self.resources['workloads'],
                        action='settings',
-                       conditions={"method": ['POST']})            
+                       conditions={"method": ['POST']})
         
         #get workloadmanager nodes
         mapper.connect("workloads_nodes",
@@ -382,3 +383,42 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='delete',
                        conditions={"method": ['DELETE']})         
         
+        ###################################################################################################
+        self.resources['settings'] = settings.create_resource(ext_mgr)
+        
+        #create settings
+        mapper.connect("create_settings",
+                       "/{project_id}/settings",
+                       controller=self.resources['settings'],
+                       action='create',
+                       conditions={"method": ['POST']}) 
+        
+        #update settings
+        mapper.connect("update_settings",
+                       "/{project_id}/settings",
+                       controller=self.resources['settings'],
+                       action='update',
+                       conditions={"method": ['PUT']})                   
+
+        #get the list of settings
+        mapper.connect("get_settings_list",
+                       "/{project_id}/settings",
+                       controller=self.resources['settings'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the specified setting
+        mapper.connect("get_setting",
+                       "/{project_id}/settings/{name}",
+                       controller=self.resources['settings'],
+                       action='show',
+                       conditions={"method": ['GET']})
+        
+        #delete a setting
+        mapper.connect("delete_setting",
+                       "/{project_id}/settings/{name}",
+                       controller=self.resources['settings'],
+                       action='delete',
+                       conditions={"method": ['DELETE']}) 
+        
+              
