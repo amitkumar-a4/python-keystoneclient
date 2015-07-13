@@ -2737,3 +2737,4 @@ if __name__ == "__main__":
     #test_multiple_vgs_multiple_disk()
     #smaller disk with large number of disks and create stripped lv
     #to really test logical to physical mapping
+    #create a test case that a volume or partition has xfs filesystem

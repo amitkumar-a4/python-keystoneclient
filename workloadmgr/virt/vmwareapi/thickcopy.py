@@ -97,74 +97,99 @@ def mount_local_vmdk(diskslist, mntlist, diskonly=False):
     vix_disk_lib_env = os.environ.copy()
     vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
 
-    cmdspec = [ "trilio-vix-disk-cli", "-mount", "-mountpointsfile", mntlist, ]
-    if diskonly:
-        cmdspec += ['-diskonly']
-    cmdspec += [diskslist]
-    cmd = " ".join(cmdspec)
-    LOG.info(_( cmd ))
-    process = subprocess.Popen(cmdspec,
-                               stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               bufsize= -1,
-                               env=vix_disk_lib_env,
-                               close_fds=True,
-                               shell=False)
-                
-    queue = Queue()
-    read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
-    read_thread.daemon = True # thread dies with the program
-    read_thread.start()            
-                
-    mountpath = None
-    while process.poll() is None:
-        try:
-            try:
-                output = queue.get(timeout=5)
-                LOG.info(_( output ))
-            except Empty:
-                continue 
-            except Exception as ex:
-                LOG.exception(ex)
+    vmdkfiles = []
+    with open(diskslist, 'r') as f:
+         for line in f.read().split():
+             vmdkfiles.append(line.rstrip().strip())
 
-            if output.startswith("Pausing the process until it is resumed"):
-                break
-        except Exception as ex:
-                LOG.exception(ex)
-                
-    if not process.poll() is None:
-        _returncode = process.returncode  # pylint: disable=E1101
-        if _returncode:
-            LOG.debug(_('Result was %s') % _returncode)
-            raise exception.ProcessExecutionError(
-                                    exit_code=_returncode,
-                                    stderr=process.stderr.read(),
-                                    cmd=cmd)
+    processes = []
     mountpoints = {}
-    with open(mntlist, 'r') as f:
-        for line in f:
-            line = line.strip("\n")
-            mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
-        
-    LOG.info(_( mountpoints ))
-    process.stdin.close()
-    return process, mountpoints
+    for vmdkfile in vmdkfiles:
+
+        try:
+            fileh, listfile = mkstemp()
+            close(fileh)
+            with open(listfile, 'w') as f:
+                f.write(vmdkfile)
+
+            cmdspec = [ "trilio-vix-disk-cli", "-mount", "-mountpointsfile", mntlist, ]
+            if diskonly:
+                cmdspec += ['-diskonly']
+            cmdspec += [listfile]
+            cmd = " ".join(cmdspec)
+            LOG.info(_( cmd ))
+            process = subprocess.Popen(cmdspec,
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       bufsize= -1,
+                                       env=vix_disk_lib_env,
+                                       close_fds=True,
+                                       shell=False)
+                
+            queue = Queue()
+            read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+            read_thread.daemon = True # thread dies with the program
+            read_thread.start()            
+
+            mountpath = None
+            while process.poll() is None:
+                try:
+                    try:
+                        output = queue.get(timeout=5)
+                        LOG.info(_( output ))
+                    except Empty:
+                        continue 
+                    except Exception as ex:
+                        LOG.exception(ex)
+    
+                    if output.startswith("Pausing the process until it is resumed"):
+                        break
+                except Exception as ex:
+                    LOG.exception(ex)
+
+            if not process.poll() is None:
+                _returncode = process.returncode  # pylint: disable=E1101
+                if _returncode:
+                    LOG.debug(_('Result was %s') % _returncode)
+                    raise exception.ProcessExecutionError(
+                                            exit_code=_returncode,
+                                            stderr=process.stderr.read(),
+                                            cmd=cmd)
+            with open(mntlist, 'r') as f:
+                for line in f:
+                    line = line.strip("\n")
+                    mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
+
+            LOG.info(_( mountpoints ))
+            process.stdin.close()
+            processes.append(process)
+     
+        except Exception as ex:
+            LOG.exception(ex)
+            umount_local_vmdk(processes)
+            raise
+        finally:
+            if os.path.isfile(listfile):
+                os.remove(listfile)
+
+    return processes, mountpoints
 
 ##
 # unmounts a vmdk by sending signal 18 to the process that as suspended during mount process
 ##
-def umount_local_vmdk(process): 
-    process.send_signal(18)
-    process.wait()
+def umount_local_vmdk(processes): 
+    for process in processes:
+        process.send_signal(18)
+        process.wait()
 
-    _returncode = process.returncode  # pylint: disable=E1101
+        _returncode = process.returncode  # pylint: disable=E1101
 
-    if _returncode != 0:
-        LOG.debug(_('Result was %s') % _returncode)
-        raise exception.ProcessExecutionError(
-                                    exit_code=_returncode,
-                                    stderr=process.stderr.read())
+        if _returncode != 0:
+            LOG.debug(_('Result was %s') % _returncode)
+            raise exception.ProcessExecutionError(
+                                        exit_code=_returncode,
+                                        stderr=process.stderr.read())
 
 def execute_cmd(cmdspec, env=None):
     process = subprocess.Popen(cmdspec,
@@ -397,21 +422,27 @@ def getgptdisk_output(mountpath=None):
 
 def get_blockgroups(mountpath):
 
-    # Read the superblock and read the blocksize
-    cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
-               "-R", "stats -h", mountpath]
-    superblock, error = execute_debugfs(cmdspec)
+    try:
+        # Read the superblock and read the blocksize
+        blocksize = 4096
+        blockgroups = ""
+        cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
+                   "-R", "stats -h", mountpath]
+        superblock, error = execute_debugfs(cmdspec)
 
-    # get the block size
-    for line in superblock.split("\n"):
-        LOG.info(_( line ))
-        if "Block size:" in line:
-             blocksize = int(line.split(":")[1].strip())
+        # get the block size
+        for line in superblock.split("\n"):
+            LOG.info(_( line ))
+            if "Block size:" in line:
+                blocksize = int(line.split(":")[1].strip())
 
-    cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
-               "-R", "stats", mountpath]
+        cmdspec = ["/opt/stack/workloadmgr/debugfs/debugfs",
+                   "-R", "stats", mountpath]
 
-    blockgroups, error = execute_debugfs(cmdspec)
+        blockgroups, error = execute_debugfs(cmdspec)
+    except Exception as ex:
+        LOG.exception(_(ex))
+        LOG.error(_("Cannot read block groups from %s") % mountpath)
 
     return blocksize, blockgroups
 
@@ -464,8 +495,7 @@ def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
         LOG.info(_( "No valid ext fs found on partitin starting on: /dev/"
                     + lv['LVM2_VG_NAME'] + "/" + lv['LVM2_LV_NAME']))
         startblk = 0
-        ## TODO copy pv extents to file
-        length = (int(part['blocks']) * 1024)/blocksize
+        length = int(lv['LVM2_LV_SIZE'])/blocksize
         usedblocks = "startblk " + str(startblk) + " length " + str(length)
 
     filehandles = {}
@@ -826,7 +856,7 @@ def getlvs(vgs):
     # get the list of volumes
     for vg in vgs:
         vgname = vg['LVM2_VG_NAME']
-        lvs = subprocess.check_output(["lvs", "--noheadings",
+        lvs = subprocess.check_output(["lvs", "--noheadings", "--units", "b",
                                       "--nameprefixes", vgname],
                                       stderr=subprocess.STDOUT)
         lvnames = []
@@ -912,28 +942,33 @@ def copylvextsuperblock(hostip, username, password, vmspec, devmap,
 def performlvthickcopy(hostip, username, password, vmspec, devmap,
                        lvsrc, srcpvlist, extentsfile):
 
-    copylvextsuperblock(hostip, username, password, vmspec,
-                        devmap, lvsrc, srcpvlist)
+    try:
+        totalblocks = {}
+        copylvextsuperblock(hostip, username, password, vmspec,
+                            devmap, lvsrc, srcpvlist)
 
-    for pvs, vgs, lvs, mountinfo in mountlvmvgs(hostip, username, password,
-                                                vmspec, devmap):
-        if len(vgs) == 0:
-            LOG.info(_( "This VM does not contain any volume groups. Defaulting to cbt"))
-            raise Exception("This VM does not contain any volume groups. Defaulting to cbt")
+        for pvs, vgs, lvs, mountinfo in mountlvmvgs(hostip, username, password,
+                                                    vmspec, devmap):
+            if len(vgs) == 0:
+                LOG.info(_( "This VM does not contain any volume groups. Defaulting to cbt"))
+                raise Exception("This VM does not contain any volume groups. Defaulting to cbt")
  
-        if len(lvs) == 0:
-            LOG.info(_("This VM does not contain any logical volumes. Defaulting to cbt"))
-            raise Exception("This VM does not contain any logical volumes. Defaulting to cbt")
+            if len(lvs) == 0:
+                LOG.info(_("This VM does not contain any logical volumes. Defaulting to cbt"))
+                raise Exception("This VM does not contain any logical volumes. Defaulting to cbt")
 
-        blocksize, blockgroups= get_blockgroups(lvsrc['LVM2_LV_PATH'])
+            blocksize, blockgroups= get_blockgroups(lvsrc['LVM2_LV_PATH'])
 
-    copy_free_bitmap_from_lv(hostip, username, password, vmspec, devmap,
-                             lvsrc, srcpvlist, blocksize, blockgroups)
+        copy_free_bitmap_from_lv(hostip, username, password, vmspec, devmap,
+                                 lvsrc, srcpvlist, blocksize, blockgroups)
 
-    for pvs, vgs, lvs, mountinfo in mountlvmvgs(hostip, username, password,
-                                                vmspec, devmap):
-        totalblocks = get_usedblockslist_from_lv(lvsrc['LVM2_LV_PATH'], extentsfile,
-                                                 lvsrc, srcpvlist, blocksize)
+        for pvs, vgs, lvs, mountinfo in mountlvmvgs(hostip, username, password,
+                                                    vmspec, devmap):
+            totalblocks = get_usedblockslist_from_lv(lvsrc['LVM2_LV_PATH'], extentsfile,
+                                                     lvsrc, srcpvlist, blocksize)
+    except Exception as ex:
+        LOG.exception(ex)
+        LOG.error(_("Cannot open lv: %s") % (lvsrc['LVM2_LV_PATH']))
 
     return totalblocks
 
@@ -1300,9 +1335,11 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
         return {'extentsfiles': extentsfiles, 'totalblocks': totalblocks,
                 'partitions': partitions}
     except Exception as ex:
+        LOG.exception(ex)
         for key, filename in extentsfiles.iteritems():
             if os.path.isfile(filename):
                 os.remove(filename)
+        raise
 
 def thickcopyextents(hostip, username, password, vmspec, devmap):
     try:
