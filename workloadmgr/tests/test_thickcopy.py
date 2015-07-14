@@ -2008,7 +2008,10 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
             cmd = ["parted", mountpoint, "mkpart", "P1", "ext2", str(1024), str("250GiB")]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-            cmd = ["parted", mountpoint, "mkpart", "P2", "ext2", str("250GiB"), str("750GiB")]
+            cmd = ["parted", mountpoint, "mkpart", "P2", "xfs", str("250GiB"), str("500GiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoint, "mkpart", "P3", "ext2", str("500GiB"), str("1TiB")]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
         for dev in devices:
@@ -2036,9 +2039,15 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
             cmd = ["mkfs", "-t", "ext4", "/dev/vg1/" + lv]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
-        for part in ["loop2p1", "loop3p1"]:
-            cmd = ["mkfs", "-t", "ext4", "/dev/" + part]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        for mountpoint in mountpoints[2:]:
+            for part in ["1"]:
+                cmd = ["mkfs", "-t", "ext4", mountpoint+"p"+part]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        for mountpoint in mountpoints[2:]:
+            for part in ["2"]:
+                cmd = ["mkfs", "-t", "xfs", mountpoint+"p"+part]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
         tempdir = mkdtemp()
         for lv in ["lv1", "lv2", "lv3"]:
@@ -2052,17 +2061,31 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
         shutil.rmtree(tempdir)
 
         tempdir = mkdtemp()
-        for part in ["loop2p1", "loop3p1"]:
-            cmd = ["mount", "-t", "ext4", "/dev/"+part, tempdir]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                         "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                   tempdir]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            time.sleep(1)
-            cmd = ["umount", tempdir]
-            cmd = ["umount", "/dev/"+part]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        for mountpoint in mountpoints[2:]:
+            for part in ["1"]:
+                cmd = ["mount", "-t", "ext4", mountpoint + "p" + part, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                             "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                       tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        shutil.rmtree(tempdir)
+
+        tempdir = mkdtemp()
+        for mountpoint in mountpoints[2:]:
+            for part in ["2"]:
+                cmd = ["mount", "-t", "xfs", mountpoint + "p" + part, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                             "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                       tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         shutil.rmtree(tempdir)
 
         vgcmd = ["vgchange", "-an", "vg1"]
@@ -2089,60 +2112,8 @@ def test_mix_of_lvm_and_partitions_with_unformatted():
                print "extentsinfo is null. Test failed"
                raise Exception("extentsinfo is null. Test failed")
 
-            for key, value in extentsinfo['extentsfiles'].iteritems():
-                my_populate_extents(None, None, None, None, key,
-                                    "vmdk" + key.split("pvname")[1], value)
-
-            for key, value in extentsinfo['extentsfiles'].iteritems():
-                freedev = subprocess.check_output(["losetup", "-f"],
-                                                stderr=subprocess.STDOUT)
-                freedev = freedev.strip("\n")
-
-                subprocess.check_output(["losetup", freedev, "vmdk" + key.split("pvname")[1],],
-                                        stderr=subprocess.STDOUT)
-
-                freedevs.append(freedev)
-                if int(key.split("pvname")[1]) in [1,2]:
-                    pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev + "p1")
-                else:
-                     partdevs.append(freedev)
-
-            # explore VGs and volumes on the disk
-            vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
-               
-            if len(vgs) == 0:
-               print "No VGs found on VMDK. Test failed"
-               raise Exception("No VGs found on VMDK. Test failed")
- 
-            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
-            if len(lvs) != 4:
-               print "Number of LVs found is not 4. Test Failed"
-               raise Exception("Number of LVs found is not 4. Test Failed")
-
-            tempdir = mkdtemp()
-            for lv in ["lv1", "lv2", "lv3"]:
-                cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                time.sleep(1)
-                cmd = ["umount", tempdir]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            shutil.rmtree(tempdir)
-
-            tempdir = mkdtemp()
-            for mountpoint in partdevs:
-                for part in [1]:
-                     cmd = ["mount", "-t", "ext4", mountpoint+"p"+str(part), tempdir]
-                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                time.sleep(1)
-                cmd = ["umount", tempdir]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            shutil.rmtree(tempdir)
+            ## Add stuff to verify the file system here. We should do with 
+            # small file systems, instead of tera bytes
 
         except Exception as ex:
             print "Exception in verification. Verification failed"
@@ -2730,8 +2701,8 @@ if __name__ == "__main__":
     #test_lv_entire_disks()
     #test_lv_entire_disks_with_one_disk_missing()
     #test_lvm_on_single_partition()
-    test_mix_of_lvm_and_partitions()
-    #test_mix_of_lvm_and_partitions_with_unformatted()
+    #test_mix_of_lvm_and_partitions()
+    test_mix_of_lvm_and_partitions_with_unformatted()
     #test_mix_of_lvm_and_partitions_with_unformatted_raw_disks()
     #test_mix_of_lvm_and_regular_partitions_on_same_disk()
     #test_multiple_vgs_multiple_disk()
