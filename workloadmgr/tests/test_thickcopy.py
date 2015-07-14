@@ -10,6 +10,7 @@ from tempfile import mkdtemp
 import time
 import shutil
 import logging
+from contextlib import contextmanager
 
 import workloadmgr
 from workloadmgr import exception
@@ -48,13 +49,15 @@ def create_empty_vmdk_mock(filepath, capacity):
     cmd = ["dd", "if=/dev/zero", "of="+filepath, "bs=1", "count=1", "seek=" + str(capacity)]
     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
+@contextmanager
 def my_mount_disk(diskslist, mntlist, diskonly=False):
     diskmounts = {}
     with open(diskslist, 'r') as f:
         for line in f:
             line = line.strip().rstrip()
             diskmounts[line] = [line + ";"]
-        return None, diskmounts
+
+    yield diskmounts
 
 def my_populate_extent(hostip, username, password, vmspec, remotepath,
                        mountpath, start, count):
