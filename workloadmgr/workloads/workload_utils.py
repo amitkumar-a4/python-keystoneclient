@@ -15,7 +15,7 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
     
     settings_db = db.setting_get_all(cntx)
     for setting in settings_db:
-        if 'password' in setting.key.lower():
+        if 'password' in setting.name.lower():
             setting.value = '******'
         for kvpair in setting.metadata:
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:

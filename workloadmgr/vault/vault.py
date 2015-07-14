@@ -74,8 +74,12 @@ wlm_vault_opts = [
                default='Trilio',
                help='Swift Container Prefix'), 
     cfg.StrOpt('wlm_vault_swift_segment_size',
-               default='5368709120',
-               help='Default segment size 5GB'),                     
+               #default='5368709120', 5GB
+               default='524288000', # 500MB
+               help='Default segment size 500MB'),
+    cfg.IntOpt('wlm_vault_retry_count',
+               default=2,
+               help='The number of times we retry on failures'),                                       
     cfg.StrOpt('wlm_vault_read_chunk_size_kb',
                default=128,
                help='Read size in KB'),
@@ -383,13 +387,7 @@ def download_snapshot_vm_resource_from_object_store(context, snapshot_vm_resourc
         WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
         snapshot_vm_resource_folder = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
         container = get_swift_container(snapshot_vm_resource_metadata)
-        try:
-            swift_download_folder(snapshot_vm_resource_folder, container, context = None)
-        except Exception as ex:
-            LOG.exception(ex)
-            progress_msg = "Retrying to download '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
-            WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
-            swift_download_folder(snapshot_vm_resource_folder, container, context = None)                           
+        swift_download_folder(snapshot_vm_resource_folder, container, context = None)
     elif FLAGS.wlm_vault_storage_type == 's3':
         pass          
 
@@ -629,10 +627,18 @@ def swift_list_all(context, container):
             break              
     if os.path.isfile('/tmp/swift.out'):
         os.remove('/tmp/swift.out')    
-    with open('/tmp/swift.out', "w") as f:
-        LOG.debug(cmd_list_str)   
-        subprocess.call(cmd_list, shell=False, stdout=f)                                              
 
+    LOG.debug(cmd_list_str)   
+    for i in range(0,FLAGS.wlm_vault_retry_count):
+        try:
+            with open('/tmp/swift.out', "w") as f:                                
+                subprocess.check_call(cmd_list, shell=False, stdout=f)
+                break
+        except Exception as ex:
+            LOG.exception(ex)                                                      
+            if i == FLAGS.wlm_vault_retry_count:
+                raise ex
+            
 @autolog.log_method(logger=Logger) 
 def swift_delete_container(container, context = None):
     cmd = get_swift_base_cmd(context)    
@@ -646,7 +652,14 @@ def swift_delete_container(container, context = None):
             cmd_delete[idx+1] = FLAGS.wlm_vault_swift_password
             break                                             
     LOG.debug(cmd_delete_str)                                  
-    subprocess.call(cmd_delete, shell=False, cwd=get_vault_local_directory())         
+    for i in range(0,FLAGS.wlm_vault_retry_count):
+        try:                                
+            subprocess.check_call(cmd_delete, shell=False, cwd=get_vault_local_directory())
+            break
+        except Exception as ex:
+            LOG.exception(ex)
+            if i == FLAGS.wlm_vault_retry_count:
+                raise ex               
                 
 @autolog.log_method(logger=Logger) 
 def swift_delete_folder(folder, container, context = None):
@@ -667,7 +680,14 @@ def swift_delete_folder(folder, container, context = None):
                         cmd_delete[idx+1] = FLAGS.wlm_vault_swift_password
                         break                                             
                 LOG.debug(cmd_delete_str)                                  
-                subprocess.call(cmd_delete, shell=False, cwd=get_vault_local_directory())                 
+                for i in range(0,FLAGS.wlm_vault_retry_count):
+                    try:                                
+                        subprocess.check_call(cmd_delete, shell=False, cwd=get_vault_local_directory())
+                        break
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        if i == FLAGS.wlm_vault_retry_count:
+                            raise ex                                 
 
 
 @autolog.log_method(logger=Logger) 
@@ -689,7 +709,14 @@ def swift_download_folder(folder, container, context = None):
                         cmd_download[idx+1] = FLAGS.wlm_vault_swift_password
                         break                                           
                 LOG.debug(cmd_download_str)                                  
-                subprocess.call(cmd_download, shell=False, cwd=get_vault_local_directory())                 
+                for i in range(0,FLAGS.wlm_vault_retry_count):
+                    try:                                
+                        subprocess.check_call(cmd_download, shell=False, cwd=get_vault_local_directory())
+                        break
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        if i == FLAGS.wlm_vault_retry_count:
+                            raise ex                                                           
 
 @autolog.log_method(logger=Logger) 
 def purge_staging_area(context):
@@ -814,8 +841,16 @@ def swift_download_metadata_from_object_store(context, container):
                         if opt == "-K":
                             cmd_download[idx+1] = FLAGS.wlm_vault_swift_password
                             break                                                  
-                    LOG.debug(cmd_download_str)                                  
-                    subprocess.call(cmd_download, shell=False, cwd=get_vault_local_directory())                 
+                    LOG.debug(cmd_download_str)
+                    for i in range(0,FLAGS.wlm_vault_retry_count):
+                        try:                                
+                            subprocess.check_call(cmd_download, shell=False, cwd=get_vault_local_directory())
+                            break
+                        except Exception as ex:
+                            LOG.exception(ex)
+                            if i == FLAGS.wlm_vault_retry_count:
+                                raise ex                              
+                    
                     
 def get_total_capacity():
     total_capacity = 1
