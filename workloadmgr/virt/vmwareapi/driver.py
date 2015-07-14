@@ -924,67 +924,68 @@ class VMwareVCDriver(VMwareESXDriver):
         snapshot_data['vm_data_size'] = 0
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
-        
-        """ MODIFY THE BELOW BLOCK OF CODE TO SEND ALL THE DISKS to evaluate for TURBO THICK COPY """
-        
         turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')        
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
             dev['disk_data_size'] = 0
             dev['extentsfile'] = None
             dev['totalblocks'] = 0
-            dev['partitions'] = 0
-            
+
+        if turbo_thick_disk_backup.lower() == 'true':
             try:
-                if snapshot_obj.snapshot_type == 'full':
-                    parent_vault_path = None
-                    parent_changeId = '*'
-                    parent_content_id = None
-                else:
-                    parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId( 
-                                                                                     cntx, 
-                                                                                     db, 
-                                                                                     snapshot['workload_id'],
-                                                                                     instance['vm_id'], 
-                                                                                     dev.backing.uuid)   
-                
-                        
-                if (hasattr(dev.backing, 'thinProvisioned') and dev.backing.thinProvisioned == False) and\
-                    parent_changeId is '*' and\
-                    parent_vault_path == None and\
-                    turbo_thick_disk_backup.lower() == 'true':
-                    
+                devicemap = []
+                for idx, dev in enumerate(snapshot_data['snapshot_devices']):
+
                     vmxspec = 'moref=' + snapshot_data['vm_ref'].value
                     vix_disk_lib_env = os.environ.copy()
                     vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
                     # Create empty vmdk file
                     fileh, copy_to_file_path = mkstemp()
                     close(fileh)                  
+                    os.remove(copy_to_file_path)
                     try:
                         cmdline = "trilio-vix-disk-cli -create " 
                         cmdline += "-cap " + str(dev.capacityInBytes / (1024 * 1024))
                         cmdline += " " + copy_to_file_path
                         check_output(cmdline.split(" "), stderr=subprocess.STDOUT, env=vix_disk_lib_env)
+                        devicemap.append({'dev': dev, 'localvmdkpath': copy_to_file_path})
                     except subprocess.CalledProcessError as ex:
                         LOG.critical(_("cmd: %s resulted in error: %s") %(cmdline, ex.output))
+                        LOG.critical(_("fallback to cbt based upload"))
                         LOG.exception(ex)
                         raise
-                    dev['extentsfile'], dev['partitions'], dev['totalblocks'],\
-                           = thickcopyextents(self._session._host_ip,
-                                              self._session._host_username,
-                                              self._session._host_password, vmxspec,
-                                              dev, copy_to_file_path)
+
+                extentsinfo = thickcopyextents(self._session._host_ip,
+                                               self._session._host_username,
+                                               self._session._host_password, vmxspec,
+                                               devicemap)
+                if extentsinfo:
+                    extentsfiles = extentsinfo['extentsfiles']
+                    totalblocks = extentsinfo['totalblocks']
+                    for idx, dev in enumerate(snapshot_data['snapshot_devices']):
+                        dev['extentsfile'] = extentsfiles[dev['backing']['fileName']]
+                        dev['totalblocks'] = totalblocks[dev['backing']['fileName']]
+
             except Exception as ex:
                 LOG.exception(ex)
             finally:
+                for dmap in devicemap:
+                    try:
+                        os.remove(dmap['localvmdkpath'])
+                    except:
+                        pass
+        for idx, dev in enumerate(snapshot_data['snapshot_devices']):                       
+            if not 'extentsfile' in dev or not dev['extentsfile'] or \
+                 (hasattr(dev.backing, 'thinProvisioned') and \
+                  dev.backing.thinProvisioned == True) or \
+                 snapshot_obj.snapshot_type == 'incremental':
+
                 try:
-                    os.remove(copy_to_file_path)
+                    if 'extentsfile' in dev and  dev['extentsfile'] and \
+                        os.path.isfile(dev['extentsfile']):
+                        os.remove(dev['extentsfile'])
                 except:
                     pass
 
-        """ MODIFY THE ABOVE BLOCK OF CODE TO SEND ALL THE DISKS to evaluate for TURBO THICK COPY """
-        
-        for idx, dev in enumerate(snapshot_data['snapshot_devices']):                       
-            if not dev['extentsfile']:
                 if snapshot_obj.snapshot_type == 'full':
                     parent_vault_path = None
                     parent_changeId = '*'
