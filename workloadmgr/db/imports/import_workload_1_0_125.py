@@ -36,6 +36,8 @@ def import_settings(cntx, new_version):
         settings = json.loads(vault.get_object('/settings_db'))
         for setting_values in settings:
             try:
+                if 'key' in setting_values:
+                    setting_values['name'] = setting_values['key']
                 setting_values = _adjust_values(cntx, new_version, setting_values)
                 db.setting_create(cntx, setting_values)  
             except Exception as ex:

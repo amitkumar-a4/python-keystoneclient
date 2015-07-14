@@ -31,6 +31,12 @@ function loadXMLDoc(url, callback)
 
 function taskfunction()
 {
+	var r = confirm("Continuing will configure the appliance.\nWould you like to proceed?");
+	if (r == false) {
+		window.location.replace("/configure_vmware")
+		return	
+	}
+
 	$("#alert").hide();
 	document.getElementById("final_status").innerHTML = "Final Status";	
    	loadXMLDoc("configure_host", function() {

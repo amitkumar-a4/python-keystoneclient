@@ -358,7 +358,7 @@ def get_lan_ip():
                 pass
     return ip
 
-def authenticate_vcenter():
+def _authenticate_with_vcenter():
     if config_data['configuration_type'] == 'vmware':
         from workloadmgr.virt.vmwareapi import vim
         vim_obj = vim.Vim(protocol="https", host=config_data['vcenter'])
@@ -367,7 +367,7 @@ def authenticate_vcenter():
                                 password=config_data['vcenter_password'])
         vim_obj.Logout(vim_obj.get_service_content().sessionManager)
         
-def authenticate_swift():
+def _authenticate_with_swift():
     if config_data['configuration_type'] == 'vmware':
         if config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             from swiftclient.service import SwiftService, SwiftError
@@ -428,7 +428,283 @@ def authenticate_swift():
                             raise stats["error"]                
                 except SwiftError as e:
                     raise
+
+def _authenticate_with_keystone():
+    # Authenticate with Keystone
+
+    configure_mysql()
+    configure_rabbitmq()
+    configure_keystone()
+    configure_nova()
+    configure_neutron()
+    configure_glance()
+    configure_horizon()
+    
+    #test admin url
+    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                               username=config_data['admin_username'], 
+                               password=config_data['admin_password'], 
+                               tenant_name=config_data['admin_tenant_name'])
+    tenants = keystone.tenants.list()
+    for tenant in tenants:
+        if tenant.name == 'service':
+            config_data['service_tenant_id'] = tenant.id
+        if tenant.name == config_data['admin_tenant_name']:
+            config_data['admin_tenant_id'] = tenant.id            
             
+    if 'service_tenant_id' not in config_data:
+        if config_data['configuration_type'] == 'vmware':
+            config_data['service_tenant_id'] = config_data['admin_tenant_id']
+        else:
+            raise Exception('No service tenant found')
+    
+
+    #test public url
+    keystone = ksclient.Client(auth_url=config_data['keystone_public_url'], 
+                               username=config_data['admin_username'], 
+                               password=config_data['admin_password'])
+    tenants = keystone.tenants.list()
+    
+    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                               username=config_data['admin_username'], 
+                               password=config_data['admin_password'], 
+                               tenant_name=config_data['admin_tenant_name']) 
+    
+     
+    
+    #image
+    kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+    image_public_url = keystone.service_catalog.url_for(**kwargs)
+    parse_result = urlparse(image_public_url)
+    config_data['glance_production_host'] = parse_result.hostname
+    config_data['glance_production_port'] = parse_result.port
+    
+    
+    #network       
+    kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+    network_public_url = keystone.service_catalog.url_for(**kwargs)
+    config_data['neutron_production_url'] = network_public_url
+    config_data['neutron_admin_auth_url'] = config_data['keystone_public_url']
+    config_data['neutron_admin_username'] = config_data['admin_username']
+    config_data['neutron_admin_password'] = config_data['admin_password']
+    
+    #compute       
+    kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+    compute_public_url = keystone.service_catalog.url_for(**kwargs)
+    config_data['nova_production_endpoint_template']  =  compute_public_url.replace(
+                                                            compute_public_url.split("/")[-1], 
+                                                            '%(project_id)s')  
+    config_data['nova_admin_auth_url'] = config_data['keystone_public_url']
+    config_data['nova_admin_username'] = config_data['admin_username']
+    config_data['nova_admin_password'] = config_data['admin_password']
+    
+    
+    try:
+        #volume
+        kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        volume_public_url = keystone.service_catalog.url_for(**kwargs)
+        config_data['cinder_production_endpoint_template']  =  volume_public_url.replace(
+                                                                volume_public_url.split("/")[-1], 
+                                                                '%(project_id)s')
+    except Exception as exception:
+        #cinder is optional
+        config_data['cinder_production_endpoint_template'] = ''
+         
+    try:        
+        #object
+        kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        object_public_url = keystone.service_catalog.url_for(**kwargs)
+        config_data['wlm_vault_swift_url']  =  object_public_url.replace(
+                                                                object_public_url.split("/")[-1], 
+                                                                'AUTH_') 
+        config_data['wlm_vault_service']  = 'swift'     
+    except Exception as exception:
+        #swift is not configured
+        config_data['wlm_vault_swift_url']  =  ''
+        config_data['wlm_vault_service']  = 'local'        
+    
+    
+    #workloadmanager
+    if  config_data['nodetype'] == 'controller':
+        #this is the first node
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+        config_data['rabbit_host'] = config_data['floating_ipaddress']
+        config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
+    else:
+        kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        wlm_public_url = keystone.service_catalog.url_for(**kwargs)
+        parse_result = urlparse(wlm_public_url)
+        
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
+        config_data['rabbit_host'] = parse_result.hostname
+        config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
+
+def _register_service():
+    # Python code to  register workloadmgr with keystone
+    if config_data['configuration_type'] == 'vmware':
+         authenticate_with_keystone()
+    
+    if config_data['nodetype'] != 'controller':
+        #nothing to do
+        return {'status':'Success'}
+    
+        keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                   username=config_data['admin_username'], 
+                                   password=config_data['admin_password'], 
+                                   tenant_name=config_data['admin_tenant_name'])
+        
+        if config_data['configuration_type'] == 'openstack':
+            #create user
+            try:
+                wlm_user = None
+                users = keystone.users.list()
+                for user in users:
+                    if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
+                        wlm_user = user
+                        break
+                    
+                admin_role = None
+                roles = keystone.roles.list()
+                for role in roles:
+                    if role.name == 'admin':
+                        admin_role = role
+                        break                
+                          
+                try:
+                    keystone.users.delete(wlm_user.id)
+                except Exception as exception:
+                    if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+                       raise exception
+                
+                
+                wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
+                                                 tenant_id=config_data['service_tenant_id'],
+                                                 enabled=True)
+                
+                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+            
+            except Exception as exception:
+                if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
+                    pass
+                elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
+                    pass            
+                else:
+                    bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+                    raise exception        
+        
+
+        #delete orphan wlm services
+        services = keystone.services.list()
+        endpoints = keystone.endpoints.list()
+        for service in services:
+            if service.type == 'workloads':
+                for endpoint in endpoints:
+                    if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                        keystone.services.delete(service.id)
+        #create service and endpoint
+        wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
+        wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+        keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
+        
+    return {'status':'Success'}
+
+def _register_workloadtypes():
+    # Python code here to register workloadtypes
+    if config_data['nodetype'] == 'controller':
+        time.sleep(5)
+        wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
+                               username=config_data['admin_username'], 
+                               password=config_data['admin_password'], 
+                               tenant_id=config_data['admin_tenant_id'])
+        workload_types = wlm.workload_types.list()
+        
+        workload_type_names = {'Hadoop':False,
+                               'MongoDB':False,
+                               'Cassandra':False,
+                               'Serial':False,
+                               'Parallel':False,
+                               'Composite':False,}
+                   
+        for workload_type in workload_types:
+            workload_type_names[workload_type.name] = True
+            
+        if workload_type_names['Hadoop'] == False:
+            """ Do not created Hadoop workload type until it is fully supported
+            #Hadoop
+            time.sleep(2)
+            metadata = {'Namenode':'{"default": "", "display_name": "Hadoop Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Hadoop node", "restore_option": "False", "group_name": "Host Settings"}', 
+                        'NamenodeSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings"}', 
+                        'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings"}', 
+                        'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings"}', 
+                        'capabilities':'discover:topology',
+                        'group_ordering' :'[{"ordinal": 10, "name": "Host Settings"}]'}
+            
+            wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                      name= 'Hadoop', description = 'Hadoop workload',
+                                      id = '09f7b42e-75da-4f77-8c34-0aef60b3d62e')
+            """
+        if workload_type_names['MongoDB'] == False:
+            #MongoDB
+            time.sleep(2)
+            metadata = {'HostUsername':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}', 
+                        'HostPassword':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "ordinal":20, "index":2}', 
+                        'HostSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}', 
+                        'DBHost':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the hostname/ipaddress of MongoDB node(For Sharded Cluster: mongos node, for Replica Set: mongod node)", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
+                        'DBPort':'{"default": "27017", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "Enter the MongoDB database port(For Sharded Cluster: mongos port, for Replica Set: mongod port)", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}', 
+                        'DBUser':'{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "restore_option": "False", "group_name": "Database Settings", "ordinal":10, "index":1}', 
+                        'DBPassword':'{"default": "", "display_name": "Database Password", "required": "False", "type": "password", "tooltip": "MongoDB password", "restore_option": "False", "group_name": "Database Settings", "ordinal":20, "index":2}',
+                        'RunAsRoot':'{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "restore_option": "False", "group_name": "Database Settings", "ordinal":40, "index":4}', 
+                        'capabilities':'discover:topology',
+                        'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "name": "Database Settings"}]'}         
+            wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                      name= 'MongoDB', description = 'MongoDB workload',
+                                      id = '11b71eeb-8b69-42e2-9862-872ae5b2afce')
+            
+        if workload_type_names['Cassandra'] == False:                
+            #Cassandra
+            time.sleep(2)
+            metadata = {'CassandraNode':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Cassandra node", "restore_option": "False", "group_name": "Host Settings", "index":3}', 
+                        'SSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "index":4}', 
+                        'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "index":1}', 
+                        'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "index":2}',
+                        'IPAddress':'{"default": "192.168.1.160", "display_name": "IP Address", "required": "True", "type": "string", "tooltip":"Enter ip address for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":2}',
+                        'Nodename':'{"default": "Cassandra1-Restored", "display_name": "Hostname", "required": "True", "type": "string", "tooltip":"Enter separated hostname for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":3}',
+                        'Netmask':'{"default": "255.255.255.0", "display_name": "Netmask", "required": "True", "type": "string", "tooltip":"Netmask for IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":4}',
+                        'Broadcast':'{"default": "192.168.1.255", "display_name": "Broadcast", "required": "True", "type": "string", "tooltip":"Broadcast address for new IP subnet", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":6}',
+                        'Gateway':'{"default": "192.168.1.1", "display_name": "Gateway", "required": "True", "type": "string", "tooltip":"Gateway address for new IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":5}',
+                        'capabilities':'discover:topology',
+                        'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "Optional": "True", "name": "Cassandra Restore Options"}]'}                       
+            wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                      name= 'Cassandra', description = 'Cassandra workload',
+                                      id = '2c1f45ec-e53b-49cd-b554-228404ece244')
+            
+        if workload_type_names['Serial'] == False:
+            #Serial
+            time.sleep(2)
+            wlm.workload_types.create(metadata={}, is_public = True, 
+                                      name= 'Serial', description = 'Serial workload that snapshots VM in the order they are recieved',
+                                      id = 'f82ce76f-17fe-438b-aa37-7a023058e50d')
+        
+        if workload_type_names['Parallel'] == False:    
+            #Parallel
+            time.sleep(2)
+            wlm.workload_types.create(metadata={}, is_public = True, 
+                                      name= 'Parallel', description = 'Parallel workload that snapshots all VMs in parallel',
+                                      id = '2ddd528d-c9b4-4d7e-8722-cc395140255a')
+        
+        if workload_type_names['Composite'] == False:    
+            #Composite
+            time.sleep(2)
+            metadata = {'capabilities':'workloads', 'workloadgraph':'string'}
+            wlm.workload_types.create(metadata=metadata, is_public = True, 
+                                      name= 'Composite', description = 'A workload that consists of other workloads',
+                                      id = '54947065-2a59-494a-ab64-b6501c139a82')
+        
+        if config_data['import_workloads'] == 'on':
+            wlm.workloads.importworkloads()
+
+    return {'status':'Success'}
+                     
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
         #configure mysql server
@@ -905,7 +1181,6 @@ def configure_horizon():
         command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
         subprocess.call(command, shell=False)      
 
-
 @bottle.route('/services/<service_display_name>/<action>')
 @authorize()
 def service_action(service_display_name, action):
@@ -1029,7 +1304,6 @@ def troubleshooting_vmware():
     values['reset_cbt_output'] = get_default_reset_cbt_output()
     values['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return values
-
 
 @bottle.post('/troubleshooting_vmware_ping')
 @bottle.view('troubleshooting_page_vmware')
@@ -1290,9 +1564,17 @@ def configure_host():
 @bottle.route('/authenticate_with_vcenter')
 @authorize()
 def authenticate_with_vcenter():
-    # Authenticate with Keystone
+    # Authenticate with vCenter
+    for i in range(0,1):
+        try:
+            _authenticate_with_vcenter()
+            time.sleep(1)
+            return {'status':'Success'}            
+        except Exception as exception:
+            pass
+    
     try:
-        authenticate_vcenter()
+        _authenticate_with_vcenter()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -1305,9 +1587,16 @@ def authenticate_with_vcenter():
 @bottle.route('/authenticate_with_swift')
 @authorize()
 def authenticate_with_swift():
-    # Authenticate with Keystone
+    # Authenticate with swift
+    for i in range(0,1):
+        try:
+            _authenticate_with_swift()
+            time.sleep(1)
+            return {'status':'Success'}            
+        except Exception as exception:
+            pass    
     try:
-        authenticate_swift()
+        _authenticate_with_swift()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -1321,114 +1610,15 @@ def authenticate_with_swift():
 @authorize()
 def authenticate_with_keystone():
     # Authenticate with Keystone
-    try:
-        configure_mysql()
-        configure_rabbitmq()
-        configure_keystone()
-        configure_nova()
-        configure_neutron()
-        configure_glance()
-        configure_horizon()
-        
-        #test admin url
-        keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                                   username=config_data['admin_username'], 
-                                   password=config_data['admin_password'], 
-                                   tenant_name=config_data['admin_tenant_name'])
-        tenants = keystone.tenants.list()
-        for tenant in tenants:
-            if tenant.name == 'service':
-                config_data['service_tenant_id'] = tenant.id
-            if tenant.name == config_data['admin_tenant_name']:
-                config_data['admin_tenant_id'] = tenant.id            
-                
-        if 'service_tenant_id' not in config_data:
-            if config_data['configuration_type'] == 'vmware':
-                config_data['service_tenant_id'] = config_data['admin_tenant_id']
-            else:
-                raise Exception('No service tenant found')
-        
-    
-        #test public url
-        keystone = ksclient.Client(auth_url=config_data['keystone_public_url'], 
-                                   username=config_data['admin_username'], 
-                                   password=config_data['admin_password'])
-        tenants = keystone.tenants.list()
-        
-        keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                                   username=config_data['admin_username'], 
-                                   password=config_data['admin_password'], 
-                                   tenant_name=config_data['admin_tenant_name']) 
-        
-         
-        
-        #image
-        kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-        image_public_url = keystone.service_catalog.url_for(**kwargs)
-        parse_result = urlparse(image_public_url)
-        config_data['glance_production_host'] = parse_result.hostname
-        config_data['glance_production_port'] = parse_result.port
-        
-        
-        #network       
-        kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-        network_public_url = keystone.service_catalog.url_for(**kwargs)
-        config_data['neutron_production_url'] = network_public_url
-        config_data['neutron_admin_auth_url'] = config_data['keystone_public_url']
-        config_data['neutron_admin_username'] = config_data['admin_username']
-        config_data['neutron_admin_password'] = config_data['admin_password']
-        
-        #compute       
-        kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-        compute_public_url = keystone.service_catalog.url_for(**kwargs)
-        config_data['nova_production_endpoint_template']  =  compute_public_url.replace(
-                                                                compute_public_url.split("/")[-1], 
-                                                                '%(project_id)s')  
-        config_data['nova_admin_auth_url'] = config_data['keystone_public_url']
-        config_data['nova_admin_username'] = config_data['admin_username']
-        config_data['nova_admin_password'] = config_data['admin_password']
-        
-        
+    for i in range(0,1):
         try:
-            #volume
-            kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-            volume_public_url = keystone.service_catalog.url_for(**kwargs)
-            config_data['cinder_production_endpoint_template']  =  volume_public_url.replace(
-                                                                    volume_public_url.split("/")[-1], 
-                                                                    '%(project_id)s')
+            _authenticate_with_keystone()
+            time.sleep(1)
+            return {'status':'Success'}            
         except Exception as exception:
-            #cinder is optional
-            config_data['cinder_production_endpoint_template'] = ''
-             
-        try:        
-            #object
-            kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-            object_public_url = keystone.service_catalog.url_for(**kwargs)
-            config_data['wlm_vault_swift_url']  =  object_public_url.replace(
-                                                                    object_public_url.split("/")[-1], 
-                                                                    'AUTH_') 
-            config_data['wlm_vault_service']  = 'swift'     
-        except Exception as exception:
-            #swift is not configured
-            config_data['wlm_vault_swift_url']  =  ''
-            config_data['wlm_vault_service']  = 'local'        
-        
-        
-        #workloadmanager
-        if  config_data['nodetype'] == 'controller':
-            #this is the first node
-            config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
-            config_data['rabbit_host'] = config_data['floating_ipaddress']
-            config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
-        else:
-            kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-            wlm_public_url = keystone.service_catalog.url_for(**kwargs)
-            parse_result = urlparse(wlm_public_url)
-            
-            config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
-            config_data['rabbit_host'] = parse_result.hostname
-            config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
-            
+            pass    
+    try:
+        _authenticate_with_keystone()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -1436,89 +1626,30 @@ def authenticate_with_keystone():
         else:
            raise exception        
     time.sleep(1)
-    return {'status':'Success'}
+    return {'status':'Success'}    
+
 
 @bottle.route('/register_service')
 @authorize()
 def register_service():
     # Python code to  register workloadmgr with keystone
-    if config_data['configuration_type'] == 'vmware':
-         authenticate_with_keystone()
-    
-    if config_data['nodetype'] != 'controller':
-        #nothing to do
-        return {'status':'Success'}
-    
-    try:
-        
-        keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                                   username=config_data['admin_username'], 
-                                   password=config_data['admin_password'], 
-                                   tenant_name=config_data['admin_tenant_name'])
-        
-        if config_data['configuration_type'] == 'openstack':
-            #create user
-            try:
-                wlm_user = None
-                users = keystone.users.list()
-                for user in users:
-                    if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
-                        wlm_user = user
-                        break
-                    
-                admin_role = None
-                roles = keystone.roles.list()
-                for role in roles:
-                    if role.name == 'admin':
-                        admin_role = role
-                        break                
-                          
-                try:
-                    keystone.users.delete(wlm_user.id)
-                except Exception as exception:
-                    if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
-                       raise exception
-                
-                
-                wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
-                                                 tenant_id=config_data['service_tenant_id'],
-                                                 enabled=True)
-                
-                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-            
-            except Exception as exception:
-                if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
-                    pass
-                elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
-                    pass            
-                else:
-                    bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-                    raise exception        
-        
+    for i in range(0,1):
         try:
-            #delete orphan wlm services
-            services = keystone.services.list()
-            endpoints = keystone.endpoints.list()
-            for service in services:
-                if service.type == 'workloads':
-                    for endpoint in endpoints:
-                        if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
-                            keystone.services.delete(service.id)
-            #create service and endpoint
-            wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
-            wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
-            keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
-            
+            _register_service()
+            time.sleep(1)
+            return {'status':'Success'}            
         except Exception as exception:
-            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-            raise exception                             
-    
+            pass    
+    try:
+        _register_service()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception  
-               
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           raise exception        
     time.sleep(1)
-    return {'status':'Success'}
+    return {'status':'Success'}        
 
 @bottle.route('/configure_api')
 @authorize()
@@ -1745,106 +1876,25 @@ def start_service():
 @bottle.route('/register_workloadtypes')
 @authorize()
 def register_workloadtypes():
-    # Python code here to configure workloadmgr
-    try:    
-        if config_data['nodetype'] == 'controller':
-            time.sleep(5)
-            wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
-                                   username=config_data['admin_username'], 
-                                   password=config_data['admin_password'], 
-                                   tenant_id=config_data['admin_tenant_id'])
-            workload_types = wlm.workload_types.list()
-            
-            workload_type_names = {'Hadoop':False,
-                                   'MongoDB':False,
-                                   'Cassandra':False,
-                                   'Serial':False,
-                                   'Parallel':False,
-                                   'Composite':False,}
-                       
-            for workload_type in workload_types:
-                workload_type_names[workload_type.name] = True
-                
-            if workload_type_names['Hadoop'] == False:
-                """ Do not created Hadoop workload type until it is fully supported
-                #Hadoop
-                time.sleep(2)
-                metadata = {'Namenode':'{"default": "", "display_name": "Hadoop Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Hadoop node", "restore_option": "False", "group_name": "Host Settings"}', 
-                            'NamenodeSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings"}', 
-                            'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings"}', 
-                            'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings"}', 
-                            'capabilities':'discover:topology',
-                            'group_ordering' :'[{"ordinal": 10, "name": "Host Settings"}]'}
-                
-                wlm.workload_types.create(metadata=metadata, is_public = True, 
-                                          name= 'Hadoop', description = 'Hadoop workload',
-                                          id = '09f7b42e-75da-4f77-8c34-0aef60b3d62e')
-                """
-            if workload_type_names['MongoDB'] == False:
-                #MongoDB
-                time.sleep(2)
-                metadata = {'HostUsername':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}', 
-                            'HostPassword':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "ordinal":20, "index":2}', 
-                            'HostSSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}', 
-                            'DBHost':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the hostname/ipaddress of MongoDB node(For Sharded Cluster: mongos node, for Replica Set: mongod node)", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
-                            'DBPort':'{"default": "27017", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "Enter the MongoDB database port(For Sharded Cluster: mongos port, for Replica Set: mongod port)", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}', 
-                            'DBUser':'{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "restore_option": "False", "group_name": "Database Settings", "ordinal":10, "index":1}', 
-                            'DBPassword':'{"default": "", "display_name": "Database Password", "required": "False", "type": "password", "tooltip": "MongoDB password", "restore_option": "False", "group_name": "Database Settings", "ordinal":20, "index":2}',
-                            'RunAsRoot':'{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "restore_option": "False", "group_name": "Database Settings", "ordinal":40, "index":4}', 
-                            'capabilities':'discover:topology',
-                            'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "name": "Database Settings"}]'}         
-                wlm.workload_types.create(metadata=metadata, is_public = True, 
-                                          name= 'MongoDB', description = 'MongoDB workload',
-                                          id = '11b71eeb-8b69-42e2-9862-872ae5b2afce')
-                
-            if workload_type_names['Cassandra'] == False:                
-                #Cassandra
-                time.sleep(2)
-                metadata = {'CassandraNode':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Cassandra node", "restore_option": "False", "group_name": "Host Settings", "index":3}', 
-                            'SSHPort':'{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "index":4}', 
-                            'Username':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "index":1}', 
-                            'Password':'{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "index":2}',
-                            'IPAddress':'{"default": "192.168.1.160", "display_name": "IP Address", "required": "True", "type": "string", "tooltip":"Enter ip address for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":2}',
-                            'Nodename':'{"default": "Cassandra1-Restored", "display_name": "Hostname", "required": "True", "type": "string", "tooltip":"Enter separated hostname for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":3}',
-                            'Netmask':'{"default": "255.255.255.0", "display_name": "Netmask", "required": "True", "type": "string", "tooltip":"Netmask for IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":4}',
-                            'Broadcast':'{"default": "192.168.1.255", "display_name": "Broadcast", "required": "True", "type": "string", "tooltip":"Broadcast address for new IP subnet", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":6}',
-                            'Gateway':'{"default": "192.168.1.1", "display_name": "Gateway", "required": "True", "type": "string", "tooltip":"Gateway address for new IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":5}',
-                            'capabilities':'discover:topology',
-                            'group_ordering':'[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "Optional": "True", "name": "Cassandra Restore Options"}]'}                       
-                wlm.workload_types.create(metadata=metadata, is_public = True, 
-                                          name= 'Cassandra', description = 'Cassandra workload',
-                                          id = '2c1f45ec-e53b-49cd-b554-228404ece244')
-                
-            if workload_type_names['Serial'] == False:
-                #Serial
-                time.sleep(2)
-                wlm.workload_types.create(metadata={}, is_public = True, 
-                                          name= 'Serial', description = 'Serial workload that snapshots VM in the order they are recieved',
-                                          id = 'f82ce76f-17fe-438b-aa37-7a023058e50d')
-            
-            if workload_type_names['Parallel'] == False:    
-                #Parallel
-                time.sleep(2)
-                wlm.workload_types.create(metadata={}, is_public = True, 
-                                          name= 'Parallel', description = 'Parallel workload that snapshots all VMs in parallel',
-                                          id = '2ddd528d-c9b4-4d7e-8722-cc395140255a')
-            
-            if workload_type_names['Composite'] == False:    
-                #Composite
-                time.sleep(2)
-                metadata = {'capabilities':'workloads', 'workloadgraph':'string'}
-                wlm.workload_types.create(metadata=metadata, is_public = True, 
-                                          name= 'Composite', description = 'A workload that consists of other workloads',
-                                          id = '54947065-2a59-494a-ab64-b6501c139a82')
-            
-            if config_data['import_workloads'] == 'on':
-                wlm.workloads.importworkloads()
-            
+    # Python code here to register workload types
+    for i in range(0,1):
+        try:
+            _register_workloadtypes()
+            time.sleep(1)
+            return {'status':'Success'}            
+        except Exception as exception:
+            pass    
+    try:
+        _register_workloadtypes()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception                    
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           raise exception        
     time.sleep(1)
-    return {'status':'Success'}
+    return {'status':'Success'}        
+
 
 @bottle.route('/discover_vcenter')
 @authorize()
