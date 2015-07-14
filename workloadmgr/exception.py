@@ -478,4 +478,7 @@ class DatacenterNotFound(NotFound):
     message = _("Could not find the Datacenter.")       
     
 class SettingNotFound(NotFound):
-    message = _("Snapshot %(setting_key)s could not be found.")     
+    message = _("Setting %(setting_name)s could not be found.") 
+    
+class VaultStorageNotFound(NotFound):
+    message = _("VaultStoreage %(vault_storage_id)s could not be found.")         

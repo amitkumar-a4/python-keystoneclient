@@ -578,25 +578,25 @@ class Settings(BASE, WorkloadsBase):
     """Represents configurable settings."""
 
     __tablename__ = 'settings'
-    key = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), primary_key=True, nullable=False)
     project_id = Column(String(255), primary_key=True, nullable=False)
     
-    @property
-    def name(self):
-        return FLAGS.workload_name_template % self.key
-
     user_id = Column(String(255), nullable=False)
     value = Column(Text)
     description = Column(String(255))
+    category = Column(String(32))
+    type = Column(String(32))
+    public = Column(Boolean, default=False)
+    hidden = Column(Boolean, default=False)     
     status =  Column(String(32), nullable=False)
     
 class SettingMetadata(BASE, WorkloadsBase):
     """Setting  metadata"""
     __tablename__ = 'setting_metadata'
-    __table_args__ = (UniqueConstraint('settings_key', 'settings_project_id', 'key'), {})
+    __table_args__ = (UniqueConstraint('settings_name', 'settings_project_id', 'key'), {})
 
     id = Column(Integer, primary_key=True)
-    settings_key = Column(String(255), ForeignKey('settings.key'), nullable=False)
+    settings_name = Column(String(255), ForeignKey('settings.name'), nullable=False)
     settings_project_id = Column(String(255), nullable=False)
     
     settings = relationship(Settings, backref=backref('metadata'))
@@ -612,8 +612,8 @@ def register_models():
     """
     from sqlalchemy import create_engine
     models = (Service,
-              vault_storages,
-              vault_storage_metadata,
+              VaultStorages,
+              VaultStorageMetadata,
               WorkloadTypes,
               WorkloadTypeMetadata,
               Workloads,

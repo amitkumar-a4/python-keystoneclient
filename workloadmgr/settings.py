@@ -37,7 +37,7 @@ def get_settings(context=None):
         persisted_settings = {}
         persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no')
         for persisted_setting in persisted_setting_objs:
-            persisted_settings[persisted_setting.key] = persisted_setting.value
+            persisted_settings[persisted_setting.name] = persisted_setting.value
         for setting, value in default_settings.iteritems():
             if setting not in persisted_settings:
                 persisted_settings[setting] = value
@@ -51,15 +51,15 @@ def set_settings(context, new_settings):
     """set settings"""
     try:
         persisted_setting_objs = db.setting_get_all(context)
-        for key, value in new_settings.iteritems():
-            key_found = False
+        for name, value in new_settings.iteritems():
+            name_found = False
             for persisted_setting in persisted_setting_objs:
-                if persisted_setting.key == key:
-                    db.setting_update(context, key, {'value' : value})
-                    key_found = True
+                if persisted_setting.name == name:
+                    db.setting_update(context, name, {'value' : value})
+                    name_found = True
                     break
-            if key_found == False:
-                db.setting_create(context, {'key' : key, 
+            if name_found == False:
+                db.setting_create(context, {'name' : name, 
                                             'value' : value,
                                             'user_id': context.user_id,
                                             'project_id': context.project_id,                                             

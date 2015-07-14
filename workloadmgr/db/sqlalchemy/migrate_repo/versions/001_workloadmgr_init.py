@@ -569,11 +569,15 @@ def upgrade(migrate_engine):
         Column('version', String(length=255)),
         Column('user_id', String(length=255)),
         Column('project_id', String(length=255), primary_key=True, nullable= False),
-        Column('key', String(length=255), primary_key=True, nullable= False),
+        Column('name', String(length=255), primary_key=True, nullable= False),
         Column('value',  Text()),         
         Column('description', String(length=255)),
+        Column('category', String(length=32)), 
+        Column('type', String(length=32)),
+        Column('public', Boolean),
+        Column('hidden', Boolean),                               
         Column('status', String(length=32), nullable=False),
-        UniqueConstraint('key', 'project_id'),
+        UniqueConstraint('name', 'project_id'),
         mysql_engine='InnoDB'
     )
     
@@ -585,11 +589,11 @@ def upgrade(migrate_engine):
         Column('deleted', Boolean),
         Column('version', String(length=255)),
         Column('id', String(length=255), primary_key=True, nullable= False),
-        Column('settings_key', String(length=255), ForeignKey('settings.key'), nullable=False, index=True),
+        Column('settings_name', String(length=255), ForeignKey('settings.name'), nullable=False, index=True),
         Column('settings_project_id', String(length=255), ForeignKey('settings.project_id'), nullable=False),        
         Column('key', String(255), nullable=False),
         Column('value', Text()),
-        UniqueConstraint('settings_key', 'settings_project_id', 'key'),
+        UniqueConstraint('settings_name', 'settings_project_id', 'key'),
         mysql_engine='InnoDB'
     )
     
