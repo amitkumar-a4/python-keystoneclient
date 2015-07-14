@@ -542,69 +542,69 @@ def _authenticate_with_keystone():
 def _register_service():
     # Python code to  register workloadmgr with keystone
     if config_data['configuration_type'] == 'vmware':
-         authenticate_with_keystone()
+        authenticate_with_keystone()
     
     if config_data['nodetype'] != 'controller':
         #nothing to do
         return {'status':'Success'}
     
-        keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                                   username=config_data['admin_username'], 
-                                   password=config_data['admin_password'], 
-                                   tenant_name=config_data['admin_tenant_name'])
-        
-        if config_data['configuration_type'] == 'openstack':
-            #create user
+    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                               username=config_data['admin_username'], 
+                               password=config_data['admin_password'], 
+                               tenant_name=config_data['admin_tenant_name'])
+    
+    if config_data['configuration_type'] == 'openstack':
+        #create user
+        try:
+            wlm_user = None
+            users = keystone.users.list()
+            for user in users:
+                if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
+                    wlm_user = user
+                    break
+                
+            admin_role = None
+            roles = keystone.roles.list()
+            for role in roles:
+                if role.name == 'admin':
+                    admin_role = role
+                    break                
+                      
             try:
-                wlm_user = None
-                users = keystone.users.list()
-                for user in users:
-                    if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
-                        wlm_user = user
-                        break
-                    
-                admin_role = None
-                roles = keystone.roles.list()
-                for role in roles:
-                    if role.name == 'admin':
-                        admin_role = role
-                        break                
-                          
-                try:
-                    keystone.users.delete(wlm_user.id)
-                except Exception as exception:
-                    if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
-                       raise exception
-                
-                
-                wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
-                                                 tenant_id=config_data['service_tenant_id'],
-                                                 enabled=True)
-                
-                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-            
+                keystone.users.delete(wlm_user.id)
             except Exception as exception:
-                if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
-                    pass
-                elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
-                    pass            
-                else:
-                    bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-                    raise exception        
+                if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+                   raise exception
+            
+            
+            wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
+                                             tenant_id=config_data['service_tenant_id'],
+                                             enabled=True)
+            
+            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+        
+        except Exception as exception:
+            if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
+                pass
+            elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
+                pass            
+            else:
+                bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+                raise exception        
         
 
-        #delete orphan wlm services
-        services = keystone.services.list()
-        endpoints = keystone.endpoints.list()
-        for service in services:
-            if service.type == 'workloads':
-                for endpoint in endpoints:
-                    if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
-                        keystone.services.delete(service.id)
-        #create service and endpoint
-        wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
-        wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
-        keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
+    #delete orphan wlm services
+    services = keystone.services.list()
+    endpoints = keystone.endpoints.list()
+    for service in services:
+        if service.type == 'workloads':
+            for endpoint in endpoints:
+                if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
+                    keystone.services.delete(service.id)
+    #create service and endpoint
+    wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
+    wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+    keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
         
     return {'status':'Success'}
 
