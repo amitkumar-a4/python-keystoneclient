@@ -925,12 +925,18 @@ class VMwareVCDriver(VMwareESXDriver):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
         turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')        
+        onlythindevices = True
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
+            if not hasattr(dev.backing, 'thinProvisioned') or \
+                  not dev.backing.thinProvisioned: 
+                onlythindevices = False
+
             dev['disk_data_size'] = 0
             dev['extentsfile'] = None
             dev['totalblocks'] = 0
 
-        if turbo_thick_disk_backup.lower() == 'true':
+        if turbo_thick_disk_backup.lower() == 'true' and \
+           not onlythindevices:
             try:
                 devicemap = []
                 for idx, dev in enumerate(snapshot_data['snapshot_devices']):
@@ -973,6 +979,7 @@ class VMwareVCDriver(VMwareESXDriver):
                         os.remove(dmap['localvmdkpath'])
                     except:
                         pass
+
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):                       
             if not 'extentsfile' in dev or not dev['extentsfile'] or \
                  (hasattr(dev.backing, 'thinProvisioned') and \

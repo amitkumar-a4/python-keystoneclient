@@ -6,6 +6,7 @@ from subprocess import check_call
 from subprocess import check_output
 import shutil
 from os import remove, close
+from contextlib import contextmanager
 
 from Queue import Queue
 from Queue import Queue, Empty
@@ -93,87 +94,93 @@ def enqueue_output(out, queue):
 # mounted path
 ##
 
+@contextmanager
 def mount_local_vmdk(diskslist, mntlist, diskonly=False): 
     vix_disk_lib_env = os.environ.copy()
     vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
 
-    vmdkfiles = []
-    with open(diskslist, 'r') as f:
-         for line in f.read().split():
-             vmdkfiles.append(line.rstrip().strip())
+    try:
+        vmdkfiles = []
+        with open(diskslist, 'r') as f:
+            for line in f.read().split():
+                vmdkfiles.append(line.rstrip().strip())
 
-    processes = []
-    mountpoints = {}
-    for vmdkfile in vmdkfiles:
+        processes = []
+        mountpoints = {}
+        for vmdkfile in vmdkfiles:
 
-        try:
-            fileh, listfile = mkstemp()
-            close(fileh)
-            with open(listfile, 'w') as f:
-                f.write(vmdkfile)
+            try:
+                fileh, listfile = mkstemp()
+                close(fileh)
+                with open(listfile, 'w') as f:
+                    f.write(vmdkfile)
 
-            cmdspec = [ "trilio-vix-disk-cli", "-mount", "-mountpointsfile", mntlist, ]
-            if diskonly:
-                cmdspec += ['-diskonly']
-            cmdspec += [listfile]
-            cmd = " ".join(cmdspec)
-            LOG.info(_( cmd ))
-            process = subprocess.Popen(cmdspec,
-                                       stdin=subprocess.PIPE,
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       bufsize= -1,
-                                       env=vix_disk_lib_env,
-                                       close_fds=True,
-                                       shell=False)
+                cmdspec = [ "trilio-vix-disk-cli", "-mount", "-mountpointsfile", mntlist, ]
+                if diskonly:
+                    cmdspec += ['-diskonly']
+                cmdspec += [listfile]
+                cmd = " ".join(cmdspec)
+                LOG.info(_( cmd ))
+                process = subprocess.Popen(cmdspec,
+                                           stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           bufsize= -1,
+                                           env=vix_disk_lib_env,
+                                           close_fds=True,
+                                           shell=False)
                 
-            queue = Queue()
-            read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
-            read_thread.daemon = True # thread dies with the program
-            read_thread.start()            
+                queue = Queue()
+                read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                read_thread.daemon = True # thread dies with the program
+                read_thread.start()            
 
-            mountpath = None
-            while process.poll() is None:
-                try:
+                mountpath = None
+                while process.poll() is None:
                     try:
-                        output = queue.get(timeout=5)
-                        LOG.info(_( output ))
-                    except Empty:
-                        continue 
+                        try:
+                            output = queue.get(timeout=5)
+                            LOG.info(_( output ))
+                        except Empty:
+                            continue 
+                        except Exception as ex:
+                            LOG.exception(ex)
+    
+                        if output.startswith("Pausing the process until it is resumed"):
+                            break
                     except Exception as ex:
                         LOG.exception(ex)
+
+                if not process.poll() is None:
+                    _returncode = process.returncode  # pylint: disable=E1101
+                    if _returncode:
+                        LOG.debug(_('Result was %s') % _returncode)
+                        raise exception.ProcessExecutionError(
+                                                exit_code=_returncode,
+                                                stderr=process.stderr.read(),
+                                                cmd=cmd)
+                with open(mntlist, 'r') as f:
+                    for line in f:
+                        line = line.strip("\n")
+                        mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
     
-                    if output.startswith("Pausing the process until it is resumed"):
-                        break
-                except Exception as ex:
-                    LOG.exception(ex)
+                LOG.info(_( mountpoints ))
+                process.stdin.close()
+                processes.append(process)
 
-            if not process.poll() is None:
-                _returncode = process.returncode  # pylint: disable=E1101
-                if _returncode:
-                    LOG.debug(_('Result was %s') % _returncode)
-                    raise exception.ProcessExecutionError(
-                                            exit_code=_returncode,
-                                            stderr=process.stderr.read(),
-                                            cmd=cmd)
-            with open(mntlist, 'r') as f:
-                for line in f:
-                    line = line.strip("\n")
-                    mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
+            except Exception as ex:
+                LOG.exception(ex)
+                raise
+            finally:
+                if os.path.isfile(listfile):
+                    os.remove(listfile)
 
-            LOG.info(_( mountpoints ))
-            process.stdin.close()
-            processes.append(process)
-     
-        except Exception as ex:
-            LOG.exception(ex)
-            umount_local_vmdk(processes)
-            raise
-        finally:
-            if os.path.isfile(listfile):
-                os.remove(listfile)
-
-    return processes, mountpoints
+        yield mountpoints
+    except Exception as ex:
+        LOG.exception(ex)
+        raise
+    finally:
+        umount_local_vmdk(processes)
 
 ##
 # unmounts a vmdk by sending signal 18 to the process that as suspended during mount process
@@ -659,12 +666,9 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
     fileh, mntlist = mkstemp()
     close(fileh)
 
-    process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
-    try:
+    with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
         for key, value in mountpaths.iteritems():
             partitions = read_partition_table(value[0].split(";")[0].strip())
-    finally:
-        umount_local_vmdk(process)
          
     # If there is an extended partition, make sure the extended partition
     # logical partition table is populated
@@ -679,13 +683,10 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
                 f.write(str(int(extended_part['start']) * 512) + ","
                         + str(2048 * 512) + "\n")
 
-            process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
-            try:
+            with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
                 for key, value in mountpaths.iteritems():
                     partitions = read_partition_table(value[0].split(";")[0].strip())
                     break
-            finally:
-                umount_local_vmdk(process)
 
             oldpartitiontable = []
             while len(oldpartitiontable) < len(partitions):
@@ -701,15 +702,11 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
                             f.write(str(int(part['end'] + 1) * 512) + ","
                                     + str(2048 * 512) + "\n")
 
-                process, mountpaths = mount_local_vmdk(listfile,
-                                                       mntlist, diskonly=True)
-                try:
+                with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
                     for key, value in mountpaths.iteritems():
                         partitions = read_partition_table(
                                            value[0].split(";")[0].strip())
                         break
-                finally:
-                    umount_local_vmdk(process)
             break
 
     os.remove(listfile)
@@ -998,76 +995,74 @@ def mountlvmvgs(hostip, username, password, vmspec, devmap):
     pvs = []
     lvs = []
     try:
-        process, mountpaths = mount_local_vmdk(listfile, mntlist, diskonly=True)
-        try:
-            for key, value in mountpaths.iteritems():
-                mountpath = value[0].split(";")[0].strip()
-                devpath = mountdevice(mountpath)
+        with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
+            try:
+                for key, value in mountpaths.iteritems():
+                    mountpath = value[0].split(";")[0].strip()
+                    devpath = mountdevice(mountpath)
 
-                # Add partition mappings here
-                try:
-                    cmd = ["partx", "-d", devpath]
-                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                except:
-                    pass
+                    # Add partition mappings here
+                    try:
+                        cmd = ["partx", "-d", devpath]
+                        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                    except:
+                        pass
 
-                try:
-                    cmd = ["partx", "-a", devpath]
-                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                except:
-                    pass
+                    try:
+                        cmd = ["partx", "-a", devpath]
+                        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                    except:
+                        pass
 
-                for dmap in devmap:
-                    if dmap['localvmdkpath'] == key:
-                        mountinfo[key] = {'mountpath': mountpath,
-                               'devpath': devpath,
-                               'localvmdkpath': key,
-                               'filename': dmap['dev']['backing']['fileName']}
+                    for dmap in devmap:
+                        if dmap['localvmdkpath'] == key:
+                            mountinfo[key] = {'mountpath': mountpath,
+                                   'devpath': devpath,
+                                   'localvmdkpath': key,
+                                   'filename': dmap['dev']['backing']['fileName']}
 
-            # explore VGs and volumes on the disk
-            vgs = getvgs()
+                # explore VGs and volumes on the disk
+                vgs = getvgs()
                
-            if len(vgs):
-                lvs = getlvs(vgs)
-                if len(lvs):
-                    pvs = getpvs(vgs)
-                    for index, pv in enumerate(pvs):
-                        for key, mount in mountinfo.iteritems():
-                            if mount['devpath'] in pv['LVM2_PV_NAME']:
-                                pvs[index]['filename'] = mount['filename']
-                                pvs[index]['localvmdkpath'] = mount['localvmdkpath']
+                if len(vgs):
+                    lvs = getlvs(vgs)
+                    if len(lvs):
+                        pvs = getpvs(vgs)
+                        for index, pv in enumerate(pvs):
+                            for key, mount in mountinfo.iteritems():
+                                if mount['devpath'] in pv['LVM2_PV_NAME']:
+                                    pvs[index]['filename'] = mount['filename']
+                                    pvs[index]['localvmdkpath'] = mount['localvmdkpath']
             
-            # purge vms based on pvlist
-            purgedvgs = []
-            # if pv list does not have any reference to vg, purge the vg
-            for vg in vgs:
-                for pv in pvs:
-                    if vg['LVM2_VG_NAME'] == pv['LVM2_VG_NAME']:
-                        purgedvgs.append(vg)
-                        break
+                # purge vms based on pvlist
+                purgedvgs = []
+                # if pv list does not have any reference to vg, purge the vg
+                for vg in vgs:
+                    for pv in pvs:
+                        if vg['LVM2_VG_NAME'] == pv['LVM2_VG_NAME']:
+                            purgedvgs.append(vg)
+                            break
  
-            purgedlvs = []
-            for lv in lvs:
-                found = False
-                for vg in purgedvgs:
-                    if lv['LVM2_VG_NAME'] == vg['LVM2_VG_NAME']:
-                        found = True
-                        break               
-                if found:
-                    purgedlvs.append(lv)
+                purgedlvs = []
+                for lv in lvs:
+                    found = False
+                    for vg in purgedvgs:
+                        if lv['LVM2_VG_NAME'] == vg['LVM2_VG_NAME']:
+                            found = True
+                            break               
+                    if found:
+                        purgedlvs.append(lv)
 
-            yield pvs, purgedvgs, purgedlvs, mountinfo
+                yield pvs, purgedvgs, purgedlvs, mountinfo
 
-        except Exception as ex:
-            LOG.exception(ex)
-        finally:
-            for vg in vgs:
-                deactivatevgs(vg['LVM2_VG_NAME'])
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                for vg in vgs:
+                    deactivatevgs(vg['LVM2_VG_NAME'])
 
-            for key, mount in mountinfo.iteritems():
-                dismountpv(mount['devpath'])
-            if process:
-                umount_local_vmdk(process)
+                for key, mount in mountinfo.iteritems():
+                    dismountpv(mount['devpath'])
 
     finally:
         if os.path.isfile(listfile):
@@ -1140,16 +1135,14 @@ def process_partitions(hostip, username, password, vmspec, devmap,
             fileh, mntlist = mkstemp()
             close(fileh)
 
-            try:
-                process, mountpaths = mount_local_vmdk(listfile,
-                                                    mntlist, diskonly=True)
+            with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
                 for key, value in mountpaths.iteritems():
                     mountpath = value[0].split(";")[0].strip()
                     break
 
                 try:
                     freedev = subprocess.check_output(["losetup", "-f"],
-                                                        stderr=subprocess.STDOUT)
+                                                       stderr=subprocess.STDOUT)
                     freedev = freedev.strip("\n")
 
                     startoffset = str(int(partition['start']) * 512)
@@ -1161,8 +1154,6 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                     partblockgroups = get_blockgroups(freedev)
                 finally:
                     dismountpv(freedev)
-            finally:
-                umount_local_vmdk(process)
 
             # copy bitmap blocks and inode blocks to empty vmdk 
             blocksize = partblockgroups[0]
@@ -1172,39 +1163,32 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                                        blocksize, blockgroups)
 
             # Get the list of used blocks for each file system
-            process, mountpaths = mount_local_vmdk(listfile,
-                                     mntlist, diskonly=True)
-            for key, value in mountpaths.iteritems():
-                mountpath = value[0].split(";")[0].strip()
-                break
+            with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
+                for key, value in mountpaths.iteritems():
+                    mountpath = value[0].split(";")[0].strip()
+                    break
 
-            try:
-
-               ##
-               # TODO: The used blocks can be pretty big. Make sure
-               # we are handling large lists correctly.
-               try:
-                   freedev = None
-                   freedev = subprocess.check_output(["losetup", "-f"],
-                                                    stderr=subprocess.STDOUT)
-                   freedev = freedev.strip("\n")
+                ##
+                # TODO: The used blocks can be pretty big. Make sure
+                # we are handling large lists correctly.
+                try:
+                    freedev = None
+                    freedev = subprocess.check_output(["losetup", "-f"],
+                                                         stderr=subprocess.STDOUT)
+                    freedev = freedev.strip("\n")
         
-                   subprocess.check_output(["losetup", freedev, mountpath, "-o",
-                                       str(int(partition['start'])*512), "--sizelimit",
-                                       partition['blocks'] + "KiB"],
-                                       stderr=subprocess.STDOUT)
-                   blocksize = partblockgroups[0]
-                   totalblocks[filename] += get_usedblockslist_from_part(freedev, extentsfiles[filename],
-                                                               partition, blocksize)
+                    subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                                            str(int(partition['start'])*512), "--sizelimit",
+                                            partition['blocks'] + "KiB"],
+                                            stderr=subprocess.STDOUT)
+                    blocksize = partblockgroups[0]
+                    totalblocks[filename] += get_usedblockslist_from_part(
+                                                       freedev, extentsfiles[filename],
+                                                       partition, blocksize)
                    
-               finally:
-                   if freedev:
-                       dismountpv(freedev)
-            except Exception as ex:
-                LOG.exception(ex)
-            finally:
-                if process:
-                    umount_local_vmdk(process)
+                finally:
+                    if freedev:
+                        dismountpv(freedev)
 
         except Exception as ex:
             LOG.exception(ex)
