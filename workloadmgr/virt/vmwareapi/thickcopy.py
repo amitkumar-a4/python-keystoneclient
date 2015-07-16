@@ -1058,11 +1058,14 @@ def mountlvmvgs(hostip, username, password, vmspec, devmap):
             except Exception as ex:
                 LOG.exception(ex)
             finally:
-                for vg in vgs:
-                    deactivatevgs(vg['LVM2_VG_NAME'])
+                #for vg in vgs:
+                    #deactivatevgs(vg['LVM2_VG_NAME'])
 
                 for key, mount in mountinfo.iteritems():
                     dismountpv(mount['devpath'])
+
+                for vg in vgs:
+                    deactivatevgs(vg['LVM2_VG_NAME'])
 
     finally:
         if os.path.isfile(listfile):
@@ -1281,10 +1284,12 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
         partitions = {}
         extentsinfo = {}
         extentsfiles = {}
+        totalblocks = {}
 
         # for each LV, check if ext file system on the LV
         for dmap in devmap:
             fileh, extentsfiles[dmap['dev']['backing']['fileName']] = mkstemp()
+            totalblocks[dmap['dev']['backing']['fileName']] = 0
             close(fileh)
 
         for dmap in devmap:
@@ -1295,6 +1300,7 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
 
             with open(extentsfiles[filename], "a") as f:
                 f.write(str(0) + "," + str(400 * 512) + "\n")
+            totalblocks[filename] += 400*512/4096
 
             partitions[filename] = get_partition_table_from_vmdk(hostip, username,
                                                  password, vmspec, filename,
@@ -1314,6 +1320,7 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
                         with open(extentsfiles[filename], "a") as f:
                             f.write(str(int(part['start']) * 512) + "," +
                                     str(400 * 512) + "\n")
+                        totalblocks[filename] += 400*512/4096
 
         # mount all devices here
         # do vg scan
@@ -1323,8 +1330,10 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
                                                     vmspec, devmap, partitions)
 
         # identify rest of partitions that were not part of LVM configuration
-        totalblocks = lvmextents_in_partition(hostip, username, password,
+        lvmtotalblocks = lvmextents_in_partition(hostip, username, password,
                                              vmspec, devmap, extentsfiles)
+        for key, value in lvmtotalblocks.iteritems():
+            totalblocks[key] += lvmtotalblocks[key]
 
         parttotalblocks = process_partitions(hostip, username, password,
                                           vmspec, devmap, logicalobjects,
