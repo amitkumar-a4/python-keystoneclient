@@ -298,7 +298,26 @@ class SnapshotsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-        
+
+    def snapshot_cancel(self, req, id):
+        """cancel snapshot"""
+        try:
+            context = req.environ['workloadmgr.context']
+            snapshot_cancel = self.workload_api.snapshot_cancel(context, id)     
+            return {'snapshot_cancel',snapshot_cancel}
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def dismount(self, req, id, workload_id=None, body=None):
         try:
             context = req.environ['workloadmgr.context']

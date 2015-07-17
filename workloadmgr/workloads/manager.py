@@ -479,8 +479,17 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       
         except Exception as ex:
             LOG.exception(ex)
-            msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
-            LOG.error(msg)
+
+            flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id)            
+            if flag == '1':
+               msg =  _("%(exception)s") %{'exception': ex}
+               status = 'cancelled'
+               for vm in self.db.workload_vms_get(context, workload.id):
+                   self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
+            else:       
+                 msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
+                 LOG.error(msg)
+                 status = 'error'
             
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -488,7 +497,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'progress_msg': '',
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
-                                     'status': 'error'
+                                     'status': status
                                     })
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)

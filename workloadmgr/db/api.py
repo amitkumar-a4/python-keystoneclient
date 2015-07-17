@@ -181,6 +181,9 @@ def snapshot_delete(context, snapshot_id):
 
 def snapshot_get(context, snapshot_id, **kwargs):
     return IMPL.snapshot_get(context, snapshot_id, **kwargs)
+
+def snapshot_get_metadata_cancel_flag(context, snapshot_id, **kwargs):
+    return IMPL.snapshot_get_metadata_cancel_flag(context, snapshot_id, **kwargs)
     
 def snapshot_get_all(context, workload_id=None, **kwargs):
     return IMPL.snapshot_get_all(context, workload_id, **kwargs)    
