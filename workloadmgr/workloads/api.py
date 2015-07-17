@@ -969,12 +969,14 @@ class API(base.Base):
                          
         rv = self.db.snapshot_show(context, snapshot_id)
         snapshot_details  = dict(rv.iteritems())
+       
         snapshot_vms = []
         try:
             for snapshot_vm_obj in self.db.snapshot_vms_get(context, snapshot_id):
                 snapshot_vm = {'id': snapshot_vm_obj.vm_id, 
                                'name':snapshot_vm_obj.vm_name,
-                               'status':snapshot_vm_obj.status,}
+                               'status':snapshot_vm_obj.status,
+                               }
                 metadata = {}
                 for kvpair in snapshot_vm_obj.metadata:
                     metadata.setdefault(kvpair['key'], kvpair['value'])
@@ -1187,6 +1189,7 @@ class API(base.Base):
             for vm in vms:
                 restored_vm = {'id': vm.vm_id, 
                                'name':vm.vm_name,
+                               'time_taken' : vm.time_taken,
                                'status':vm.status,}
                 metadata = {}
                 for kvpair in vm.metadata:
@@ -1207,7 +1210,6 @@ class API(base.Base):
         restore_details.setdefault('workload_id', snapshot.workload_id)
         
         restore_details['snapshot_details'] = dict(snapshot.iteritems())
-        
         instances = []
         try:
             vms = self.db.restored_vms_get(context, restore_id)

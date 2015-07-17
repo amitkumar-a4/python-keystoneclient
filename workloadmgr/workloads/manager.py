@@ -690,12 +690,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow.execute()
             
             compute_service = nova.API(production=True)
+            restore_data_transfer_time = 0
+            restore_object_store_transfer_time = 0            
             for restored_vm in self.db.restored_vms_get(context, restore_id):
                 instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
                 if instance == None:
                     pass 
                 else:
-                    self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})                    
+                    self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
+                restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
+                restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
                                    
                                         
 
@@ -713,6 +717,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                              'progress_msg': 'Restore from snapshot is complete',
                              'finished_at' : timeutils.utcnow(),
                              'time_taken' : int((timeutils.utcnow() - restore.created_at).total_seconds()),
+                             'metadata' : {'data_transfer_time' : restore_data_transfer_time,
+                                           'object_store_transfer_time' : restore_object_store_transfer_time,
+                                          },                              
                              'status': 'available'
                             })
         except WrappedFailure as ex:
@@ -722,13 +729,23 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 for cause in ex._causes:
                     if cause._exception_str not in msg:
                         msg = msg + ' ' + cause._exception_str
-            LOG.error(msg)        
+            LOG.error(msg)
+            
+            time_taken = 0
+            if 'restore' in locals() or 'restore' in globals():
+                if restore:
+                    time_taken = int((timeutils.utcnow() - restore.created_at).total_seconds())
+                        
             self.db.restore_update( context,
                                     restore_id,
                                     {'progress_percent': 100,
                                      'progress_msg': '',
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
+                                     'time_taken' : time_taken,
+                                     'metadata' : {'data_transfer_time' : 0,
+                                                   'object_store_transfer_time' : 0,
+                                                  },                                        
                                      'status': 'error'
                                     })       
         except Exception as ex:
@@ -738,12 +755,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
             LOG.error(msg)
+            
+            time_taken = 0
+            if 'restore' in locals() or 'restore' in globals():
+                if restore:
+                    time_taken = int((timeutils.utcnow() - restore.created_at).total_seconds())
+                                
             self.db.restore_update( context,
                                     restore_id,
                                     {'progress_percent': 100,
                                      'progress_msg': '',
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
+                                     'time_taken' : time_taken,
+                                     'metadata' : {'data_transfer_time' : 0,
+                                                   'object_store_transfer_time' : 0,
+                                                  },                                        
                                      'status': 'error'
                                     })
         finally:
