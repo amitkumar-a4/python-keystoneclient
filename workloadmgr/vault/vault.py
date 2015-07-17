@@ -272,7 +272,7 @@ def get_workloads(context):
 def upload_snapshot_metatdata_to_object_store(context, snapshot_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
         pass
-    if FLAGS.wlm_vault_storage_type == 'swift-s': 
+    elif FLAGS.wlm_vault_storage_type == 'swift-s': 
         workload_path = get_workload_path(snapshot_metadata)
         snapshot_path = get_snapshot_path(snapshot_metadata)
         container = get_swift_container(snapshot_metadata)
@@ -316,7 +316,7 @@ def upload_snapshot_metatdata_to_object_store(context, snapshot_metadata):
 def upload_snapshot_vm_to_object_store(context, snapshot_vm_metadata):
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
         pass
-    if FLAGS.wlm_vault_storage_type == 'swift-s': 
+    elif FLAGS.wlm_vault_storage_type == 'swift-s': 
         WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_metadata['snapshot_id'], {'progress_msg': 'Uploading virtual machine snapshot to object store'}) 
         snapshot_vm_path = get_snapshot_vm_path(snapshot_vm_metadata)
         container = get_swift_container(snapshot_vm_metadata)
@@ -331,9 +331,10 @@ def upload_snapshot_vm_to_object_store(context, snapshot_vm_metadata):
     
 @autolog.log_method(logger=Logger) 
 def upload_snapshot_vm_resource_to_object_store(context, snapshot_vm_resource_metadata):
+    start_time = timeutils.utcnow()
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
-        pass
-    if FLAGS.wlm_vault_storage_type == 'swift-s': 
+        return 0
+    elif FLAGS.wlm_vault_storage_type == 'swift-s': 
         progress_msg = "Uploading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' to object store"
         WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_resource_metadata['snapshot_id'], {'progress_msg': progress_msg}) 
         snapshot_vm_resource_path = get_snapshot_vm_path(snapshot_vm_resource_metadata)
@@ -346,13 +347,17 @@ def upload_snapshot_vm_resource_to_object_store(context, snapshot_vm_resource_me
             WorkloadMgrDB().db.snapshot_update(context, snapshot_vm_resource_metadata['snapshot_id'], {'progress_msg': progress_msg})
             swift_upload_files([snapshot_vm_resource_path], container, context = None)
     elif FLAGS.wlm_vault_storage_type == 's3':
-        pass       
+        return 0
+    else:
+        return 0
+    return int((timeutils.utcnow() - start_time).total_seconds())       
     
 @autolog.log_method(logger=Logger) 
 def download_metadata_from_object_store(context):
+    start_time = timeutils.utcnow()
     if FLAGS.wlm_vault_storage_type == 'swift-i': 
-        pass
-    if FLAGS.wlm_vault_storage_type == 'swift-s':
+        return 0
+    elif FLAGS.wlm_vault_storage_type == 'swift-s':
         purge_staging_area(context) 
         swift_list_all(context, container = None)
         cmd = get_swift_base_cmd(context)    
@@ -363,33 +368,44 @@ def download_metadata_from_object_store(context):
                 if container.startswith(FLAGS.wlm_vault_swift_container_prefix):
                     swift_download_metadata_from_object_store(context, container.replace('\n', ''))
     elif FLAGS.wlm_vault_storage_type == 's3':
-        pass
+        return 0
+    else:
+        return 0
+    return int((timeutils.utcnow() - start_time).total_seconds())  
     
 
 @autolog.log_method(logger=Logger)     
 def download_snapshot_vm_from_object_store(context, snapshot_vm_metadata):
+    start_time = timeutils.utcnow()
     if FLAGS.wlm_vault_storage_type == 'swift-i':
-        pass
-    if FLAGS.wlm_vault_storage_type == 'swift-s': 
+        return 0
+    elif FLAGS.wlm_vault_storage_type == 'swift-s': 
         WorkloadMgrDB().db.restore_update(context, snapshot_vm_metadata['restore_id'], {'progress_msg': 'Downloading virtual machine snapshot from object store'})  
         snapshot_vm_folder = get_snapshot_vm_path(snapshot_vm_metadata)
         container = get_swift_container(snapshot_vm_metadata)
         swift_download_folder(snapshot_vm_folder, container, context = None)       
     elif FLAGS.wlm_vault_storage_type == 's3':
-        pass
+        return 0
+    else:
+        return 0
+    return int((timeutils.utcnow() - start_time).total_seconds())  
     
 @autolog.log_method(logger=Logger)     
 def download_snapshot_vm_resource_from_object_store(context, snapshot_vm_resource_metadata):
+    start_time = timeutils.utcnow()    
     if FLAGS.wlm_vault_storage_type == 'swift-i':
-        pass
-    if FLAGS.wlm_vault_storage_type == 'swift-s':
+        return 0
+    elif FLAGS.wlm_vault_storage_type == 'swift-s':
         progress_msg = "Downloading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
         WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
         snapshot_vm_resource_folder = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
         container = get_swift_container(snapshot_vm_resource_metadata)
         swift_download_folder(snapshot_vm_resource_folder, container, context = None)
     elif FLAGS.wlm_vault_storage_type == 's3':
-        pass          
+        return 0
+    else:
+        return 0
+    return int((timeutils.utcnow() - start_time).total_seconds())        
 
 @autolog.log_method(logger=Logger)         
 def swift_upload_files(files, container, context = None): 

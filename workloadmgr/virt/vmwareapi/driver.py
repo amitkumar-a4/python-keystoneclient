@@ -1323,7 +1323,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                      'status': 'uploading'
                                     })                                                           
                 vmdk_size, snapshot_type = _upload_vmdk(dev)
-                vault.upload_snapshot_vm_resource_to_object_store(cntx,{'workload_id': snapshot_obj.workload_id,
+                
+                object_store_transfer_time = vault.upload_snapshot_vm_resource_to_object_store(cntx,{'workload_id': snapshot_obj.workload_id,
                                                                         'workload_name': workload_obj.display_name,
                                                                         'snapshot_id': snapshot_obj.id,
                                                                         'snapshot_vm_id': instance['vm_id'],
@@ -1344,6 +1345,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                        'snapshot_type': snapshot_type,
                                                                        'finished_at' : timeutils.utcnow(),
                                                                        'time_taken' : int((timeutils.utcnow() - snapshot_vm_resource.created_at).total_seconds()),
+                                                                       'metadata' : {'object_store_transfer_time' : object_store_transfer_time},
                                                                        })
         except Exception as ex:
             LOG.exception(ex)      
@@ -1874,10 +1876,17 @@ class VMwareVCDriver(VMwareESXDriver):
                     
             #restore, rebase, commit & upload
             LOG.info(_('Processing disks'))
+            snapshot_vm_object_store_transfer_time = 0
+            snapshot_vm_data_transfer_time = 0
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
-                workload_utils.download_snapshot_vm_resource_from_object_store(cntx, restore_obj.id, restore_obj.snapshot_id, snapshot_vm_resource.id)
+                snapshot_vm_resource_object_store_transfer_time = workload_utils.download_snapshot_vm_resource_from_object_store(cntx, 
+                                                                                                                restore_obj.id, 
+                                                                                                                restore_obj.snapshot_id,
+                                                                                                                snapshot_vm_resource.id) 
+                snapshot_vm_object_store_transfer_time += snapshot_vm_resource_object_store_transfer_time                                                                                                        
+                snapshot_vm_data_transfer_time  +=  snapshot_vm_resource_object_store_transfer_time
                 
                 for vdisk in instance_options['vdisks']:
                     if vdisk['label'] == snapshot_vm_resource.resource_name:
@@ -1957,6 +1966,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     LOG.exception(ex)
                     raise
                 
+                start_time = timeutils.utcnow()
                 vmxspec = 'moref=' + vm_ref.value              
                 cmdspec = ["trilio-vix-disk-cli", "-clone",
                            vm_disk_resource_snap.vault_path,
@@ -2017,6 +2027,7 @@ class VMwareVCDriver(VMwareESXDriver):
                             stderr=process.stderr.read(),
                             cmd=cmd)                
                 
+                snapshot_vm_data_transfer_time += int((timeutils.utcnow() - start_time).total_seconds())
                 """
                 Repair is not working for remote disks
                 try:
@@ -2057,6 +2068,9 @@ class VMwareVCDriver(VMwareESXDriver):
             restored_vm_values = {'vm_id': restored_instance_id,
                                   'vm_name':  restored_instance_name,    
                                   'restore_id': restore_obj.id,
+                                  'metadata' : {'data_transfer_time' : snapshot_vm_data_transfer_time,
+                                                'object_store_transfer_time' : snapshot_vm_object_store_transfer_time,
+                                                },                                  
                                   'status': 'available'}
             restored_vm = db.restored_vm_create(cntx,restored_vm_values)
             

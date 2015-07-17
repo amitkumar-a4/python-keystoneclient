@@ -1027,20 +1027,38 @@ def snapshot_type_time_size_update(context, snapshot_id):
     
         
     snapshot_vms= snapshot_vms_get(context, snapshot_id)
+    snapshot_data_transfer_time = 0
+    snapshot_object_store_transfer_time = 0
     for snapshot_vm in snapshot_vms:
         snapshot_vm_size = 0
         snapshot_vm_restore_size = 0
+        snapshot_vm_data_transfer_time = 0
+        snapshot_vm_object_store_transfer_time = 0
         snapshot_vm_resources = snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot_id)
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
             snapshot_vm_size = snapshot_vm_size +  snapshot_vm_resource.size
             snapshot_vm_restore_size = snapshot_vm_restore_size + snapshot_vm_resource.restore_size
-        snapshot_vm_update(context, snapshot_vm.vm_id, snapshot_id, {'size' : snapshot_vm_size, 'restore_size' : snapshot_vm_restore_size})        
+            snapshot_vm_data_transfer_time += snapshot_vm_resource.time_taken
+            snapshot_vm_object_store_transfer_time +=  int(get_metadata_value(snapshot_vm_resource.metadata,  'object_store_transfer_time', '0'))
+        snapshot_vm_update(context, snapshot_vm.vm_id, snapshot_id, {'size' : snapshot_vm_size, 
+                                                                     'restore_size' : snapshot_vm_restore_size,
+                                                                     'metadata' : {'data_transfer_time' : snapshot_vm_data_transfer_time,
+                                                                                   'object_store_transfer_time' : snapshot_vm_object_store_transfer_time,
+                                                                                   },
+                                                                     })
+        snapshot_data_transfer_time += snapshot_vm_data_transfer_time        
+        snapshot_object_store_transfer_time += snapshot_vm_object_store_transfer_time
+
+                
                
     
     if snapshot.finished_at:
         time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
+    else:
+        time_taken = max(time_taken, int((timeutils.utcnow() - snapshot.created_at).total_seconds()))
+        
     
         
     if snapshot_type_full and snapshot_type_incremental:
@@ -1056,7 +1074,11 @@ def snapshot_type_time_size_update(context, snapshot_id):
                                                   'time_taken' : time_taken,
                                                   'size' : snapshot_size,
                                                   'restore_size' : snapshot_restore_size,
-                                                  'uploaded_size' : snapshot_size})
+                                                  'uploaded_size' : snapshot_size,
+                                                  'metadata' : {'data_transfer_time' : snapshot_data_transfer_time,
+                                                                'object_store_transfer_time' : snapshot_object_store_transfer_time,
+                                                                },                                                  
+                                                  })
     
 @require_context
 def snapshot_delete(context, snapshot_id):
