@@ -187,7 +187,8 @@ def download_snapshot_vm_from_object_store(context, restore_id, snapshot_id, sna
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
     workload = db.workload_get(context, snapshot.workload_id)
      
-    vault.download_snapshot_vm_from_object_store(context,
+    object_store_download_time = 0 
+    object_store_download_time += vault.download_snapshot_vm_from_object_store(context,
                                                 {'restore_id' : restore_id,
                                                  'workload_id': snapshot.workload_id,
                                                  'snapshot_id': snapshot.id,
@@ -199,12 +200,13 @@ def download_snapshot_vm_from_object_store(context, restore_id, snapshot_id, sna
         parent_snapshot_vms = db.snapshot_vms_get(context, parent_snapshot_id) 
         for parent_snapshot_vm in parent_snapshot_vms:
             if  parent_snapshot_vm.vm_id == snapshot_vm_id:
-                vault.download_snapshot_vm_from_object_store(context,
+                object_store_download_time += vault.download_snapshot_vm_from_object_store(context,
                                                             {'restore_id' : restore_id,
                                                              'workload_id': snapshot.workload_id,
                                                              'workload_name': workload.display_name,
                                                              'snapshot_id': parent_snapshot_id,
-                                                             'snapshot_vm_id': snapshot_vm_id})    
+                                                             'snapshot_vm_id': snapshot_vm_id}) 
+    return object_store_download_time   
                 
 def download_snapshot_vm_resource_from_object_store(context, restore_id, snapshot_id, snapshot_vm_resource_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes') 
@@ -212,8 +214,9 @@ def download_snapshot_vm_resource_from_object_store(context, restore_id, snapsho
     snapshot_vm_resource = db.snapshot_vm_resource_get(context, snapshot_vm_resource_id)
     snapshot_vm = db.snapshot_vm_get(context, snapshot_vm_resource.vm_id, snapshot.id)    
 
+    object_store_download_time = 0
     while snapshot_vm_resource:
-        vault.download_snapshot_vm_resource_from_object_store(context,
+        object_store_download_time += vault.download_snapshot_vm_resource_from_object_store(context,
                                                               {'restore_id' : restore_id,
                                                                'workload_id': snapshot.workload_id,
                                                                'workload_name': workload.display_name,
@@ -228,6 +231,7 @@ def download_snapshot_vm_resource_from_object_store(context, restore_id, snapsho
             snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap.snapshot_vm_resource_id)
         else:
             snapshot_vm_resource = None
+    return object_store_download_time
     
 def purge_snapshot_vm_from_staging_area(context, snapshot_id, snapshot_vm_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
