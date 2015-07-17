@@ -925,18 +925,34 @@ class VMwareVCDriver(VMwareESXDriver):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
         turbo_thick_disk_backup = settings.get_settings(cntx).get('turbo_thick_disk_backup', 'False')        
-        onlythindevices = True
+        runthickcopy = False
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
-            if not hasattr(dev.backing, 'thinProvisioned') or \
-                  not dev.backing.thinProvisioned: 
-                onlythindevices = False
+            if snapshot_obj.snapshot_type == 'full':
+                parent_vault_path = None
+                parent_changeId = '*'
+                parent_content_id = None
+            else:
+                parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId( 
+                                                                                     cntx, 
+                                                                                     db, 
+                                                                                     snapshot['workload_id'],
+                                                                                     instance['vm_id'], 
+                                                                                     dev.backing.uuid)                   
+            dev['parent_vault_path'] = parent_vault_path
+            dev['parent_changeId'] = parent_changeId
+            dev['parent_content_id'] = parent_content_id
+
+            if (not hasattr(dev.backing, 'thinProvisioned') or \
+                  not dev.backing.thinProvisioned) and \
+                  dev['parent_changeId'] == '*': 
+                runthickcopy = True
 
             dev['disk_data_size'] = 0
             dev['extentsfile'] = None
             dev['totalblocks'] = 0
 
         if turbo_thick_disk_backup.lower() == 'true' and \
-           not onlythindevices:
+           runthickcopy:
             try:
                 devicemap = []
                 for idx, dev in enumerate(snapshot_data['snapshot_devices']):
@@ -984,7 +1000,7 @@ class VMwareVCDriver(VMwareESXDriver):
             if not 'extentsfile' in dev or not dev['extentsfile'] or \
                  (hasattr(dev.backing, 'thinProvisioned') and \
                   dev.backing.thinProvisioned == True) or \
-                 snapshot_obj.snapshot_type == 'incremental':
+                 dev['parent_changeId'] != '*':
 
                 try:
                     if 'extentsfile' in dev and  dev['extentsfile'] and \
@@ -993,17 +1009,10 @@ class VMwareVCDriver(VMwareESXDriver):
                 except:
                     pass
 
-                if snapshot_obj.snapshot_type == 'full':
-                    parent_vault_path = None
-                    parent_changeId = '*'
-                    parent_content_id = None
-                else:
-                    parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId( 
-                                                                                     cntx, 
-                                                                                     db, 
-                                                                                     snapshot['workload_id'],
-                                                                                     instance['vm_id'], 
-                                                                                     dev.backing.uuid)                   
+                parent_vault_path = dev['parent_vault_path']
+                parent_changeId = dev['parent_changeId']
+                parent_content_id = dev['parent_content_id']
+
                 fileh, dev['extentsfile'] = mkstemp()
                 close(fileh)                    
                 with open(dev['extentsfile'], 'w') as ctkfile:
