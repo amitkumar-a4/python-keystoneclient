@@ -528,6 +528,12 @@ class LibvirtDriver(driver.ComputeDriver):
 
         disks_info = self.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)
         for disk_info in disks_info:
+
+            flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+            if flag=='1':
+               error = _('Cancel requested for snapshot')
+               raise exception.ErrorOccurred(reason=error)
+
             vm_disk_size = 0
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': instance['vm_id'],

@@ -908,6 +908,9 @@ class API(base.Base):
             finally:
                 workload_lock.release()                    
 
+            metadata = {}
+            metadata.setdefault('cancel_requested','0')
+ 
             options = {'user_id': context.user_id,
                        'project_id': context.project_id,
                        'workload_id': workload_id,
@@ -915,8 +918,10 @@ class API(base.Base):
                        'display_name': name,
                        'display_description': description,
                        'host':'',                   
-                       'status': 'creating',}
+                       'status': 'creating',
+                       'metadata': metadata, }
             snapshot = self.db.snapshot_create(context, options)
+
             self.db.snapshot_update(context, 
                                     snapshot.id, 
                                     {'progress_percent': 0, 
@@ -1106,6 +1111,30 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
+    
+    @autolog.log_method(logger=Logger)
+    def snapshot_cancel(self, context, snapshot_id):
+        """
+        Make the RPC call to cancel snapshot 
+        """
+        try:
+
+            metadata = {}
+            metadata.setdefault('cancel_requested','1')
+
+            self.db.snapshot_update(context,
+                                    snapshot_id,
+                                    {
+                                     'metadata': metadata
+                                    })
+            return True
+
+            AUDITLOG.log(context,'Snapshot Cancel Requested', snapshot_id)
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+
 
     @autolog.log_method(logger=Logger)
     def snapshot_mount(self, context, snapshot_id):

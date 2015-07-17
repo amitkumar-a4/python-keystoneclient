@@ -35,6 +35,8 @@ from workloadmgr import autolog
 import vmtasks_openstack
 import vmtasks_vcloud
 
+from workloadmgr import exception
+
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
@@ -263,6 +265,12 @@ class SnapshotVMNetworks(task.Task):
         # Snapshot the networking configuration of VMs
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
+
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
   
         # refresh the VM configuration such as network etc
         if source_platform == "vmware":
@@ -298,6 +306,11 @@ class SnapshotVMFlavors(task.Task):
     def execute_with_log(self, context, source_platform, instances, snapshot):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
+  
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
 
         return vmtasks_openstack.snapshot_vm_flavors(cntx, db, instances, snapshot)
         """
@@ -324,6 +337,12 @@ class SnapshotVMSecurityGroups(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
+
         if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_security_groups(cntx, db, instances, snapshot)
         else:
@@ -347,12 +366,19 @@ class PauseVM(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
+
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
         if source_platform == 'openstack':
             return vmtasks_openstack.pause_vm(cntx, db, instance)
         else:
             return vmtasks_vcloud.pause_vm(cntx, db, instance)
+
 
     @autolog.log_method(Logger, 'PauseVM.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -486,12 +512,17 @@ class PreSnapshot(task.Task):
         # pre processing of snapshot
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
         
         if source_platform == 'openstack':
             return vmtasks_openstack.pre_snapshot_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.pre_snapshot_vm(cntx, db, instance, snapshot)
-
+ 
     @autolog.log_method(Logger, 'PreSnapshot.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
@@ -520,10 +551,16 @@ class FreezeVM(task.Task):
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
 
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
         if source_platform == 'openstack':
             return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
         else:
             return vmtasks_vcloud.freeze_vm(cntx, db, instance, snapshot)
+
 
     @autolog.log_method(Logger, 'FreezeVM.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -577,6 +614,12 @@ class SnapshotVM(task.Task):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
         
         if source_platform == 'openstack':
             ret_val = vmtasks_openstack.snapshot_vm(cntx, db, instance, snapshot)
@@ -622,6 +665,11 @@ class SnapshotDataSize(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
         
         if source_platform == 'openstack':
             snapshot_data_ex = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
@@ -657,6 +705,11 @@ class UploadSnapshot(task.Task):
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
         snapshot_data_size = 0
         for vm in db.snapshot_vms_get(cntx, snapshot_obj.id):
             snapshot_data_size = snapshot_data_size + vm.size 
@@ -698,6 +751,11 @@ class PostSnapshot(task.Task):
             ret_val = vmtasks_vcloud.post_snapshot(cntx, db, instance, snapshot, snapshot_data)        
 
         db.vm_recent_snapshot_update(cntx, instance['vm_id'], {'snapshot_id': snapshot['id']})
+ 
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
 
         return ret_val
 
@@ -725,13 +783,18 @@ class ApplyRetentionPolicy(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
+        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+        if flag=='1':
+           error = _('Cancel requested for snapshot')
+           raise exception.ErrorOccurred(reason=error)
+
         if source_platform == 'openstack':
             return vmtasks_openstack.apply_retention_policy(cntx, db, instances, snapshot)
         else:
             return vmtasks_vcloud.apply_retention_policy(cntx, db, instances, snapshot)
           
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.revert')
-    def revert_with_log(self, *args, **kwargs):
+    def revert_with_log(self, *args, **kwargs):       
         pass    
     
 def UnorderedPreSnapshot(instances):

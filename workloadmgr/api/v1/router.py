@@ -169,7 +169,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='snapshot',
                        conditions={"method": ['POST']})
-        
+
         #pause and resume workload
         mapper.connect("workloads_pause",
                        "/{project_id}/workloads/{id}/pause",
@@ -268,6 +268,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['snapshots'],
                        action='delete',
                        conditions={"method": ['DELETE']})     
+
+        #cancel snapshot
+        mapper.connect("cancel_snapshot",
+                       "/{project_id}/snapshots/{id}/cancel",
+                       controller=self.resources['snapshots'],
+                       action='snapshot_cancel',
+                       conditions={"method": ['GET']})
 
         #mount a snapshot
         mapper.connect("mount_snapshot_1",

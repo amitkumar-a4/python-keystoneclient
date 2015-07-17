@@ -1295,6 +1295,12 @@ class VMwareVCDriver(VMwareESXDriver):
             db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vmx_file_size})
                 
             for idx, dev in enumerate(snapshot_data_ex['snapshot_devices']):
+
+                flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+                if flag=='1':
+                   error = _('Cancel requested for snapshot')
+                   raise exception.ErrorOccurred(reason=error)
+                        
                 vm_disk_size = 0
                 disk = snapshot_data_ex['disks'][idx]
     

@@ -917,6 +917,15 @@ def snapshot_get(context, snapshot_id, **kwargs):
         kwargs['session'] = get_session()    
     return _snapshot_get(context, snapshot_id, **kwargs) 
 
+@require_context
+def snapshot_get_metadata_cancel_flag(context, snapshot_id, **kwargs):
+    flag='0'
+    snapshot_obj = snapshot_get(context, snapshot_id)
+    for meta in snapshot_obj.metadata:
+        if meta.key == 'cancel_requested':
+           flag = meta.value
+    return flag
+
 @require_admin_context
 def snapshot_get_all(context, workload_id=None, **kwargs):
     if kwargs.get('session') == None:
