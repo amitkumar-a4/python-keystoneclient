@@ -1,6 +1,7 @@
 import subprocess
 import os
 import re
+import time
 from subprocess import call
 from subprocess import check_call
 from subprocess import check_output
@@ -1058,14 +1059,19 @@ def mountlvmvgs(hostip, username, password, vmspec, devmap):
             except Exception as ex:
                 LOG.exception(ex)
             finally:
-                #for vg in vgs:
-                    #deactivatevgs(vg['LVM2_VG_NAME'])
+                for vg in vgs:
+                    deactivatevgs(vg['LVM2_VG_NAME'])
 
+                time.sleep(2)
                 for key, mount in mountinfo.iteritems():
                     dismountpv(mount['devpath'])
 
+                time.sleep(2)
                 for vg in vgs:
-                    deactivatevgs(vg['LVM2_VG_NAME'])
+                    try:
+                        deactivatevgs(vg['LVM2_VG_NAME'])
+                    except:
+                        pass
 
     finally:
         if os.path.isfile(listfile):
