@@ -361,7 +361,8 @@ class API(base.Base):
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 workload_dict['jobschedule']['enabled'] = True
-                workload_dict['jobschedule']['nextrun'] = job.compute_next_run_time(datetime.now())
+                timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
+                workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
                 break
 
                 
