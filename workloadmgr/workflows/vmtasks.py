@@ -65,6 +65,9 @@ class RestoreVMNetworks(task.Task):
         # Restore the networking configuration of VMs
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+      
         target_platform = 'openstack' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
@@ -91,6 +94,9 @@ class RestoreSecurityGroups(task.Task):
         # Restore the security groups
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
         target_platform = 'openstack' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
@@ -118,6 +124,9 @@ class PreRestore(task.Task):
         # pre processing of restore
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])   
+
         target_platform = 'openstack' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
@@ -134,6 +143,12 @@ class PreRestore(task.Task):
             cntx = amqp.RpcContext.from_dict(kwargs['context'])
             db = WorkloadMgrDB().db
             db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+
+            if kwargs['source_platform'] == 'openstack':
+               vmtasks_openstack.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore'])
+            else:
+                 vmtasks_vcloud.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore']) 
+
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -155,6 +170,8 @@ class RestoreVM(task.Task):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
         target_platform = 'vmware' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
@@ -193,6 +210,9 @@ class PowerOnVM(task.Task):
         # Resume the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
         target_platform = 'vmware' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
@@ -229,6 +249,9 @@ class PostRestore(task.Task):
         # post processing of restore
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
         target_platform = 'openstack' 
         if 'pickle' in restore:
             options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
@@ -266,12 +289,8 @@ class SnapshotVMNetworks(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
-  
         # refresh the VM configuration such as network etc
         if source_platform == "vmware":
             compute_service = nova.API(production=True)
@@ -307,10 +326,7 @@ class SnapshotVMFlavors(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
   
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         return vmtasks_openstack.snapshot_vm_flavors(cntx, db, instances, snapshot)
         """
@@ -337,11 +353,7 @@ class SnapshotVMSecurityGroups(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
-
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if source_platform == 'openstack':
             return vmtasks_openstack.snapshot_vm_security_groups(cntx, db, instances, snapshot)
@@ -366,11 +378,7 @@ class PauseVM(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
-
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
@@ -513,10 +521,7 @@ class PreSnapshot(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
         
         if source_platform == 'openstack':
             return vmtasks_openstack.pre_snapshot_vm(cntx, db, instance, snapshot)
@@ -551,10 +556,7 @@ class FreezeVM(task.Task):
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if source_platform == 'openstack':
             return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
@@ -614,13 +616,8 @@ class SnapshotVM(task.Task):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
-
-        
         if source_platform == 'openstack':
             ret_val = vmtasks_openstack.snapshot_vm(cntx, db, instance, snapshot)
         else:
@@ -666,10 +663,7 @@ class SnapshotDataSize(task.Task):
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
         
         if source_platform == 'openstack':
             snapshot_data_ex = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
@@ -705,10 +699,7 @@ class UploadSnapshot(task.Task):
         db = WorkloadMgrDB().db
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         snapshot_data_size = 0
         for vm in db.snapshot_vms_get(cntx, snapshot_obj.id):
@@ -752,10 +743,7 @@ class PostSnapshot(task.Task):
 
         db.vm_recent_snapshot_update(cntx, instance['vm_id'], {'snapshot_id': snapshot['id']})
  
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         return ret_val
 
@@ -783,10 +771,7 @@ class ApplyRetentionPolicy(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-        if flag=='1':
-           error = _('Cancel requested for snapshot')
-           raise exception.ErrorOccurred(reason=error)
+        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if source_platform == 'openstack':
             return vmtasks_openstack.apply_retention_policy(cntx, db, instances, snapshot)
