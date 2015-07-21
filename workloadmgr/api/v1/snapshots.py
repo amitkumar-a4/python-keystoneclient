@@ -303,8 +303,7 @@ class SnapshotsController(wsgi.Controller):
         """cancel snapshot"""
         try:
             context = req.environ['workloadmgr.context']
-            snapshot_cancel = self.workload_api.snapshot_cancel(context, id)     
-            return {'snapshot_cancel',snapshot_cancel}
+            return self.workload_api.snapshot_cancel(context, id)     
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

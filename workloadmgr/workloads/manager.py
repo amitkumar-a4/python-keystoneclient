@@ -480,7 +480,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             LOG.exception(ex)
 
-            flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id)            
+            flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id, 1)            
             if flag == '1':
                msg =  _("%(exception)s") %{'exception': ex}
                status = 'cancelled'
@@ -749,12 +749,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'error'
                                     })       
         except Exception as ex:
-            LOG.exception(ex)
-            if restore_type == 'test':
-                msg = _("Failed creating test bubble: %(exception)s") %{'exception': ex}
+            
+            flag = self.db.restore_get_metadata_cancel_flag(context, restore_id, 1)
+            if flag == '1':
+               msg =  _("%(exception)s") %{'exception': ex}
+               status = 'cancelled'
             else:
-                msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
-            LOG.error(msg)
+                 status = 'error'
+                 LOG.exception(ex)
+                 if restore_type == 'test':
+                    msg = _("Failed creating test bubble: %(exception)s") %{'exception': ex}
+                 else:
+                      msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
+                 LOG.error(msg)
             
             time_taken = 0
             if 'restore' in locals() or 'restore' in globals():
@@ -771,7 +778,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'metadata' : {'data_transfer_time' : 0,
                                                    'object_store_transfer_time' : 0,
                                                   },                                        
-                                     'status': 'error'
+                                     'status': status
                                     })
         finally:
             try:

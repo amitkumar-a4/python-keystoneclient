@@ -1361,7 +1361,31 @@ class API(base.Base):
 
         self.db.restore_delete(context, restore_id)
         AUDITLOG.log(context,'Restore Deleted', restore_details)
-        
+       
+    @autolog.log_method(logger=Logger)
+    def restore_cancel(self, context, restore_id):
+        """
+        Make the RPC call to cancel restore
+        """
+        try:
+
+            metadata = {}
+            metadata.setdefault('cancel_requested','1')
+
+            self.db.restore_update(context,
+                                    restore_id,
+                                    {
+                                     'metadata': metadata
+                                    })
+            return True
+
+            AUDITLOG.log(context,'Restore Cancel Requested', restore_id)
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+   
+  
     @autolog.log_method(logger=Logger)
     def settings_create(self, context, settings):
         created_settings = []
