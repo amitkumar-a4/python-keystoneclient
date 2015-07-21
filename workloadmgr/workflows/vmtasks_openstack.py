@@ -403,6 +403,16 @@ def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)  
 
+@autolog.log_method(Logger, 'vmtasks_openstack.delete_restored_vm')
+def delete_restored_vm(cntx, db, instance, restore):
+
+    if instance['hypervisor_type'] == 'QEMU':
+       virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+       virtdriver.delete_restored_vm(cntx, db, instance, restore)
+    else:
+         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+         virtdriver.delete_restored_vm(cntx, db, instance, restore)
+
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
 

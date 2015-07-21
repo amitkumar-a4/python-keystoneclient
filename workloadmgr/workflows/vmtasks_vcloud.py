@@ -112,6 +112,10 @@ def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
     with vmwaresessionpool.item() as vmsession:
         vmsession.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
         print debug.format_hub_listeners()
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.delete_restored_vm')
+def delete_restored_vm(cntx, db, instance, restore):
+    return None
       
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):

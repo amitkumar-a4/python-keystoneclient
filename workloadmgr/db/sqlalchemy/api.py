@@ -918,13 +918,20 @@ def snapshot_get(context, snapshot_id, **kwargs):
     return _snapshot_get(context, snapshot_id, **kwargs) 
 
 @require_context
-def snapshot_get_metadata_cancel_flag(context, snapshot_id, **kwargs):
+def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,**kwargs):
     flag='0'
     snapshot_obj = snapshot_get(context, snapshot_id)
     for meta in snapshot_obj.metadata:
         if meta.key == 'cancel_requested':
            flag = meta.value
-    return flag
+
+    if return_val == 1:
+       return flag
+
+    if flag == '1':
+       error = _('Cancel requested for snapshot')
+       raise exception.ErrorOccurred(reason=error)
+
 
 @require_admin_context
 def snapshot_get_all(context, workload_id=None, **kwargs):
@@ -2100,6 +2107,22 @@ def restore_get(context, restore_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()    
     return _restore_get(context, restore_id, **kwargs) 
+
+
+@require_context
+def restore_get_metadata_cancel_flag(context, restore_id, return_val=0, **kwargs):
+    flag='0'
+    restore_obj = restore_get(context, restore_id)
+    for meta in restore_obj.metadata:
+        if meta.key == 'cancel_requested':
+           flag = meta.value
+    
+    if return_val == 1:
+       return flag
+
+    if flag=='1': 
+       error = _('Cancel requested for restore')
+       raise exception.ErrorOccurred(reason=error)
 
 @require_admin_context
 def restore_get_all(context, snapshot_id=None, **kwargs):

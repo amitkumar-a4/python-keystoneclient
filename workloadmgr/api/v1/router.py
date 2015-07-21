@@ -346,6 +346,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='delete',
                        conditions={"method": ['DELETE']})         
         
+        #cancel a restore
+        mapper.connect("cancel_restore",
+                       "/{project_id}/restores/{id}/cancel",
+                       controller=self.resources['restores'],
+                       action='restore_cancel',
+                       conditions={"method": ['GET']})
+                
         ###################################################################################################
         self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
         #detail list of testbubbles
