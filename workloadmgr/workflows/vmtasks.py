@@ -144,7 +144,7 @@ class PreRestore(task.Task):
             db = WorkloadMgrDB().db
             db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
 
-            if kwargs['source_platform'] == 'openstack':
+            if kwargs['target_platform'] == 'openstack':
                vmtasks_openstack.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore'])
             else:
                  vmtasks_vcloud.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore']) 
