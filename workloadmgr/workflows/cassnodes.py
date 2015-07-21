@@ -445,6 +445,7 @@ def main(argv):
         outfile = '/tmp/cassnodes_output.txt'
         addlnodes = None
         preferredgroups = None
+        findpartitiontype = False
 
         opts, args = getopt.getopt(argv,"",["defaultnode=","port=","username=","password=","addlnodes=", "preferredgroups=", "findpartitiontype=", "outfile=", "errfile="])
         for opt, arg in opts:
