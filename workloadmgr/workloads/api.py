@@ -458,8 +458,7 @@ class API(base.Base):
             #                              'start_time': '2:30 PM',
             #                              'snapshots_to_keep': '2'}
             try:
-                if not 'enabled' in jobschedule or jobschedule['enabled']:
-                    self.workload_add_scheduler_job(jobschedule, workload)
+                self.workload_add_scheduler_job(jobschedule, workload)
             except Exception as ex:
                 LOG.exception(ex)    
                 
@@ -471,13 +470,14 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload):
-        if len(jobschedule):                                        
-            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                                jobschedule,
-                                                jobstore='jobscheduler_store', 
-                                                kwargs={'workload_id':workload.id,  
-                                                        'user_id': workload.user_id, 
-                                                        'project_id':workload.project_id})
+        if jobschedule and len(jobschedule): 
+            if 'enabled' in jobschedule and jobschedule['enabled']:                                       
+                self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                                    jobschedule,
+                                                    jobstore='jobscheduler_store', 
+                                                    kwargs={'workload_id':workload.id,  
+                                                            'user_id': workload.user_id, 
+                                                            'project_id':workload.project_id})
 
     @autolog.log_method(logger=Logger)
     def workload_modify(self, context, workload_id, workload):
