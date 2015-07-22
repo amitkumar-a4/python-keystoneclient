@@ -182,8 +182,8 @@ def snapshot_delete(context, snapshot_id):
 def snapshot_get(context, snapshot_id, **kwargs):
     return IMPL.snapshot_get(context, snapshot_id, **kwargs)
 
-def snapshot_get_metadata_cancel_flag(context, snapshot_id, **kwargs):
-    return IMPL.snapshot_get_metadata_cancel_flag(context, snapshot_id, **kwargs)
+def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,**kwargs):
+    return IMPL.snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val,**kwargs)
     
 def snapshot_get_all(context, workload_id=None, **kwargs):
     return IMPL.snapshot_get_all(context, workload_id, **kwargs)    
@@ -317,6 +317,9 @@ def restore_delete(context, restore_id):
 
 def restore_get(context, restore_id, **kwargs):
     return IMPL.restore_get(context, restore_id, **kwargs)
+
+def restore_get_metadata_cancel_flag(context, restore_id, return_val=0,**kwargs):
+    return IMPL.restore_get_metadata_cancel_flag(context, restore_id, return_val,**kwargs)
     
 def restore_get_all(context, snapshot_id=None, **kwargs):
     return IMPL.restore_get_all(context, snapshot_id, **kwargs)    

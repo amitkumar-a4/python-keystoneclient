@@ -1305,10 +1305,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 
             for idx, dev in enumerate(snapshot_data_ex['snapshot_devices']):
 
-                flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-                if flag=='1':
-                   error = _('Cancel requested for snapshot')
-                   raise exception.ErrorOccurred(reason=error)
+                db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
                         
                 vm_disk_size = 0
                 disk = snapshot_data_ex['disks'][idx]
@@ -1678,7 +1675,27 @@ class VMwareVCDriver(VMwareESXDriver):
         except Exception as ex:
             LOG.exception(ex)      
             raise                     
-           
+    
+    @autolog.log_method(Logger, 'VMwareVCDriver.delete_restored_vm')
+    def delete_restored_vm(self, cntx, db, instance, restore):
+        vms = db.restored_vms_get(cntx, restore['id'])
+        for vm in vms:
+            uuid = None
+            for meta in vm.metadata:
+                if meta.key == 'uuid':
+                   uuid = meta.value
+
+            vm_ref = vm_util.get_vm_ref(self._session, {'uuid': vm.vm_id,
+                                                    'vm_name': vm.vm_name,
+                                                    'vmware_uuid': uuid ,
+                                                    })
+
+            delete_task = self._session._call_method(self._session._get_vim(),
+                    "Destroy_Task", vm_ref)
+            self._session._wait_for_task(vm.vm_id, delete_task)
+
+            db.restored_vm_update( cntx, vm.vm_id, restore['id'], {'status': 'deleted'})
+       
     @autolog.log_method(Logger, 'VMwareVCDriver.restore_vm')
     def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_security_groups,
                    restored_compute_flavor, restored_nics, instance_options):    

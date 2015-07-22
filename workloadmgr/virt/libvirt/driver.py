@@ -529,10 +529,7 @@ class LibvirtDriver(driver.ComputeDriver):
         disks_info = self.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)
         for disk_info in disks_info:
 
-            flag = db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-            if flag=='1':
-               error = _('Cancel requested for snapshot')
-               raise exception.ErrorOccurred(reason=error)
+            db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
             vm_disk_size = 0
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
@@ -630,6 +627,15 @@ class LibvirtDriver(driver.ComputeDriver):
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
         compute_service = nova.API(production=True)
         return compute_service.vast_finalize(cntx, instance['vm_id'], {})
+    
+    @autolog.log_method(Logger, 'libvirt.driver.delete_restored_vm')
+    def delete_restored_vm(self, cntx, db, instance, restore):
+        vms = db.restored_vms_get(cntx, restore['id']) 
+        compute_service = nova.API(production=True)
+        for vm in vms:
+            instance = compute_service.get_server_by_id(cntx, vm.vm_id, admin=True)
+            compute_service.force_delete(cntx, instance)
+            db.restored_vm_update( cntx, vm.vm_id, restore['id'], {'status': 'deleted'})            
     
     @autolog.log_method(Logger, 'libvirt.driver.pre_restore_vm')
     def pre_restore_vm(self, cntx, db, instance, restore):
