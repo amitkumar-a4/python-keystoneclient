@@ -240,9 +240,11 @@ class VMwareESXDriver(driver.ComputeDriver):
             poweron_task = self._session._call_method(
                                         self._session._get_vim(),
                                         "PowerOnVM_Task", vm_ref)
+           
             vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
                                                    "VirtualMachine", "summary")
-            
+   
+         
             while vmSummary.runtime.powerState != "poweredOn":
                 question_answered = False
                 start = timeutils.utcnow()
@@ -2141,7 +2143,6 @@ class VMwareVCDriver(VMwareESXDriver):
         restore_options = pickle.loads(str(restore_obj.pickle))
         instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'], 'vmware')
         vm_ref = vm_util.get_vm_ref_from_vmware_uuid(self._session, restored_instance['uuid'])
-        
         if 'power' in instance_options and \
            instance_options['power'] and \
            'state' in instance_options['power'] and \
@@ -2513,8 +2514,13 @@ class VMwareAPISession(object):
         except Exception as excep:
             LOG.info(_("In vmwareapi:_poll_task, Got this error %s") % excep)
             raise
-        else:            
-            task_name = task_info.name
+        else:
+
+            if hasattr(task_info, 'name'):
+               task_name = task_info.name
+            else:
+                 task_name = task_info.descriptionId
+
             if task_info.state in ['queued', 'running']:
                 if hasattr(task_info, 'progress'):
                     LOG.info("Task: %(task)s progress is %(progress)s%%.", {'task': task_ref, 'progress': task_info.progress})                
