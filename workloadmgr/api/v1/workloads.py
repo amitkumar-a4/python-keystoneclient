@@ -574,7 +574,48 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-        
+   
+    def test_email(self, req):
+        """Test email configuration"""
+        try:
+
+            context = req.environ['workloadmgr.context']        
+            html = '<html><head></head><body>'
+            html += 'Test email</body></html>'
+
+            try:
+                 msg = MIMEMultipart('alternative')
+                 msg['From'] = settings_module.get_settings().get('smtp_default_sender')
+                 if settings_module.get_settings().get('smtp_default_recipient') is None: 
+                    msg['To'] = msg['From']
+                 else:
+                      msg['To'] =  settings_module.get_settings().get('smtp_default_recipient')
+ 
+                 msg['Subject'] = 'Testing email configuration'
+                 part2 = MIMEText(html, 'html')
+                 msg.attach(part2)
+                 s = smtplib.SMTP(settings_module.get_settings().get('smtp_server_name'),int(settings_module.get_settings().get('smtp_port')))
+                 if settings_module.get_settings().get('smtp_server_name') != 'localhost':
+                    s.ehlo()
+                    s.starttls()
+                    s.ehlo
+                    s.login(settings_module.get_settings().get('smtp_server_username'),settings_module.get_settings().get('smtp_server_password'))
+                 s.sendmail(msg['From'], msg['To'], msg.as_string())
+                 s.quit()
+
+            except Exception as error:
+                   raise exception.ErrorOccurred("Not able to send email with this configuration")
+
+
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            LOG.exception(error)
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+      
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
 
