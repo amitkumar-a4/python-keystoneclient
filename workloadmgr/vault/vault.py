@@ -182,6 +182,7 @@ def get_swift_container(workload_metadata, context = None):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
         for container in content:
+            container = container.replace('\n', '')
             if container.endswith('_' + workload_metadata['workload_id']):
                 return container    
     
@@ -713,6 +714,10 @@ def swift_download_folder(folder, container, context = None):
     if os.path.isfile('/tmp/swift.out'):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
+        if len(content) <= 0:
+            msg = 'Error downloading objects from ' + folder.replace(get_vault_local_directory() + '/', '', 1)
+            msg = msg + ' in container ' + container
+            raise exception.ErrorOccurred(reason=msg)
         for line in content:
             if folder.replace(get_vault_local_directory() + '/', '', 1) in line:
                 cmd_download = cmd + [ "download", container, line.replace('\n', '')]
