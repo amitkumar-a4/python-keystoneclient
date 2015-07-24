@@ -171,7 +171,7 @@ class PauseDBInstance(task.Task):
         # Flush the database and hold the write # lock the instance.
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
-        self.client = connect_server(host_info[0], int(host_info[1]), '', '')
+        self.client = connect_server(host_info[0], int(host_info[1]), DBUser, DBPassword)
         self.client.fsync(lock = True)
 
         # Add code to wait until the fsync operations is complete
@@ -193,7 +193,7 @@ class ResumeDBInstance(task.Task):
         LOG.debug(_('ResumeDBInstance'))
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
-        self.client = connect_server(host_info[0], int(host_info[1]), '', '')
+        self.client = connect_server(host_info[0], int(host_info[1]), DBUser, DBPassword)
         self.client.unlock()
 
 class PauseBalancer(task.Task):
@@ -434,8 +434,13 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
 
             #print 'Getting secondary from hosts in ', hosts
             # Get the replica set for each shard
-            c = pymongo.MongoClient(hosts,
-                        read_preference=ReadPreference.SECONDARY)
+            if username != '':
+                c = pymongo.MongoClient("mongodb://" + username + ":" +
+                                    password + "@" + hosts,
+                                    read_preference=ReadPreference.SECONDARY)
+            else:
+                c = pymongo.MongoClient(hosts, 
+                                        read_preference=ReadPreference.SECONDARY)
 
             status = c.admin.command('replSetGetStatus')
 
@@ -890,9 +895,14 @@ class MongoDBWorkflow(workflow.Workflow):
         for replica, hosts in replicahosts.iteritems():
             LOG.debug(_('Getting secondary from hosts in ' + hosts +
                         " for replica " + replica))
-            c = MongoClient(hosts,
-                        read_preference=ReadPreference.SECONDARY)
-            status = c.admin.command('replSetGetStatus')
+            if self._store['DBUser'] != '':
+                repl = pymongo.MongoClient("mongodb://" + self._store['DBUser'] + ":" +
+                                        self._store['DBPassword'] + "@" + hosts,
+                                        read_preference=ReadPreference.SECONDARY)
+            else:
+                repl = pymongo.MongoClient(hosts, 
+                                        read_preference=ReadPreference.SECONDARY)
+            status = repl.admin.command('replSetGetStatus')
 
             status["date"] = str(status["date"])
             status["children"] = status.pop("members")
