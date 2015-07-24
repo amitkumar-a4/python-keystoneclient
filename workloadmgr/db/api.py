@@ -184,6 +184,9 @@ def snapshot_get(context, snapshot_id, **kwargs):
 
 def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,**kwargs):
     return IMPL.snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val,**kwargs)
+
+def snapshot_get_running_snapshots_by_host(context, **kwargs):
+    return IMPL.snapshot_get_running_snapshots_by_host(context, **kwargs)    
     
 def snapshot_get_all(context, workload_id=None, **kwargs):
     return IMPL.snapshot_get_all(context, workload_id, **kwargs)    

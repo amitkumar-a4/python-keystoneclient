@@ -19,6 +19,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import literal_column
 from sqlalchemy.sql import func
+from sqlalchemy import and_
 
 from workloadmgr.common import sqlalchemyutils
 from workloadmgr import db
@@ -932,6 +933,16 @@ def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,**kwarg
        error = _('Cancel requested for snapshot')
        raise exception.ErrorOccurred(reason=error)
 
+@require_context
+def snapshot_get_running_snapshots_by_host(context, **kwargs):
+    if kwargs.get('session') == None:
+       kwargs['session'] = get_session()
+
+    result = model_query(   context, models.Snapshots.host, func.count(models.Snapshots.host), **kwargs).\
+                            filter(and_(~models.Snapshots.status.in_(['available','error','deleted','cancelled'])),models.Snapshots.host != '').\
+                            group_by(models.Snapshots.host).\
+                            all() 
+    return result
 
 @require_admin_context
 def snapshot_get_all(context, workload_id=None, **kwargs):

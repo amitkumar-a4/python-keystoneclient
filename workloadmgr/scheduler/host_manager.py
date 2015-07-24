@@ -134,6 +134,7 @@ class HostManager(object):
     def __init__(self):
         self.service_states = {}  # { <host>: {<service>: {cap k : v}}}
         self.host_state_map = {}
+        self.host_state_running = {}
         self.filter_handler = filters.HostFilterHandler('workloadmgr.scheduler.'
                                                         'filters')
         self.filter_classes = self.filter_handler.get_all_classes()
@@ -244,6 +245,11 @@ class HostManager(object):
 
         # Get resource usage across the available workloadmanager nodes:
         topic = FLAGS.workloads_topic
+        hosts_snapshots = db.snapshot_get_running_snapshots_by_host(context)
+        self.host_state_running = {}
+        for obj in hosts_snapshots:
+            self.host_state_running[obj[0]] = int(obj[1])
+
         wlm_services = db.service_get_all_by_topic(context, topic)
         for service in wlm_services:
             if not utils.service_is_up(service) or service['disabled']:
@@ -253,16 +259,22 @@ class HostManager(object):
             capabilities = self.service_states.get(host, None)
             host_state = self.host_state_map.get(host)
             if host_state:
-                # copy capabilities to host_state.capabilities
-                host_state.update_capabilities(capabilities,
+               # copy capabilities to host_state.capabilities
+               host_state.update_capabilities(capabilities,
                                                dict(service.iteritems()))
             else:
                 host_state = self.host_state_cls(host,
                                                  capabilities=capabilities,
                                                  service=
                                                  dict(service.iteritems()))
-                self.host_state_map[host] = host_state
             # update host_state
+      
+            if host in self.host_state_running.keys():
+               host_state.running_snapshots = self.host_state_running[host]
+            else: 
+                 host_state.running_snapshots = 0
+
+            self.host_state_map[host] = host_state
             host_state.update_from_workloadmgr_capability(capabilities)
 
         return self.host_state_map.itervalues()
