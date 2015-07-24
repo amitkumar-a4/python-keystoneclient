@@ -1106,6 +1106,13 @@ class API(base.Base):
                        'host':'',                   
                        'status': 'restoring',}
             restore = self.db.restore_create(context, values)
+
+            self.db.restore_update(context, 
+                                    restore.id, 
+                                    {'progress_percent': 0, 
+                                     'progress_msg': 'Restore operation is scheduled',
+                                     'status': 'restoring'
+                                    })
             self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
             AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
             return restore
