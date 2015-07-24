@@ -119,12 +119,12 @@ class RestoresController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error)) 
 
-    def restore_cancel(self, req, id):
+    def restore_cancel(self, req, id, workload_id=None, snapshot_id=None, body=None):
         """Cancel a restore."""
         try:
             context = req.environ['workloadmgr.context']
             try:
-                return self.workload_api.restore_cancel(context, id)              
+                self.workload_api.restore_cancel(context, id)              
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
             except wlm_exceptions.InvalidState as error:
