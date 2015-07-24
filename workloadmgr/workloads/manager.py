@@ -682,6 +682,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
                 'restore': dict(restore.iteritems()),   # restore dictionary
+                'target_platform': target_platform,                
             }
 
             workflow_class = get_workflow_class(context, workload.workload_type_id, True)

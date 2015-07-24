@@ -54,25 +54,20 @@ POWER_STATES = {
 }
 
 class RestoreVMNetworks(task.Task):
-    def execute(self, context, restore):
-        return self.execute_with_log(context, restore)
+    def execute(self, context, target_platform, restore):
+        return self.execute_with_log(context, target_platform, restore)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)    
 
     @autolog.log_method(Logger, 'RestoreVMNetworks.execute')
-    def execute_with_log(self, context, restore):
+    def execute_with_log(self, context, target_platform, restore):
         # Restore the networking configuration of VMs
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
       
-        target_platform = 'openstack' 
-        if 'pickle' in restore:
-            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
-            if options and 'type' in options:
-                target_platform = options['type'] 
         if target_platform == 'openstack':
             return vmtasks_openstack.restore_vm_networks(cntx, db, restore)
         else:
@@ -83,25 +78,20 @@ class RestoreVMNetworks(task.Task):
         pass    
 
 class RestoreSecurityGroups(task.Task):
-    def execute(self, context, restore):
-        return self.execute_with_log(context, restore)
+    def execute(self, context, target_platform, restore):
+        return self.execute_with_log(context, target_platform, restore)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)    
 
     @autolog.log_method(Logger, 'RestoreSecurityGroups.execute')
-    def execute_with_log(self, context, restore):
+    def execute_with_log(self, context, target_platform, restore):
         # Restore the security groups
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
-        target_platform = 'openstack' 
-        if 'pickle' in restore:
-            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
-            if options and 'type' in options:
-                target_platform = options['type'] 
         if target_platform == 'openstack':
             return vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
         else:
@@ -113,25 +103,20 @@ class RestoreSecurityGroups(task.Task):
 
 class PreRestore(task.Task):
 
-    def execute(self, context, instance, restore):
-        return self.execute_with_log(context, instance, restore)
+    def execute(self, context, target_platform, instance, restore):
+        return self.execute_with_log(context, target_platform, instance, restore)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'PreRestore.execute')
-    def execute_with_log(self, context, instance, restore):
+    def execute_with_log(self, context, target_platform, instance, restore):
         # pre processing of restore
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])   
 
-        target_platform = 'openstack' 
-        if 'pickle' in restore:
-            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
-            if options and 'type' in options:
-                target_platform = options['type'] 
         if target_platform == 'openstack':
             return vmtasks_openstack.pre_restore_vm(cntx, db, instance, restore)
         else:
@@ -143,12 +128,6 @@ class PreRestore(task.Task):
             cntx = amqp.RpcContext.from_dict(kwargs['context'])
             db = WorkloadMgrDB().db
             db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
-
-            if kwargs['target_platform'] == 'openstack':
-               vmtasks_openstack.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore'])
-            else:
-                 vmtasks_vcloud.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore']) 
-
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -156,27 +135,22 @@ class PreRestore(task.Task):
 
 class RestoreVM(task.Task):
 
-    def execute(self, context, instance, restore, 
+    def execute(self, context, target_platform, instance, restore, 
                 restored_net_resources, restored_security_groups):
-        return self.execute_with_log(context, instance, restore, 
+        return self.execute_with_log(context, target_platform, instance, restore, 
                                      restored_net_resources, restored_security_groups)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'RestoreVM.execute')
-    def execute_with_log(self, context, instance, restore, 
+    def execute_with_log(self, context, target_platform, instance, restore, 
                          restored_net_resources, restored_security_groups):
         # Snapshot the VM
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
-        target_platform = 'vmware' 
-        if 'pickle' in restore:
-            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
-            if options and 'type' in options:
-                target_platform = options['type'] 
         if target_platform == 'openstack':
             ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore, 
                                                    restored_net_resources, restored_security_groups)
@@ -192,6 +166,10 @@ class RestoreVM(task.Task):
             cntx = amqp.RpcContext.from_dict(kwargs['context'])
             db = WorkloadMgrDB().db
             db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+            if kwargs['target_platform'] == 'openstack':
+                vmtasks_openstack.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore'])
+            else:
+                vmtasks_vcloud.delete_restored_vm(cntx, db, kwargs['instance'], kwargs['restore'])             
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -199,25 +177,19 @@ class RestoreVM(task.Task):
         
 class PowerOnVM(task.Task):
 
-    def execute(self, context, instance, restore, restored_instance):
-        return self.execute_with_log(context, instance, restore, restored_instance)
+    def execute(self, context, target_platform, instance, restore, restored_instance):
+        return self.execute_with_log(context, target_platform, instance, restore, restored_instance)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'PowerOnVM.execute')
-    def execute_with_log(self, context, instance, restore, restored_instance):
+    def execute_with_log(self, context, target_platform, instance, restore, restored_instance):
         # Resume the VM
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
-
-        target_platform = 'vmware' 
-        if 'pickle' in restore:
-            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
-            if options and 'type' in options:
-                target_platform = options['type'] 
 
         if target_platform == 'openstack':
             return vmtasks_openstack.poweron_vm(cntx, instance, restore, restored_instance)
@@ -238,25 +210,20 @@ class PowerOnVM(task.Task):
              
 class PostRestore(task.Task):
 
-    def execute(self, context, instance, restore):
-        return self.execute_with_log(context, instance, restore)
+    def execute(self, context, target_platform, instance, restore):
+        return self.execute_with_log(context, target_platform, instance, restore)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'PostRestore.execute')    
-    def execute_with_log(self, context, instance, restore):
+    def execute_with_log(self, context, target_platform, instance, restore):
         # post processing of restore
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
-        target_platform = 'openstack' 
-        if 'pickle' in restore:
-            options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
-            if options and 'type' in options:
-                target_platform = options['type'] 
         if target_platform == 'openstack':
             ret_val = vmtasks_openstack.post_restore_vm(cntx, db, instance, restore)
         else:
@@ -669,7 +636,7 @@ class SnapshotDataSize(task.Task):
             snapshot_data_ex = vmtasks_openstack.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
         else:
             snapshot_data_ex = vmtasks_vcloud.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
-        
+
         db.snapshot_vm_update(cntx, instance['vm_id'], snapshot_obj.id, {'size': snapshot_data_ex['vm_data_size'],})
         
         return snapshot_data_ex        
