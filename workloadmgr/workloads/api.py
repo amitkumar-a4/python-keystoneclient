@@ -854,17 +854,14 @@ class API(base.Base):
                 msg = _('Workload job scheduler is not paused')
                 raise wlm_exceptions.InvalidState(reason=msg)
         jobschedule = workload['jobschedule']
-        if len(jobschedule) < 5:
-                msg = _('Invalid job scheduler settings')
-                raise wlm_exceptions.Invalid(reason=msg)            
-   
-        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                            jobschedule,
-                                            jobstore='jobscheduler_store', 
-                                            kwargs={'workload_id':workload_id,  
-                                                    'user_id': workload['user_id'],
-                                                    'project_id':workload['project_id']})
-        AUDITLOG.log(context,'Workload Resumed', workload)
+        if len(jobschedule) >= 5:
+            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                                jobschedule,
+                                                jobstore='jobscheduler_store', 
+                                                kwargs={'workload_id':workload_id,  
+                                                        'user_id': workload['user_id'],
+                                                        'project_id':workload['project_id']})
+            AUDITLOG.log(context,'Workload Resumed', workload)
 
     @autolog.log_method(logger=Logger)
     def workload_unlock(self, context, workload_id):
