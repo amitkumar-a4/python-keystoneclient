@@ -120,16 +120,19 @@ class DisableProfiling(task.Task):
             try:
                 self.cfgclient = connect_server(cfghost, int(cfgport),
                                                 DBUser, DBPassword)
-                break
+                proflevel = self.cfgclient.admin.profiling_level()
+                # diable profiling
+                self.cfgclient.admin.set_profiling_level(pymongo.OFF)
+                return proflevel
             except:
                 LOG.debug(_( '"' + cfghost +'" appears to be offline'))
                 pass
 
-        proflevel = self.cfgclient.admin.profiling_level()
+        LOG.error(_("Cannot find config server to disable profiling. \
+                           Make sure your mongodb cluster is up and running"))
+        raise Exception(_("Cannot find config server to disable profiling. \
+                           Make sure your mongodb cluster is up and running"))
 
-        # diable profiling
-        self.cfgclient.admin.set_profiling_level(pymongo.OFF)
-        return proflevel
 
     def revert(self, *args, **kwargs):
         try:
@@ -156,13 +159,18 @@ class EnableProfiling(task.Task):
             try:
                 self.cfgclient = connect_server(cfghost, int(cfgport),
                                                 DBUser, DBPassword)
-                break
+                # Read profile level from the flow record?
+                self.cfgclient.admin.set_profiling_level(proflevel)
+                return
             except:
                 LOG.debug(_( '"' + cfghost +'" appears to be offline'))
                 pass
 
-        # Read profile level from the flow record?
-        self.cfgclient.admin.set_profiling_level(proflevel)
+        LOG.error(_("Cannot enable profiling. \
+                    Make sure your mongodb cluster is up and running"))
+        raise Exception(_("Cannot enable profiling. \
+                           Make sure your mongodb cluster is up and running"))
+
 
 class PauseDBInstance(task.Task):
 
@@ -171,7 +179,7 @@ class PauseDBInstance(task.Task):
         # Flush the database and hold the write # lock the instance.
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
-        self.client = connect_server(host_info[0], int(host_info[1]), '', '')
+        self.client = connect_server(host_info[0], int(host_info[1]), DBUser, DBPassword)
         self.client.fsync(lock = True)
 
         # Add code to wait until the fsync operations is complete
@@ -193,7 +201,7 @@ class ResumeDBInstance(task.Task):
         LOG.debug(_('ResumeDBInstance'))
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
-        self.client = connect_server(host_info[0], int(host_info[1]), '', '')
+        self.client = connect_server(host_info[0], int(host_info[1]), DBUser, DBPassword)
         self.client.unlock()
 
 class PauseBalancer(task.Task):
@@ -209,28 +217,35 @@ class PauseBalancer(task.Task):
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
-            break
+            try:
+                self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
+                db = self.client.config
 
-        self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
-        db = self.client.config
+                timeout = settings.get_settings().get('mongodb_stop_balancer_timeout', '300')
+                currtime = time.time()
+                db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
+                balancer_info = db.locks.find_one({'_id': 'balancer'})
+                while int(str(balancer_info['state'])) > 0 and\
+                      time.time() - currtime < timeout :
+                    time.sleep(5)
+                    LOG.debug(_('\t\twaiting for balancer to stop...'))
+                    balancer_info = db.locks.find_one({'_id': 'balancer'})
 
-        timeout = settings.get_settings().get('mongodb_stop_balancer_timeout', '300')
-        currtime = time.time()
-        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
-        balancer_info = db.locks.find_one({'_id': 'balancer'})
-        while int(str(balancer_info['state'])) > 0 and\
-              time.time() - currtime < timeout :
-            time.sleep(5)
-            LOG.debug(_('\t\twaiting for balancer to stop...'))
-            balancer_info = db.locks.find_one({'_id': 'balancer'})
-
-        if int(str(balancer_info['state'])) > 0:
-            LOG.error(_("Cannot stop the balancer with in the \
-                        mongodb_stop_balancer_timeout(%d) interval") %\
-                        mongodb_stop_balancer_timeout)
-            raise Exception(_("Cannot stop the balancer with in the \
-                        mongodb_stop_balancer_timeout(%d) interval") %\
-                        mongodb_stop_balancer_timeout)
+                if int(str(balancer_info['state'])) > 0:
+                    LOG.error(_("Cannot stop the balancer with in the \
+                                mongodb_stop_balancer_timeout(%d) interval") %\
+                                mongodb_stop_balancer_timeout)
+                    raise Exception(_("Cannot stop the balancer with in the \
+                                mongodb_stop_balancer_timeout(%d) interval") %\
+                                mongodb_stop_balancer_timeout)
+                return
+            except:
+                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                pass
+        LOG.error(_("Cannot pause balancer. \
+                    Make sure your mongodb cluster is up and running"))
+        raise Exception(_("Cannot pause balancer. \
+                           Make sure your mongodb cluster is up and running"))
 
     def revert(self, *args, **kwargs):
         try:
@@ -254,12 +269,20 @@ class ResumeBalancer(task.Task):
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
-            break
+            try:
+                self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
 
-        self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
+                db = self.client.config
+                db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
+                return
+            except:
+                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                pass
 
-        db = self.client.config
-        db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
+        LOG.error(_("Cannot resume balancer. \
+                    Make sure your mongodb cluster is up and running"))
+        raise Exception(_("Cannot resume balancer. \
+                           Make sure your mongodb cluster is up and running"))
 
 class ShutdownConfigServer(task.Task):
 
@@ -292,34 +315,38 @@ class ShutdownConfigServer(task.Task):
             try:
                 self.cfgclient = connect_server(cfghost, int(cfgport),
                                                 DBUser, DBPassword)
-                break
+
+                cmdlineopts = self.cfgclient.admin.command('getCmdLineOpts')
+
+                command = 'mongod --shutdown --port ' + cfgport + ' --configsvr'
+                if RunAsRoot:
+                    command = 'sudo ' + command
+
+                LOG.debug(_('ShutdownConfigServer'))
+                try:
+                    client = paramiko.SSHClient()
+                    client.load_system_host_keys()
+                    if HostPassword == '':
+                        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+                    else:
+                        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
+
+                    stdin, stdout, stderr = client.exec_command(command, timeout=120)
+                    LOG.debug(_(stdout.read()))
+                finally:
+                    client.close()
+
+                # Also make sure the config server command line operations are saved
+                return cfgsrv, cmdlineopts
             except:
                 LOG.debug(_( '"' + cfghost +'" appears to be offline'))
                 pass
+        LOG.error(_("Cannot shutdown configsrv. \
+                    Make sure your mongodb cluster is up and running"))
+        raise Exception(_("Cannot shutdown configsrv. \
+                           Make sure your mongodb cluster is up and running"))
 
-        cmdlineopts = self.cfgclient.admin.command('getCmdLineOpts')
-
-        command = 'mongod --shutdown --port ' + cfgport + ' --configsvr'
-        if RunAsRoot:
-            command = 'sudo ' + command
-
-        LOG.debug(_('ShutdownConfigServer'))
-        try:
-            client = paramiko.SSHClient()
-            client.load_system_host_keys()
-            if HostPassword == '':
-                client.set_missing_host_key_policy(paramiko.WarningPolicy())
-            else:
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
-
-            stdin, stdout, stderr = client.exec_command(command, timeout=120)
-            LOG.debug(_(stdout.read()))
-        finally:
-            client.close()
-
-        # Also make sure the config server command line operations are saved
-        return cfgsrv, cmdlineopts
 
         def revert(self, *args, **kwargs):
             client = None
@@ -434,8 +461,13 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
 
             #print 'Getting secondary from hosts in ', hosts
             # Get the replica set for each shard
-            c = pymongo.MongoClient(hosts,
-                        read_preference=ReadPreference.SECONDARY)
+            if username != '':
+                c = pymongo.MongoClient("mongodb://" + username + ":" +
+                                    password + "@" + hosts,
+                                    read_preference=ReadPreference.SECONDARY)
+            else:
+                c = pymongo.MongoClient(hosts, 
+                                        read_preference=ReadPreference.SECONDARY)
 
             status = c.admin.command('replSetGetStatus')
 
@@ -575,8 +607,6 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         except Exception as ex:
             LOG.exception(ex)
             LOG.info(_( '"' + hostname +'" appears to be offline. Cannot exec ifconfig' ))
-            raise
-
 
     # query VM by ethernet and get instance info here
     # call nova list
@@ -890,9 +920,14 @@ class MongoDBWorkflow(workflow.Workflow):
         for replica, hosts in replicahosts.iteritems():
             LOG.debug(_('Getting secondary from hosts in ' + hosts +
                         " for replica " + replica))
-            c = MongoClient(hosts,
-                        read_preference=ReadPreference.SECONDARY)
-            status = c.admin.command('replSetGetStatus')
+            if self._store['DBUser'] != '':
+                repl = pymongo.MongoClient("mongodb://" + self._store['DBUser'] + ":" +
+                                        self._store['DBPassword'] + "@" + hosts,
+                                        read_preference=ReadPreference.SECONDARY)
+            else:
+                repl = pymongo.MongoClient(hosts, 
+                                        read_preference=ReadPreference.SECONDARY)
+            status = repl.admin.command('replSetGetStatus')
 
             status["date"] = str(status["date"])
             status["children"] = status.pop("members")
