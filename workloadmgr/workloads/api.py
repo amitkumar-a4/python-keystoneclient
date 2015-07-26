@@ -952,7 +952,7 @@ class API(base.Base):
         snapshot_details.setdefault('instances', snapshot_vms)    
         return snapshot_details
 
-    @autolog.log_method(logger=Logger, log_args=False, log_retval=False)
+    #@autolog.log_method(logger=Logger, log_args=False, log_retval=False)
     def snapshot_show(self, context, snapshot_id):
         def _get_pit_resource_id(metadata, key):
             for metadata_item in metadata:
@@ -1206,7 +1206,7 @@ class API(base.Base):
         restore_details.setdefault('instances', instances)    
         return restore_details
 
-    @autolog.log_method(logger=Logger)
+    #@autolog.log_method(logger=Logger, log_args=False, log_retval=False)
     def restore_show(self, context, restore_id):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())
