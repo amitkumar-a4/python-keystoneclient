@@ -303,7 +303,7 @@ def vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_
     return IMPL.vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_id)
     
 def get_metadata_value(metadata, key, default=None):
-    return IMPL.get_metadata_value(metadata, key, default=None)
+    return IMPL.get_metadata_value(metadata, key, default=default)
 
 def restore_mark_incomplete_as_error(context, host):
     return IMPL.restore_mark_incomplete_as_error(context, host)

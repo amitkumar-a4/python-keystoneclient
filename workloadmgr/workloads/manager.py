@@ -657,7 +657,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                  })
 
             values = {'status': 'executing'}
-            if 'oneclickrestore' in options and options['oneclickrestore']:
+            if options and 'oneclickrestore' in options and options['oneclickrestore']:
                 # Fill the restore options from the snapshot instances metadata
                 options = self._oneclick_restore_options(context, restore, options)
                 values['pickle'] = pickle.dumps(options, 0)
@@ -699,6 +699,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     pass 
                 else:
                     self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
+
                 restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                 restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
                                    
