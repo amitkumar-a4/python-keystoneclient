@@ -121,7 +121,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='settings',
                        conditions={"method": ['POST']})
-        
+       
+        #Test email configuration
+        mapper.connect("test_email",
+                        "/{project_id}/workloads/test_email",
+                        controller=self.resources['workloads'],
+                        action='test_email',
+                        conditions={"method": ['GET']})
+ 
         #get workloadmanager nodes
         mapper.connect("workloads_nodes",
                        "/{project_id}/workloads/metrics/nodes",
@@ -271,10 +278,10 @@ class APIRouter(workloadmgr.api.APIRouter):
 
         #cancel snapshot
         mapper.connect("cancel_snapshot",
-                       "/{project_id}/snapshots/{id}/cancel",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/cancel",
                        controller=self.resources['snapshots'],
                        action='snapshot_cancel',
-                       conditions={"method": ['GET']})
+                       conditions={"method": ['POST']})
 
         #mount a snapshot
         mapper.connect("mount_snapshot_1",
@@ -348,10 +355,10 @@ class APIRouter(workloadmgr.api.APIRouter):
         
         #cancel a restore
         mapper.connect("cancel_restore",
-                       "/{project_id}/restores/{id}/cancel",
+                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}/cancel",
                        controller=self.resources['restores'],
                        action='restore_cancel',
-                       conditions={"method": ['GET']})
+                       conditions={"method": ['POST']})
                 
         ###################################################################################################
         self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
