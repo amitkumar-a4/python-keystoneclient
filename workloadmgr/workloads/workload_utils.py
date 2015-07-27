@@ -225,12 +225,16 @@ def download_snapshot_vm_resource_from_object_store(context, restore_id, snapsho
                                                                'snapshot_vm_name': snapshot_vm.vm_name,
                                                                'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                                'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
-        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
-        if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
-            vm_disk_resource_snap = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-            snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap.snapshot_vm_resource_id)
-        else:
-            snapshot_vm_resource = None
+        vm_disk_resource_snaps = db.vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+        for vm_disk_resource_snap in vm_disk_resource_snaps:
+            if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
+                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                if vm_disk_resource_snap_backing.snapshot_vm_resource_id != snapshot_vm_resource.id:
+                    snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                    break
+            else:
+                snapshot_vm_resource = None
+                break
     return object_store_download_time
     
 def purge_snapshot_vm_from_staging_area(context, snapshot_id, snapshot_vm_id):

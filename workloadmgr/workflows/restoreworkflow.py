@@ -48,7 +48,9 @@ def get_vms(cntx, restore_id):
     snapshots_vms_to_be_restored = []
     for snapshot_vm in snapshot_vms:
         instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
-        if instance_options and instance_options.get('include', True) == True:  
+        if not instance_options:
+            snapshots_vms_to_be_restored.append(snapshot_vm)
+        elif instance_options.get('include', True) == True:  
             snapshots_vms_to_be_restored.append(snapshot_vm)
             
     snapshot_vms = snapshots_vms_to_be_restored
@@ -60,7 +62,8 @@ def get_vms(cntx, restore_id):
               'hypervisor_hostname' : 'None',
               'hypervisor_type' :  'QEMU'}
         instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
-        if 'power' in instance_options and \
+        if instance_options and \
+           'power' in instance_options and \
            instance_options['power'] and \
            'sequence' in instance_options['power'] and \
            instance_options['power']['sequence']:
@@ -78,7 +81,8 @@ def get_vms(cntx, restore_id):
                   'hypervisor_type' :  'QEMU'}
             
             instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
-            if 'power' in instance_options and \
+            if instance_options and \
+               'power' in instance_options and \
                instance_options['power'] and \
                'sequence' in instance_options['power'] and \
                instance_options['power']['sequence']:
