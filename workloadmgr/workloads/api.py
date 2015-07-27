@@ -854,17 +854,14 @@ class API(base.Base):
                 msg = _('Workload job scheduler is not paused')
                 raise wlm_exceptions.InvalidState(reason=msg)
         jobschedule = workload['jobschedule']
-        if len(jobschedule) < 5:
-                msg = _('Invalid job scheduler settings')
-                raise wlm_exceptions.Invalid(reason=msg)            
-   
-        self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                            jobschedule,
-                                            jobstore='jobscheduler_store', 
-                                            kwargs={'workload_id':workload_id,  
-                                                    'user_id': workload['user_id'],
-                                                    'project_id':workload['project_id']})
-        AUDITLOG.log(context,'Workload Resumed', workload)
+        if len(jobschedule) >= 5:
+            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                                                jobschedule,
+                                                jobstore='jobscheduler_store', 
+                                                kwargs={'workload_id':workload_id,  
+                                                        'user_id': workload['user_id'],
+                                                        'project_id':workload['project_id']})
+            AUDITLOG.log(context,'Workload Resumed', workload)
 
     @autolog.log_method(logger=Logger)
     def workload_unlock(self, context, workload_id):
@@ -955,7 +952,7 @@ class API(base.Base):
         snapshot_details.setdefault('instances', snapshot_vms)    
         return snapshot_details
 
-    @autolog.log_method(logger=Logger, log_args=False, log_retval=False)
+    #@autolog.log_method(logger=Logger, log_args=False, log_retval=False)
     def snapshot_show(self, context, snapshot_id):
         def _get_pit_resource_id(metadata, key):
             for metadata_item in metadata:
@@ -1106,6 +1103,13 @@ class API(base.Base):
                        'host':'',                   
                        'status': 'restoring',}
             restore = self.db.restore_create(context, values)
+
+            self.db.restore_update(context, 
+                                    restore.id, 
+                                    {'progress_percent': 0, 
+                                     'progress_msg': 'Restore operation is scheduled',
+                                     'status': 'restoring'
+                                    })
             self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
             AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
             return restore
@@ -1202,7 +1206,7 @@ class API(base.Base):
         restore_details.setdefault('instances', instances)    
         return restore_details
 
-    @autolog.log_method(logger=Logger)
+    #@autolog.log_method(logger=Logger, log_args=False, log_retval=False)
     def restore_show(self, context, restore_id):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())

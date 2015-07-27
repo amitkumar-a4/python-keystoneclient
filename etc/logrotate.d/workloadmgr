@@ -1,12 +1,11 @@
 /var/log/workloadmgr/*.log {
-  daily
+  hourly
   missingok
-  compress
-  delaycompress
   notifempty
   copytruncate
   size=25M
   rotate 3
+  compress
 }
 
 /opt/stack/data/wlm/auditlogs/*.log {

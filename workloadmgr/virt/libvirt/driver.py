@@ -27,6 +27,7 @@ import cPickle as pickle
 import re
 import shutil
 import math
+import datetime
 
 from stat import *
 from eventlet import greenio
@@ -52,6 +53,8 @@ from workloadmgr.vault import vault
 from workloadmgr import autolog
 
 from workloadmgr.workflows import vmtasks_openstack
+from workloadmgr.openstack.common import timeutils
+from workloadmgr.workloads import workload_utils
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -462,7 +465,9 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         vast_params = {'snapshot_id': snapshot_obj.id,
                        'workload_id': workload_obj.id}
-        compute_service.vast_instance(cntx, instance['vm_id'], vast_params) 
+        compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
+        snapshot_data = {}
+        return snapshot_data 
         
     @autolog.log_method(Logger, 'libvirt.driver.get_snapshot_disk_info')
     def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
@@ -516,17 +521,17 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.debug(_("    vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
             vm_data_size = vm_data_size + vm_disk_size
             LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
-
-        return vm_data_size
+        
+        snapshot_data['vm_data_size'] = vm_data_size
+        return snapshot_data
     
     @autolog.log_method(Logger, 'libvirt.driver..upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
-                
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
-        vault_service = vault.get_vault_service(cntx)
 
-        disks_info = self.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)
+        disks_info = self.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data_ex)
         for disk_info in disks_info:
 
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
@@ -592,36 +597,76 @@ class LibvirtDriver(driver.ComputeDriver):
                                                  'status': 'creating'}     
                                                              
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)                
-                #upload to vault service
-                vault_metadata = {'metadata': vm_disk_resource_snap_metadata,
-                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
-                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                  'resource_name':  disk_info['dev'],
-                                  'snapshot_vm_id': instance['vm_id'],
-                                  'snapshot_id': snapshot_obj.id,
-                                  'workload_id': snapshot_obj.workload_id,}
-                vast_data = compute_service.vast_data(cntx, instance['vm_id'], {'path': base_backing_path['path'],
-                                                                                'urls': base_backing_path['urls'],})
+                
+                #upload to backup store
+                snapshot_vm_disk_resource_metadata = {'workload_id': snapshot['workload_id'],
+                                                      'workload_name': workload_obj.display_name,
+                                                      'snapshot_id': snapshot['id'],
+                                                      'snapshot_vm_id': instance['vm_id'],
+                                                      'snapshot_vm_name': instance['vm_name'],
+                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                      'snapshot_vm_resource_name':  disk_info['dev'],
+                                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
+                
+                vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)                 
+                
+                
+                compute_service.vast_data_transfer(cntx, instance['vm_id'], {'path': base_backing_path['path'],
+                                                                             'urls': base_backing_path['urls'],
+                                                                             'metadata': snapshot_vm_disk_resource_metadata,})
+
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
                                                     })
+                
                 LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + '; backing file:' + os.path.basename(base_backing_path['path'])))
-                vault_service_url = vault_service.store(vault_metadata, vast_data, vast_data._size);
-                snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
-                                                    {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
-                                                     'status': 'uploading'
-                                                    })                           
+
+
+                start_time = timeutils.utcnow()
+                data_transfer_completed = False
+                while True:
+                    try:
+                        time.sleep(5)
+                        data_transfer_status = compute_service.vast_data_transfer_status(cntx, instance['vm_id'], 
+                                                                                        {'metadata': {'resource_id' : vm_disk_resource_snap_id}})
+                        if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):
+                            for line in data_transfer_status['status']:
+                                if 'Completed' in line:
+                                    data_transfer_completed = True                     
+                                    break;
+                        if data_transfer_completed:
+                            break;
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        raise ex
+                    now = timeutils.utcnow()
+                    if (now - start_time) > datetime.timedelta(minutes=10*60):
+                        raise exception.ErrorOccurred(reason='Timeout uploading data')
+
+                snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id, 
+                                                  {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
+                                                   'status': 'uploading'})                           
                 
                 # update the entry in the vm_disk_resource_snap table
-                vm_disk_resource_snap_values = {'vault_service_url' :  vault_service_url ,
+                vm_disk_resource_snap_values = {'vault_url' :  vault_url.replace(vault.get_vault_local_directory(), '', 1) ,
                                                 'vault_service_metadata' : 'None',
                                                 'status': 'available'} 
                 db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 vm_disk_size = vm_disk_size + base_backing_path['size']
                 base_backing_path = top_backing_path
-
-            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, {'status': 'available', 'size': vm_disk_size})
+                
+            
+            snapshot_type = 'incremental'
+            vm_disk_resource_snaps = db.vm_disk_resource_snaps_get(cntx, snapshot_vm_resource.id)
+            for vm_disk_resource_snap in vm_disk_resource_snaps:
+                if  vm_disk_resource_snap.vm_disk_resource_snap_backing_id == None:
+                    snapshot_type = 'full'
+                     
+            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, 
+                                           {'snapshot_type' : snapshot_type,
+                                            'status': 'available', 
+                                            'size': vm_disk_size})
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
@@ -656,7 +701,7 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production = (restore['restore_type'] != 'test')) 
         image_service = glance.get_default_image_service(production= (restore['restore_type'] != 'test'))
         volume_service = cinder.API()
-        vault_service = vault.get_vault_service(cntx)
+
         
         test = (restore['restore_type'] == 'test')
         
@@ -666,9 +711,19 @@ class LibvirtDriver(driver.ComputeDriver):
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
     
         #restore, rebase, commit & upload
+        LOG.info(_('Processing disks'))
+        snapshot_vm_object_store_transfer_time = 0
+        snapshot_vm_data_transfer_time = 0        
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
+            snapshot_vm_resource_object_store_transfer_time = workload_utils.download_snapshot_vm_resource_from_object_store(cntx, 
+                                                                                                                             restore_obj.id, 
+                                                                                                                             restore_obj.snapshot_id,
+                                                                                                                             snapshot_vm_resource.id)
+            snapshot_vm_object_store_transfer_time += snapshot_vm_resource_object_store_transfer_time                                                                                                        
+            snapshot_vm_data_transfer_time  +=  snapshot_vm_resource_object_store_transfer_time
+                                     
             temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
             try:
                 shutil.rmtree( temp_directory )
@@ -678,100 +733,54 @@ class LibvirtDriver(driver.ComputeDriver):
             
             commit_queue = Queue() # queue to hold the files to be committed                 
             vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
+            disk_format = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
             disk_filename_extention = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
             restored_file_path =temp_directory + '/' + vm_disk_resource_snap.id + \
                                 '_' + snapshot_vm_resource.resource_name + '.' \
                                 + disk_filename_extention
-            restored_file_path = restored_file_path.replace(" ", "")
-            vault_metadata = {'vault_service_url' : vm_disk_resource_snap.vault_service_url,
-                              'vault_service_metadata' : vm_disk_resource_snap.vault_service_metadata,
-                              'vm_disk_resource_snap_id' : vm_disk_resource_snap.id,
-                              'disk_format' : db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format'),                              
-                              'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                              'resource_name':  snapshot_vm_resource.resource_name,
-                              'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                              'snapshot_id': snapshot_vm_resource.snapshot_id,
-                              'workload_id': snapshot_obj.workload_id,
-                              'restore_id': restore_obj.id}
-            LOG.debug('Restoring ' + vm_disk_resource_snap.vault_service_url)
-            vault_service.restore(vault_metadata, restored_file_path)
-            LOG.debug('Restored ' + vm_disk_resource_snap.vault_service_url)
+            restored_file_path = restored_file_path.replace(" ", "")            
+            image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
+            if disk_format == 'qcow2' and image_attr.file_format == 'raw':
+                qemuimages.convert_image(vm_disk_resource_snap.vault_path, restored_file_path, 'qcow2')
+            else:
+                shutil.copyfile(vm_disk_resource_snap.vault_path, restored_file_path)
 
-            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
-                if vm_disk_resource_snap.vm_disk_resource_snap_backing_id is None:
-                    self.rebase_vmdk(restored_file_path,
-                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
-                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'),
-                                     None,
-                                     None,
-                                     None)
-                    commit_queue.put(restored_file_path)  
-                                 
             while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
                 vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                disk_format = db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'disk_format')
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
                 restored_file_path_backing =temp_directory + '/' + vm_disk_resource_snap_backing.id + \
                                             '_' + snapshot_vm_resource_backing.resource_name + '.' \
                                             + disk_filename_extention
                 restored_file_path_backing = restored_file_path_backing.replace(" ", "")
-                vault_metadata = {'vault_service_url' : vm_disk_resource_snap_backing.vault_service_url,
-                                  'vault_service_metadata' : vm_disk_resource_snap_backing.vault_service_metadata,
-                                  'vm_disk_resource_snap_id' : vm_disk_resource_snap_backing.id,
-                                  'disk_format' : db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'disk_format'),
-                                  'snapshot_vm_resource_id': snapshot_vm_resource_backing.id,
-                                  'resource_name':  snapshot_vm_resource_backing.resource_name,
-                                  'snapshot_vm_id': snapshot_vm_resource_backing.vm_id,
-                                  'snapshot_id': snapshot_vm_resource_backing.snapshot_id,
-                                  'workload_id': snapshot_obj.workload_id,
-                                  'restore_id': restore_obj.id}
-                LOG.debug('Restoring ' + vm_disk_resource_snap_backing.vault_service_url)
-                vault_service.restore(vault_metadata, restored_file_path_backing)
-                LOG.debug('Restored ' + vm_disk_resource_snap_backing.vault_service_url)     
+                image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap_backing.vault_path)
+                if disk_format == 'qcow2' and image_attr.file_format == 'raw':
+                    qemuimages.convert_image(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing, 'qcow2')
+                else:
+                    shutil.copyfile(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing)
+  
                 #rebase
-                if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
-                    image_info = qemuimages.qemu_img_info(restored_file_path)
-                    image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
-                    #covert the raw image to qcow2
-                    if image_backing_info.file_format == 'raw':
-                        converted = os.path.join(os.path.dirname(restored_file_path_backing), str(uuid.uuid4()))
-                        LOG.debug('Converting ' + restored_file_path_backing + ' to QCOW2')  
-                        qemuimages.convert_image(restored_file_path_backing, converted, 'qcow2')
-                        LOG.debug('Finished Converting ' + restored_file_path_backing + ' to QCOW2')
-                        utils.delete_if_exists(restored_file_path_backing)
-                        shutil.move(converted, restored_file_path_backing)
-                        image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
-                    #increase the size of the base image
-                    if image_backing_info.virtual_size < image_info.virtual_size :
-                        qemuimages.resize_image(restored_file_path_backing, image_info.virtual_size)  
-                    #rebase the image                            
-                    qemuimages.rebase_qcow2(restored_file_path_backing, restored_file_path)
-                elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
-                    self.rebase_vmdk(restored_file_path_backing,
-                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_data_file_name'),
-                                     db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'vmdk_descriptor'),
-                                     restored_file_path,
-                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_data_file_name'),
-                                     db.get_metadata_value(vm_disk_resource_snap.metadata,'vmdk_descriptor'))               
+                image_info = qemuimages.qemu_img_info(restored_file_path)
+                image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
+                #increase the size of the base image
+                if image_backing_info.virtual_size < image_info.virtual_size :
+                    qemuimages.resize_image(restored_file_path_backing, image_info.virtual_size)  
+                #rebase the image                            
+                qemuimages.rebase_qcow2(restored_file_path_backing, restored_file_path)
+            
                 commit_queue.put(restored_file_path)                                 
                 vm_disk_resource_snap = vm_disk_resource_snap_backing
                 restored_file_path = restored_file_path_backing
 
-            if(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'qcow2'):
-                while commit_queue.empty() is not True:
-                    file_to_commit = commit_queue.get_nowait()
-                    try:
-                        LOG.debug('Commiting QCOW2 ' + file_to_commit)
-                        qemuimages.commit_qcow2(file_to_commit)
-                    except Exception, ex:
-                        LOG.exception(ex)                       
-                    if restored_file_path != file_to_commit:
-                        utils.delete_if_exists(file_to_commit)
-            elif(db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk'):
-                    file_to_commit = commit_queue.get_nowait()
-                    commit_to = temp_directory + '/' + vm_disk_resource_snap.id + '_Restored_' + snapshot_vm_resource.resource_name + '.' + disk_filename_extention
-                    commit_to = commit_to.replace(" ", "")
-                    LOG.debug('Commiting VMDK ' + file_to_commit)
-                    restored_file_path = self.commit_vmdk(file_to_commit, commit_to, test)
+            while commit_queue.empty() is not True:
+                file_to_commit = commit_queue.get_nowait()
+                try:
+                    LOG.debug('Commiting QCOW2 ' + file_to_commit)
+                    qemuimages.commit_qcow2(file_to_commit)
+                except Exception, ex:
+                    LOG.exception(ex)                       
+                if restored_file_path != file_to_commit:
+                    utils.delete_if_exists(file_to_commit)
             
             LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
             db.restore_update(cntx,  restore['id'], 

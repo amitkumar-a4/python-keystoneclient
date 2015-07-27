@@ -848,24 +848,43 @@ class API(base.Base):
             raise          
         
     @synchronized(novalock)
-    def vast_data(self, context, server, params):
+    def vast_data_transfer(self, context, server, params):
         """
-        Read a component of a VASTed instance
+        Transfer a component of a VASTed instance to backup store
         :param server: The :class:`Server` (or its ID) to query.
         """        
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_data(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True) 
         except nova_exception.Unauthorized as unauth_ex:
             client.client.unauthenticate()
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_data(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True) 
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             raise   
 
+    @synchronized(novalock)
+    def vast_data_transfer_status(self, context, server, params):
+        """
+        Get data transfer status of VASTed instance component
+        :param server: The :class:`Server` (or its ID) to query.
+        """        
+        try:
+            extensions = _discover_extensions('1.1')
+            client =  novaclient(context, self._production, extensions=extensions)
+            return client.contego.vast_data_transfer_status(server=server, params=params, do_checksum=True) 
+        except nova_exception.Unauthorized as unauth_ex:
+            client.client.unauthenticate()
+            client =  novaclient(context, self._production, extensions=extensions)
+            return client.contego.vast_data_transfer_status(server=server, params=params, do_checksum=True) 
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception   
+            raise   
+        
     @synchronized(novalock)
     def vast_finalize(self, context, server, params):
         """

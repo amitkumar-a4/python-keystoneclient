@@ -55,7 +55,10 @@ class AuditLog(object):
             
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
             auditlogmsg = auditlogmsg + ',' + user.name + ',' + context.user_id
-            auditlogmsg = auditlogmsg + ',' +  object.get('display_name', 'NA') + ',' + object.get('id', 'NA')  
+            display_name = object.get('display_name', 'NA')
+            if not display_name:
+                display_name = object.get('id', 'NA')
+            auditlogmsg = auditlogmsg + ',' +  display_name + ',' + object.get('id', 'NA')  
             auditlogmsg = auditlogmsg + ',' + message + '\n'
 
             head, tail = os.path.split(self._filepath)

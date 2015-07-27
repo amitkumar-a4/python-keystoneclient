@@ -113,7 +113,8 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            raise exc.HTTPServerError(explanation=unicode(error))
+          
         
     def delete(self, req, id, workload_id=None):
         """Delete a snapshot."""
@@ -213,8 +214,8 @@ class SnapshotsController(wsgi.Controller):
                 name = body['restore'].get('name', None)
                 description = body['restore'].get('description', None)
                 options = body['restore'].get('options', {})
-                #options = body['recoveryoptions'].get('options', {})
-            
+            if not options:
+                options = {'type' : 'openstack'}                
             restore = self.workload_api.snapshot_restore(context, 
                                                          snapshot_id=id, 
                                                          test=test,
