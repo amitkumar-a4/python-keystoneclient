@@ -105,7 +105,10 @@ def _snapshot_create_callback(*args, **kwargs):
                 num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
                 
         if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
-            snapshot_type = "full"
+           snapshot_type = "full"
+
+        if snapshots.__len__ == 0:
+           snapshot_type = 'full'
 
     try:
         snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
@@ -878,6 +881,7 @@ class API(base.Base):
         """
         try:
             workload = self.workload_get(context, workload_id)
+
             AUDITLOG.log(context,'Workload Snapshot Requested', workload)
         
             workloads = self.db.workload_get_all(context)

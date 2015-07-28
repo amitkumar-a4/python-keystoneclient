@@ -119,7 +119,7 @@ class RestoresController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error)) 
 
-    def restore_cancel(self, req, id, workload_id=None, snapshot_id=None, body=None):
+    def restore_cancel(self, req, id):
         """Cancel a restore."""
         try:
             context = req.environ['workloadmgr.context']
