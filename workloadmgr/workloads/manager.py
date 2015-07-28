@@ -456,12 +456,21 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
         except WrappedFailure as ex:
             LOG.exception(ex)
-            msg = _("Failed creating workload snapshot with following error(s):")
-            if hasattr(ex, '_causes'):
-                for cause in ex._causes:
-                    if cause._exception_str not in msg:
-                        msg = msg + ' ' + cause._exception_str
-            LOG.error(msg)  
+
+            flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id, 1)
+            if flag == '1':
+               msg =  _("%(exception)s") %{'exception': ex}
+               status = 'cancelled'
+               for vm in self.db.workload_vms_get(context, workload.id):
+                   self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
+            else:
+                 msg = _("Failed creating workload snapshot with following error(s):")
+                 if hasattr(ex, '_causes'):
+                    for cause in ex._causes:
+                        if cause._exception_str not in msg:
+                           msg = msg + ' ' + cause._exception_str
+                 LOG.error(msg)  
+                 status = 'error'
             
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -469,7 +478,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'progress_msg': '',
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
-                                     'status': 'error'
+                                     'status': status
                                     })  
             try:
                 self.db.snapshot_type_time_size_update(context, snapshot_id)
@@ -725,13 +734,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                              'status': 'available'
                             })
         except WrappedFailure as ex:
-            LOG.exception(ex)
-            msg = _("Failed restoring snapshot with following error(s):")
-            if hasattr(ex, '_causes'):
-                for cause in ex._causes:
-                    if cause._exception_str not in msg:
-                        msg = msg + ' ' + cause._exception_str
-            LOG.error(msg)
+
+            flag = self.db.restore_get_metadata_cancel_flag(context, restore_id, 1)
+            if flag == '1':
+               msg =  _("%(exception)s") %{'exception': ex}
+               status = 'cancelled'
+            else:
+                 status = 'error'
+                 LOG.exception(ex)
+                 msg = _("Failed restoring snapshot with following error(s):")
+                 if hasattr(ex, '_causes'):
+                    for cause in ex._causes:
+                        if cause._exception_str not in msg:
+                           msg = msg + ' ' + cause._exception_str
+                 LOG.error(msg)
             
             time_taken = 0
             if 'restore' in locals() or 'restore' in globals():
@@ -748,7 +764,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'metadata' : {'data_transfer_time' : 0,
                                                    'object_store_transfer_time' : 0,
                                                   },                                        
-                                     'status': 'error'
+                                     'status': status
                                     })       
         except Exception as ex:
             

@@ -300,7 +300,7 @@ class SnapshotsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
-    def snapshot_cancel(self, req, id, workload_id=None, body=None):
+    def snapshot_cancel(self, req, id):
         """cancel snapshot"""
         try:
             context = req.environ['workloadmgr.context']

@@ -278,10 +278,10 @@ class APIRouter(workloadmgr.api.APIRouter):
 
         #cancel snapshot
         mapper.connect("cancel_snapshot",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/cancel",
+                       "/{project_id}/snapshots/{id}/cancel",
                        controller=self.resources['snapshots'],
                        action='snapshot_cancel',
-                       conditions={"method": ['POST']})
+                       conditions={"method": ['GET']})
 
         #mount a snapshot
         mapper.connect("mount_snapshot_1",
@@ -355,10 +355,10 @@ class APIRouter(workloadmgr.api.APIRouter):
         
         #cancel a restore
         mapper.connect("cancel_restore",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}/cancel",
+                       "/{project_id}/restores/{id}/cancel",
                        controller=self.resources['restores'],
                        action='restore_cancel',
-                       conditions={"method": ['POST']})
+                       conditions={"method": ['GET']})
                 
         ###################################################################################################
         self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
