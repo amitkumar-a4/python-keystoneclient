@@ -1295,8 +1295,8 @@ class API(base.Base):
             return
             
         
-        if restore_details['status'] not in ['available', 'error']:
-            msg = _("Status of the requested resource status must be 'available' or 'error'")
+        if restore_details['status'] not in ['available', 'error', 'cancelled']:
+            msg = _("Status of the requested resource status must be 'available' or 'error' or 'cancelled'")
             raise wlm_exceptions.InvalidState(reason=msg)
 
         if restore_details['restore_type'] == 'test':
