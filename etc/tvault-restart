@@ -1,0 +1,6 @@
+#!/bin/bash
+
+#Required
+
+sudo service tvault-config stop
+sudo service tvault-config start
