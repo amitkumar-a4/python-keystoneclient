@@ -278,6 +278,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                           'vm_name': instance['vm_name']}
                 vm = self.db.workload_vms_create(context, values)                                       
         
+        if instances and 'topology' in instances:
+            workload_metadata = {'topology': json.dumps(instances['topology'])}
+            self.db.workload_update(context, 
+                                    workload_id,
+                                    {'metadata': workload_metadata})
         return instances
 
     @autolog.log_method(logger=Logger)
@@ -313,7 +318,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     @autolog.log_method(logger=Logger)    
     def workload_get_workflow_details(self, context, workload_id):
         """
-        Return workload topology
+        Return workload workflow
         """        
         context_dict = dict([('%s' % key, value)
                           for (key, value) in context.to_dict().iteritems()])            
