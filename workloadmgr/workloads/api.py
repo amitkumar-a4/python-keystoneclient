@@ -1054,8 +1054,8 @@ class API(base.Base):
             snapshot = self.snapshot_get(context, snapshot_id)
             AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
             
-            if snapshot['status'] not in ['available', 'error']:
-                msg = _("Snapshot status must be 'available' or 'error'")
+            if snapshot['status'] not in ['available', 'error', 'cancelled']:
+                msg = _("Snapshot status must be 'available' or 'error' or 'cancelled'")
                 raise wlm_exceptions.InvalidState(reason=msg)
             
             try:
