@@ -1054,8 +1054,8 @@ class API(base.Base):
             snapshot = self.snapshot_get(context, snapshot_id)
             AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
             
-            if snapshot['status'] not in ['available', 'error']:
-                msg = _("Snapshot status must be 'available' or 'error'")
+            if snapshot['status'] not in ['available', 'error', 'cancelled']:
+                msg = _("Snapshot status must be 'available' or 'error' or 'cancelled'")
                 raise wlm_exceptions.InvalidState(reason=msg)
             
             try:
@@ -1295,8 +1295,8 @@ class API(base.Base):
             return
             
         
-        if restore_details['status'] not in ['available', 'error']:
-            msg = _("Status of the requested resource status must be 'available' or 'error'")
+        if restore_details['status'] not in ['available', 'error', 'cancelled']:
+            msg = _("Status of the requested resource status must be 'available' or 'error' or 'cancelled'")
             raise wlm_exceptions.InvalidState(reason=msg)
 
         if restore_details['restore_type'] == 'test':
