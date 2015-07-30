@@ -1485,6 +1485,20 @@ def configure_host():
         #close temp file
         new_file.close()
         close(fh)
+
+        #SSL regeneration
+        os.chdir("/etc/tvault/ssl")
+        if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
+           command = ['sudo', 'mv', "/opt/stack/workloadmgr/etc/gen-cer", "/etc/tvault/ssl/"];
+           subprocess.call(command, shell=False)
+           os.chmod('/etc/tvault/ssl/gen-cer',0554)
+           command = ['sudo', 'sh','gen-cer',socket.gethostname()];
+           subprocess.call(command, shell=False)
+           command = ['sudo', 'rm', '-rf',"/etc/tvault/ssl/"+socket.gethostname()+".csr"];
+           subprocess.call(command, shell=False)
+           command = ['sudo', 'mv', "gen-cer","/opt/stack/workloadmgr/etc/"];
+           subprocess.call(command, shell=False) 
+
         #Move new file
         command = ['sudo', 'mv', abs_path, "/etc/hosts"];
         subprocess.call(command, shell=False)
@@ -1913,6 +1927,15 @@ def discover_vcenter():
                 client.servers.list(True, search_opts)
         config_data['config_status'] = 'success'
         persist_config()
+
+        command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.crt", "/etc/tvault/ssl/localhost_bak.crt"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.key", "/etc/tvault/ssl/localhost_bak.key"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".crt", "/etc/tvault/ssl/localhost.crt"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".key", "/etc/tvault/ssl/localhost.key"];
+        subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         config_data['config_status'] = 'failed'
@@ -1921,6 +1944,12 @@ def discover_vcenter():
     time.sleep(1)
     return {'status':'Success'}
 
+@bottle.route('/restart_self')
+@authorize()
+def restart_self():
+    command = ['sudo', 'sh', 'tvault-restart'];
+    subprocess.call(command, shell=False)
+    
 @bottle.post('/configure_openstack')
 @authorize()
 def persist_config():
@@ -2248,6 +2277,7 @@ def main():
         
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
+
                 
     except Exception as exception:
         #TODO: implement logging
