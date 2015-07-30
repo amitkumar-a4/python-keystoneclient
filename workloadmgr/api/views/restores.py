@@ -123,6 +123,7 @@ class ViewBuilder(common.ViewBuilder):
         d['warning_msg'] =  restore['warning_msg']
         d['error_msg'] =  restore['error_msg']
         d['time_taken'] = restore['time_taken']
+        d['metadata'] = restore['metadata']        
         return {'restore': d}        
 
     def _list_view(self, func, request, restores):
