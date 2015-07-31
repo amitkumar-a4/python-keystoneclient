@@ -2281,7 +2281,7 @@ def main():
 
     bottle.debug(True)
     srv = SSLWSGIRefServer(host='0.0.0.0', port=443)
-    bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
+    #bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
     bottle.run(server=srv, app=app, quiet=False, reloader=True)          
 
 if __name__ == "__main__":
