@@ -6,8 +6,8 @@ commonname=$domain
  
 #Change to your company details
 country=US
-state=California
-locality=Los Angeles
+state=Massachusetts
+locality=Cambridge
 organization=triliodata.com
 organizationalunit=IT
 email=admin@triliodata.com

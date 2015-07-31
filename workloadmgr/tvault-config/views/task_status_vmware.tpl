@@ -284,20 +284,6 @@ function taskfunction()
 					                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
 					                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
 
-
-                                                                 loadXMLDoc("restart_self",function() {
-                                                                                        if (xmlhttp.readyState != 4) return;
-                                                                                        if (xmlhttp.readyState==4 && xmlhttp.status==200)
-                                                                                        {
-                                                                                        }
-                                                                                        else
-                                                                                        {
-                                                                                                return;
-                                                                                        }
-                                                           });
-
-                                                          
-
 					                   });
 
 

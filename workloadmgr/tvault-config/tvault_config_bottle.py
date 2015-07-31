@@ -38,8 +38,6 @@ import workloadmgrclient.v1.client as wlmclient
 from workloadmgr.compute import nova
 from workloadmgr.openstack.common.gettextutils import _
 
-
-
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
@@ -1485,7 +1483,6 @@ def configure_host():
         #close temp file
         new_file.close()
         close(fh)
-
         #SSL regeneration
         os.chdir("/etc/tvault/ssl")
         if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
@@ -1944,12 +1941,6 @@ def discover_vcenter():
     time.sleep(1)
     return {'status':'Success'}
 
-@bottle.route('/restart_self')
-@authorize()
-def restart_self():
-    command = ['sudo', 'sh', 'tvault-restart'];
-    subprocess.call(command, shell=False)
-    
 @bottle.post('/configure_openstack')
 @authorize()
 def persist_config():
@@ -2226,7 +2217,8 @@ def set_network_interfaces(propertyMap):
 def main_http():
     # Start the Bottle webapp
     bottle.debug(True)
-    bottle.run(host='0.0.0.0', port=80)
+    bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
+    bottle.run(host='0.0.0.0', port=80, reloader=True)
     
 def main():
     #configure the networking
@@ -2289,6 +2281,7 @@ def main():
 
     bottle.debug(True)
     srv = SSLWSGIRefServer(host='0.0.0.0', port=443)
+    bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
     bottle.run(server=srv, app=app, quiet=False, reloader=True)          
 
 if __name__ == "__main__":
