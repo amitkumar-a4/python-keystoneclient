@@ -585,6 +585,9 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
             cfgport = cfgsrv.split(':')[1]
             if not cfghost in hostnames:
                 hostnames[cfghost] = 1
+
+        if not dbhost in hostnames:
+            hostnames[dbhost] = 1
     else:
         # this is a replica set
         status = connection.admin.command('replSetGetStatus')
@@ -607,6 +610,10 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         except Exception as ex:
             LOG.exception(ex)
             LOG.info(_( '"' + hostname +'" appears to be offline. Cannot exec ifconfig' ))
+
+    if len(interfaces) == 0:
+        LOG.info(_("Unabled to login to VMs to discover MAC Addresses. Please check username/passwor and try again."))
+        raise Exception(_("Unabled to login to VMs to discover MAC Addresses. Please check username/passwor and try again."))
 
     # query VM by ethernet and get instance info here
     # call nova list
