@@ -27,7 +27,6 @@ from workloadmgr import utils
 from workloadmgr.openstack.common import fileutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
-from workloadmgr.vault import swift
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.virt import qemuimages
 from workloadmgr import autolog
@@ -37,6 +36,8 @@ from swiftclient.exceptions import ClientException
 from os.path import isfile, isdir, join
 from os import environ, walk, _exit as os_exit
 
+from threading import Thread
+from functools import wraps
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -91,6 +92,38 @@ wlm_vault_opts = [
 
 FLAGS = flags.FLAGS
 FLAGS.register_opts(wlm_vault_opts)
+
+def run_async(func):
+    """
+        run_async(func)
+            function decorator, intended to make "func" run in a separate
+            thread (asynchronously).
+            Returns the created Thread object
+
+            E.g.:
+            @run_async
+            def task1():
+                do_something
+
+            @run_async
+            def task2():
+                do_something_too
+
+            t1 = task1()
+            t2 = task2()
+            ...
+            t1.join()
+            t2.join()
+    """
+
+
+    @wraps(func)
+    def async_func(*args, **kwargs):
+        func_hl = Thread(target = func, args = args, kwargs = kwargs)
+        func_hl.start()
+        return func_hl
+
+    return async_func
 
 def get_vault_local_directory():
     vault_local_directory = ''
@@ -351,7 +384,37 @@ def upload_snapshot_vm_resource_to_object_store(context, snapshot_vm_resource_me
         return 0
     else:
         return 0
-    return int((timeutils.utcnow() - start_time).total_seconds())       
+    return int((timeutils.utcnow() - start_time).total_seconds()) 
+
+@run_async 
+@autolog.log_method(logger=Logger)
+def upload_snapshot_vm_disk_resource_to_object_store(context, snapshot_vm_disk_resource_metadata, snapshot_vm_disk_resource_path=None):
+    fileutils.ensure_tree('/var/run/workloadmgr')
+    progress_tracking_file_path = '/var/run/workloadmgr' + '/' + snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id']
+    with open(progress_tracking_file_path, "w+") as progress_tracking_file:
+        progress_tracking_file.write('In Progress')    
+    if FLAGS.vault_storage_type == 'swift-i' or FLAGS.vault_storage_type == 'swift-s': 
+        progress_msg = "Uploading '"+ snapshot_vm_disk_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_disk_resource_metadata['snapshot_vm_name'] + "' to object store"
+        LOG.info(progress_msg)
+        if snapshot_vm_disk_resource_path:
+            object_name = get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
+            object_name = object_name.replace(get_vault_local_directory(), '', 1)
+        else:
+            snapshot_vm_disk_resource_path = get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
+        container = get_swift_container(snapshot_vm_disk_resource_metadata)
+        try:
+            swift_upload_files([snapshot_vm_disk_resource_path], container, object_name=object_name, context = None)
+        except Exception as ex:
+            LOG.exception(ex)
+            progress_msg = "Retrying to upload '"+ snapshot_vm_disk_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_disk_resource_metadata['snapshot_vm_name'] + "' to object store"
+            LOG.info(progress_msg)
+            swift_upload_files([snapshot_vm_disk_resource_path], container, object_name=object_name, context = None)
+    elif FLAGS.contego_vault_storage_type == 's3':
+        pass
+    else:
+        pass
+    with open(progress_tracking_file_path, "w+") as progress_tracking_file:
+        progress_tracking_file.write('Completed')       
     
 @autolog.log_method(logger=Logger) 
 def download_metadata_from_object_store(context):
@@ -915,128 +978,14 @@ def get_total_capacity():
     
     return total_capacity,total_utilization                                           
    
-class VaultBackupService(base.Base):
-    def __init__(self, context):
-        self.context = context
-
-    def store(self, snapshot_metadata, iterator, size):
-        """Backup from the given iterator to trilioFS using the given snapshot metadata."""
-        copy_to_file_path = self.get_snapshot_file_path(snapshot_metadata) 
-        head, tail = os.path.split(copy_to_file_path)
-        if FLAGS.wlm_vault_service == 'local':
-            fileutils.ensure_tree(head)
-            vault_file = open(copy_to_file_path, 'wb') 
-        else:
-            from workloadmgr.vault.glusterapi import gfapi
-            volume = gfapi.Volume("localhost", "vault")
-            volume.mount() 
-            volume.mkdir(head.encode('ascii','ignore'))
-            vault_file = volume.creat(copy_to_file_path.encode('ascii','ignore'), os.O_RDWR, 0644)
-        
-        #TODO(giri): The connection can be closed in the middle:  try catch block and retry?
-        db = WorkloadMgrDB().db
-        snapshot_obj = db.snapshot_get(self.context, snapshot_metadata['snapshot_id'])
-        uploaded_size_incremental = 0
-        for chunk in iterator:
-            vault_file.write(chunk)
-            uploaded_size_incremental = uploaded_size_incremental + len(chunk)
-            #update every 5MB
-            if uploaded_size_incremental > (5 * 1024 * 1024):
-                snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
-                print "progress_percent: " + str(snapshot_obj.progress_percent) + "%"
-                #LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
-                uploaded_size_incremental = 0
-        
-        vault_file.close()
-        
-        if uploaded_size_incremental > 0:
-            snapshot_obj = db.snapshot_update(self.context, snapshot_obj.id, {'uploaded_size_incremental': uploaded_size_incremental})
-            uploaded_size_incremental = 0
-
-        LOG.debug(_("snapshot_size: %(snapshot_size)s") %{'snapshot_size': snapshot_obj.size,})
-        LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': snapshot_obj.uploaded_size,})
-        LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': snapshot_obj.progress_percent,})
-                
-        return copy_to_file_path   
-    
-    def restore_local(self, snapshot_metadata, restore_to_file_path):
-        """Restore a snapshot from the local filesystem."""
-        copy_from_file_path = self.get_snapshot_file_path(snapshot_metadata)
-        image_attr = qemuimages.qemu_img_info(copy_from_file_path)
-        if snapshot_metadata['disk_format'] == 'qcow2' and image_attr.file_format == 'raw':
-            qemuimages.convert_image(copy_from_file_path, restore_to_file_path, 'qcow2')
-            WorkloadMgrDB().db.restore_update(  self.context, 
-                                                snapshot_metadata['restore_id'], 
-                                                {'uploaded_size_incremental': os.path.getsize(copy_from_file_path)})
-        else:        
-            restore_to_file = open(restore_to_file_path, 'wb')
-            for chunk in utils.ChunkedFile(copy_from_file_path, {'function': WorkloadMgrDB().db.restore_update,
-                                                                 'context': self.context,
-                                                                 'id':snapshot_metadata['restore_id']}):
-                restore_to_file.write(chunk)
-            restore_to_file.close()
-
-        restore_obj = WorkloadMgrDB().db.restore_get(self.context, snapshot_metadata['restore_id'])
-        LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
-        LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
-        LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})
-           
-        return    
-        
-    def restore(self, snapshot_metadata, restore_to_file_path):
-        """Restore a snapshot from trilioFS."""
-        if FLAGS.wlm_vault_service == 'local':
-            return self.restore_local(snapshot_metadata, restore_to_file_path)
-        from workloadmgr.vault.glusterapi import gfapi
-        volume = gfapi.Volume("localhost", "vault")
-        volume.mount() 
-                 
-        copy_from_file_path = self.get_snapshot_file_path(snapshot_metadata) 
-        copy_from_file_path_handle = volume.open(copy_from_file_path.encode('ascii','ignore'), os.O_RDONLY)
-        restore_to_file_path_handle = file(restore_to_file_path, 'wb')
-        rbuf = create_string_buffer(FLAGS.wlm_vault_read_chunk_size_kb*1024)
-        rc = copy_from_file_path_handle.read_buffer(rbuf, FLAGS.wlm_vault_read_chunk_size_kb*1024)
-        while rc > 0:
-            restore_to_file_path_handle.write(rbuf[:rc])
-            rc = copy_from_file_path_handle.read_buffer(rbuf, FLAGS.wlm_vault_read_chunk_size_kb*1024)
-        restore_to_file_path_handle.close()
-        return
-    
-    def get_size(self, vault_service_url):
-        size = 0
-        try:
-            statinfo = os.stat(vault_service_url)
-            size = statinfo.st_size
-        except Exception as ex:
-            LOG.exception(ex)
-        return size            
-
-    def get_restore_size(self, vault_service_url, disk_format, disk_type):
-        restore_size = 0
-        if disk_format == 'vmdk':
-            try:
-                vix_disk_lib_env = os.environ.copy()
-                vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
-                                   
-                cmdspec = [ "trilio-vix-disk-cli", "-spaceforclone", disk_type, vault_service_url,]      
-                cmd = " ".join(cmdspec)
-                for idx, opt in enumerate(cmdspec):
-                    if opt == "-password":
-                        cmdspec[idx+1] = self._session._host_password
-                        break
-                              
-                output = check_output(cmdspec, stderr=subprocess.STDOUT, env=vix_disk_lib_env)
-                space_for_clone_str = re.search(r'\d+ Bytes Required for Cloning',output)
-                restore_size = int(space_for_clone_str.group().split(" ")[0])
-            except subprocess.CalledProcessError as ex:
-                LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
-                LOG.exception(ex)
-        return restore_size
-                  
-
-def get_vault_service(context):
-    return VaultBackupService(context)
-    if FLAGS.wlm_vault_service == 'swift':
-        return swift.SwiftBackupService(context)
-    else:
-        return VaultBackupService(context)
+@autolog.log_method(logger=Logger) 
+def get_data_transfer_status(context, metadata):
+    data_transfer_status = {'status' : []}
+    try:
+        progress_tracking_file_path = '/var/run/workloadmgr' + '/' + metadata['resource_id']
+        with open(progress_tracking_file_path, "r") as progress_tracking_file:
+            data_transfer_status['status'] = progress_tracking_file.readlines()
+            
+    except:
+        pass
+    return data_transfer_status     

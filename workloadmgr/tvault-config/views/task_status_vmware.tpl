@@ -33,7 +33,7 @@ function taskfunction()
 {
 	var r = confirm("Continuing will configure the appliance.\nWould you like to proceed?");
 	if (r == false) {
-		window.location.replace("/configure_vmware")
+		window.history.back()
 		return	
 	}
 
@@ -261,33 +261,50 @@ function taskfunction()
 											//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 											return;
 										}
-				                       	loadXMLDoc("discover_vcenter",function() {
-											document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-refresh");
+				                       	loadXMLDoc("workloads_import",function() {
+											document.getElementById("workloads_import").children[0].classList.add("glyphicon-refresh");
 											if (xmlhttp.readyState != 4) return;
-											document.getElementById("discover_vcenter").children[0].classList.remove("glyphicon-refresh");
+											document.getElementById("workloads_import").children[0].classList.remove("glyphicon-refresh");
 											if (xmlhttp.readyState==4 && xmlhttp.status==200)
 											{
-												document.getElementById("discover_vcenter").classList.add("list-group-item-success");
-												document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-ok");
+												document.getElementById("workloads_import").classList.add("list-group-item-success");
+												document.getElementById("workloads_import").children[0].classList.add("glyphicon-ok");
 											}
 											else
 											{
 												$("#error_message").html(xmlhttp.responseText);
 												$("#alert").show();		                          
-												document.getElementById("discover_vcenter").classList.add("list-group-item-danger");
-												document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-remove");
+												document.getElementById("workloads_import").classList.add("list-group-item-danger");
+												document.getElementById("workloads_import").children[0].classList.add("glyphicon-remove");
 												document.getElementById("final_status").classList.add("list-group-item-danger");
 												//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 												return;
 											}
-					                        document.getElementById("final_status").classList.add("list-group-item-success");
-					                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-					                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
-
-					                   });
-
-
-
+					                       	loadXMLDoc("discover_vcenter",function() {
+												document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-refresh");
+												if (xmlhttp.readyState != 4) return;
+												document.getElementById("discover_vcenter").children[0].classList.remove("glyphicon-refresh");
+												if (xmlhttp.readyState==4 && xmlhttp.status==200)
+												{
+													document.getElementById("discover_vcenter").classList.add("list-group-item-success");
+													document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-ok");
+												}
+												else
+												{
+													$("#error_message").html(xmlhttp.responseText);
+													$("#alert").show();		                          
+													document.getElementById("discover_vcenter").classList.add("list-group-item-danger");
+													document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-remove");
+													document.getElementById("final_status").classList.add("list-group-item-danger");
+													//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+													return;
+												}
+						                        document.getElementById("final_status").classList.add("list-group-item-success");
+						                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+						                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
+	
+						                   });
+						               });
 					           	   });
 		                       });
 		                    });
@@ -360,6 +377,13 @@ $( document ).ready(function() {
                 Starting trilioVault service</li>
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
+	%if 'import_workloads' in locals() and import_workloads == 'on':
+    	<li id="workloads_import" class="list-group-item"><span class="glyphicon"></span>
+                Importing workloads</li>     
+	%else:
+    	<li id="workloads_import" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+                Importing workloads</li>     
+    %end      			
     <li id="discover_vcenter" class="list-group-item"><span class="glyphicon"></span>
                 Discover vCenter inventory</li>                
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>

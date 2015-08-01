@@ -698,7 +698,15 @@ def _register_workloadtypes():
                                       name= 'Composite', description = 'A workload that consists of other workloads',
                                       id = '54947065-2a59-494a-ab64-b6501c139a82')
         
+    return {'status':'Success'}
+
+def _workloads_import():
+    if config_data['nodetype'] == 'controller':
         if config_data['import_workloads'] == 'on':
+            wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
+                                   username=config_data['admin_username'], 
+                                   password=config_data['admin_password'], 
+                                   tenant_id=config_data['admin_tenant_id'])            
             wlm.workloads.importworkloads()
 
     return {'status':'Success'}
@@ -1483,18 +1491,6 @@ def configure_host():
         #close temp file
         new_file.close()
         close(fh)
-        #SSL regeneration
-        os.chdir("/etc/tvault/ssl")
-        if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
-           command = ['sudo', 'mv', "/opt/stack/workloadmgr/etc/gen-cer", "/etc/tvault/ssl/"];
-           subprocess.call(command, shell=False)
-           os.chmod('/etc/tvault/ssl/gen-cer',0554)
-           command = ['sudo', 'sh','gen-cer',socket.gethostname()];
-           subprocess.call(command, shell=False)
-           command = ['sudo', 'rm', '-rf',"/etc/tvault/ssl/"+socket.gethostname()+".csr"];
-           subprocess.call(command, shell=False)
-           command = ['sudo', 'mv', "gen-cer","/opt/stack/workloadmgr/etc/"];
-           subprocess.call(command, shell=False) 
 
         #Move new file
         command = ['sudo', 'mv', abs_path, "/etc/hosts"];
@@ -1904,8 +1900,29 @@ def register_workloadtypes():
         else:
            raise exception        
     time.sleep(1)
-    return {'status':'Success'}        
+    return {'status':'Success'}  
 
+@bottle.route('/workloads_import')
+@authorize()
+def workloads_import():
+    # Python code here to register workload types
+    for i in range(0,1):
+        try:
+            _workloads_import()
+            time.sleep(1)
+            return {'status':'Success'}            
+        except Exception as exception:
+            pass    
+    try:
+        _workloads_import()
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           raise exception        
+    time.sleep(1)
+    return {'status':'Success'}        
 
 @bottle.route('/discover_vcenter')
 @authorize()
@@ -1925,14 +1942,6 @@ def discover_vcenter():
         config_data['config_status'] = 'success'
         persist_config()
 
-        command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.crt", "/etc/tvault/ssl/localhost_bak.crt"];
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.key", "/etc/tvault/ssl/localhost_bak.key"];
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".crt", "/etc/tvault/ssl/localhost.crt"];
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".key", "/etc/tvault/ssl/localhost.key"];
-        subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         config_data['config_status'] = 'failed'
@@ -1941,7 +1950,7 @@ def discover_vcenter():
     time.sleep(1)
     return {'status':'Success'}
 
-@bottle.post('/configure_openstack')
+
 @authorize()
 def persist_config():
     try:
@@ -2218,7 +2227,7 @@ def main_http():
     # Start the Bottle webapp
     bottle.debug(True)
     bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
-    bottle.run(host='0.0.0.0', port=80, reloader=True)
+    bottle.run(host='0.0.0.0', port=80, reloader=False)
     
 def main():
     #configure the networking
@@ -2270,7 +2279,41 @@ def main():
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
-                
+        #SSL regeneration     
+        prev_hostname = 'none'
+        Config = ConfigParser.RawConfigParser()
+        try:
+            Config.read('/etc/tvault-config/tvault-config.conf')
+            config_data = dict(Config._defaults)
+            prev_hostname = config_data.get('hostname', 'none')
+        except Exception as exception:
+            prev_hostname = 'none'
+
+        if prev_hostname != socket.gethostname():
+            if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
+                command = ['sudo', 'mv', "/opt/stack/workloadmgr/etc/gen-cer", "/etc/tvault/ssl/"];
+                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+                os.chmod('/etc/tvault/ssl/gen-cer',0554)
+                command = ['sudo', 'sh','gen-cer',socket.gethostname()];
+                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+                command = ['sudo', 'rm', '-rf',"/etc/tvault/ssl/"+socket.gethostname()+".csr"];
+                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+                command = ['sudo', 'mv', "gen-cer","/opt/stack/workloadmgr/etc/"];
+                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl") 
+                Config.set(None, 'hostname', socket.gethostname())
+               
+                command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.crt", "/etc/tvault/ssl/localhost_bak.crt"];
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.key", "/etc/tvault/ssl/localhost_bak.key"];
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".crt", "/etc/tvault/ssl/localhost.crt"];
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".key", "/etc/tvault/ssl/localhost.key"];
+                subprocess.call(command, shell=False)
+               
+                with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
+                    Config.write(configfile)
+                                   
     except Exception as exception:
         #TODO: implement logging
         pass
@@ -2281,8 +2324,7 @@ def main():
 
     bottle.debug(True)
     srv = SSLWSGIRefServer(host='0.0.0.0', port=443)
-    #bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
-    bottle.run(server=srv, app=app, quiet=False, reloader=True)          
+    bottle.run(server=srv, app=app, quiet=False, reloader=False)          
 
 if __name__ == "__main__":
     main()

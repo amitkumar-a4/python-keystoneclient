@@ -7,10 +7,10 @@ commonname=$domain
 #Change to your company details
 country=US
 state=Massachusetts
-locality=Cambridge
+locality=Hopkinton
 organization=triliodata.com
 organizationalunit=IT
-email=admin@triliodata.com
+email=support@triliodata.com
  
 #Optional
 password=dummypassword
