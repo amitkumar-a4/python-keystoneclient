@@ -38,8 +38,6 @@ import workloadmgrclient.v1.client as wlmclient
 from workloadmgr.compute import nova
 from workloadmgr.openstack.common.gettextutils import _
 
-
-
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
@@ -1485,6 +1483,19 @@ def configure_host():
         #close temp file
         new_file.close()
         close(fh)
+        #SSL regeneration
+        os.chdir("/etc/tvault/ssl")
+        if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
+           command = ['sudo', 'mv', "/opt/stack/workloadmgr/etc/gen-cer", "/etc/tvault/ssl/"];
+           subprocess.call(command, shell=False)
+           os.chmod('/etc/tvault/ssl/gen-cer',0554)
+           command = ['sudo', 'sh','gen-cer',socket.gethostname()];
+           subprocess.call(command, shell=False)
+           command = ['sudo', 'rm', '-rf',"/etc/tvault/ssl/"+socket.gethostname()+".csr"];
+           subprocess.call(command, shell=False)
+           command = ['sudo', 'mv', "gen-cer","/opt/stack/workloadmgr/etc/"];
+           subprocess.call(command, shell=False) 
+
         #Move new file
         command = ['sudo', 'mv', abs_path, "/etc/hosts"];
         subprocess.call(command, shell=False)
@@ -1913,6 +1924,15 @@ def discover_vcenter():
                 client.servers.list(True, search_opts)
         config_data['config_status'] = 'success'
         persist_config()
+
+        command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.crt", "/etc/tvault/ssl/localhost_bak.crt"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'mv', "/etc/tvault/ssl/localhost.key", "/etc/tvault/ssl/localhost_bak.key"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".crt", "/etc/tvault/ssl/localhost.crt"];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".key", "/etc/tvault/ssl/localhost.key"];
+        subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         config_data['config_status'] = 'failed'
@@ -2197,7 +2217,8 @@ def set_network_interfaces(propertyMap):
 def main_http():
     # Start the Bottle webapp
     bottle.debug(True)
-    bottle.run(host='0.0.0.0', port=80)
+    bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
+    bottle.run(host='0.0.0.0', port=80, reloader=True)
     
 def main():
     #configure the networking
@@ -2248,6 +2269,7 @@ def main():
         
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
+
                 
     except Exception as exception:
         #TODO: implement logging
@@ -2259,6 +2281,7 @@ def main():
 
     bottle.debug(True)
     srv = SSLWSGIRefServer(host='0.0.0.0', port=443)
+    #bottle.TEMPLATE_PATH.insert(0, '/opt/stack/workloadmgr/workloadmgr/tvault-config/views')
     bottle.run(server=srv, app=app, quiet=False, reloader=True)          
 
 if __name__ == "__main__":
