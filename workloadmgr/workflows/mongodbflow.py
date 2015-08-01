@@ -91,8 +91,12 @@ def connect_server(host, port, user, password, verbose=False):
     return connection
 
 def isShardedCluster(conn):
-    status = conn.admin.command("ismaster")
-    return not ('primary' in status and 'secondary' in status)
+    try:
+        status = conn.admin.command("ismaster")
+        return not ('primary' in status and 'secondary' in status)
+    except Exception as ex:
+        LOG.exception(ex)
+        raise exception.ErrorOccurred(reason=_("Cannot connect to mongos server.Check database settings in Credentials tab and try again"))
 
 def getShards(conn):
     try:
