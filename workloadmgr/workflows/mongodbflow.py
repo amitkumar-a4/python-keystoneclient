@@ -91,8 +91,12 @@ def connect_server(host, port, user, password, verbose=False):
     return connection
 
 def isShardedCluster(conn):
-    status = conn.admin.command("ismaster")
-    return not ('primary' in status and 'secondary' in status)
+    try:
+        status = conn.admin.command("ismaster")
+        return not ('primary' in status and 'secondary' in status)
+    except Exception as ex:
+        LOG.exception(ex)
+        raise exception.ErrorOccurred(reason=_("Cannot connect to mongos server.Check database settings in Credentials tab and try again"))
 
 def getShards(conn):
     try:
@@ -585,6 +589,9 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
             cfgport = cfgsrv.split(':')[1]
             if not cfghost in hostnames:
                 hostnames[cfghost] = 1
+
+        if not dbhost in hostnames:
+            hostnames[dbhost] = 1
     else:
         # this is a replica set
         status = connection.admin.command('replSetGetStatus')
@@ -607,6 +614,10 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         except Exception as ex:
             LOG.exception(ex)
             LOG.info(_( '"' + hostname +'" appears to be offline. Cannot exec ifconfig' ))
+
+    if len(interfaces) == 0:
+        LOG.info(_("Unabled to login to VMs to discover MAC Addresses. Please check username/passwor and try again."))
+        raise Exception(_("Unabled to login to VMs to discover MAC Addresses. Please check username/passwor and try again."))
 
     # query VM by ethernet and get instance info here
     # call nova list
