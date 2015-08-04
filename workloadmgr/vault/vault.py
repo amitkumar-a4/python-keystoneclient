@@ -480,7 +480,7 @@ def swift_upload_files(files, container, context = None):
         options = {'use_slo': False, 'verbose': 1, 'os_username': None, 'os_user_domain_name': None, 
                    'os_cacert': None, 'os_tenant_name': None, 'os_user_domain_id': None, 'header': [], 
                    'auth_version': '1.0', 'ssl_compression': True, 'os_password': None, 'os_user_id': None, 
-                   'skip_identical': False, 'segment_container': None, 'os_project_id': None, 'snet': False, 
+                   'skip_identical': True, 'segment_container': None, 'os_project_id': None, 'snet': False, 
                    'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
                    'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
                    'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
@@ -503,7 +503,7 @@ def swift_upload_files(files, container, context = None):
         options = { 'use_slo': False, 'verbose': 1, 'os_username': FLAGS.wlm_vault_swift_username, 'os_user_domain_name': None, 
                     'os_cacert': None, 'os_tenant_name': FLAGS.wlm_vault_swift_tenant, 'os_user_domain_id': None, 'header': [], 
                     'auth_version': auth_version, 'ssl_compression': True, 'os_password': FLAGS.wlm_vault_swift_password, 'os_user_id': None, 
-                    'skip_identical': False, 'segment_container': None, 'os_project_id': None, 'snet': False, 
+                    'skip_identical': True, 'segment_container': None, 'os_project_id': None, 'snet': False, 
                     'object_uu_threads': 10, 'object_name': None, 'os_tenant_id': None, 
                     'os_project_name': None, 'os_service_type': None, 'segment_size': FLAGS.wlm_vault_swift_segment_size, 'os_help': None, 
                     'object_threads': 10, 'os_storage_url': None, 'insecure': False, 'segment_threads': 10, 
@@ -538,110 +538,100 @@ def swift_upload_files(files, container, context = None):
 
             options.segment_size = str((1024 ** size_mod) * multiplier)
     
-    fhs = []
-    try:
-        with SwiftService(options=options) as swift:
-            try:
-                objs = []
-                dir_markers = []
-                for f in files:
-                    if isfile(f):
-                        objs.append(f)
-                    elif isdir(f):
-                        for (_dir, _ds, _fs) in walk(f):
-                            if not (_ds + _fs):
-                                dir_markers.append(_dir)
-                            else:
-                                objs.extend([join(_dir, _f) for _f in _fs])
-                    else:
-                        raise exception.ErrorOccurred(reason="Local file '%s' not found."% f)
-    
-                # Now that we've collected all the required files and dir markers
-                # build the tuples for the call to upload
-                if options['object_name'] is not None:
-                    objs = [
-                        SwiftUploadObject(
-                            o, object_name=o.replace(
-                                orig_path, options['object_name'], 1
-                            )
-                        ) for o in objs
-                    ]
-                    dir_markers = [
-                        SwiftUploadObject(
-                            None, object_name=d.replace(
-                                orig_path, options['object_name'], 1
-                            ), options={'dir_marker': True}
-                        ) for d in dir_markers
-                    ]
-                else:
-                    upload_objs = []
-                    for o in objs:
-                        fh = open(o, 'rb')
-                        fhs.append(fh)
-                        upload_objs.append(SwiftUploadObject(fh, object_name=o.replace(get_vault_local_directory(), '', 1)))
-                    #objs = [
-                    #    SwiftUploadObject(
-                    #        o, object_name=o.replace(get_vault_local_directory(), '', 1)
-                    #    ) for o in objs
-                    #]
-                    dir_markers = [
-                        SwiftUploadObject(
-                            None, object_name=d.replace(get_vault_local_directory(), '', 1), options={'dir_marker': True}
-                        ) for d in dir_markers
-                    ]                
-    
-                for r in swift.upload(container, upload_objs + dir_markers):
-                    if r['success']:
-                        if options['verbose']:
-                            if 'attempts' in r and r['attempts'] > 1:
-                                if 'object' in r:
-                                    LOG.info('%s [after %d attempts]' % (r['object'], r['attempts']))
-                            else:
-                                if 'object' in r:
-                                    LOG.info(r['object'])
-                                elif 'for_object' in r:
-                                    LOG.info('%s segment %s' % (r['for_object'], r['segment_index']))
-                    else:
-                        error = r['error']
-                        if 'action' in r and r['action'] == "create_container":
-                            # it is not an error to be unable to create the
-                            # container so print a warning and carry on
-                            if isinstance(error, ClientException):
-                                if (r['headers'] and
-                                        'X-Storage-Policy' in r['headers']):
-                                    msg = ' with Storage Policy %s' % \
-                                          r['headers']['X-Storage-Policy'].strip()
-                                else:
-                                    msg = ' '.join(str(x) for x in (
-                                        error.http_status, error.http_reason)
-                                    )
-                                    if error.http_response_content:
-                                        if msg:
-                                            msg += ': '
-                                        msg += error.http_response_content[:60]
-                                    msg = ': %s' % msg
-                            else:
-                                msg = ': %s' % error
-                            LOG.warning('Warning: failed to create container %r%s', container, msg )
-                            raise exception.ErrorOccurred(reason = ('Warning: failed to create container %r%s', container, msg))
+    with SwiftService(options=options) as swift:
+        try:
+            objs = []
+            dir_markers = []
+            for f in files:
+                if isfile(f):
+                    objs.append(f)
+                elif isdir(f):
+                    for (_dir, _ds, _fs) in walk(f):
+                        if not (_ds + _fs):
+                            dir_markers.append(_dir)
                         else:
-                            LOG.warning("%s" % error)
-                            too_large = (isinstance(error, ClientException) and
-                                         error.http_status == 413)
-                            if too_large and options['verbose'] > 0:
-                                LOG.error("Consider using the --segment-size option to chunk the object")
-                            raise exception.ErrorOccurred(reason = error)                            
-            
-            
-            except SwiftError as ex:
-                LOG.exception(ex)
-                raise  
-            except Exception as ex:
-                LOG.exception(ex)
-                raise 
-    finally:
-        for fh in fhs:
-            fh.close()
+                            objs.extend([join(_dir, _f) for _f in _fs])
+                else:
+                    raise exception.ErrorOccurred(reason="Local file '%s' not found."% f)
+
+            # Now that we've collected all the required files and dir markers
+            # build the tuples for the call to upload
+            if options['object_name'] is not None:
+                objs = [
+                    SwiftUploadObject(
+                        o, object_name=o.replace(
+                            orig_path, options['object_name'], 1
+                        )
+                    ) for o in objs
+                ]
+                dir_markers = [
+                    SwiftUploadObject(
+                        None, object_name=d.replace(
+                            orig_path, options['object_name'], 1
+                        ), options={'dir_marker': True}
+                    ) for d in dir_markers
+                ]
+            else:
+                objs = [
+                    SwiftUploadObject(
+                        o, object_name=o.replace(get_vault_local_directory(), '', 1)
+                    ) for o in objs
+                ]
+                dir_markers = [
+                    SwiftUploadObject(
+                        None, object_name=d.replace(get_vault_local_directory(), '', 1), options={'dir_marker': True}
+                    ) for d in dir_markers
+                ]                
+
+            for r in swift.upload(container, objs + dir_markers):
+                if r['success']:
+                    if options['verbose']:
+                        if 'attempts' in r and r['attempts'] > 1:
+                            if 'object' in r:
+                                LOG.info('%s [after %d attempts]' % (r['object'], r['attempts']))
+                        else:
+                            if 'object' in r:
+                                LOG.info(r['object'])
+                            elif 'for_object' in r:
+                                LOG.info('%s segment %s' % (r['for_object'], r['segment_index']))
+                else:
+                    error = r['error']
+                    if 'action' in r and r['action'] == "create_container":
+                        # it is not an error to be unable to create the
+                        # container so print a warning and carry on
+                        if isinstance(error, ClientException):
+                            if (r['headers'] and
+                                    'X-Storage-Policy' in r['headers']):
+                                msg = ' with Storage Policy %s' % \
+                                      r['headers']['X-Storage-Policy'].strip()
+                            else:
+                                msg = ' '.join(str(x) for x in (
+                                    error.http_status, error.http_reason)
+                                )
+                                if error.http_response_content:
+                                    if msg:
+                                        msg += ': '
+                                    msg += error.http_response_content[:60]
+                                msg = ': %s' % msg
+                        else:
+                            msg = ': %s' % error
+                        LOG.warning('Warning: failed to create container %r%s', container, msg )
+                        raise exception.ErrorOccurred(reason = ('Warning: failed to create container %r%s', container, msg))
+                    else:
+                        LOG.warning("%s" % error)
+                        too_large = (isinstance(error, ClientException) and
+                                     error.http_status == 413)
+                        if too_large and options['verbose'] > 0:
+                            LOG.error("Consider using the --segment-size option to chunk the object")
+                        raise exception.ErrorOccurred(reason = error)                            
+        
+        
+        except SwiftError as ex:
+            LOG.exception(ex)
+            raise  
+        except Exception as ex:
+            LOG.exception(ex)
+            raise 
         
 @autolog.log_method(logger=Logger)        
 def get_swift_cmd(context, container, command):
