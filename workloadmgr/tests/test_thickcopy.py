@@ -174,29 +174,43 @@ def test_lv_entire_disk():
         return 
 
     def cleanup():
-        deletepv("pvname1")
-        if os.path.isfile("vmdk"):
-            os.remove("vmdk")
- 
-    def verify(remotepath, extentsfile, vmdkfile):
-        try:
-            my_populate_extents(None, None, None, None, remotepath,
-                                vmdkfile, extentsfile)
-            freedev = subprocess.check_output(["losetup", "-f"],
-                                                stderr=subprocess.STDOUT)
-            freedev = freedev.strip("\n")
+        pass
 
-            subprocess.check_output(["losetup", freedev, vmdkfile,],
-                                   stderr=subprocess.STDOUT)
-            pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev, '0', '1099511627776L')
+ 
+    def verify(extentsinfo):
+        try:
+            freedevs = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
+            if len(extentsinfo['extentsfiles']) != 1:
+               print "Number of extents files is not 1. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                my_populate_extents(None, None, None, None, key,
+                                    "vmdk" + key.split("pvname")[1], value)
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                freedev = freedev.strip("\n")
+
+                subprocess.check_output(["losetup", freedev, "vmdk" + key.split("pvname")[1],],
+                                        stderr=subprocess.STDOUT)
+
+                pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev)
+                freedevs.append(freedev)
+
             # explore VGs and volumes on the disk
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
-            if len(vgs) == 0:
-               print "No VGs found on VMDK. Test failed"
-               raise Exception("No VGs found on VMDK. Test failed")
+            if len(vgs) != 1:
+               print "Number of VGs is not 1"
+               raise Exception("Number of VGs found on VMDK is not 1. Test failed")
  
-            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs[0]['LVM2_VG_NAME'])
+            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
                print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
@@ -213,15 +227,16 @@ def test_lv_entire_disk():
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
-            for vg in vgs:
-                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
-         
         except Exception as ex:
             print "Exception in verification. Verification failed"
             raise
         finally:
+            for vg in vgs:
+                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
+
             try:
-                subprocess.check_output(["losetup", "-d", freedev],
+                for freedev in freedevs:
+                    subprocess.check_output(["losetup", "-d", freedev],
                                   stderr=subprocess.STDOUT)
             except:
                 pass
@@ -230,15 +245,26 @@ def test_lv_entire_disk():
         print "Running test_lv_entire_disk(): "
         setup() 
         print "\tSetup complete"
-        extentsfile, partitions, totalblocks = test()
+
+        extentsinfo = test(1)
         print "\ttest() complete"
-        verify("pvname1", extentsfile, "vmdk")
+        verify(extentsinfo)
+
         print "\t verified successfully"
-        if os.path.isfile(extentsfile):
-            os.remove(extentsfile)
     finally:
         cleanup()
+        if extentsinfo and 'extentsfiles' in extentsinfo:
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                if os.path.isfile(value):
+                    os.remove(value)
+
+        for i in range(1, 2):
+            deletepv("pvname" + str(i))
+            if os.path.isfile("vmdk" + str(i)):
+                os.remove("vmdk" + str(i))
+
         print"\tcleanup done"
+        pass
 
 ## 
 # LVM PV is carved out of 
@@ -286,8 +312,6 @@ def test_lv_on_partitions():
 
             vgcmd = ["vgchange", "-an", "vg1"]
             subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
-            vgcmd = ["vgexport", "vg1"]
-            #subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
             cmd = ["losetup", "-d", dev]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
@@ -297,47 +321,45 @@ def test_lv_on_partitions():
         return 
 
     def cleanup():
-        for lv in ["lv1", "lv2", "lv3", "lv4"]:
-            cmd = ["lvremove", "-f", "/dev/vg1/" + lv]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-
-        cmd = ["vgremove", "vg1"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-
-        cmd = ["losetup", "-a"]
-        devs = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        devices = []
-        for dev in devs.strip().split("\n"):
-            devices.append(dev.strip().split(":")[0].strip())
-
-        for pv in subprocess.check_output(["pvs", "--noheading"]).strip().split("\n"):
-            try:
-                cmd = ["pvremove", pv.split()[0]]
-                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            except:
-                pass
-
-        for dev in sorted(devices, reverse=True):
-            cmd = ["losetup", "-d", dev]
-            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        for i in range(1, 2):
+            deletepv("pvname" + str(i))
+            if os.path.isfile("vmdk" + str(i)):
+                os.remove("vmdk" + str(i))
 
  
-    def verify(remotepath, extentsfile, vmdkfile):
+    def verify(extentsinfo):
         try:
-            my_populate_extents(None, None, None, None, remotepath,
-                                vmdkfile, extentsfile)
+            freedevs = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
 
-            freedev = assignloopdevice(vmdkfile, 2000896, 1953124351)
+            if len(extentsinfo['extentsfiles']) != 1:
+               print "Number of extents files is not 1. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
 
-            pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev, '0', (1953124351 - 2000896 + 1) * 512)
-            # explore VGs and volumes on the disk
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                my_populate_extents(None, None, None, None, key,
+                                    "vmdk" + key.split("pvname")[1], value)
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                freedev = freedev.strip("\n")
+
+                subprocess.check_output(["losetup", freedev, "vmdk" + key.split("pvname")[1],],
+                                        stderr=subprocess.STDOUT)
+
+                pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev + "p1")
+                freedevs.append(freedev)
+
             vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
                
-            if len(vgs) == 0:
-               print "No VGs found on VMDK. Test failed"
-               raise Exception("No VGs found on VMDK. Test failed")
+            if len(vgs) != 1:
+               print "Number VGs found on VMDK is not 1. Test failed"
+               raise Exception("Number VGs found on VMDK is not 1. Test failed")
  
-            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs[0]['LVM2_VG_NAME'])
+            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
             if len(lvs) != 4:
                print "Number of LVs found is not 4. Test Failed"
                raise Exception("Number of LVs found is not 4. Test Failed")
@@ -356,38 +378,42 @@ def test_lv_on_partitions():
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             shutil.rmtree(tempdir)
 
-            for vg in vgs:
-                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
-         
         except Exception as ex:
             print "Exception in verification. Verification failed"
             raise
         finally:
-            try:
-                subprocess.check_output(["losetup", "-d", freedev],
+            for vg in vgs:
+                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
+         
+            for freedev in freedevs:
+                try:
+                    subprocess.check_output(["losetup", "-d", freedev],
                                   stderr=subprocess.STDOUT)
-            except:
-                pass
+                except:
+                    pass
 
     try:
         print "Running test_lv_on_partitions():"
         setup() 
         print "\tSetup() complete"
-        extentsfile, partitions, totalblocks = test()
+        extentsinfo = test(1)
         print "\ttest() done"
 
         # first clean up and then verify so the volume groups do not interfere
         # with existing volume groups
-        verify("pvname1", extentsfile, "vmdk")
+        verify(extentsinfo)
         print "\tverification done"
 
-        if os.path.isfile(extentsfile):
-            os.remove(extentsfile)
-
     finally:
-        deletepv("pvname1")
-        if os.path.isfile("vmdk"):
-            os.remove("vmdk")
+        if extentsinfo and 'extentsfiles' in extentsinfo:
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                if os.path.isfile(value):
+                    os.remove(value)
+
+        for i in range(1, 2):
+            deletepv("pvname" + str(i))
+            if os.path.isfile("vmdk" + str(i)):
+                os.remove("vmdk" + str(i))
         print "\t cleanup done"
 
 ## 
@@ -430,7 +456,8 @@ def test_lv_part_mixed():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                       "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -456,22 +483,104 @@ def test_lv_part_mixed():
 
         return 
 
+    def verify(extentsinfo):
+        try:
+            freedevs = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
+            if len(extentsinfo['extentsfiles']) != 1:
+               print "Number of extents files is not 1. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                my_populate_extents(None, None, None, None, key,
+                                    "vmdk" + key.split("pvname")[1], value)
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                freedev = freedev.strip("\n")
+
+                subprocess.check_output(["losetup", freedev, "vmdk" + key.split("pvname")[1],],
+                                        stderr=subprocess.STDOUT)
+
+                pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev + "p1")
+                pvinfo = workloadmgr.virt.vmwareapi.thickcopy._getpvinfo(freedev + "p2")
+                freedevs.append(freedev)
+
+            vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
+               
+            if len(vgs) != 1:
+               print "Number VGs found on VMDK is not 1. Test failed"
+               raise Exception("Number VGs found on VMDK is not 1. Test failed")
+ 
+            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
+            if len(lvs) != 4:
+               print "Number of LVs found is not 4. Test Failed"
+               raise Exception("Number of LVs found is not 4. Test Failed")
+
+            # this test is assuming one partition per disk. We need additional tests for multiple 
+            # partitions per disk
+            tempdir = mkdtemp()
+            for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                cmd = ["mount", "-t", "ext4", "/dev/vg1/"+lv, tempdir]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                time.sleep(1)
+                cmd = ["umount", tempdir] 
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+            tempdir = mkdtemp()
+            cmd = ["mount", "-t", "ext4", freedev+"p1", tempdir]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            time.sleep(1)
+            cmd = ["umount", tempdir] 
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+        except Exception as ex:
+            print "Exception in verification. Verification failed"
+            raise
+        finally:
+            for vg in vgs:
+                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
+         
+            for freedev in freedevs:
+                try:
+                    subprocess.check_output(["losetup", "-d", freedev],
+                                  stderr=subprocess.STDOUT)
+                except:
+                    pass
+
     try:
         print "Running test_lv_part_mixed():"
         setup()
         print "\tSetup() complete"
-        extentsfile, partitions, totalblocks = test()
+        extentsinfo = test(1)
         print "\ttest() done"
 
         # first clean up and then verify so the volume groups do not interfere
         # with existing volume groups
-        assert extentsfile == None
         print "\tverification done"
 
     finally:
-        deletepv("pvname1")
-        if os.path.isfile("vmdk"):
-            os.remove("vmdk")
+        if extentsinfo and 'extentsfiles' in extentsinfo:
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                if os.path.isfile(value):
+                    os.remove(value)
+
+        for i in range(1, 2):
+            deletepv("pvname" + str(i))
+            if os.path.isfile("vmdk" + str(i)):
+                os.remove("vmdk" + str(i))
         print "\t cleanup done"
 
 ## 
@@ -2686,8 +2795,220 @@ def test_multiple_vgs_multiple_disk():
         cleanup()
         print"\tcleanup done"
 
+# thick copy when each disk is a single partition for PV
+# thick copy should return the list of extent files
+def test_multiple_vgs_multiple_disk_small_partition():
+
+    def setup():
+        mountpoints = []
+        try:
+            mountpoints.append(createpv("pvname1", "10GiB")) #/dev/sda
+            mountpoints.append(createpv("pvname2", "20GiB")) #/dev/sdb
+            mountpoints.append(createpv("pvname3", "20GiB")) #/dev/sdc
+            mountpoints.append(createpv("pvname4", "20GiB")) #/dev/sdd
+            mountpoints.append(createpv("pvname5", "10GiB")) #/dev/sde
+            mountpoints.append(createpv("pvname6", "10GiB"))
+
+            devices = []
+            cmd = ["parted", mountpoints[0], "mklabel", "gpt"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[0], "mkpart", "P1", "ext2", str(1024), str("1GiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[0], "mkpart", "P2", "ext2", str("1GiB"), str("10GiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            devices.append(mountpoints[0] + "p1")
+            devices.append(mountpoints[0] + "p2")
+
+            cmd = ["parted", mountpoints[1], "mklabel", "gpt"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[1], "mkpart", "P1", "ext2", str(1024), str("20GiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[2], "mklabel", "gpt"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[2], "mkpart", "P1", "ext2", str(1024), str("1028MiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[2], "mkpart", "P2", "ext2", str("1029MiB"), str("20GiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            devices.append(mountpoints[2] + "p1")
+            devices.append(mountpoints[2] + "p2")
+
+            devices.append(mountpoints[3])
+            devices.append(mountpoints[5])
+
+            cmd = ["parted", mountpoints[4], "mklabel", "gpt"]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["parted", mountpoints[4], "mkpart", "P1", "ext2", str(1024), str("10GiB")]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            for dev in devices:
+                cmd = ["pvcreate", dev]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "vg1", ] + [devices[2]] + [devices[3]]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "vg2", ] + [devices[4]]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "centos-os", ] + [devices[1]]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            cmd = ["vgcreate", "tvault-appliance-vg", ] + [devices[5]]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    
+            # create multiple volumes
+            for vg in ["vg1", "vg2", "tvault-appliance-vg", "centos-os"]:
+                cmd = ["lvcreate", "-L", "1G", vg, "-n", "lv1"]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+                cmd = ["lvcreate", "-L", "1G", vg, "-n", "lv2"]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+                cmd = ["lvcreate", "-L", "1G", vg, "-n", "lv3"]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+                cmd = ["lvcreate", "-L", "1G", vg, "-n", "lv4"]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            # Format each volume to a filesystem
+            tempdir = mkdtemp()
+            for vg in ["vg1", "vg2", "tvault-appliance-vg", "centos-os"]:
+                for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                    cmd = ["mkfs", "-t", "ext4", "/dev/" + vg + "/" + lv]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+                    cmd = ["mount", "-t", "ext4", "/dev/" + vg + "/" + lv, tempdir]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                    cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                           "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                    time.sleep(1)
+                    cmd = ["umount", tempdir]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+            for vg in ["vg1", "vg2", "tvault-appliance-vg", "centos-os"]:
+                vgcmd = ["vgchange", "-an", vg]
+                subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+
+            for mountpoint in mountpoints:
+                cmd = ["losetup", "-d", mountpoint]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+            # mount tvaultvg
+            freedev = subprocess.check_output(["losetup", "-f"],
+                                              stderr=subprocess.STDOUT)
+            freedev = freedev.strip("\n")
+
+            subprocess.check_output(["losetup", freedev, "pvname5",],
+                                     stderr=subprocess.STDOUT)
+        except:
+            vgcmd = ["vgchange", "-an"]
+            subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+           
+            for mountpoint in mountpoints:
+                cmd = ["losetup", "-d", mountpoint]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            raise
+        return 
+
+    def cleanup():
+        for i in range(1, 7):
+            deletepv("pvname" + str(i))
+            if os.path.isfile("vmdk" + str(i)):
+                os.remove("vmdk" + str(i))
+ 
+    def verify(extentsinfo):
+        try:
+            import pdb;pdb.set_trace()
+            freedevs = []
+            vgs = []
+            partdev = []
+            if not extentsinfo:
+               print "extentsinfo is null. Test failed"
+               raise Exception("extentsinfo is null. Test failed")
+
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+                my_populate_extents(None, None, None, None, key,
+                                    "vmdk" + key.split("pvname")[1], value)
+
+            for key, value in extentsinfo['extentsfiles'].iteritems():
+
+                freedev = subprocess.check_output(["losetup", "-f"],
+                                                stderr=subprocess.STDOUT)
+                freedev = freedev.strip("\n")
+
+                subprocess.check_output(["losetup", freedev, "vmdk" + key.split("pvname")[1],],
+                                        stderr=subprocess.STDOUT)
+
+                freedevs.append(freedev)
+
+            vgs = workloadmgr.virt.vmwareapi.thickcopy.getvgs()
+
+            if len(vgs) == 0:
+               print "No VGs found on VMDK. Test failed"
+               raise Exception("No VGs found on VMDK. Test failed")
+ 
+            lvs = workloadmgr.virt.vmwareapi.thickcopy.getlvs(vgs)
+            if len(lvs) != 12:
+                print "Number of LVs found is not 8. Test Failed"
+                raise Exception("Number of LVs found is not 8. Test Failed")
+
+            tempdir = mkdtemp()
+            for vg in ["vg1", "vg2", "centos-os"]:
+                for lv in ["lv1", "lv2", "lv3", "lv4"]:
+                    cmd = ["mount", "-t", "ext4", "/dev/" + vg  + "/" +lv, tempdir]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                           tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                    time.sleep(1)
+                    cmd = ["umount", tempdir]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            shutil.rmtree(tempdir)
+
+        except Exception as ex:
+            print "Exception in verification. Verification failed"
+            raise
+        finally:
+            for vg in vgs:
+                workloadmgr.virt.vmwareapi.thickcopy.deactivatevgs(vg['LVM2_VG_NAME'])
+         
+            for freedev in freedevs:
+                try:
+                    subprocess.check_output(["losetup", "-d", freedev],
+                                      stderr=subprocess.STDOUT)
+                except:
+                    pass
+
+    try:
+        print "Running test_multiple_vgs_multiple_disk_small_partition(): "
+
+        setup() 
+        print "\tSetup complete"
+
+        extentsinfo = test(4)
+        print "\ttest() complete"
+
+        verify(extentsinfo)
+        print "\t verified successfully"
+
+    finally:
+        cleanup()
+        print"\tcleanup done"
+
 if __name__ == "__main__":
-    #test_lv_entire_disk()
+    test_lv_entire_disk()
     #test_lv_on_partitions()
     #test_lvs_on_two_partitions()
     #test_lvs_span_two_partitions()
@@ -2705,10 +3026,11 @@ if __name__ == "__main__":
     #test_lv_entire_disks_with_one_disk_missing()
     #test_lvm_on_single_partition()
     #test_mix_of_lvm_and_partitions()
-    test_mix_of_lvm_and_partitions_with_unformatted()
+    #test_mix_of_lvm_and_partitions_with_unformatted()
     #test_mix_of_lvm_and_partitions_with_unformatted_raw_disks()
     #test_mix_of_lvm_and_regular_partitions_on_same_disk()
     #test_multiple_vgs_multiple_disk()
+    #test_multiple_vgs_multiple_disk_small_partition()
     #smaller disk with large number of disks and create stripped lv
     #to really test logical to physical mapping
     #create a test case that a volume or partition has xfs filesystem
