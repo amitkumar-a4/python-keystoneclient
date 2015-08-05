@@ -593,11 +593,10 @@ def workload_get_all_by_project(context, project_id):
     return workloads
     
 @require_context
-def _workload_get(context, id, session):
+def _workload_get(context, id, session, **kwargs):
     try:
-
         workload = model_query(
-                     context, models.Workloads, session=session, read_deleted="no").\
+                     context, models.Workloads, session=session, **kwargs).\
                      options(sa_orm.joinedload(models.Workloads.metadata)).\
                      filter_by(id=id).first()
 
@@ -609,9 +608,9 @@ def _workload_get(context, id, session):
     return workload
 
 @require_context
-def workload_get(context, id):
+def workload_get(context, id, **kwargs):
     session = get_session() 
-    return _workload_get(context, id, session)   
+    return _workload_get(context, id, session, **kwargs)   
     
 @require_context
 def workload_delete(context, id):
