@@ -1195,6 +1195,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 previous_uploaded_size = 0
                 while process.poll() is None:
                     try:
+                        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'], 0, process)
                         try:
                             output = queue.get(timeout=5)
                         except Empty:
@@ -2032,6 +2033,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 previous_uploaded_size = 0
                 while process.poll() is None:
                     try:
+                        db.restore_get_metadata_cancel_flag(cntx, restore['id'], 0, process)
                         try:
                             output = queue.get(timeout=5)
                         except Empty:

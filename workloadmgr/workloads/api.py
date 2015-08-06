@@ -306,7 +306,6 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_show(self, context, workload_id):
-
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
 
@@ -1134,11 +1133,13 @@ class API(base.Base):
             self.db.snapshot_update(context,
                                     snapshot_id,
                                     {
-                                     'metadata': metadata
+                                     'metadata': metadata,
+                                     'status': 'cancelling'
                                     })
-            return True
 
-            AUDITLOG.log(context,'Snapshot Cancel Requested', snapshot_id)
+            #AUDITLOG.log(context,'Snapshot Cancel Requested', snapshot_id)
+
+            return True
 
         except Exception as ex:
             LOG.exception(ex)
@@ -1383,11 +1384,13 @@ class API(base.Base):
             self.db.restore_update(context,
                                     restore_id,
                                     {
-                                     'metadata': metadata
+                                     'metadata': metadata,
+                                     'status': 'cancelling'
                                     })
-            return True
 
-            AUDITLOG.log(context,'Restore Cancel Requested', restore_id)
+            #AUDITLOG.log(context,'Restore Cancel Requested', restore_id)
+
+            return True
 
         except Exception as ex:
             LOG.exception(ex)
