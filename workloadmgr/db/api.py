@@ -116,9 +116,9 @@ def workload_type_get(context, id):
 def workload_type_delete(context, id):
     return IMPL.workload_type_delete(context, id)
 
-def workload_get(context, workload_id):
+def workload_get(context, workload_id, **kwargs):
     """Get a workload or raise if it does not exist."""
-    return IMPL.workload_get(context, workload_id)
+    return IMPL.workload_get(context, workload_id, **kwargs)
 
 def workload_show(context, workload_id):
     """Get more details of the  workload or raise if it does not exist."""
