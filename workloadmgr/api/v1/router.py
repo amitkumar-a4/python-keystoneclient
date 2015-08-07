@@ -124,7 +124,7 @@ class APIRouter(workloadmgr.api.APIRouter):
        
         #Test email configuration
         mapper.connect("test_email",
-                        "/{project_id}/workloads/test_email",
+                        "/{project_id}/workloads/email/test_email",
                         controller=self.resources['workloads'],
                         action='test_email',
                         conditions={"method": ['GET']})
