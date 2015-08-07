@@ -601,6 +601,9 @@ def _workload_get(context, id, session, **kwargs):
                      filter_by(id=id).first()
 
         #TODO(gbasava): filter out deleted workloads if context disallows it
+      
+        if workload is None:
+           raise exception.WorkloadNotFound(workload_id=id)
 
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadNotFound(workload_id=id)

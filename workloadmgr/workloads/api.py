@@ -631,7 +631,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
-        total_capacity, total_utilization = vault.get_total_capacity()
+        total_capacity, total_utilization = vault.get_total_capacity(context)
         storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
