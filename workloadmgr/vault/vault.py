@@ -936,7 +936,7 @@ def swift_download_metadata_from_object_store(context, container):
                                 raise ex                              
                     
                     
-def get_total_capacity():
+def get_total_capacity(context):
     total_capacity = 1
     total_utilization = 1 
     try:
@@ -970,12 +970,29 @@ def get_total_capacity():
         elif FLAGS.wlm_vault_storage_type == 'swift-i':
             pass
         elif FLAGS.wlm_vault_storage_type == 'swift-s':
-            pass
+             cmd = get_swift_base_cmd(context)
+             cmd_stat = cmd + ["stat"]
+             for idx, opt in enumerate(cmd_stat):
+                 if opt == "--os-password":
+                    cmd_stat[idx+1] = FLAGS.wlm_vault_swift_password
+                    break
+                 if opt == "-K":
+                    cmd_stat[idx+1] = FLAGS.wlm_vault_swift_password
+                    break   
+             stdout, stderr = utils.execute(*cmd_stat) 
+             values = stdout.split('\n')
+             for val in values:
+                 if "Meta Quota-Bytes:" in val:
+                    total_capacity = int(val.split(':')[1].strip())                    
+
+                 if "Bytes:" in val:
+                    if val.split(':')[0].strip() == 'Bytes':
+                       total_utilization = int(val.split(':')[1].strip())
+ 
         elif FLAGS.wlm_vault_storage_type == 's3':
             pass                          
     except Exception as ex:
         LOG.exception(ex)    
-    
     return total_capacity,total_utilization                                           
    
 @autolog.log_method(logger=Logger) 
