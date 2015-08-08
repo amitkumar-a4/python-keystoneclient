@@ -940,6 +940,7 @@ class MongoDBWorkflow(workflow.Workflow):
                                         read_preference=ReadPreference.SECONDARY)
             status = repl.admin.command('replSetGetStatus')
 
+            status.pop('$gleStats')
             status["date"] = str(status["date"])
             status["children"] = status.pop("members")
             status["name"] = status.pop("set")
@@ -960,7 +961,7 @@ class MongoDBWorkflow(workflow.Workflow):
                 if ("lastHeartbeat" in m):
                     m["lastHeartbeat"] = str(m["lastHeartbeat"])
                 if ("optime" in m):
-                    m["optime"] = str(m["optime"])
+                    m.pop('optime')
                 m["input"] = []
                 m["input"].append([])
                 m["input"].append([])
