@@ -42,7 +42,6 @@ from workloadmgr.virt.vmwareapi import host
 from workloadmgr.virt.vmwareapi import vim
 from workloadmgr.virt.vmwareapi import vim_util
 from workloadmgr.virt.vmwareapi import vm_util
-from workloadmgr.virt.vmwareapi import vmops
 from workloadmgr.virt.vmwareapi import volumeops
 from workloadmgr.virt.vmwareapi import read_write_util
 from workloadmgr.virt.vmwareapi.thickcopy import thickcopyextents
@@ -1196,6 +1195,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 previous_uploaded_size = 0
                 while process.poll() is None:
                     try:
+                        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'], 0, process)
                         try:
                             output = queue.get(timeout=5)
                         except Empty:
@@ -1337,7 +1337,6 @@ class VMwareVCDriver(VMwareESXDriver):
                                      'status': 'uploading'
                                     })                                                           
                 vmdk_size, snapshot_type = _upload_vmdk(dev)
-                
                 object_store_transfer_time = vault.upload_snapshot_vm_resource_to_object_store(cntx,{'workload_id': snapshot_obj.workload_id,
                                                                         'workload_name': workload_obj.display_name,
                                                                         'snapshot_id': snapshot_obj.id,
@@ -2034,6 +2033,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 previous_uploaded_size = 0
                 while process.poll() is None:
                     try:
+                        db.restore_get_metadata_cancel_flag(cntx, restore['id'], 0, process)
                         try:
                             output = queue.get(timeout=5)
                         except Empty:

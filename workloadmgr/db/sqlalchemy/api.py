@@ -593,14 +593,17 @@ def workload_get_all_by_project(context, project_id):
     return workloads
     
 @require_context
-def _workload_get(context, id, session):
+def _workload_get(context, id, session, **kwargs):
     try:
-        query = session.query(models.Workloads)\
-                       .options(sa_orm.joinedload(models.Workloads.metadata))\
-                       .filter_by(id=id)\
+        workload = model_query(
+                     context, models.Workloads, session=session, **kwargs).\
+                     options(sa_orm.joinedload(models.Workloads.metadata)).\
+                     filter_by(id=id).first()
 
         #TODO(gbasava): filter out deleted workloads if context disallows it
-        workload = query.first()
+      
+        if workload is None:
+           raise exception.WorkloadNotFound(workload_id=id)
 
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadNotFound(workload_id=id)
@@ -608,9 +611,9 @@ def _workload_get(context, id, session):
     return workload
 
 @require_context
-def workload_get(context, id):
+def workload_get(context, id, **kwargs):
     session = get_session() 
-    return _workload_get(context, id, session)   
+    return _workload_get(context, id, session, **kwargs)   
     
 @require_context
 def workload_delete(context, id):
@@ -919,7 +922,7 @@ def snapshot_get(context, snapshot_id, **kwargs):
     return _snapshot_get(context, snapshot_id, **kwargs) 
 
 @require_context
-def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,**kwargs):
+def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,process=None,**kwargs):
     flag='0'
     snapshot_obj = snapshot_get(context, snapshot_id)
     for meta in snapshot_obj.metadata:
@@ -930,6 +933,9 @@ def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,**kwarg
        return flag
 
     if flag == '1':
+       if process:
+          process.kill()
+
        error = _('Cancel requested for snapshot')
        raise exception.ErrorOccurred(reason=error)
 
@@ -2121,7 +2127,7 @@ def restore_get(context, restore_id, **kwargs):
 
 
 @require_context
-def restore_get_metadata_cancel_flag(context, restore_id, return_val=0, **kwargs):
+def restore_get_metadata_cancel_flag(context, restore_id, return_val=0, process=None, **kwargs):
     flag='0'
     restore_obj = restore_get(context, restore_id)
     for meta in restore_obj.metadata:
@@ -2132,6 +2138,8 @@ def restore_get_metadata_cancel_flag(context, restore_id, return_val=0, **kwargs
        return flag
 
     if flag=='1': 
+       if process:
+          process.kill() 
        error = _('Cancel requested for restore')
        raise exception.ErrorOccurred(reason=error)
 
