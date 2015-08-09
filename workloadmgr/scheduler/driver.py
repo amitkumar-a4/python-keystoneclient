@@ -36,6 +36,14 @@ def snapshot_update_db(context, snapshot_id, host):
     values = {'host': host, 'scheduled_at': now}
     return db.snapshot_update(context, snapshot_id, values)
 
+def restore_update_db(context, restore_id, host):
+    '''Set the host and set the scheduled_at field of the restore.
+
+    :returns: A Snapshot with the updated fields set properly.
+    '''
+    now = timeutils.utcnow()
+    values = {'host': host, 'scheduled_at': now}
+    return db.restore_update(context, restore_id, values)
 
 class Scheduler(object):
     """The base class that all Scheduler classes should inherit from."""
@@ -77,4 +85,3 @@ class Scheduler(object):
     def schedule_restore(self, context, request_spec, filter_properties):
         """Must override schedule method for scheduler to work."""
         raise NotImplementedError(_("Must implement schedule_restore"))    
-    

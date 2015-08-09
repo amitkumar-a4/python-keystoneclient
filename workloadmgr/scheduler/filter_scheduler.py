@@ -47,7 +47,7 @@ class FilterScheduler(driver.Scheduler):
         pass
 
     def schedule_workload_snapshot(self, context, request_spec, filter_properties):
-        weighed_host = self._schedule(context, request_spec, filter_properties)
+        weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
 
         if not weighed_host:
             raise exception.NoValidHost(reason="")
@@ -64,6 +64,25 @@ class FilterScheduler(driver.Scheduler):
             filter_properties.pop('context', None)
 
         self.workloads_rpcapi.workload_snapshot(context, host, snapshot_id)
+
+    def schedule_snapshot_restore(self, context, request_spec, filter_properties):
+        weighed_host = self._host_for_restore(context, request_spec, filter_properties)
+
+        if not weighed_host:
+            raise exception.NoValidHost(reason="")
+
+        host = weighed_host.obj.host
+        restore_id = request_spec['restore_id']
+
+        updated_restore = driver.restore_update_db(context, restore_id, host)
+        self._post_select_populate_filter_properties(filter_properties,
+                                                     weighed_host.obj)
+
+        # context is not serializable
+        if filter_properties:
+            filter_properties.pop('context', None)
+
+        self.workloads_rpcapi.snapshot_restore(context, host, restore_id)
 
     def _post_select_populate_filter_properties(self, filter_properties,
                                                 host_state):
@@ -96,7 +115,7 @@ class FilterScheduler(driver.Scheduler):
             raise exception.InvalidParameterValue(err=msg)
         return max_attempts
 
-    def _log_snapshot_error(self, snapshot_id, retry):
+    def _log_snapshot_error(self, id, retry):
         """If the request contained an exception from a previous workload_snapshot operation, 
            log it to aid debugging
         """
@@ -109,7 +128,7 @@ class FilterScheduler(driver.Scheduler):
             return  # no previously attempted hosts, skip
 
         last_host = hosts[-1]
-        msg = _("Error scheduling %(snapshot_id)s from last workloadmgr-service: "
+        msg = _("Error scheduling %(id)s from last workloadmgr-service: "
                 "%(last_host)s : %(exc)s") % locals()
         LOG.error(msg)
 
@@ -142,7 +161,7 @@ class FilterScheduler(driver.Scheduler):
                     "snapshot %(snapshot_id)s") % locals()
             raise exception.NoValidHost(reason=msg)
 
-    def _schedule(self, context, request_spec, filter_properties=None):
+    def _host_for_snapshot(self, context, request_spec, filter_properties=None):
         """Returns a list of hosts that meet the required specs,
         ordered by their fitness.
         """
@@ -179,5 +198,48 @@ class FilterScheduler(driver.Scheduler):
                                                             filter_properties)
         best_host = weighed_hosts[0]
         LOG.info(_("Choosing %(best_host)s") % locals())
+        best_host.obj.consume_from_snapshot(snapshot_properties)
+        return best_host
+
+    def _host_for_restore(self, context, request_spec, filter_properties=None):
+        """Returns a list of hosts that meet the required specs,
+        ordered by their fitness.
+        """
+        elevated = context.elevated()
+
+        snapshot_properties = request_spec['restore_properties']
+        resource_properties = snapshot_properties.copy()
+        request_spec.update({'resource_properties': resource_properties})
+
+        config_options = self._get_configuration_options()
+
+        if filter_properties is None:
+            filter_properties = {}
+        self._populate_retry(filter_properties, resource_properties)
+
+        filter_properties.update({'context': context,
+                                  'request_spec': request_spec,
+                                  'config_options': config_options})
+
+        self.populate_filter_properties(request_spec,
+                                        filter_properties)
+
+        hosts = self.host_manager.get_all_host_states(elevated)
+
+        hosts = self.host_manager.get_filtered_hosts(hosts,
+                                                     filter_properties)
+        if not hosts:
+            return None
+
+        LOG.info(_("Filtered %(hosts)s") % locals())
+        # weighted_host = WeightedHost() ... the best
+        # host for the job.
+        weighed_hosts = self.host_manager.get_weighed_hosts(hosts,
+                                                            filter_properties)
+        best_host = weighed_hosts[0]
+        LOG.info(_("Choosing %(best_host)s") % locals())
+        # lets give the same weight for both snapshot and restore.
+        # so the following api name suggest count for snapshot, we overload
+        # for restore operation too
         best_host.obj.consume_from_snapshot(snapshot_properties)
         return best_host
