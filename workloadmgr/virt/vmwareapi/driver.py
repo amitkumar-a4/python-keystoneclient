@@ -2238,66 +2238,105 @@ class VMwareVCDriver(VMwareESXDriver):
         vix_disk_lib_env = os.environ.copy()
         vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'   
         try:
-            mountpointsfile_fh, mountpointsfile_path = mkstemp()
-            close(mountpointsfile_fh)
-            diskpathsfile_fh, diskpathsfile_path = mkstemp()
-            close(diskpathsfile_fh)
-            
-            diskpathsfile_fh = open(diskpathsfile_path,'w')
+            vmdkfiles = []
             snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot['id'])
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type == 'disk':
                     vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,snapshot_vm_resource.id)
-                    diskpathsfile_fh.write(vm_disk_resource_snap.vault_path+'\n')
-            diskpathsfile_fh.close()                    
+                    vmdkfiles.append(vm_disk_resource_snap.vault_path+'\n')
 
-                        
-            cmdspec = [ "trilio-vix-disk-cli", "-mount",
-                       "-mountpointsfile", mountpointsfile_path,
-                       diskpathsfile_path]      
-            cmd = " ".join(cmdspec)
-                         
-            process = subprocess.Popen(cmdspec,
-                                   stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   bufsize= -1,
-                                   env=vix_disk_lib_env,
-                                   close_fds=True,
-                                   shell=False)
-        
-            queue = Queue()
-            read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
-            read_thread.daemon = True # thread dies with the program
-            read_thread.start()            
-        
-            output = ''
-            while process.poll() is None:
+            processes = []
+            mountpoints = {}
+            snapshot_metadata = {'mountprocesses' : "",
+                                 'mountpointsfiles' : "",}
+            for vmdkfile in vmdkfiles:
+
                 try:
-                    try:
-                        output = queue.get(timeout=5)
-                    except Empty:
-                        continue 
-                    except Exception as ex:
-                        LOG.exception(ex)
-                    if output.startswith("Pausing the process"):
-                        break
+                    fileh, listfile = mkstemp()
+                    close(fileh)
+                    mountpointsfile_fh, mountpointsfile_path = mkstemp()
+                    close(mountpointsfile_fh)
+            
+                    snapshot_metadata['mountpointsfiles'] += mountpointsfile_path + '\n'
+                    with open(listfile, 'w') as f:
+                        f.write(vmdkfile.strip().rstrip() + "\n")
+
+                    cmdspec = [ "trilio-vix-disk-cli", "-mount", "-diskonly", "-mountpointsfile", mountpointsfile_path, ]
+                    cmdspec += [listfile]
+                    cmd = " ".join(cmdspec)
+                    LOG.info(_( cmd ))
+                    process = subprocess.Popen(cmdspec,
+                                               stdin=subprocess.PIPE,
+                                               stdout=subprocess.PIPE,
+                                               stderr=subprocess.PIPE,
+                                               bufsize= -1,
+                                               env=vix_disk_lib_env,
+                                               close_fds=True,
+                                               shell=False)
+                
+                    queue = Queue()
+                    read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                    read_thread.daemon = True # thread dies with the program
+                    read_thread.start()            
+
+                    mountpath = None
+                    while process.poll() is None:
+                        try:
+                            try:
+                                output = queue.get(timeout=5)
+                                LOG.info(_( output ))
+                            except Empty:
+                                continue 
+                            except Exception as ex:
+                                LOG.exception(ex)
+    
+                            if output.startswith("Pausing the process until it is resumed"):
+                                break
+                        except Exception as ex:
+                            LOG.exception(ex)
+
+                    if not process.poll() is None:
+                        _returncode = process.returncode  # pylint: disable=E1101
+                        if _returncode:
+                            LOG.debug(_('Result was %s') % _returncode)
+                            raise exception.ProcessExecutionError(
+                                                    exit_code=_returncode,
+                                                    stderr=process.stderr.read(),
+                                                    cmd=cmd)
+                    with open(mountpointsfile_path, 'r') as f:
+                        for line in f:
+                            line = line.strip("\n")
+                            mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
+    
+                    LOG.info(_( mountpoints ))
+                    process.stdin.close()
+                    processes.append(process)
+                    snapshot_metadata['mountprocesses'] += str(process.pid) + ";"
+
                 except Exception as ex:
                     LOG.exception(ex)
-        
-            if not process.poll() is None:
-                _returncode = process.returncode  # pylint: disable=E1101
-                if _returncode:
-                    LOG.debug(_('Result was %s') % _returncode)
-                    raise exception.ProcessExecutionError(
-                                        exit_code=_returncode,
-                                        stderr=process.stderr.read() + output,
-                                        cmd=cmd)
-            process.stdin.close()
-            snapshot_metadata = {'mountprocess' : process.pid,
-                                 'mountpointsfile' : mountpointsfile_path,
-                                 'diskpathsfile' : diskpathsfile_path}
+                    # Resume the processes if we cannot mount all processes
+                    for mountprocess in processes:
+                        os.kill(int(mountprocess.pid), 18)
+                    for mountpointfile in snapshot_metadata['mountpointsfiles'].split("\n"):
+                        if os.path.isfile(mountpointfile):
+                            os.remove(mountpointfile)
+                        
+                    raise
+                finally:
+                    if os.path.isfile(listfile):
+                        os.remove(listfile)
+
             db.snapshot_update(cntx, snapshot['id'], {'status': 'mounted', 'metadata': snapshot_metadata})            
+            ## Add loop device
+            ## scan
+        except Exception as ex:
+            LOG.exception(ex)
+            try:
+                self.snapshot_dismount(cntx, snapshot)
+            except:
+                pass
+            raise
 
         except subprocess.CalledProcessError as ex:
             LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
@@ -2306,23 +2345,25 @@ class VMwareVCDriver(VMwareESXDriver):
             
     @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_dismount')
     def snapshot_dismount(self, cntx, snapshot):
+        # Deactivate volumes
         db = WorkloadMgrDB().db 
         
-        mountprocess = db.get_metadata_value(snapshot.metadata,'mountprocess')
-        mountpointsfile = db.get_metadata_value(snapshot.metadata,'mountpointsfile')
-        diskpathsfile = db.get_metadata_value(snapshot.metadata,'diskpathsfile')        
+        mountprocesses = db.get_metadata_value(snapshot.metadata, 'mountprocesses')
+        mountpointsfiles = db.get_metadata_value(snapshot.metadata, 'mountpointsfiles')
         
-        os.kill(int(mountprocess), 18)
+        if mountprocesses:
+            for mountprocess in mountprocesses.split(";"): 
+                if mountprocess != '':
+                    os.kill(int(mountprocess), 18)
         
-        snapshot_metadata = {'mountprocess' : '',
-                             'mountpointsfile' : '',
-                             'diskpathsfile' : ''}
+        snapshot_metadata = {'mountprocesses' : '',
+                             'mountpointsfiles' : '',}
         db.snapshot_update(cntx, snapshot['id'], {'status': 'available', 'metadata': snapshot_metadata})            
         
-        remove(mountpointsfile)
-        remove(diskpathsfile)
-        
-                  
+        if mountpointsfiles:
+            for mfile in mountpointsfiles.split("\n"):
+                if os.path.isfile(mfile):
+                    remove(mfile)
         pass
         
 class VMwareAPISession(object):
