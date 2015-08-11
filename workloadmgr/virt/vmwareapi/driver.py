@@ -45,6 +45,7 @@ from workloadmgr.virt.vmwareapi import vm_util
 from workloadmgr.virt.vmwareapi import volumeops
 from workloadmgr.virt.vmwareapi import read_write_util
 from workloadmgr.virt.vmwareapi.thickcopy import thickcopyextents
+from workloadmgr.virt.vmwareapi import thickcopy
 from workloadmgr.vault import vault
 from workloadmgr.virt import qemuimages
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -2298,6 +2299,7 @@ class VMwareVCDriver(VMwareESXDriver):
                     if not process.poll() is None:
                         _returncode = process.returncode  # pylint: disable=E1101
                         if _returncode:
+                            import pdb;pdb.set_trace()
                             LOG.debug(_('Result was %s') % _returncode)
                             raise exception.ProcessExecutionError(
                                                     exit_code=_returncode,
@@ -2328,8 +2330,29 @@ class VMwareVCDriver(VMwareESXDriver):
                         os.remove(listfile)
 
             db.snapshot_update(cntx, snapshot['id'], {'status': 'mounted', 'metadata': snapshot_metadata})            
+
+            snapshot_metadata = {}
+            snapshot_metadata['devpaths'] = ""
             ## Add loop device
-            ## scan
+            for mountpath in mountpoints:
+                devpath = thickcopy.mountdevice(mountpath)
+                snapshot_metadata['devpaths'] += devpath + '\n'
+
+                # Add partition mappings here
+                try:
+                    cmd = ["partx", "-d", devpath]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                except:
+                    pass
+
+                try:
+                    cmd = ["partx", "-a", devpath]
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                except:
+                    pass
+            db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})            
+
+            ## scan for VG
         except Exception as ex:
             LOG.exception(ex)
             try:
@@ -2350,16 +2373,22 @@ class VMwareVCDriver(VMwareESXDriver):
         
         mountprocesses = db.get_metadata_value(snapshot.metadata, 'mountprocesses')
         mountpointsfiles = db.get_metadata_value(snapshot.metadata, 'mountpointsfiles')
-        
+        devpaths = db.get_metadata_value(snapshot.metadata, 'devpaths')
+
+        if devpaths:
+            for devpath in devpaths.split("\n"): 
+                if devpath != '':
+                    thickcopy.dismountpv(devpath)
+
         if mountprocesses:
             for mountprocess in mountprocesses.split(";"): 
                 if mountprocess != '':
                     os.kill(int(mountprocess), 18)
-        
+
         snapshot_metadata = {'mountprocesses' : '',
                              'mountpointsfiles' : '',}
         db.snapshot_update(cntx, snapshot['id'], {'status': 'available', 'metadata': snapshot_metadata})            
-        
+
         if mountpointsfiles:
             for mfile in mountpointsfiles.split("\n"):
                 if os.path.isfile(mfile):
