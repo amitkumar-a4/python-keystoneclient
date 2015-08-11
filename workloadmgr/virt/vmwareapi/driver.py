@@ -2353,6 +2353,13 @@ class VMwareVCDriver(VMwareESXDriver):
             db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})            
 
             ## scan for VG
+            vglist = thickcopy.getvgs()
+            snapshot_metadata = {}
+            snapshot_metadata['vgs'] = ""
+            for vg in vglist:
+                snapshot_metadata['vgs'] += vg + ";"
+  
+            ## Mount all file systems
         except Exception as ex:
             LOG.exception(ex)
             try:
@@ -2368,12 +2375,18 @@ class VMwareVCDriver(VMwareESXDriver):
             
     @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_dismount')
     def snapshot_dismount(self, cntx, snapshot):
-        # Deactivate volumes
         db = WorkloadMgrDB().db 
         
         mountprocesses = db.get_metadata_value(snapshot.metadata, 'mountprocesses')
         mountpointsfiles = db.get_metadata_value(snapshot.metadata, 'mountpointsfiles')
         devpaths = db.get_metadata_value(snapshot.metadata, 'devpaths')
+        vgs = db.get_metadata_value(snapshot.metadata, 'vgs')
+
+        # Deactivate volumes
+        if vgs:
+            for vg in vgs.split(";"):
+                if vg != '':
+                    thickcopy.deactivatevgs(vg)
 
         if devpaths:
             for devpath in devpaths.split("\n"): 
