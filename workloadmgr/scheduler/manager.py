@@ -84,6 +84,29 @@ class SchedulerManager(manager.Manager):
                                                   snapshot_state,
                                                   context, ex, request_spec)
 
+    def snapshot_restore(self, context, topic, restore_id,
+                          request_spec=None, filter_properties=None):
+        try:
+            if request_spec is None:
+                request_spec = {}
+                restore_ref = db.restore_get(context, restore_id)
+
+                request_spec.update( {'restore_id': restore_id, 'restore_properties':{}})
+
+            self.driver.schedule_snapshot_restore(context, request_spec,
+                                                   filter_properties)
+        except exception.NoValidHost as ex:
+            restore_state = {'status': {'status': 'error'}}
+            self._set_restore_state_and_notify('snapshot_restore',
+                                              restore_state,
+                                              context, ex, request_spec)
+        except Exception as ex:
+            with excutils.save_and_reraise_exception():
+                restore_state = {'status': {'status': 'error'}}
+                self._set_restore_state_and_notify('snapshot_restore',
+                                                  restore_state,
+                                                  context, ex, request_spec)
+
     def _set_snapshot_state_and_notify(self, method, updates, context, ex,
                                      request_spec):
         LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
@@ -106,3 +129,24 @@ class SchedulerManager(manager.Manager):
         notifier.notify(context, notifier.publisher_id("scheduler"),
                         'scheduler.' + method, notifier.ERROR, payload)
 
+    def _set_restore_state_and_notify(self, method, updates, context, ex,
+                                     request_spec):
+        LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
+  
+        restore_status = updates['status']
+        properties = request_spec.get('restore_properties', {})
+
+        restore_id = request_spec.get('restore_id', None)
+
+        if restore_id:
+            db.restore_update(context, restore_id, restore_status)
+
+        payload = dict(request_spec=request_spec,
+                       restore_properties=properties,
+                       restore_id=restore_id,
+                       state=restore_status,
+                       method=method,
+                       reason=ex)
+
+        notifier.notify(context, notifier.publisher_id("scheduler"),
+                        'scheduler.' + method, notifier.ERROR, payload)
