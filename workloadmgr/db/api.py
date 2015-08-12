@@ -430,3 +430,13 @@ def purge_snapshot(context, id):
 
 def purge_workload(context, id):
     return IMPL.purge_workload(context, id)
+
+def task_create(context, values):
+    return IMPL.task_create(context, values)
+
+def task_update(context, task_id, values):
+    return IMPL.task_update(context, task_id, values)
+
+def task_get(context, task_id, **kwargs):
+    return IMPL.task_get(context, task_id, **kwargs)
+
