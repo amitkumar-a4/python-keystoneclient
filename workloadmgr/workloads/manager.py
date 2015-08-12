@@ -561,7 +561,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete({'workload_id': workload.id, 'workload_name': workload.display_name,})
+        vault.workload_delete(context, {'workload_id': workload.id, 'workload_name': workload.display_name,})
 
         
     @autolog.log_method(logger=Logger)
