@@ -130,8 +130,6 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('snapshot_delete', snapshot_id=snapshot_id, task_id=task_id),
                   topic=topic)
-
-        return task_id
         
     @autolog.log_method(logger=Logger)     
     def snapshot_mount(self, ctxt, host, snapshot_id):

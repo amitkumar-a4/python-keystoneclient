@@ -1086,6 +1086,9 @@ class API(base.Base):
  
             self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id, task.id)
             AUDITLOG.log(context,'Snapshot Deleted', snapshot)
+
+            return task.id
+            
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
