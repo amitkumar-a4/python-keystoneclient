@@ -65,6 +65,10 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
 workloads_manager_opts = [
+    cfg.StrOpt('mountdir',
+               default='/opt/stack/data/wlm/tvault-mounts',
+               deprecated_name='vmwareapi_host_username',
+               help='Root directory where all snapshots are mounted.'),
 ]
 
 scheduler_config = {'standalone': 'True'}
@@ -838,19 +842,61 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Mount an existing snapshot
         """
-        snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-        self.driver.snapshot_mount(context, snapshot)
+        try:
+            snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+            diskfiles = []
+            vmid = ""
+            snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot['id'])
+            for snapshot_vm_resource in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type == 'disk':
+                    vmid = snapshot_vm_resource.id
+                    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,snapshot_vm_resource.id)
+                    diskfiles.append(vm_disk_resource_snap.vault_path)
+
+            ## TODO: Handle multiple VMs
+            devpaths = self.driver.snapshot_mount(context, snapshot, diskfiles)
+
+            snapshot_metadata = {}
+
+            try:
+                partitions = {}
+                for diskpath, mountpath in devpaths.iteritems():
+                    partitions[mountpath] = mountutils.read_partition_table(mountpath)
+
+                logicalobjects = mountutils.discover_lvs_and_partitions(devpaths, partitions)
+
+                mountutils.mount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, logicalobjects)
+
+                mountutils.umount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, logicalobjects)
+
+                snapshot_metadata['devpaths'] = json.dumps(devpaths)
+                snapshot_metadata['vgs'] = json.dumps(logicalobjects['vgs'])
+                db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})
+
+                ## TODO: Spin up php webserver
+            except Exception as ex:
+                if logicalobjects:
+                    for vg in logicalobjects['vgs']:
+                        mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                LOG.exception(ex)
+                raise
+        except Exception as ex:
+            self.driver.snapshot_dismount(context, snapshot, devpaths)
+            LOG.exception(ex)
+            raise
 
     @autolog.log_method(logger=Logger)
     def snapshot_dismount(self, context, snapshot_id):
         """
-        Mount an existing snapshot
+        Dismount an existing snapshot
         """
         snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-        self.driver.snapshot_dismount(context, snapshot)
-        pass
+        devpaths = json.loads(db.get_metadata_value(snapshot.metadata, 'devpaths'))
+        vgs = json.loads(db.get_metadata_value(snapshot.metadata, 'devpaths'))
+        for vg in vgs:
+            mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+        self.driver.snapshot_dismount(context, snapshot, devpaths)
                     
-            
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
