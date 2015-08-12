@@ -26,6 +26,10 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import settings as settings_module
 
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import smtplib
+
 FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
 
@@ -606,8 +610,6 @@ class WorkloadMgrsController(wsgi.Controller):
             except Exception as error:
                    raise exception.ErrorOccurred("Not able to send email with this configuration")
 
-
-            raise exc.HTTPNotFound(explanation=unicode(error))
         except exception.InvalidState as error:
             LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
