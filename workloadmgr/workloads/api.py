@@ -1073,9 +1073,22 @@ class API(base.Base):
                 if restore.restore_type == 'test':
                     msg = _('This workload snapshot contains testbubbles')
                     raise wlm_exceptions.InvalidState(reason=msg)      
-        
-            self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
+
+            status_messages = {'message': 'Snapshot delete operation starting'} 
+            options = {
+                       'display_name': "Snapshot Delete",
+                       'display_description': "Snapshot delete for snapshot id %s" % snapshot_id,
+                       'status': "starting",
+                       'status_messages':  status_messages,
+                      }
+
+            task = self.db.task_create(context, options)
+ 
+            self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id, task.id)
             AUDITLOG.log(context,'Snapshot Deleted', snapshot)
+
+            return task.id
+            
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
@@ -1444,6 +1457,12 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return settings 
-    
+
+    @autolog.log_method(logger=Logger)
+    def task_show(self, context, task_id):
+
+        task = self.db.task_get(context, task_id)
+        task_dict = dict(task.iteritems())
+        return task_dict  
 
       

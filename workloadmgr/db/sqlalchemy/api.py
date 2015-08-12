@@ -889,7 +889,6 @@ def _snapshot_update(context, values, snapshot_id, purge_metadata, session):
                 values['uploaded_size'] = 0
             if not values.get('progress_percent'):
                 values['progress_percent'] = 0 
-                
         snapshot_ref.update(values)
         snapshot_ref.save(session)
         
@@ -2522,14 +2521,14 @@ def _set_status_messages_for_task(context, task_ref, status_messages, session):
     :param status_messages: A dict of status_messages to set
     :param session: A SQLAlchemy session to use (if present)
     """
-    for status_message in status_messages.iteritems():
+    for key, status_message in status_messages.iteritems():
         status_messages_values = {'task_id': task_ref.id, 'status_message': status_message}
         _task_status_messages_create(context, status_messages_values, session)
 
 @require_context
 def _task_status_messages_create(context, values, session):
     """Create a TaskStatusMessages object"""
-    status_messages_ref = models.TaskStatusMessages()
+    status_messages_ref = models.TaskStatusMessages()    
     if not values.get('id'):
         values['id'] = str(uuid.uuid4())    
     return _task_status_messages_update(context, status_messages_ref, values, session)
@@ -2578,7 +2577,7 @@ def _task_update(context, values, task_id, session):
         task_ref.save(session)
         
         if status_messages:
-            _set_status_messages_for_task(context, task_ref, status_messages, ession=session)  
+            _set_status_messages_for_task(context, task_ref, status_messages, session=session)  
           
         return task_ref
     finally:
@@ -2640,7 +2639,7 @@ def task_show(context, task_id):
 @require_context
 def task_create(context, values):
     session = get_session()
-    return _task_update(context, values, None, False, session)
+    return _task_update(context, values, None, session)
 
 @require_context
 def task_update(context, task_id, values):

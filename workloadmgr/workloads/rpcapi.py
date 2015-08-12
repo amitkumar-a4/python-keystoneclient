@@ -124,13 +124,12 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
     
     @autolog.log_method(logger=Logger)    
-    def snapshot_delete(self, ctxt, host, snapshot_id):
+    def snapshot_delete(self, ctxt, host, snapshot_id, task_id):
         LOG.debug("delete_snapshot  rpcapi snapshot_id %s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
-        self.call(ctxt,
-                  self.make_msg('snapshot_delete',snapshot_id=snapshot_id),
-                  topic=topic,
-                  timeout=300)
+        self.cast(ctxt,
+                  self.make_msg('snapshot_delete', snapshot_id=snapshot_id, task_id=task_id),
+                  topic=topic)
         
     @autolog.log_method(logger=Logger)     
     def snapshot_mount(self, ctxt, host, snapshot_id):

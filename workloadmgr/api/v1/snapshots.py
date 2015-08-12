@@ -121,7 +121,8 @@ class SnapshotsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                self.workload_api.snapshot_delete(context, id)
+                task_id = self.workload_api.snapshot_delete(context, id)
+                return self._view_builder.task(req, task_id)
             except exception.NotFound:
                 raise exc.HTTPNotFound()
             return webob.Response(status_int=202)

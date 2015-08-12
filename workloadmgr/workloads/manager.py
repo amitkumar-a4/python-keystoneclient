@@ -16,6 +16,7 @@ Job scheduler manages WorkloadMgr
 
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy import *
 from datetime import datetime, timedelta
 import time
@@ -149,6 +150,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         # self.scheduler.add_interval_job(self.job_def,args=['hello','there'],hours=1)
         self.scheduler.start()       
         self.driver = driver.load_compute_driver(None, None)
+        self.pool = ThreadPoolExecutor(max_workers=5)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
 
  
@@ -823,15 +825,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)                     
 
     @autolog.log_method(logger=Logger)
-    def snapshot_delete(self, context, snapshot_id):
+    def snapshot_delete(self, context, snapshot_id, task_id):
         """
         Delete an existing snapshot
         """
-        workload_utils.snapshot_delete(context, snapshot_id)
+        def execute(context, snapshot_id, task_id):
+            workload_utils.snapshot_delete(context, snapshot_id)
                     
-        #unlock the workload
-        snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-        self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            #unlock the workload
+            snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+            self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+
+            status_messages = {'message': 'Snapshot delete operation completed'}
+            self.db.task_update(context,task_id,{'status': 'done','finished_at': timeutils.utcnow(),
+                                'status_messages': status_messages})
+
+        self.pool.submit(execute, context, snapshot_id, task_id)
                     
     @autolog.log_method(logger=Logger)
     def snapshot_mount(self, context, snapshot_id):

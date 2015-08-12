@@ -109,3 +109,11 @@ class ViewBuilder(common.ViewBuilder):
         #    snapshots_dict['snapshots_links'] = snapshots_links
 
         return snapshots_dict
+
+    def task(self, request, task_id):
+        return {
+            'task': {
+                'id': task_id,
+            },
+        }
+

@@ -482,3 +482,6 @@ class SettingNotFound(NotFound):
     
 class VaultStorageNotFound(NotFound):
     message = _("VaultStoreage %(vault_storage_id)s could not be found.")         
+
+class TaskNotFound(NotFound):
+    message = _("Task %(task_id)s could not be found.")
