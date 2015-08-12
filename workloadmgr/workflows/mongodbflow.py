@@ -940,39 +940,46 @@ class MongoDBWorkflow(workflow.Workflow):
                                         read_preference=ReadPreference.SECONDARY)
             status = repl.admin.command('replSetGetStatus')
 
-            status["date"] = str(status["date"])
-            status["children"] = status.pop("members")
-            status["name"] = status.pop("set")
-            status["status"] = "OK:"+str(status["ok"])
-            status["input"] = []
-            status["input"].append([])
-            status["input"][0].append("myState")
-            status["input"][0].append(status["myState"])
-            for m in status["children"]:
-                m["optimeDate"] = str(m["optimeDate"])
-                m["status"] = m.pop("stateStr")
+            replstatus = {}
+            replstatus["date"] = str(status["date"])
+            replstatus["children"] = []
+            replstatus["name"] = status.pop("set")
+            replstatus["status"] = "OK:"+str(status["ok"])
+            replstatus["input"] = []
+            replstatus["input"].append([])
+            replstatus["input"][0].append("myState")
+            replstatus["input"][0].append(status["myState"])
+            replstatus['children'] = []
+            for m in status["members"]:
+                replchild = {}
+                replchild['name'] = m['name']
+                replchild['configVersion'] = m['configVersion']
+                replchild["optimeDate"] = m["optimeDate"].strftime("%B %d, %Y")
+                replchild["status"] = m.pop("stateStr")
+                replchild["uptime"] = m.pop("uptime")
                 if ('electionDate' in m):
                     m.pop('electionDate')
                 if ('electionTime' in m):
                     m.pop('electionTime')
                 if ("lastHeartbeatRecv" in m):
-                    m["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
+                    replchild["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
                 if ("lastHeartbeat" in m):
-                    m["lastHeartbeat"] = str(m["lastHeartbeat"])
+                    replchild["lastHeartbeat"] = str(m["lastHeartbeat"])
                 if ("optime" in m):
-                    m["optime"] = str(m["optime"])
-                m["input"] = []
-                m["input"].append([])
-                m["input"].append([])
-                m["input"].append([])
+                    replchild["optime"] = m['optime'].as_datetime().strftime("%B %d, %Y")
+                replchild["input"] = []
+                replchild["input"].append([])
+                replchild["input"].append([])
+                replchild["input"].append([])
                 if ("syncingTo" in m):
-                    m["input"][0].append("syncingTo")
-                    m["input"][0].append(m["syncingTo"])
-                m["input"][1].append("state")
-                m["input"][1].append(m["state"])
-                m["input"][2].append("health")
-                m["input"][2].append(m["health"])
-            replicas.append(status)
+                    replchild["input"][0].append("syncingTo")
+                    replchild["input"][0].append(m["syncingTo"])
+                replchild["input"][1].append("state")
+                replchild["input"][1].append(m["state"])
+                replchild["input"][2].append("health")
+                replchild["input"][2].append(m["health"])
+                replstatus['children'].append(replchild)
+            replicas.append(replstatus)
 
         # Covert the topology into generic topology that can be
         # returned as restful payload

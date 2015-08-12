@@ -1163,6 +1163,10 @@ class API(base.Base):
         """
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
+            if not snapshot:
+                msg = _('Invalid snapshot id')
+                raise wlm_exceptions.Invalid(reason=msg)
+
             AUDITLOG.log(context,'Snapshot Mount Requested', snapshot)
             workload = self.workload_get(context, snapshot['workload_id'])
             if snapshot['status'] != 'available':
@@ -1182,6 +1186,9 @@ class API(base.Base):
         """
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
+            if not snapshot:
+                msg = _('Invalid snapshot id')
+                raise wlm_exceptions.Invalid(reason=msg)
             AUDITLOG.log(context,'Snapshot Dismount Requested', snapshot)
             workload = self.workload_get(context, snapshot['workload_id'])
             if snapshot['status'] != 'mounted':

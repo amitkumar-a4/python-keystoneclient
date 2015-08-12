@@ -842,6 +842,23 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         self.pool.submit(execute, context, snapshot_id, task_id)
                     
+    @autolog.log_method(logger=Logger)
+    def snapshot_mount(self, context, snapshot_id):
+        """
+        Mount an existing snapshot
+        """
+        snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+        self.driver.snapshot_mount(context, snapshot)
+
+    @autolog.log_method(logger=Logger)
+    def snapshot_dismount(self, context, snapshot_id):
+        """
+        Mount an existing snapshot
+        """
+        snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+        self.driver.snapshot_dismount(context, snapshot)
+        pass
+                    
             
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
