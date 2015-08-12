@@ -1489,7 +1489,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))
                             db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
             except Exception as ex:
                 LOG.exception(ex)
                 
@@ -1559,7 +1559,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
                             
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                                 
@@ -1579,7 +1579,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                         snap.id,
                                                                                                         snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                         workload_obj.display_name ))                            
-                                vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                                vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                             except Exception as ex:
                                 LOG.exception(ex)    
                         continue
@@ -1655,7 +1655,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.id,
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                         

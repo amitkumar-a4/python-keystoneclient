@@ -100,7 +100,7 @@ def _remove_data(context, snapshot_id):
     try:
         LOG.info(_('Deleting the data of snapshot %s of workload %s') % (snapshot_with_data.id, snapshot_with_data.workload_id))
         workload_obj = db.workload_get(context, snapshot_with_data.workload_id)                            
-        vault.snapshot_delete({'workload_id': snapshot_with_data.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snapshot_with_data.id})
+        vault.snapshot_delete(context, {'workload_id': snapshot_with_data.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snapshot_with_data.id})
         db.snapshot_update(context, snapshot_with_data.id, {'data_deleted':True})
     except Exception as ex:
         LOG.exception(ex)

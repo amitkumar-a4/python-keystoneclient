@@ -50,11 +50,16 @@ class AuditLog(object):
             if object == None:
                 object = {}
             
-            keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
-            user = keystone.users.get(context.user_id)
+            user_name = context.user_id
+            try:
+                keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
+                user = keystone.users.get(context.user_id)
+                user_name = user.name
+            except Exception as ex:
+                pass
             
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
-            auditlogmsg = auditlogmsg + ',' + user.name + ',' + context.user_id
+            auditlogmsg = auditlogmsg + ',' + user_name + ',' + context.user_id
             display_name = object.get('display_name', 'NA')
             if not display_name:
                 display_name = object.get('id', 'NA')
