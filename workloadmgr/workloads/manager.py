@@ -957,7 +957,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
 
         for vmid, paths in devpaths.iteritems():
-            self.driver.snapshot_dismount(context, snapshot, paths)
+            virtdriver.snapshot_dismount(context, snapshot, paths)
         snapshot_metadata = {}
         snapshot_metadata['devpaths'] = ""
         snapshot_metadata['logicalobjects'] = ""
