@@ -30,6 +30,7 @@ import shutil
 
 import smtplib
 import socket
+import os
 
 # Import the email modules
 from email.mime.multipart import MIMEMultipart
@@ -61,6 +62,7 @@ from workloadmgr import exception as wlm_exceptions
 from workloadmgr.openstack.common import timeutils
 from taskflow.exceptions import WrappedFailure
 from workloadmgr.workloads import workload_utils
+from workloadmgr.openstack.common import fileutils
 
 from workloadmgr import autolog
 from workloadmgr import settings
@@ -153,9 +155,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def __init__(self, service_name=None, *args, **kwargs):
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
-        # self.scheduler.add_interval_job(self.job_def,args=['hello','there'],hours=1)
         self.scheduler.start()       
-        self.driver = driver.load_compute_driver(None, None)
         self.pool = ThreadPoolExecutor(max_workers=5)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
 
@@ -472,18 +472,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id, 1)
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
-               for vm in self.db.workload_vms_get(context, workload.id):
-                   self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
+                for vm in self.db.workload_vms_get(context, workload.id):
+                    self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
             else:
-                 msg = _("Failed creating workload snapshot with following error(s):")
-                 if hasattr(ex, '_causes'):
-                    for cause in ex._causes:
-                        if cause._exception_str not in msg:
+                msg = _("Failed creating workload snapshot with following error(s):")
+                if hasattr(ex, '_causes'):
+                   for cause in ex._causes:
+                       if cause._exception_str not in msg:
                            msg = msg + ' ' + cause._exception_str
-                 LOG.error(msg)  
-                 status = 'error'
+                LOG.error(msg)  
+                status = 'error'
             
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -504,14 +504,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id, 1)            
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
-               for vm in self.db.workload_vms_get(context, workload.id):
-                   self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
+                for vm in self.db.workload_vms_get(context, workload.id):
+                    self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
             else:       
-                 msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
-                 LOG.error(msg)
-                 status = 'error'
+                msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
+                LOG.error(msg)
+                status = 'error'
             
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -750,17 +750,17 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             flag = self.db.restore_get_metadata_cancel_flag(context, restore_id, 1)
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
             else:
-                 status = 'error'
-                 LOG.exception(ex)
-                 msg = _("Failed restoring snapshot with following error(s):")
-                 if hasattr(ex, '_causes'):
+                status = 'error'
+                LOG.exception(ex)
+                msg = _("Failed restoring snapshot with following error(s):")
+                if hasattr(ex, '_causes'):
                     for cause in ex._causes:
                         if cause._exception_str not in msg:
-                           msg = msg + ' ' + cause._exception_str
-                 LOG.error(msg)
+                            msg = msg + ' ' + cause._exception_str
+                LOG.error(msg)
             
             time_taken = 0
             if 'restore' in locals() or 'restore' in globals():
@@ -783,16 +783,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             flag = self.db.restore_get_metadata_cancel_flag(context, restore_id, 1)
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
             else:
-                 status = 'error'
-                 LOG.exception(ex)
-                 if restore_type == 'test':
+                status = 'error'
+                LOG.exception(ex)
+                if restore_type == 'test':
                     msg = _("Failed creating test bubble: %(exception)s") %{'exception': ex}
-                 else:
-                      msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
-                 LOG.error(msg)
+                else:
+                    msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
+                LOG.error(msg)
             
             time_taken = 0
             if 'restore' in locals() or 'restore' in globals():
@@ -858,8 +858,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             pervmdisks = {}
             logicalobjects = {}
             snapshot_metadata = {}
+            
+            head, tail = os.path.split(FLAGS.mountdir + '/')
+            fileutils.ensure_tree(head)
 
             snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+            workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+            if workload.source_platform == 'openstack': 
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            elif workload.source_platform == 'vmware': 
+                virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
             snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot['id'])
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type == 'disk':
@@ -870,7 +878,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             for vmid, diskfiles in pervmdisks.iteritems():
                 # the goal is to mount as many artifacts as possible from snapshot
-                devpaths[vmid] = self.driver.snapshot_mount(context, snapshot, diskfiles)
+                devpaths[vmid] = virtdriver.snapshot_mount(context, snapshot, diskfiles)
 
                 try:
                     partitions = {}
@@ -920,6 +928,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Dismount an existing snapshot
         """
         snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+        workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+        if workload.source_platform == 'openstack': 
+            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        elif workload.source_platform == 'vmware': 
+            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')        
         devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
         if devpaths_json:
             devpaths = json.loads(devpaths_json)
@@ -944,7 +957,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
 
         for vmid, paths in devpaths.iteritems():
-            self.driver.snapshot_dismount(context, snapshot, paths)
+            virtdriver.snapshot_dismount(context, snapshot, paths)
         snapshot_metadata = {}
         snapshot_metadata['devpaths'] = ""
         snapshot_metadata['logicalobjects'] = ""
