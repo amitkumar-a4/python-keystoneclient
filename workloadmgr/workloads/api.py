@@ -266,7 +266,7 @@ class API(base.Base):
                                           'full': {'snap_count': 0, 'usage': 0}, 
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                           }
-        for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes'):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
@@ -313,7 +313,8 @@ class API(base.Base):
                                           'full': {'snap_count': 0, 'usage': 0}, 
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                          }
-        for workload_snapshot in self.db.snapshot_get_all(context, workload_id, read_deleted='yes'):
+       
+        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes'):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
@@ -372,11 +373,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_get_all(self, context, search_opts={}):
-        if context.is_admin:
-            workloads = self.db.workload_get_all(context)
-        else:
-            workloads = self.db.workload_get_all_by_project(context, context.project_id)
-
+        workloads = self.db.workload_get_all(context)
         return workloads
     
     @autolog.log_method(logger=Logger)
@@ -635,7 +632,7 @@ class API(base.Base):
         storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
-                for workload_snapshot in self.db.snapshot_get_all(context, workload.id, read_deleted='yes'):
+                for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes'):
                     if workload_snapshot.data_deleted == False:
                         if workload_snapshot.snapshot_type == 'incremental':
                             storage_usage['incremental'] = storage_usage['incremental'] + workload_snapshot.size
@@ -1034,14 +1031,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def snapshot_get_all(self, context, workload_id=None):
-        if workload_id:
-            snapshots = self.db.snapshot_get_all_by_project_workload(
-                                                    context,
-                                                    context.project_id,
-                                                    workload_id)
-        else:
-            snapshots = self.db.snapshot_get_all_by_project(
-                                        context,context.project_id)
+        snapshots = self.db.snapshot_get_all(context, workload_id)
         return snapshots
     
     @autolog.log_method(logger=Logger)
@@ -1073,9 +1063,22 @@ class API(base.Base):
                 if restore.restore_type == 'test':
                     msg = _('This workload snapshot contains testbubbles')
                     raise wlm_exceptions.InvalidState(reason=msg)      
-        
-            self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id)
+
+            status_messages = {'message': 'Snapshot delete operation starting'} 
+            options = {
+                       'display_name': "Snapshot Delete",
+                       'display_description': "Snapshot delete for snapshot id %s" % snapshot_id,
+                       'status': "starting",
+                       'status_messages':  status_messages,
+                      }
+
+            task = self.db.task_create(context, options)
+ 
+            self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id, task.id)
             AUDITLOG.log(context,'Snapshot Deleted', snapshot)
+
+            return task.id
+            
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
@@ -1278,16 +1281,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def restore_get_all(self, context, snapshot_id=None):
-        if snapshot_id:
-            restores = self.db.restore_get_all_by_project_snapshot(
-                                                    context,
-                                                    context.project_id,
-                                                    snapshot_id)
-        elif context.is_admin:
-            restores = self.db.restore_get_all(context)
-        else:
-            restores = self.db.restore_get_all_by_project(
-                                        context,context.project_id)
+        restores = self.db.restore_get_all(context, snapshot_id)
         return restores
     
     @autolog.log_method(logger=Logger)
@@ -1445,6 +1439,12 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
         return settings 
-    
+
+    @autolog.log_method(logger=Logger)
+    def task_show(self, context, task_id):
+
+        task = self.db.task_get(context, task_id)
+        task_dict = dict(task.iteritems())
+        return task_dict  
 
       

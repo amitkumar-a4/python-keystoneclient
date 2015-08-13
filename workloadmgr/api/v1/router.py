@@ -17,6 +17,7 @@ from workloadmgr.api.v1 import restores
 from workloadmgr.api.v1 import testbubbles
 from workloadmgr.api.v1 import workloadtypes
 from workloadmgr.api.v1 import settings
+from workloadmgr.api.v1 import tasks
 
 LOG = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class APIRouter(workloadmgr.api.APIRouter):
         mapper.redirect("", "/")
         ###################################################################################################
         self.resources['workload_types'] = workloadtypes.create_resource(ext_mgr)
+        self.resources['tasks'] = tasks.create_resource(ext_mgr)
         #detail list of workload_types
         mapper.resource("workload_types_1", "workload_types",
                         controller=self.resources['workload_types'],
@@ -442,4 +444,10 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='delete',
                        conditions={"method": ['DELETE']}) 
         
-              
+        #get the specified task
+        mapper.connect("get_task",
+                       "/{project_id}/tasks/{id}",
+                       controller=self.resources['tasks'],
+                       action='index',
+                       conditions={"method": ['GET']})
+             
