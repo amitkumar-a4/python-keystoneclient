@@ -891,6 +891,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshot_metadata = {}
                 snapshot_metadata['fsmanagerpid'] = \
                       mountutils.start_filemanager_server(FLAGS.mountdir)
+                snapshot_metadata['mounturl'] = "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
                 self.db.snapshot_update(context, snapshot['id'],
                              {'status': 'mounted', 'metadata': snapshot_metadata})
             except Exception as ex:
@@ -928,17 +929,36 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             logicalobjects = {}
 
         for vmid, objects in logicalobjects.iteritems():
-            mountutils.umount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, objects)
+            try:
+                mountutils.umount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, objects)
+            except Exception as ex:
+                # always cleanup as much as possible
+                LOG.exception(ex)
+                pass
 
             vgs = objects['vgs']
             for vg in vgs:
-                mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                try:
+                    mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                except Exception as ex:
+                    # always cleanup as much as possible
+                    LOG.exception(ex)
+                    pass
+ 
 
         for vmid, paths in devpaths.iteritems():
-            self.driver.snapshot_dismount(context, snapshot, paths)
+            try:
+                self.driver.snapshot_dismount(context, snapshot, paths)
+
+            except Exception as ex:
+                # always cleanup as much as possible
+                LOG.exception(ex)
+                pass
         snapshot_metadata = {}
         snapshot_metadata['devpaths'] = ""
         snapshot_metadata['logicalobjects'] = ""
+        snapshot_metadata['mounturl'] = ""
+        snapshot_metadata['fsmanagerpid'] = -1
         self.db.snapshot_update(context, snapshot_id, {'status': 'available', 'metadata': snapshot_metadata})
 
     @autolog.log_method(logger=Logger)
