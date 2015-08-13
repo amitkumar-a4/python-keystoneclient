@@ -2239,10 +2239,10 @@ class VMwareVCDriver(VMwareESXDriver):
         db = WorkloadMgrDB().db 
         processes = []
         mountpoints = {}
-        devpath = {}
+        devpaths = {}
 
         try:
-            processes, mountpaths = vmdkmount.mount_local_vmdk(diskfiles, mntlist, diskonly=True)
+            processes, mountpaths = vmdkmount.mount_local_vmdk(diskfiles, diskonly=True)
 
             snapshot_metadata = {'mountprocesses' : "",}
             for process in processes:

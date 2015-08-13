@@ -1162,9 +1162,10 @@ class API(base.Base):
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
-            mountpoints = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id)
+            mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id)
                         
             AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Mounted', snapshot)
+            return mounturl
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 

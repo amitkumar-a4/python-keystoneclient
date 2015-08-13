@@ -6,7 +6,6 @@ from subprocess import call
 from subprocess import check_call
 from subprocess import check_output
 import shutil
-import socket
 from os import remove, close
 
 from Queue import Queue
@@ -19,10 +18,10 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import autolog
 
-LOG = logging.getLogger(__name__)
-Logger = autolog.Logger(LOG)
+#LOG = logging.getLogger(__name__)
+#LOG = logging.getLogger('workloadmgr.virt.vmwareapi.driver')
+#Logger = autolog.Logger(LOG)
 
-"""
 def _(*args):
     return str(args[0])
 
@@ -43,7 +42,11 @@ class log():
         print arg[0]
 
 LOG = log()
-"""
+
+def enqueue_output(out, queue):
+    for line in iter(out.readline, b''):
+        queue.put(line)
+    out.close()
 
 ##
 # getfdisk_output():
@@ -358,6 +361,112 @@ def read_partition_table(mountpath=None):
 
     return partitions
 
+def mount_local_vmdk(diskslist, mntlist, diskonly=False): 
+    vix_disk_lib_env = os.environ.copy()
+    vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
+
+    try:
+        vmdkfiles = []
+        with open(diskslist, 'r') as f:
+            for line in f.read().split():
+                vmdkfiles.append(line.rstrip().strip())
+
+        processes = []
+        mountpoints = {}
+        for vmdkfile in vmdkfiles:
+
+            try:
+                fileh, listfile = mkstemp()
+                close(fileh)
+                with open(listfile, 'w') as f:
+                    f.write(vmdkfile)
+
+                cmdspec = [ "trilio-vix-disk-cli", "-mount", "-mountpointsfile", mntlist, ]
+                if diskonly:
+                    cmdspec += ['-diskonly']
+                cmdspec += [listfile]
+                cmd = " ".join(cmdspec)
+                LOG.info(_( cmd ))
+                process = subprocess.Popen(cmdspec,
+                                           stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           bufsize= -1,
+                                           env=vix_disk_lib_env,
+                                           close_fds=True,
+                                           shell=False)
+                
+                queue = Queue()
+                read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
+                read_thread.daemon = True # thread dies with the program
+                read_thread.start()            
+
+                mountpath = None
+                while process.poll() is None:
+                    try:
+                        try:
+                            output = queue.get(timeout=5)
+                            LOG.info(_( output ))
+                        except Empty:
+                            continue 
+                        except Exception as ex:
+                            LOG.exception(ex)
+    
+                        if output.startswith("Pausing the process until it is resumed"):
+                            break
+                    except Exception as ex:
+                        LOG.exception(ex)
+
+                if not process.poll() is None:
+                    _returncode = process.returncode  # pylint: disable=E1101
+                    if _returncode:
+                        LOG.debug(_('Result was %s') % _returncode)
+                        raise exception.ProcessExecutionError(
+                                                exit_code=_returncode,
+                                                stderr=process.stderr.read(),
+                                                cmd=cmd)
+                with open(mntlist, 'r') as f:
+                    for line in f:
+                        line = line.strip("\n")
+                        mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
+    
+                LOG.info(_( mountpoints ))
+                process.stdin.close()
+                processes.append(process)
+
+            except Exception as ex:
+                LOG.exception(ex)
+                raise
+            finally:
+                if os.path.isfile(listfile):
+                    os.remove(listfile)
+
+        return processes, mountpoints
+    except Exception as ex:
+        LOG.exception(ex)
+        try:
+            umount_local_vmdk(processes)
+        except:
+            pass
+
+        raise
+
+##
+# unmounts a vmdk by sending signal 18 to the process that as suspended during mount process
+##
+def umount_local_vmdk(processes): 
+    for process in processes:
+        process.send_signal(18)
+        process.wait()
+
+        _returncode = process.returncode  # pylint: disable=E1101
+
+        if _returncode != 0:
+            LOG.debug(_('Result was %s') % _returncode)
+            raise exception.ProcessExecutionError(
+                                        exit_code=_returncode,
+                                        stderr=process.stderr.read())
+
 def mountlvmvgs(mountinfo):
     vgs = []
     pvs = []
@@ -460,6 +569,55 @@ def discover_lvs_and_partitions(devicepaths, partitions):
     except Exception as ex:
         LOG.exception(ex)
 
+def mountdevice(mountpath, startoffset = '0', length = None):
+    options = []
+    if length:
+        options = ["-o", startoffset, "--sizelimit", length]
+
+    freedev = subprocess.check_output(["losetup", "-f"],
+                                            stderr=subprocess.STDOUT)
+    freedev = freedev.strip("\n")
+
+    subprocess.check_output(["losetup", freedev, mountpath,] + options,
+                               stderr=subprocess.STDOUT)
+    return freedev
+
+def umountdevice(devpath):
+    subprocess.check_output(["losetup", "-d", devpath],
+                              stderr=subprocess.STDOUT)
+
+def unassignloopdevices(devpaths):
+    for key, devpath in devpaths.iteritems():
+        try:
+            umountdevice(devpath)
+        except:
+            pass
+
+def assignloopdevices(mountpaths):
+    devicepaths = {}
+    for key, mountpath in mountpaths.iteritems():
+        try:
+            devpath = mountdevice(mountpath.pop().strip().rstrip())
+        
+            devicepaths[key] = devpath
+            # Add partition mappings here
+            try:
+                cmd = ["partx", "-d", devpath]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            except:
+                pass
+
+            try:
+                cmd = ["partx", "-a", devpath]
+                subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            except:
+                pass
+        except:
+            unassignloopdevices(devicepaths)
+            raise
+
+    return devicepaths
+
 def mount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
 
     # create snapshot directory
@@ -518,35 +676,6 @@ def umount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
     if os.path.exists(snapshotdir):
         shutil.rmtree(snapshotdir, True)
 
-def start_filemanager_server(mountdir):
-    hostspec = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
-    cmdspec = ["php", "-S", hostspec,
-               "-t", "/home/stack/tvault-mounts"]
-
-    LOG.info(_( " ".join(cmdspec) ))
-    cmd = " ".join(cmdspec)
-    process = subprocess.Popen(cmdspec,
-                               stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               bufsize= -1,
-                               close_fds=True,
-                               shell=False)
-                
-    if not process.poll() is None:
-        _returncode = process.returncode  # pylint: disable=E1101
-        if _returncode:
-            LOG.debug(_('Result was %s') % _returncode)
-            raise exception.ProcessExecutionError(
-                                      exit_code=_returncode,
-                                      stderr=process.stderr.read(),
-                                      cmd=cmd)
-    return process.pid
-
-def stop_filemanager_server(mountdir, pid):
-    os.kill(int(pid), 9)
-
-"""
 vmdkfiles=[u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_550479e5-eafa-46b9-8a0f-55d7455f3de8_Harddisk2/3271e40f-f7a2-4889-84b5-21538180c9f2\n', u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_64ffbc78-3ac6-473d-b6d6-83016ed05ca0_Harddisk3/36a68e15-c910-4085-85d6-6e1db51e70c2\n', u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_dea95503-0851-41af-878c-6456241f3bae_Harddisk1/404ed8a8-3628-4fec-b031-13433a5bee47\n']
 
 # We mount vmdk file first?
@@ -592,4 +721,3 @@ if os.path.isfile(listfile):
     os.remove(listfile)
 if os.path.isfile(mntlist):
     os.remove(mntlist)
-"""

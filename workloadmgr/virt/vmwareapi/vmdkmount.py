@@ -26,21 +26,18 @@ def enqueue_output(out, queue):
         queue.put(line)
     out.close()
 
-def mount_local_vmdk(diskslist, mntlist, diskonly=False): 
+def mount_local_vmdk(vmdkfiles, diskonly=False): 
     vix_disk_lib_env = os.environ.copy()
     vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
 
     try:
-        vmdkfiles = []
-        with open(diskslist, 'r') as f:
-            for line in f.read().split():
-                vmdkfiles.append(line.rstrip().strip())
-
         processes = []
         mountpoints = {}
         for vmdkfile in vmdkfiles:
-
             try:
+                fileh, mntlist = mkstemp()
+                close(fileh)
+
                 fileh, listfile = mkstemp()
                 close(fileh)
                 with open(listfile, 'w') as f:
@@ -105,6 +102,8 @@ def mount_local_vmdk(diskslist, mntlist, diskonly=False):
             finally:
                 if os.path.isfile(listfile):
                     os.remove(listfile)
+                if os.path.isfile(mntlist):
+                    os.remove(mntlist)
 
         return processes, mountpoints
     except Exception as ex:
@@ -138,7 +137,7 @@ def mountdevice(mountpath, startoffset = '0', length = None):
         options = ["-o", startoffset, "--sizelimit", length]
 
     freedev = subprocess.check_output(["losetup", "-f"],
-                                            stderr=subprocess.STDOUT)
+                                      stderr=subprocess.STDOUT)
     freedev = freedev.strip("\n")
 
     subprocess.check_output(["losetup", freedev, mountpath,] + options,

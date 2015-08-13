@@ -286,7 +286,8 @@ class SnapshotsController(wsgi.Controller):
     def mount(self, req, id, workload_id=None, body=None):
         try:
             context = req.environ['workloadmgr.context']
-            self.workload_api.snapshot_mount(context, id)
+            mounturl = self.workload_api.snapshot_mount(context, id)
+            return mounturl
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
