@@ -597,7 +597,7 @@ class API(base.Base):
                 except Exception as ex:
                     LOG.exception(ex)
             if not import_workload_module:
-                import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_1_0_118')
+                import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_1_0_125')
             import_settings_method = getattr(import_workload_module, 'import_settings')
             import_settings_method(context, models.DB_VERSION)
         except Exception as ex:
