@@ -780,7 +780,8 @@ def snapshot_mark_incomplete_as_error(context, host):
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             filter_by(host=host).all()
     for snapshot in snapshots:
-        if snapshot.status != 'available' and snapshot.status != 'error':
+        if snapshot.status != 'available' and snapshot.status != 'error' and \
+           snapshot.status != 'mounted' and snapshot.status != 'cancelled':
             values =  {'progress_percent': 100, 'progress_msg': '',
                        'error_msg': 'Snapshot did not finish successfully',
                        'status': 'error' }
@@ -790,7 +791,8 @@ def snapshot_mark_incomplete_as_error(context, host):
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             all()
     for snapshot in snapshots:
-        if snapshot.status != 'available' and snapshot.status != 'error':
+        if snapshot.status != 'available' and snapshot.status != 'error' and\
+           snapshot.status != 'mounted' and snapshot.status != 'cancelled':
             if (snapshot.host is not None) and snapshot.host == '':
                 values =  {'progress_percent': 100, 'progress_msg': '',
                            'error_msg': 'Snapshot did not finish successfully',
@@ -2011,7 +2013,8 @@ def restore_mark_incomplete_as_error(context, host):
     restores =  model_query(context, models.Restores, session=session).\
                             filter_by(host=host).all()
     for restore in restores:
-        if restore.status != 'available' and restore.status != 'error':
+        if restore.status != 'available' and restore.status != 'error' and\
+           restore.status != 'cancelled':
             values =  {'progress_percent': 100, 'progress_msg': '',
                        'error_msg': 'Restore did not finish successfully',
                        'status': 'error' }

@@ -181,8 +181,12 @@ def mount_backup_media():
         subprocess.check_call(command, shell=False) 
     else: # das, swift-i, swift-s, s3
         if CONF.vault_storage_das_device != 'none':      
-            command = ['sudo', 'mount', CONF.vault_storage_das_device, CONF.vault_local_directory]
-            subprocess.check_call(command, shell=False) 
+            try:
+                command = ['sudo', 'mount', CONF.vault_storage_das_device, CONF.vault_local_directory]
+                _returncode = subprocess.check_call(command, shell=False) 
+            except Exception as ex:
+                LOG.exception(ex)
+                pass
             
 def get_workload_path(workload_metadata):
     workload_path = os.path.join(get_vault_local_directory() + '/workload_%s' % (workload_metadata['workload_id']))
