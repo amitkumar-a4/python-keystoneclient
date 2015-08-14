@@ -970,9 +970,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         for vmid, paths in devpaths.iteritems():
             try:
-                self.driver.snapshot_dismount(context, snapshot, paths)
                 virtdriver.snapshot_dismount(context, snapshot, paths)
-
             except Exception as ex:
                 # always cleanup as much as possible
                 LOG.exception(ex)

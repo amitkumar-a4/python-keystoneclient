@@ -2268,7 +2268,10 @@ class VMwareVCDriver(VMwareESXDriver):
         if mountprocesses:
             for mountprocess in mountprocesses.split(";"): 
                 if mountprocess != '':
-                    os.kill(int(mountprocess), 18)
+                    try:
+                        os.kill(int(mountprocess), 18)
+                    except Exception as ex:
+                        LOG.exception(ex)
 
         snapshot_metadata = {'mountprocesses' : '',}
         db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})            
