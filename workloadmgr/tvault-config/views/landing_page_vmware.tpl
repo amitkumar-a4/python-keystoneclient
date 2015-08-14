@@ -18,7 +18,7 @@
     <div>
         <div class="container">
         <br>
-            <h1 class="center-block text-center">Welcome to trilioVault landing page. trilioVault provides tenant driven data protection for the VMware Cloud.</h1>
+            <h1 class="center-block text-center">Welcome to TrilioVault landing page. TrilioVault provides tenant driven data protection for the VMware Cloud.</h1>
         <br>
         </div>
 
@@ -35,7 +35,7 @@
                 </ol>
                 <h2>Configuration</h2>
                 <ol>
-                    <li>Configure tVault Appliance( Controller or Additional Node)
+                    <li>Configure TrilioVault Appliance( Controller or Additional Node)
                         <br>
                         <br>
                         <div class="well">
@@ -45,7 +45,7 @@
                 </ol>
                 <h2>Dashboard</h2>
                 <ol>
-                    <li>trilioVault Dashboard
+                    <li>TrilioVault Dashboard
                         <br>
                         <br>
                         <div class="well">
