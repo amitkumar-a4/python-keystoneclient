@@ -1,5 +1,5 @@
 Hello {{username}},<br/>
-You are receiving this email because you registered on trilioVault Appliance {{creation_date}}.<br/>
+You are receiving this email because you registered on TrilioVault Appliance {{creation_date}}.<br/>
 <br/>
 If you wish to complete the registration please click on:<br/>
 <a href="http://localhost/validate_registration/{{registration_code}}">Confirm</a>
