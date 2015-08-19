@@ -553,11 +553,12 @@ def workload_update(context, id, values, purge_metadata=False):
 
 @require_context
 def workload_get_all(context, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
-    return model_query( context, models.Workloads, **kwargs).\
-                        options(sa_orm.joinedload(models.Workloads.metadata)).\
-                        order_by(models.Workloads.created_at.desc()).all()
+    if not is_admin_context(context):
+        return workload_get_all_by_project(context, context.project_id)
+    else:        
+        return model_query( context, models.Workloads, **kwargs).\
+                            options(sa_orm.joinedload(models.Workloads.metadata)).\
+                            order_by(models.Workloads.created_at.desc()).all()
 
 @require_admin_context
 def workload_get_all_by_host(context, host):
@@ -603,7 +604,7 @@ def _workload_get(context, id, session, **kwargs):
         #TODO(gbasava): filter out deleted workloads if context disallows it
       
         if workload is None:
-           raise exception.WorkloadNotFound(workload_id=id)
+            raise exception.WorkloadNotFound(workload_id=id)
 
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadNotFound(workload_id=id)
@@ -779,7 +780,8 @@ def snapshot_mark_incomplete_as_error(context, host):
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             filter_by(host=host).all()
     for snapshot in snapshots:
-        if snapshot.status != 'available' and snapshot.status != 'error':
+        if snapshot.status != 'available' and snapshot.status != 'error' and \
+           snapshot.status != 'mounted' and snapshot.status != 'cancelled':
             values =  {'progress_percent': 100, 'progress_msg': '',
                        'error_msg': 'Snapshot did not finish successfully',
                        'status': 'error' }
@@ -789,7 +791,8 @@ def snapshot_mark_incomplete_as_error(context, host):
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             all()
     for snapshot in snapshots:
-        if snapshot.status != 'available' and snapshot.status != 'error':
+        if snapshot.status != 'available' and snapshot.status != 'error' and\
+           snapshot.status != 'mounted' and snapshot.status != 'cancelled':
             if (snapshot.host is not None) and snapshot.host == '':
                 values =  {'progress_percent': 100, 'progress_msg': '',
                            'error_msg': 'Snapshot did not finish successfully',
@@ -921,27 +924,26 @@ def snapshot_get(context, snapshot_id, **kwargs):
     return _snapshot_get(context, snapshot_id, **kwargs) 
 
 @require_context
-def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0,process=None,**kwargs):
+def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0, process=None, **kwargs):
     flag='0'
     snapshot_obj = snapshot_get(context, snapshot_id)
     for meta in snapshot_obj.metadata:
         if meta.key == 'cancel_requested':
-           flag = meta.value
+            flag = meta.value
 
     if return_val == 1:
-       return flag
+        return flag
 
     if flag == '1':
-       if process:
-          process.kill()
-
-       error = _('Cancel requested for snapshot')
-       raise exception.ErrorOccurred(reason=error)
+        if process:
+            process.kill()
+        error = _('Cancel requested for snapshot')
+        raise exception.ErrorOccurred(reason=error)
 
 @require_context
 def snapshot_get_running_snapshots_by_host(context, **kwargs):
     if kwargs.get('session') == None:
-       kwargs['session'] = get_session()
+        kwargs['session'] = get_session()
 
     result = model_query(   context, models.Snapshots.host, func.count(models.Snapshots.host), **kwargs).\
                             filter(and_(~models.Snapshots.status.in_(['available','error','deleted','cancelled'])),models.Snapshots.host != '').\
@@ -949,10 +951,14 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
                             all() 
     return result
 
-@require_admin_context
+@require_context
 def snapshot_get_all(context, workload_id=None, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
+    if not is_admin_context(context):
+        if workload_id:
+            return snapshot_get_all_by_workload(context, workload_id, **kwargs)
+        else:
+            return snapshot_get_all_by_project(context, context.project_id, **kwargs)
+ 
     if workload_id == None:
         return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
@@ -962,6 +968,16 @@ def snapshot_get_all(context, workload_id=None, **kwargs):
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(workload_id=workload_id).\
                             order_by(models.Snapshots.created_at.desc()).all()
+
+@require_context                            
+def snapshot_get_all_by_workload(context, workload_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+
+    return model_query(context, models.Snapshots, **kwargs).\
+                        options(sa_orm.joinedload(models.Snapshots.metadata)).\
+                        filter_by(workload_id=workload_id).\
+                        order_by(models.Snapshots.created_at.desc()).all()
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
@@ -1238,6 +1254,8 @@ def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, ses
     
     if vm_id:
         snapshot_vm_ref = _snapshot_vm_get(context, vm_id, snapshot_id, session)
+        if snapshot_vm_ref is None:
+           return
     else:
         snapshot_vm_ref = models.SnapshotVMs()
         if not values.get('id'):
@@ -1997,7 +2015,8 @@ def restore_mark_incomplete_as_error(context, host):
     restores =  model_query(context, models.Restores, session=session).\
                             filter_by(host=host).all()
     for restore in restores:
-        if restore.status != 'available' and restore.status != 'error':
+        if restore.status != 'available' and restore.status != 'error' and\
+           restore.status != 'cancelled':
             values =  {'progress_percent': 100, 'progress_msg': '',
                        'error_msg': 'Restore did not finish successfully',
                        'status': 'error' }
@@ -2131,21 +2150,25 @@ def restore_get_metadata_cancel_flag(context, restore_id, return_val=0, process=
     restore_obj = restore_get(context, restore_id)
     for meta in restore_obj.metadata:
         if meta.key == 'cancel_requested':
-           flag = meta.value
+            flag = meta.value
     
     if return_val == 1:
-       return flag
+        return flag
 
     if flag=='1': 
-       if process:
-          process.kill() 
-       error = _('Cancel requested for restore')
-       raise exception.ErrorOccurred(reason=error)
+        if process:
+            process.kill() 
+        error = _('Cancel requested for restore')
+        raise exception.ErrorOccurred(reason=error)
 
-@require_admin_context
+@require_context
 def restore_get_all(context, snapshot_id=None, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
+    if not is_admin_context(context):
+        if snapshot_id:
+            return restore_get_all_by_snapshot(context, snapshot_id, **kwargs)
+        else:
+            return restore_get_all_by_project(context, context.project_id, **kwargs)
+        
     if snapshot_id == None:
         return model_query(context, models.Restores, **kwargs).\
                             options(sa_orm.joinedload(models.Restores.metadata)).\
@@ -2155,6 +2178,16 @@ def restore_get_all(context, snapshot_id=None, **kwargs):
                             options(sa_orm.joinedload(models.Restores.metadata)).\
                             filter_by(snapshot_id=snapshot_id).\
                             order_by(models.Restores.created_at.desc()).all()
+
+@require_context                            
+def restore_get_all_by_snapshot(context, snapshot_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    return model_query(context, models.Restores, **kwargs).\
+                        options(sa_orm.joinedload(models.Restores.metadata)).\
+                        filter_by(snapshot_id=snapshot_id).\
+                        order_by(models.Restores.created_at.desc()).all()
+                                                        
 @require_context
 def restore_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
@@ -2604,11 +2637,11 @@ def task_get(context, task_id, **kwargs):
         kwargs['session'] = get_session()    
     return _task_get(context, task_id, **kwargs) 
 
-@require_admin_context
+@require_context
 def task_get_all(context, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
-
+    if not is_admin_context(context):
+        return task_get_all_by_project(context, context.project_id, **kwargs)
+        
     return model_query(context, models.Tasks, **kwargs).\
                         options(sa_orm.joinedload(models.Tasks.status_messages)).\
                         order_by(models.Tasks.created_at.desc()).all()        
@@ -2777,20 +2810,13 @@ def setting_get(context, setting_name, **kwargs):
         kwargs['session'] = get_session()    
     return _setting_get(context, setting_name, **kwargs) 
 
-#@require_admin_context
 def setting_get_all(context, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
-    if context:
-        return model_query(context, models.Settings, **kwargs).\
-                            options(sa_orm.joinedload(models.Settings.metadata)).\
-                            filter_by(project_id=context.project_id).\
-                            order_by(models.Settings.created_at.desc()).all()  
-    else:       
-            
-        return model_query(context, models.Settings, **kwargs).\
-                            options(sa_orm.joinedload(models.Settings.metadata)).\
-                            order_by(models.Settings.created_at.desc()).all()        
+    if context and not is_admin_context(context):
+        return setting_get_all_by_project(context, context.project_id, **kwargs)
+    
+    return model_query(context, models.Settings, **kwargs).\
+                        options(sa_orm.joinedload(models.Settings.metadata)).\
+                        order_by(models.Settings.created_at.desc()).all()        
 
 @require_context
 def setting_get_all_by_project(context, project_id, **kwargs):
@@ -2935,10 +2961,11 @@ def vault_storage_get(context, vault_storage_id, **kwargs):
         kwargs['session'] = get_session()    
     return _vault_storage_get(context, vault_storage_id, **kwargs) 
 
-@require_admin_context
+@require_context
 def vault_storage_get_all(context, workload_id=None, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
+    if not is_admin_context(context):
+        return vault_storage_get_all_by_project(context, context.project_id, **kwargs)
+    
     if workload_id == None:
         return model_query(context, models.VaultStorages, **kwargs).\
                             options(sa_orm.joinedload(models.VaultStorages.metadata)).\
@@ -2948,6 +2975,17 @@ def vault_storage_get_all(context, workload_id=None, **kwargs):
                             options(sa_orm.joinedload(models.VaultStorages.metadata)).\
                             filter_by(workload_id=workload_id).\
                             order_by(models.VaultStorages.created_at.desc()).all()
+                            
+@require_admin_context
+def vault_storage_get_all_by_workload(context, workload_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+        
+    return model_query(context, models.VaultStorages, **kwargs).\
+                        options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+                        filter_by(workload_id=workload_id).\
+                        order_by(models.VaultStorages.created_at.desc()).all()
+                                                        
 @require_context
 def vault_storage_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
@@ -3026,11 +3064,11 @@ def purge_snapshot(context, id, session=None):
     if snapshot:
         snapshot.purge(session)
     
-@require_context
+@require_admin_context
 def purge_workload(context, id):
     try:
         session = get_session()
-        for snapshot in snapshot_get_all(context, workload_id=id, session=session, read_deleted='yes'):
+        for snapshot in snapshot_get_all(context, session=session, read_deleted='yes'):
             purge_snapshot(context, snapshot.id, session)
         for workload_vm in workload_vms_get(context, id, session=session):
             for metadata_ref in workload_vm.metadata:
