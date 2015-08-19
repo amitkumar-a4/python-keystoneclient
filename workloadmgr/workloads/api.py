@@ -1129,10 +1129,12 @@ class API(base.Base):
         Make the RPC call to cancel snapshot 
         """
         try:
+            snapshot = self.db.snapshot_get(context, snapshot_id)
+            if snapshot.status in ['available','cancelled','error']:
+               return
 
             metadata = {}
             metadata.setdefault('cancel_requested','1')
-
             self.db.snapshot_update(context,
                                     snapshot_id,
                                     {
@@ -1379,6 +1381,9 @@ class API(base.Base):
         Make the RPC call to cancel restore
         """
         try:
+            restore = self.db.restore_get(context, restore_id)
+            if restore.status in ['available','cancelled','error']:
+               return
 
             metadata = {}
             metadata.setdefault('cancel_requested','1')

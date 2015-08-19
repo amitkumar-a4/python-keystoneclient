@@ -1254,6 +1254,8 @@ def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, ses
     
     if vm_id:
         snapshot_vm_ref = _snapshot_vm_get(context, vm_id, snapshot_id, session)
+        if snapshot_vm_ref is None:
+           return
     else:
         snapshot_vm_ref = models.SnapshotVMs()
         if not values.get('id'):
