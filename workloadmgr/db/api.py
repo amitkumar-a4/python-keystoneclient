@@ -189,7 +189,11 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     return IMPL.snapshot_get_running_snapshots_by_host(context, **kwargs)    
     
 def snapshot_get_all(context, workload_id=None, **kwargs):
-    return IMPL.snapshot_get_all(context, workload_id, **kwargs)    
+    return IMPL.snapshot_get_all(context, workload_id, **kwargs)   
+
+def snapshot_get_all_by_workload(context, workload_id, **kwargs):
+    """Get all snapshots belonging to a workload."""
+    return IMPL.snapshot_get_all_by_workload(context, workload_id, **kwargs) 
 
 def snapshot_get_all_by_project(context, project_id, **kwargs):
     """Get all snapshots belonging to a project."""
@@ -327,6 +331,10 @@ def restore_get_metadata_cancel_flag(context, restore_id, return_val=0 ,process=
 def restore_get_all(context, snapshot_id=None, **kwargs):
     return IMPL.restore_get_all(context, snapshot_id, **kwargs)    
 
+def restore_get_all_by_snapshot(context, snapshot_id, **kwargs):
+    """Get all restores belonging to a snapshot."""
+    return IMPL.restore_get_all_by_snapshot(context, snapshot_id, **kwargs)
+
 def restore_get_all_by_project(context, project_id, **kwargs):
     """Get all restores belonging to a project."""
     return IMPL.restore_get_all_by_project(context, project_id, **kwargs)
@@ -413,6 +421,10 @@ def vault_storage_get(context, vault_storage_id, **kwargs):
     
 def vault_storage_get_all(context, workload_id=None, **kwargs):
     return IMPL.vault_storage_get_all(context, workload_id, **kwargs)    
+
+def vault_storage_get_all_by_workload(context, workload_id, **kwargs):
+    """Get all vault_storages belonging to a workload."""
+    return IMPL.vault_storage_get_all_by_workload(context, workload_id, **kwargs)
 
 def vault_storage_get_all_by_project(context, project_id, **kwargs):
     """Get all vault_storages belonging to a project."""
