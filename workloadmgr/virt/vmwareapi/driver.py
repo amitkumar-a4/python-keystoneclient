@@ -46,6 +46,7 @@ from workloadmgr.virt.vmwareapi import volumeops
 from workloadmgr.virt.vmwareapi import read_write_util
 from workloadmgr.virt.vmwareapi.thickcopy import thickcopyextents
 from workloadmgr.virt.vmwareapi import thickcopy
+from workloadmgr.virt.vmwareapi import vmdkmount
 from workloadmgr.vault import vault
 from workloadmgr.virt import qemuimages
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -54,7 +55,6 @@ from workloadmgr import exception
 from workloadmgr import autolog
 from workloadmgr import settings
 from workloadmgr.workloads import workload_utils
-
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -1490,7 +1490,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))
                             db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
             except Exception as ex:
                 LOG.exception(ex)
                 
@@ -1560,7 +1560,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
                             
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                                 
@@ -1580,7 +1580,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                         snap.id,
                                                                                                         snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                         workload_obj.display_name ))                            
-                                vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                                vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                             except Exception as ex:
                                 LOG.exception(ex)    
                         continue
@@ -1656,7 +1656,7 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                                                     snap.id,
                                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                     workload_obj.display_name ))                            
-                            vault.snapshot_delete({'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
                         except Exception as ex:
                             LOG.exception(ex)
                         
@@ -2234,180 +2234,48 @@ class VMwareVCDriver(VMwareESXDriver):
                                     stderr=process.stderr.read())
             
     @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_mount')
-    def snapshot_mount(self, cntx, snapshot):
+    def snapshot_mount(self, cntx, snapshot, diskfiles):
+
         db = WorkloadMgrDB().db 
-        vix_disk_lib_env = os.environ.copy()
-        vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'   
+        processes = []
+        mountpoints = {}
+        devpaths = {}
+
         try:
-            vmdkfiles = []
-            snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot['id'])
-            for snapshot_vm_resource in snapshot_vm_resources:
-                if snapshot_vm_resource.resource_type == 'disk':
-                    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx,snapshot_vm_resource.id)
-                    vmdkfiles.append(vm_disk_resource_snap.vault_path+'\n')
+            processes, mountpaths = vmdkmount.mount_local_vmdk(diskfiles, diskonly=True)
 
-            processes = []
-            mountpoints = {}
-            snapshot_metadata = {'mountprocesses' : "",
-                                 'mountpointsfiles' : "",}
-            for vmdkfile in vmdkfiles:
+            snapshot_metadata = {'mountprocesses' : "",}
+            for process in processes:
+                snapshot_metadata['mountprocesses'] += str(process.pid) + ";"
+            db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})
 
-                try:
-                    fileh, listfile = mkstemp()
-                    close(fileh)
-                    mountpointsfile_fh, mountpointsfile_path = mkstemp()
-                    close(mountpointsfile_fh)
-            
-                    snapshot_metadata['mountpointsfiles'] += mountpointsfile_path + '\n'
-                    with open(listfile, 'w') as f:
-                        f.write(vmdkfile.strip().rstrip() + "\n")
-
-                    cmdspec = [ "trilio-vix-disk-cli", "-mount", "-diskonly", "-mountpointsfile", mountpointsfile_path, ]
-                    cmdspec += [listfile]
-                    cmd = " ".join(cmdspec)
-                    LOG.info(_( cmd ))
-                    process = subprocess.Popen(cmdspec,
-                                               stdin=subprocess.PIPE,
-                                               stdout=subprocess.PIPE,
-                                               stderr=subprocess.PIPE,
-                                               bufsize= -1,
-                                               env=vix_disk_lib_env,
-                                               close_fds=True,
-                                               shell=False)
-                
-                    queue = Queue()
-                    read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
-                    read_thread.daemon = True # thread dies with the program
-                    read_thread.start()            
-
-                    mountpath = None
-                    while process.poll() is None:
-                        try:
-                            try:
-                                output = queue.get(timeout=5)
-                                LOG.info(_( output ))
-                            except Empty:
-                                continue 
-                            except Exception as ex:
-                                LOG.exception(ex)
-    
-                            if output.startswith("Pausing the process until it is resumed"):
-                                break
-                        except Exception as ex:
-                            LOG.exception(ex)
-
-                    if not process.poll() is None:
-                        _returncode = process.returncode  # pylint: disable=E1101
-                        if _returncode:
-                            import pdb;pdb.set_trace()
-                            LOG.debug(_('Result was %s') % _returncode)
-                            raise exception.ProcessExecutionError(
-                                                    exit_code=_returncode,
-                                                    stderr=process.stderr.read(),
-                                                    cmd=cmd)
-                    with open(mountpointsfile_path, 'r') as f:
-                        for line in f:
-                            line = line.strip("\n")
-                            mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
-    
-                    LOG.info(_( mountpoints ))
-                    process.stdin.close()
-                    processes.append(process)
-                    snapshot_metadata['mountprocesses'] += str(process.pid) + ";"
-
-                except Exception as ex:
-                    LOG.exception(ex)
-                    # Resume the processes if we cannot mount all processes
-                    for mountprocess in processes:
-                        os.kill(int(mountprocess.pid), 18)
-                    for mountpointfile in snapshot_metadata['mountpointsfiles'].split("\n"):
-                        if os.path.isfile(mountpointfile):
-                            os.remove(mountpointfile)
-                        
-                    raise
-                finally:
-                    if os.path.isfile(listfile):
-                        os.remove(listfile)
-
-            db.snapshot_update(cntx, snapshot['id'], {'status': 'mounted', 'metadata': snapshot_metadata})            
-
-            snapshot_metadata = {}
-            snapshot_metadata['devpaths'] = ""
-            ## Add loop device
-            for mountpath in mountpoints:
-                devpath = thickcopy.mountdevice(mountpath)
-                snapshot_metadata['devpaths'] += devpath + '\n'
-
-                # Add partition mappings here
-                try:
-                    cmd = ["partx", "-d", devpath]
-                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                except:
-                    pass
-
-                try:
-                    cmd = ["partx", "-a", devpath]
-                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                except:
-                    pass
-            db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})            
-
-            ## scan for VG
-            vglist = thickcopy.getvgs()
-            snapshot_metadata = {}
-            snapshot_metadata['vgs'] = ""
-            for vg in vglist:
-                snapshot_metadata['vgs'] += vg + ";"
-  
-            ## Mount all file systems
+            devpaths = vmdkmount.assignloopdevices(mountpaths)
         except Exception as ex:
+            vmdkmount.unassignloopdevices(devpaths)
+            vmdkmount.umount_local_vmdk(processes)
             LOG.exception(ex)
-            try:
-                self.snapshot_dismount(cntx, snapshot)
-            except:
-                pass
             raise
 
-        except subprocess.CalledProcessError as ex:
-            LOG.critical(_("cmd: %s resulted in error: %s") %(cmd, ex.output))
-            LOG.exception(ex)
-            raise
+        return devpaths
             
     @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_dismount')
-    def snapshot_dismount(self, cntx, snapshot):
+    def snapshot_dismount(self, cntx, snapshot, devpaths):
         db = WorkloadMgrDB().db 
         
         mountprocesses = db.get_metadata_value(snapshot.metadata, 'mountprocesses')
-        mountpointsfiles = db.get_metadata_value(snapshot.metadata, 'mountpointsfiles')
-        devpaths = db.get_metadata_value(snapshot.metadata, 'devpaths')
-        vgs = db.get_metadata_value(snapshot.metadata, 'vgs')
-
-        # Deactivate volumes
-        if vgs:
-            for vg in vgs.split(";"):
-                if vg != '':
-                    thickcopy.deactivatevgs(vg)
-
-        if devpaths:
-            for devpath in devpaths.split("\n"): 
-                if devpath != '':
-                    thickcopy.dismountpv(devpath)
-
+        vmdkmount.unassignloopdevices(devpaths)
+        
         if mountprocesses:
             for mountprocess in mountprocesses.split(";"): 
                 if mountprocess != '':
-                    os.kill(int(mountprocess), 18)
+                    try:
+                        os.kill(int(mountprocess), 18)
+                    except Exception as ex:
+                        LOG.exception(ex)
 
-        snapshot_metadata = {'mountprocesses' : '',
-                             'mountpointsfiles' : '',}
-        db.snapshot_update(cntx, snapshot['id'], {'status': 'available', 'metadata': snapshot_metadata})            
+        snapshot_metadata = {'mountprocesses' : '',}
+        db.snapshot_update(cntx, snapshot['id'], {'metadata': snapshot_metadata})            
 
-        if mountpointsfiles:
-            for mfile in mountpointsfiles.split("\n"):
-                if os.path.isfile(mfile):
-                    remove(mfile)
-        pass
-        
 class VMwareAPISession(object):
     """
     Sets up a session with the VC/ESX host and handles all

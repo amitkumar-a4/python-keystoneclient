@@ -24,10 +24,13 @@ import uuid
 import cPickle as pickle
 import json
 from threading import Lock
+import subprocess
+from subprocess import check_output
 import shutil
 
 import smtplib
 import socket
+import os
 
 # Import the email modules
 from email.mime.multipart import MIMEMultipart
@@ -39,6 +42,7 @@ from oslo.config import cfg
 from workloadmgr import context
 from workloadmgr import flags
 from workloadmgr import manager
+from workloadmgr import mountutils
 from workloadmgr.virt import driver
 from workloadmgr.virt import virtapi
 from workloadmgr.openstack.common import excutils
@@ -58,6 +62,7 @@ from workloadmgr import exception as wlm_exceptions
 from workloadmgr.openstack.common import timeutils
 from taskflow.exceptions import WrappedFailure
 from workloadmgr.workloads import workload_utils
+from workloadmgr.openstack.common import fileutils
 
 from workloadmgr import autolog
 from workloadmgr import settings
@@ -66,6 +71,9 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
 workloads_manager_opts = [
+    cfg.StrOpt('mountdir',
+               default='/opt/stack/data/wlm/tvault-mounts',
+               help='Root directory where all snapshots are mounted.'),
 ]
 
 scheduler_config = {'standalone': 'True'}
@@ -147,9 +155,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def __init__(self, service_name=None, *args, **kwargs):
         self.az = FLAGS.storage_availability_zone
         self.scheduler = Scheduler(scheduler_config)
-        # self.scheduler.add_interval_job(self.job_def,args=['hello','there'],hours=1)
         self.scheduler.start()       
-        self.driver = driver.load_compute_driver(None, None)
         self.pool = ThreadPoolExecutor(max_workers=5)
         super(WorkloadMgrManager, self).__init__(service_name='workloadscheduler',*args, **kwargs)
 
@@ -466,18 +472,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id, 1)
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
-               for vm in self.db.workload_vms_get(context, workload.id):
-                   self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
+                for vm in self.db.workload_vms_get(context, workload.id):
+                    self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
             else:
-                 msg = _("Failed creating workload snapshot with following error(s):")
-                 if hasattr(ex, '_causes'):
-                    for cause in ex._causes:
-                        if cause._exception_str not in msg:
+                msg = _("Failed creating workload snapshot with following error(s):")
+                if hasattr(ex, '_causes'):
+                   for cause in ex._causes:
+                       if cause._exception_str not in msg:
                            msg = msg + ' ' + cause._exception_str
-                 LOG.error(msg)  
-                 status = 'error'
+                LOG.error(msg)  
+                status = 'error'
             
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -498,14 +504,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             flag = self.db.snapshot_get_metadata_cancel_flag(context, snapshot_id, 1)            
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
-               for vm in self.db.workload_vms_get(context, workload.id):
-                   self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
+                for vm in self.db.workload_vms_get(context, workload.id):
+                    self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
             else:       
-                 msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
-                 LOG.error(msg)
-                 status = 'error'
+                msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
+                LOG.error(msg)
+                status = 'error'
             
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -561,7 +567,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete({'workload_id': workload.id, 'workload_name': workload.display_name,})
+        vault.workload_delete(context, {'workload_id': workload.id, 'workload_name': workload.display_name,})
 
         
     @autolog.log_method(logger=Logger)
@@ -744,17 +750,17 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             flag = self.db.restore_get_metadata_cancel_flag(context, restore_id, 1)
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
             else:
-                 status = 'error'
-                 LOG.exception(ex)
-                 msg = _("Failed restoring snapshot with following error(s):")
-                 if hasattr(ex, '_causes'):
+                status = 'error'
+                LOG.exception(ex)
+                msg = _("Failed restoring snapshot with following error(s):")
+                if hasattr(ex, '_causes'):
                     for cause in ex._causes:
                         if cause._exception_str not in msg:
-                           msg = msg + ' ' + cause._exception_str
-                 LOG.error(msg)
+                            msg = msg + ' ' + cause._exception_str
+                LOG.error(msg)
             
             time_taken = 0
             if 'restore' in locals() or 'restore' in globals():
@@ -777,16 +783,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             flag = self.db.restore_get_metadata_cancel_flag(context, restore_id, 1)
             if flag == '1':
-               msg =  _("%(exception)s") %{'exception': ex}
-               status = 'cancelled'
+                msg =  _("%(exception)s") %{'exception': ex}
+                status = 'cancelled'
             else:
-                 status = 'error'
-                 LOG.exception(ex)
-                 if restore_type == 'test':
+                status = 'error'
+                LOG.exception(ex)
+                if restore_type == 'test':
                     msg = _("Failed creating test bubble: %(exception)s") %{'exception': ex}
-                 else:
-                      msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
-                 LOG.error(msg)
+                else:
+                    msg = _("Failed restoring snapshot: %(exception)s") %{'exception': ex}
+                LOG.error(msg)
             
             time_taken = 0
             if 'restore' in locals() or 'restore' in globals():
@@ -847,19 +853,135 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Mount an existing snapshot
         """
-        snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-        self.driver.snapshot_mount(context, snapshot)
+        try:
+            devpaths = {}
+            pervmdisks = {}
+            logicalobjects = {}
+            snapshot_metadata = {}
+            
+            head, tail = os.path.split(FLAGS.mountdir + '/')
+            fileutils.ensure_tree(head)
+
+            snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
+            workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+            if workload.source_platform == 'openstack': 
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            elif workload.source_platform == 'vmware': 
+                virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
+            snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot['id'])
+            for snapshot_vm_resource in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type == 'disk':
+                    if not snapshot_vm_resource.vm_id in pervmdisks:
+                        pervmdisks[snapshot_vm_resource.vm_id] = []
+                    vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
+                    pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
+
+            for vmid, diskfiles in pervmdisks.iteritems():
+                # the goal is to mount as many artifacts as possible from snapshot
+                devpaths[vmid] = virtdriver.snapshot_mount(context, snapshot, diskfiles)
+
+                try:
+                    partitions = {}
+
+                    for diskpath, mountpath in devpaths[vmid].iteritems():
+                        partitions[mountpath] = mountutils.read_partition_table(mountpath)
+
+                    logicalobjects[vmid] = mountutils.discover_lvs_and_partitions(devpaths[vmid], partitions)
+
+                    mountutils.mount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, logicalobjects[vmid])
+                except Exception as ex:
+                    if vmid in logicalobjects:
+                        for vg in logicalobjects[vmid]['vgs']:
+                            mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                        logicalobjects.pop(vmid)
+                    LOG.exception(ex)
+
+            snapshot_metadata['devpaths'] = json.dumps(devpaths)
+            snapshot_metadata['logicalobjects'] = json.dumps(logicalobjects)
+            snapshot_metadata['fsmanagerpid'] = -1
+            
+            self.db.snapshot_update(context, snapshot['id'],
+                             {'metadata': snapshot_metadata})
+
+            ## TODO: Spin up php webserver
+            try:
+                snapshot_metadata = {}
+                snapshot_metadata['fsmanagerpid'] = \
+                      mountutils.start_filemanager_server(FLAGS.mountdir)
+                snapshot_metadata['mounturl'] = "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+                self.db.snapshot_update(context, snapshot['id'],
+                             {'status': 'mounted', 'metadata': snapshot_metadata})
+            except Exception as ex:
+                LOG.error(_("Could not start file manager server"))
+                LOG.exception(ex)
+                raise
+
+            return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+
+        except Exception as ex:
+            self.snapshot_dismount(context, snapshot['id'])
+            LOG.exception(ex)
+            raise
 
     @autolog.log_method(logger=Logger)
     def snapshot_dismount(self, context, snapshot_id):
         """
-        Mount an existing snapshot
+        Dismount an existing snapshot
         """
         snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-        self.driver.snapshot_dismount(context, snapshot)
-        pass
-                    
-            
+        workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+        if workload.source_platform == 'openstack': 
+            virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        elif workload.source_platform == 'vmware': 
+            virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')        
+        devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
+        if devpaths_json:
+            devpaths = json.loads(devpaths_json)
+        else:
+            devpaths = {}
+       
+        fspid = self.db.get_metadata_value(snapshot.metadata, 'fsmanagerpid')
+        if (fspid and int(fspid) != -1):
+            mountutils.stop_filemanager_server(FLAGS.mountdir, fspid)
+
+        logicalobjects_json = self.db.get_metadata_value(snapshot.metadata, 'logicalobjects')
+        if logicalobjects_json:
+            logicalobjects = json.loads(logicalobjects_json)
+        else:
+            logicalobjects = {}
+
+        for vmid, objects in logicalobjects.iteritems():
+            try:
+                mountutils.umount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, objects)
+            except Exception as ex:
+                # always cleanup as much as possible
+                LOG.exception(ex)
+                pass
+
+            vgs = objects['vgs']
+            for vg in vgs:
+                try:
+                    mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                except Exception as ex:
+                    # always cleanup as much as possible
+                    LOG.exception(ex)
+                    pass
+ 
+
+        for vmid, paths in devpaths.iteritems():
+            try:
+                virtdriver.snapshot_dismount(context, snapshot, paths)
+            except Exception as ex:
+                # always cleanup as much as possible
+                LOG.exception(ex)
+                pass
+        snapshot_metadata = {}
+        snapshot_metadata['devpaths'] = ""
+        snapshot_metadata['logicalobjects'] = ""
+        snapshot_metadata['mounturl'] = ""
+        snapshot_metadata['fsmanagerpid'] = -1
+        self.db.snapshot_update(context, snapshot_id, {'status': 'available', 'metadata': snapshot_metadata})
+
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """

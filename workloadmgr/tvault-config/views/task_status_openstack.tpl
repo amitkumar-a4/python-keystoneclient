@@ -275,7 +275,7 @@ $( document ).ready(function() {
 
 <div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
   <!-- Default panel contents -->
-  <div class="panel-heading">Configuring trilioVault Appliance </div>
+  <div class="panel-heading">Configuring TrilioVault Appliance </div>
   <!-- List group -->
   <ul class="list-group">
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>

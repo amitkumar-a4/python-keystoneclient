@@ -301,7 +301,7 @@ function taskfunction()
 												}
 						                        document.getElementById("final_status").classList.add("list-group-item-success");
 						                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-						                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> trilioVault Dashboard</a> </b>";
+						                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> TrilioVault Dashboard</a> </b>";
 	
 						                   });
 						               });
@@ -347,11 +347,11 @@ $( document ).ready(function() {
 
 <div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
   <!-- Default panel contents -->
-  <div class="panel-heading">Configuring trilioVault Appliance </div>
+  <div class="panel-heading">Configuring TrilioVault Appliance </div>
   <!-- List group -->
   <ul class="list-group">
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>
-                Configuring trilioVault host</li>  
+                Configuring TrilioVault host</li>  
     <li id="authenticate_with_vcenter" class="list-group-item"><span class="glyphicon"></span>
                 Authenticating with vCenter</li> 
 	%if 'swift_auth_url' in locals() and len(swift_auth_url) > 0:
@@ -362,19 +362,19 @@ $( document ).ready(function() {
                 Authenticating with Swift Object Store</li>     
     %end      			
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
-                Registering trilioVault service</li>
+                Registering TrilioVault service</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>
-                Configuring trilioVault API service</li>
+                Configuring TrilioVault API service</li>
     <li id="configure_scheduler" class="list-group-item"><span class="glyphicon"></span>
-                Configuring trilioVault scheduler service </li>
+                Configuring TrilioVault scheduler service </li>
     <li id="configure_service" class="list-group-item"><span class="glyphicon"></span>
-                Configuring trilioVault service </li>
+                Configuring TrilioVault service </li>
     <li id="start_api" class="list-group-item"><span class="glyphicon"></span>
-                Starting trilioVault API service</li>
+                Starting TrilioVault API service</li>
     <li id="start_scheduler" class="list-group-item"><span class="glyphicon"></span>
-                Starting trilioVault scheduler service</li>
+                Starting TrilioVault scheduler service</li>
     <li id="start_service" class="list-group-item"><span class="glyphicon"></span>
-                Starting trilioVault service</li>
+                Starting TrilioVault service</li>
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
 	%if 'import_workloads' in locals() and import_workloads == 'on':

@@ -512,14 +512,12 @@ def _authenticate_with_keystone():
         #object
         kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
         object_public_url = keystone.service_catalog.url_for(**kwargs)
-        config_data['wlm_vault_swift_url']  =  object_public_url.replace(
+        config_data['vault_swift_url']  =  object_public_url.replace(
                                                                 object_public_url.split("/")[-1], 
                                                                 'AUTH_') 
-        config_data['wlm_vault_service']  = 'swift'     
     except Exception as exception:
         #swift is not configured
-        config_data['wlm_vault_swift_url']  =  ''
-        config_data['wlm_vault_service']  = 'local'        
+        config_data['vault_swift_url']  =  ''
     
     
     #workloadmanager
@@ -1774,25 +1772,24 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_production_endpoint_template = ', 'cinder_production_endpoint_template = ' + config_data['cinder_production_endpoint_template'])
         
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_service = ', 'wlm_vault_service = ' + config_data['wlm_vault_service'])
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['wlm_vault_swift_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['vault_swift_url'])
         
         if config_data['storage_type'] == 'nfs': 
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = nfs')
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_nfs_export = ', 'wlm_vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
         else:
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = das')
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_das_device = ', 'wlm_vault_storage_das_device = ' + config_data['storage_local_device'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = das')
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_das_device = ', 'vault_storage_das_device = ' + config_data['storage_local_device'])
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_storage_type = ', 'wlm_vault_storage_type = swift-s')
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_url = ', 'wlm_vault_swift_url = ' + config_data['swift_auth_url'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_auth_version = ', 'wlm_vault_swift_auth_version = ' + config_data['swift_auth_version'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_auth_url = ', 'wlm_vault_swift_auth_url = ' + config_data['swift_auth_url'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_username = ', 'wlm_vault_swift_username = ' + config_data['swift_username'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_password = ', 'wlm_vault_swift_password = ' + config_data['swift_password'])            
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_tenant = ', 'wlm_vault_swift_tenant = ' + config_data['swift_tenantname'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'wlm_vault_swift_container_prefix = ', 'wlm_vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-s')
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['swift_auth_url'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_auth_version = ', 'vault_swift_auth_version = ' + config_data['swift_auth_version'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_auth_url = ', 'vault_swift_auth_url = ' + config_data['swift_auth_url'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_username = ', 'vault_swift_username = ' + config_data['swift_username'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_password = ', 'vault_swift_password = ' + config_data['swift_password'])            
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['swift_tenantname'])
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_container_prefix = ', 'vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
                         
               
 
