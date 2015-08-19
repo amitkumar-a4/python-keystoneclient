@@ -255,7 +255,6 @@ class WorkloadMgrsController(wsgi.Controller):
             metadata = workload.get('metadata', {}) 
             if not metadata:
                 metadata = {}    
-    
             try:
                 new_workload = self.workload_api.workload_create(context, 
                                                                  name, 
@@ -562,7 +561,6 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             Config = ConfigParser.RawConfigParser()
             Config.read('/opt/stack/data/wlm/settings/workloadmgr-settings.conf')
-            
             settings = None            
             if (body and 'settings' in body):
                 settings = settings_module.set_settings(context, body['settings'])
