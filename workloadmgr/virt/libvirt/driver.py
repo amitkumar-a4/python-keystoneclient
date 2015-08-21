@@ -465,8 +465,7 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         vast_params = {'snapshot_id': snapshot_obj.id,
                        'workload_id': workload_obj.id}
-        compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
-        snapshot_data = {}
+        snapshot_data = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
         return snapshot_data 
         
     @autolog.log_method(Logger, 'libvirt.driver.get_snapshot_disk_info')
@@ -507,7 +506,7 @@ class LibvirtDriver(driver.ComputeDriver):
             if len(disk_info['backings']) > 0 and pop_backings == True:
                 base_backing_path = disk_info['backings'].pop()
             else:
-                base_backing_path = disk_info['backings'][0]
+                base_backing_path = disk_info
             
             
             while (base_backing_path != None):
@@ -525,7 +524,7 @@ class LibvirtDriver(driver.ComputeDriver):
         snapshot_data['vm_data_size'] = vm_data_size
         return snapshot_data
     
-    @autolog.log_method(Logger, 'libvirt.driver..upload_snapshot')
+    @autolog.log_method(Logger, 'libvirt.driver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
@@ -546,7 +545,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                            'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)                                                
-           
+
             pop_backings = True                
             vm_disk_resource_snap_id = None
             if snapshot['snapshot_type'] != 'full':
@@ -567,18 +566,17 @@ class LibvirtDriver(driver.ComputeDriver):
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
                             vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
                             pop_backings = False 
-                        
 
             if len(disk_info['backings']) > 0 and pop_backings == True:
                 base_backing_path = disk_info['backings'].pop()
             else:
-                base_backing_path = disk_info['backings'][0]
+                base_backing_path = disk_info
 
             while (base_backing_path != None):
                 top_backing_path = None
                 if len(disk_info['backings']) > 0 and pop_backings == True:
                     top_backing_path = disk_info['backings'].pop()
-                    
+
                 # create an entry in the vm_disk_resource_snaps table
                 vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
                 vm_disk_resource_snap_id = str(uuid.uuid4())
@@ -586,7 +584,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 if(disk_info['dev'] == 'vda' and top_backing_path == None):
                     vm_disk_resource_snap_metadata.setdefault('base_image_ref','TODO')                    
                 vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
-                
+
                 top = (top_backing_path == None)
                 vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
@@ -595,9 +593,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                                  'top':  top,
                                                  'size': base_backing_path['size'],                                                     
                                                  'status': 'creating'}     
-                                                             
-                vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)                
-                
+
+                vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)
+
                 #upload to backup store
                 snapshot_vm_disk_resource_metadata = {'workload_id': snapshot['workload_id'],
                                                       'workload_name': workload_obj.display_name,
@@ -607,21 +605,21 @@ class LibvirtDriver(driver.ComputeDriver):
                                                       'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                       'snapshot_vm_resource_name':  disk_info['dev'],
                                                       'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
-                
+
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)                 
-                
-                
+
                 compute_service.vast_data_transfer(cntx, instance['vm_id'], {'path': base_backing_path['path'],
                                                                              'urls': base_backing_path['urls'],
-                                                                             'metadata': snapshot_vm_disk_resource_metadata,})
+                                                                             'metadata': snapshot_vm_disk_resource_metadata,
+                                                                             'snapshot_data': snapshot_data_ex})
 
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
                                                     })
-                
-                LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + '; backing file:' + os.path.basename(base_backing_path['path'])))
 
+                LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + \
+                            '; backing file:' + os.path.basename(base_backing_path['path'])))
 
                 start_time = timeutils.utcnow()
                 data_transfer_completed = False
