@@ -551,6 +551,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
             pop_backings = True                
             vm_disk_resource_snap_id = None
+            previous_snapshot_data = None
             if snapshot['snapshot_type'] != 'full':
                 #TODO(giri): the disk can be a new disk than the previous snapshot  
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
@@ -561,7 +562,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                         instance['vm_id'],
                                                                         vm_recent_snapshot.snapshot_id,
                                                                         disk_info['dev'])
-                        previous_snapshot_data = None
                         for meta in previous_snapshot_vm_resource.metadata:
                             if meta['key'] == 'snapshot_data':
                                 previous_snapshot_data = json.loads(meta['value'])
