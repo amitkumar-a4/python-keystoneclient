@@ -562,14 +562,13 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                         instance['vm_id'],
                                                                         vm_recent_snapshot.snapshot_id,
                                                                         disk_info['dev'])
-                        for meta in previous_snapshot_vm_resource.metadata:
-                            if meta['key'] == 'snapshot_data':
-                                previous_snapshot_data = json.loads(meta['value'])
-                                                                  
                     except Exception as ex:
                         LOG.exception(ex)
                         previous_snapshot_vm_resource = None
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
+                        for meta in previous_snapshot_vm_resource.metadata:
+                            if meta['key'] == 'snapshot_data':
+                                previous_snapshot_data = json.loads(meta['value'])
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
                         if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
                             vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
