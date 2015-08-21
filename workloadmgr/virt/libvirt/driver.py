@@ -599,8 +599,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                                  'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
                                                  'metadata': vm_disk_resource_snap_metadata,
                                                  'top':  top,
-                                                 'size': base_backing_path['size'],
-                                                 'status': 'creating'}
+                                                 'size': base_backing_path['size'],                                                     
+                                                 'status': 'creating'}     
 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)
 
