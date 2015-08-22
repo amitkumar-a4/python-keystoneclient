@@ -56,6 +56,9 @@ from workloadmgr import autolog
 from workloadmgr.workflows import vmtasks_openstack
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.workloads import workload_utils
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+
+from nbd import NbdMount as nbd
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -373,7 +376,39 @@ class LibvirtDriver(driver.ComputeDriver):
         return filter(bool,
                       [target.get("dev")
                        for target in doc.findall('devices/disk/target')])  
-        
+
+    @autolog.log_method(Logger, 'libvirt.driver.snapshot_mount')
+    def snapshot_mount(self, cntx, snapshot, diskfiles):
+
+        devpaths = {}
+        try:
+            for disk in diskfiles:
+                nbddevice = nbd(disk, None)
+                nbddevice.get_dev()
+                devpaths[disk] = nbddevice.device
+
+        except Exception as ex:
+            for dev in devpaths:
+                try:
+                    nbddevice.unget_dev()
+                except:
+                    pass
+            LOG.exception(ex)
+            raise
+
+        return devpaths
+            
+    @autolog.log_method(Logger, 'libvirt.driver.snapshot_dismount')
+    def snapshot_dismount(self, cntx, snapshot, devpaths):
+        for disk, dev in devpaths.iteritems():
+            try:
+                nbddevice = nbd(disk, None)
+                nbddevice.device = dev
+                nbddevice.linked = True
+                nbddevice.unget_dev()
+            except:
+                pass
+
     def rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
         """
         rebase the top to base
@@ -708,9 +743,7 @@ class LibvirtDriver(driver.ComputeDriver):
         image_service = glance.get_default_image_service(production= (restore['restore_type'] != 'test'))
         volume_service = cinder.API()
 
-        
         test = (restore['restore_type'] == 'test')
-        
    
         restored_image = None
         device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
@@ -736,7 +769,7 @@ class LibvirtDriver(driver.ComputeDriver):
             except OSError as exc:
                 pass
             fileutils.ensure_tree(temp_directory)
-            
+
             commit_queue = Queue() # queue to hold the files to be committed                 
             vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
             disk_format = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
