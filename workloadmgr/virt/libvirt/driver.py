@@ -884,11 +884,16 @@ class LibvirtDriver(driver.ComputeDriver):
                     #TODO(gbasava): Request a feature in cinder to create volume from a file.
                     #As a workaround we will create the image and covert that to cinder volume
                     with file(restored_file_path) as image_file:
-                        LOG.debug('Uploading image ' + image_file)
+                        LOG.debug('Uploading image ' + restored_file_path)
                         restored_volume_image = image_service.create(cntx, image_metadata, image_file)
                     restored_volume_name = uuid.uuid4().hex
-                    LOG.debug('Creating volume from image ' + image_file)
-                    restored_volume = volume_service.create(cntx, math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)), restored_volume_name, 'from workloadmgr', None, restored_volume_image['id'], None, None, None)
+                    LOG.debug('Creating volume from image ' + restored_file_path)
+                    volume_size = int(math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)))
+                    restored_volume = volume_service.create(cntx, volume_size,
+                                                            restored_volume_name,
+                                                            'from workloadmgr', None,
+                                                            restored_volume_image['id'],
+                                                            None, None, None)
                     device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
                    
                     #delete the image...it is not needed anymore
