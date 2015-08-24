@@ -674,8 +674,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 while True:
                     try:
                         time.sleep(5)
-                        data_transfer_status = compute_service.vast_data_transfer_status(cntx, instance['vm_id'], 
-                                                                                        {'metadata': {'resource_id' : vm_disk_resource_snap_id}})
+                        data_transfer_status = compute_service.vast_data_transfer_status(cntx, instance['vm_id'],
+                                                                                        {'metadata': {'resource_id' : instance['vm_id']}})
                         if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):
                             for line in data_transfer_status['status']:
                                 if 'Completed' in line:
