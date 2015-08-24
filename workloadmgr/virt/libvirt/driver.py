@@ -524,6 +524,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
                     try:
+                        recent_snapshot = db.snapshot_get(cntx, vm_recent_snapshot.snapshot_id)
                         previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
                                                                         cntx, 
                                                                         instance['vm_id'], 
@@ -531,6 +532,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                         disk_info['dev'])
                     except Exception as ex:
                         LOG.exception(ex)
+                        LOG.info(_("No previous snapshots found. Performing full snapshot"))
                         previous_snapshot_vm_resource = None                         
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
@@ -592,14 +594,17 @@ class LibvirtDriver(driver.ComputeDriver):
                 vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
                 if vm_recent_snapshot:
                     try:
+                        recent_snapshot = db.snapshot_get(cntx, vm_recent_snapshot.snapshot_id)
                         previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
                                                                         cntx,
                                                                         instance['vm_id'],
                                                                         vm_recent_snapshot.snapshot_id,
                                                                         disk_info['dev'])
                     except Exception as ex:
+                        LOG.info(_("No previous snapshots found. Performing full snapshot"))
                         LOG.exception(ex)
                         previous_snapshot_vm_resource = None
+
                     if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
                         for meta in previous_snapshot_vm_resource.metadata:
                             if meta['key'] == 'snapshot_data':
@@ -709,10 +714,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
+            return previous_snapshot_data
+
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
-    def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data): 
+    def post_snapshot_vm(self, cntx, db, instance, snapshot, previous_snapshot_data):
         compute_service = nova.API(production=True)
-        return compute_service.vast_finalize(cntx, instance['vm_id'], {})
+        return compute_service.vast_finalize(cntx, instance['vm_id'], previous_snapshot_data)
     
     @autolog.log_method(Logger, 'libvirt.driver.delete_restored_vm')
     def delete_restored_vm(self, cntx, db, instance, restore):

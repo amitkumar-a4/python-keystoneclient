@@ -68,7 +68,7 @@ nova_opts = [
                help='auth system for connecting to '
                     'nova in admin context'),
     cfg.IntOpt('nova_url_timeout',
-               default=30,
+               default=600,
                help='timeout value for connecting to nova in seconds'),
 
               
