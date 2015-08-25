@@ -647,6 +647,7 @@ class API(base.Base):
     def get_recentactivities(self, context, time_in_minutes):
         recentactivites = []
         now = timeutils.utcnow()
+        time_offset = datetime.now() - datetime.utcnow()
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
                 if workload.deleted:
@@ -683,7 +684,7 @@ class API(base.Base):
                     if now - snapshot.deleted_at < timedelta(minutes=time_in_minutes):
                         workload = self.db.workload_get(context, snapshot.workload_id)
                         activity_description =  "Snapshot '%s' of Workload '%s' deleted" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)
                         recentactivity = {'activity_type': 'delete',
                                           'activity_time': snapshot.deleted_at,
@@ -699,15 +700,15 @@ class API(base.Base):
                     workload = self.db.workload_get(context, snapshot.workload_id)
                     if snapshot.status == 'error':
                         activity_description =  "Snapshot '%s' of Workload '%s' failed" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)                     
                     elif snapshot.status == 'available':
                         activity_description =  "Snapshot '%s' of Workload '%s' created" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name) 
                     else:
                         activity_description =  "Snapshot '%s' of Workload '%s' is in progress" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)                                                                  
                     recentactivity = {'activity_type': 'create',
                                       'activity_time': snapshot.created_at,
@@ -727,7 +728,7 @@ class API(base.Base):
                         workload = self.db.workload_get(context, snapshot.workload_id)
                         
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' deleted" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)                  
                         recentactivity = {'activity_type': 'delete',
                                          'activity_time': restore.deleted_at,
@@ -744,15 +745,15 @@ class API(base.Base):
                     workload = self.db.workload_get(context, snapshot.workload_id)
                     if restore.status == 'error':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)      
                     elif restore.status == 'available':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)   
                     else:
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' is in progress" %\
-                                                (snapshot.created_at.strftime("%d-%m-%Y %H:%M:%S"), 
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)   
                           
                     recentactivity = {'activity_type': 'create',
