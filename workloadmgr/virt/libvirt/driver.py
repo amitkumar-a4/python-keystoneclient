@@ -576,12 +576,17 @@ class LibvirtDriver(driver.ComputeDriver):
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
             vm_disk_size = 0
+            if disk_info['disk_type'] == 'file':
+                disk_type = 'file'
+            else:
+                disk_type = 'volume'
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': instance['vm_id'],
                                            'snapshot_id': snapshot_obj.id,       
                                            'resource_type': 'disk',
                                            'resource_name': disk_info['dev'],
-                                           'metadata': {'snapshot_data': json.dumps(snapshot_data_ex)},
+                                           'metadata': {'snapshot_data': json.dumps(snapshot_data_ex),
+                                                        'disk_type': disk_type},
                                            'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,

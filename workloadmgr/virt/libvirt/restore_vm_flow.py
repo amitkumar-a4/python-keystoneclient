@@ -142,12 +142,19 @@ class PrepareBackupImage(task.Task):
             if restored_file_path != file_to_commit:
                 utils.delete_if_exists(file_to_commit)
 
-        return restored_file_path
+        image_info = qemuimages.qemu_img_info(restored_file_path)
+        self.virtual_size = image_info.virtual_size
+        self.restored_file_path = restored_file_path
+        return restored_file_path, image_info.virtual_size
 
     @autolog.log_method(Logger, 'PrepareBackupImage.revert')
     def revert_with_log(self, *args, **kwargs):
         # TODO: Remove restored_file_path so we can clear the staging area
-        pass
+        try:
+            if self.restored_file_path:
+                os.remove(self.restored_file_path)
+        except:
+            pass
 
 class UploadImageToGlance(task.Task):
     """
@@ -166,11 +173,12 @@ class UploadImageToGlance(task.Task):
     def execute_with_log(self, context, vmid, restore_id,
                          vm_resource_id, restore_file_path):
 
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
-        restore_obj = db.restore_get(cntx, restore_id)
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.restore_obj = restore_obj = db.restore_get(cntx, restore_id)
         snapshot_id = restore_obj.snapshot_id
-        image_service = glance.get_default_image_service(production= (restore_obj['restore_type'] != 'test'))
+        self.image_service = image_service = glance.get_default_image_service(\
+                                  production= (restore_obj['restore_type'] != 'test'))
 
         progressmsg = _('Uploading image and volumes of instance %(vmid)s from \
                         snapshot %(snapshot_id)s') % \
@@ -249,12 +257,19 @@ class UploadImageToGlance(task.Task):
                    })
         LOG.debug( progress)
 
+        if not restored_image:
+            raise Exception("Cannot create glance image")
+
+        self.imageid = restored_image['id']
         return restored_image['id']
 
     @autolog.log_method(Logger, 'UploadImageToGlance.revert')
     def revert_with_log(self, *args, **kwargs):
         # TODO: Delete image from the glance
-        pass
+        try:
+            image_service.delete(self.cntx, self.imageid)
+        except:
+            pass
 
 class RestoreVolumeFromImage(task.Task):
     """
@@ -262,31 +277,30 @@ class RestoreVolumeFromImage(task.Task):
     """
 
     def execute(self, context, vmid, restore_id, vm_resource_id,
-                imageid):
+                imageid, image_virtual_size):
         return self.execute_with_log(context, vmid, restore_id,
-                                     vm_resource_id, imageid)
+                                     vm_resource_id, imageid, image_virtual_size)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'UploadImageToGlance.execute')
     def execute_with_log(self, context, vmid, restore_id,
-                         vm_resource_id, imageid):
+                         vm_resource_id, imageid, image_virtual_size):
 
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
-        restore_obj = db.restore_get(cntx, restore_id)
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.restore_obj = restore_obj = db.restore_get(cntx, restore_id)
 
         image_service = glance.get_default_image_service(production= (restore_obj['restore_type'] != 'test'))
-        volume_service = cinder.API()
+        self.volume_service = volume_service = cinder.API()
 
         restored_image = image_service.show(cntx, imageid)
 
         restored_volume_name = uuid.uuid4().hex
         LOG.debug('Restoring volume from image ' + imageid)
 
-        volume_size = int(math.ceil(restored_image['size']/(float)(1024*1024*1024)))
-        volume_size = 20
+        volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
         restored_volume = volume_service.create(cntx, volume_size,
                                                 restored_volume_name,
                                                 'from workloadmgr', None,
@@ -297,8 +311,8 @@ class RestoreVolumeFromImage(task.Task):
         while True:
             time.sleep(10)
             restored_volume = volume_service.get(cntx, restored_volume['id'])
-            if restored_volume['status'] == 'available' or\
-                restored_volume['status'] == 'error':
+            if restored_volume['status'].lower() == 'available' or\
+                restored_volume['status'].lower() == 'error':
                 break
 
         image_service.delete(cntx, imageid)
@@ -307,12 +321,19 @@ class RestoreVolumeFromImage(task.Task):
             raise Exception("Restoring volume failed")
 
         restore_obj = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
+        if not restored_volume:
+            raise Exception("Cannot create volume from image")
+
+        self.restored_volume = restored_volume
         return restored_volume['id']
 
     @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
     def revert_with_log(self, *args, **kwargs):
         # TODO: Delete the volume that is created
-        pass
+        try:
+            self.volume_service.delete(self.cntx, self.restored_volume)
+        except:
+            pass
 
 class RestoreInstanceFromVolume(task.Task):
     """
@@ -337,9 +358,9 @@ class RestoreInstanceFromVolume(task.Task):
                          restored_security_groups, restored_nics,
                          restored_compute_flavor_id):
 
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
-        compute_service = nova.API(production = restore_type)
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
 
         restore_obj = db.restore_get(cntx, restore_id)
         snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
@@ -354,7 +375,7 @@ class RestoreInstanceFromVolume(task.Task):
         if instance_options and 'availability_zone' in instance_options:
             availability_zone = instance_options['availability_zone']
         else:   
-            if restore_type == True:   
+            if restore_type == 'test':   
                 availability_zone = CONF.default_tvault_availability_zone
             else:
                 if CONF.default_production_availability_zone == 'None':
@@ -367,7 +388,7 @@ class RestoreInstanceFromVolume(task.Task):
             restored_security_group_ids.append(restored_security_group_id)
                      
         restored_compute_flavor = compute_service.get_flavor_by_id(cntx, restored_compute_flavor_id)
-        block_device_mapping = {u'vda': volumeid+":vol:20:False"}
+        block_device_mapping = {u'vda': volumeid+":vol"}
 
         restored_instance = compute_service.create_server(cntx, restored_instance_name, 
                                                           None, restored_compute_flavor, 
@@ -375,6 +396,9 @@ class RestoreInstanceFromVolume(task.Task):
                                                           block_device_mapping=block_device_mapping,
                                                           security_groups=restored_security_group_ids, 
                                                           availability_zone=availability_zone)
+
+        if not restored_instance:
+            raise Exception("Cannot create instance from image")
 
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
@@ -384,12 +408,15 @@ class RestoreInstanceFromVolume(task.Task):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
 
+        self.restored_instance = restored_instance
         return restored_instance.id
 
     @autolog.log_method(Logger, 'RestoreInstanceFromVolume.revert')
     def revert_with_log(self, *args, **kwargs):
-        # TODO: Delete the instance that was created
-        pass
+        try:
+            self.compute_service.delete(self.cntx, self.restored_instance.id)
+        except:
+            pass
 
 class RestoreInstanceFromImage(task.Task):
     """
@@ -414,9 +441,9 @@ class RestoreInstanceFromImage(task.Task):
                          restored_security_groups, restored_nics,
                          restored_compute_flavor_id):
 
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
-        compute_service = nova.API(production = restore_type)
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.compute_serivce = compute_service = nova.API(production = (restore_type == 'restore'))
 
         restore_obj = db.restore_get(cntx, restore_id)
         snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
@@ -432,7 +459,7 @@ class RestoreInstanceFromImage(task.Task):
         if instance_options and 'availability_zone' in instance_options:
             availability_zone = instance_options['availability_zone']
         else:   
-            if restore_type == True:   
+            if restore_type == 'test':   
                 availability_zone = CONF.default_tvault_availability_zone
             else:
                 if CONF.default_production_availability_zone == 'None':
@@ -450,6 +477,9 @@ class RestoreInstanceFromImage(task.Task):
                                                           nics=restored_nics,
                                                           security_groups=restored_security_group_ids, 
                                                           availability_zone=availability_zone)
+
+        if not restored_instance:
+            raise Exception("Cannot create instance from image")
         
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
@@ -459,12 +489,16 @@ class RestoreInstanceFromImage(task.Task):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
 
+        self.restored_instance = restored_instance
         return restored_instance['id'] 
         
 
     @autolog.log_method(Logger, 'RestoreInstanceFromImage.revert')
     def revert_with_log(self, *args, **kwargs):
-        # TODO: Delete the instance that was created
+        try:
+            self.compute_service.delete(self.cntx, self.restored_instance.id)
+        except:
+            pass
         pass
 
 class AttachVolume(task.Task):
@@ -473,24 +507,42 @@ class AttachVolume(task.Task):
     """
 
     def execute(self, context, restored_instance_id,
-                volumeid):
-        return self.execute_with_log(context, restored_instance_id, volumeid)
+                volumeid, restore_type, devname):
+        return self.execute_with_log(context, restored_instance_id, volumeid,
+                restore_type, devname)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'AttachVolume.execute')
-    def execute_with_log(self, context, restored_instance_id, volumeid):
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
-        compute_service = nova.API(production = restore_type)
-
+    def execute_with_log(self, context, restored_instance_id, volumeid,
+                         restore_type, devname):
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
+        self.volume_serivce = volume_service = cinder.API()
+        if restore_type == 'restore':
+            self.restored_volume = volume_service.get(cntx, volumeid)
+            while restored_volume['status'].lower() != 'available' or\
+                   restored_volume['status'].lower() != 'error':
+                    #TODO:(giri) need a timeout to exit
+                    LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
+                    time.sleep(10)
+                    restored_volume = volume_service.get(cntx, volumeid)
+            LOG.debug('Attaching volume ' + volumeid)
+            compute_service.attach_volume(cntx, restored_instance_id, volumeid, ('/dev/' + devname))
+            time.sleep(15)
+        else:
+            params = {'path': restored_volume, 'mountpoint': '/dev/' + devname}
+            compute_service.testbubble_attach_volume(cntx, restored_instance.id, params)
         pass
 
     @autolog.log_method(Logger, 'AttachVolume.revert')
     def revert_with_log(self, *args, **kwargs):
-        # TODO: Delete the instance that was created
-        pass
+        try:
+            self.compute_service.detach_volume(cntx, self.restored_volume)
+        except:
+            pass
 
 def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
     flow = lf.Flow("processbackupimageslf")
@@ -503,7 +555,8 @@ def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
 
         flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id),
-                                    provides='restore_file_path_' + str(snapshot_vm_resource.id)))
+                                    provides=('restore_file_path_' + str(snapshot_vm_resource.id),
+                                              'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
 def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid):
@@ -531,10 +584,12 @@ def RestoreVolumes(context, instance, snapshotobj, restoreid):
             continue
 
         disk_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'disk_type')
-        #if disk_type == "volume":
-        flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
+        if disk_type == "volume":
+            flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                               imageid='image_id_' + str(snapshot_vm_resource.id)),
+                                               imageid='image_id_' + str(snapshot_vm_resource.id),
+                                               image_virtual_size='image_virtual_size_'\
+                                                           + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
     return flow
 
@@ -548,7 +603,6 @@ def RestoreInstance(context, instance, snapshotobj, restoreid):
             continue
         if snapshot_vm_resource.resource_name == 'vda':
             disk_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'disk_type')
-            disk_type="volume"
             if disk_type == "volume":
                 flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
                                     rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id)),
@@ -571,7 +625,8 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
             continue
         flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                                volumeid='volume_id_' + str(snapshot_vm_resource.id))))
+                                                volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                                                devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
@@ -599,7 +654,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'restore_id': restore['id'],
                 'vmid': instance['vm_id'],
                 'vmname': instance['vm_name'],
-                'restore_type': (restore['restore_type'] != 'test'),
+                'restore_type': restore['restore_type'],
                 'restored_net_resources': restored_net_resources,    
                 'restored_security_groups': restored_security_groups,
                 'restored_compute_flavor_id': restored_compute_flavor.id,
@@ -611,6 +666,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                          instance['vm_id'], snapshot_obj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
+        store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
 
     #restore, rebase, commit & upload
     LOG.info(_('Processing disks'))
