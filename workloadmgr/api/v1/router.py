@@ -138,6 +138,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='get_nodes',
                        conditions={"method": ['GET']})             
 
+        #remove workloadmanager node
+        mapper.connect("workloads_nodes",
+                       "/{project_id}/workloads/metrics/remove_nodes/{ip}",
+                       controller=self.resources['workloads'],
+                       action='remove_node',
+                       conditions={"method": ['DELETE']})
+
         #get total storage used
         mapper.connect("workloads_storage_usage",
                        "/{project_id}/workloads/metrics/storage_usage",
