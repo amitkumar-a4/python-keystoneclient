@@ -38,6 +38,10 @@ import workloadmgrclient.v1.client as wlmclient
 from workloadmgr.compute import nova
 from workloadmgr.openstack.common.gettextutils import _
 
+from sqlalchemy import *
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+from workloadmgr import context as context
+
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
@@ -1947,14 +1951,30 @@ def discover_vcenter():
     time.sleep(1)
     return {'status':'Success'}
 
-
 @authorize()
 def persist_config():
     try:
+        cntx = context.RequestContext(user_id='Configurator', project_id='Configurator',
+                                               is_admin=True)
+        persisted_setting_objs = WorkloadMgrDB().db.setting_get_all(cntx)
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
             Config.set(None, key, value)
+            name_found = False
+            for persisted_setting in persisted_setting_objs:
+                if persisted_setting.name == key:
+                    WorkloadMgrDB().db.setting_update(cntx, key, {'value' : value})
+                    name_found = True
+                    break
+            if name_found == False:
+                WorkloadMgrDB().db.setting_create(cntx, {'name' : key, 
+                                            'value' : value,
+                                            'user_id': context.user_id,
+                                            'project_id': context.project_id,                                             
+                                            'status': 'available',
+                                            'hidden': True })
+
         if not os.path.exists('/etc/tvault-config/'):
             os.makedirs('/etc/tvault-config/')
         with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
