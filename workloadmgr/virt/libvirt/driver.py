@@ -59,6 +59,7 @@ from workloadmgr.workloads import workload_utils
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 from nbd import NbdMount as nbd
+import restore_vm_flow
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -678,9 +679,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                         {'metadata': {'resource_id' : instance['vm_id']}})
                         if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):
                             for line in data_transfer_status['status']:
-                                if 'Completed' in line:
+                                if 'Completed' in line or 'Errored' in line:
                                     data_transfer_completed = True
                                     break;
+
+                                if 'Errored' in line:
+                                    raise Exception("Data transfer failed")
                         if data_transfer_completed:
                             break;
                     except Exception as ex:
@@ -740,6 +744,10 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         Restores the specified instance from a snapshot
         """
+        return restore_vm_flow.restore_vm(cntx, db, instance, restore, restored_net_resources,
+                           restored_security_groups, restored_compute_flavor, restored_nics,
+                           instance_options)
+
         restore_obj = db.restore_get(cntx, restore['id'])
         snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
     
@@ -918,7 +926,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 'progress_percent': str(restore_obj.progress_percent),
                 'normal_color': autolog.NORMAL,
             }) 
-            LOG.debug( progress)    
+            LOG.debug( progress)
                     
         #create nova instance
         restored_instance_name = instance['vm_name'] + '_of_snapshot_' + snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
