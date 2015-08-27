@@ -723,7 +723,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
-            return previous_snapshot_data
+        return previous_snapshot_data
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, previous_snapshot_data):

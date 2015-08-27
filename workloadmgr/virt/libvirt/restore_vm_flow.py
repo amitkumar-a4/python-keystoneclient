@@ -218,37 +218,26 @@ class UploadImageToGlance(task.Task):
                                   'owner_id': cntx.project_id}
                               }
 
-        if snapshot_vm_resource.resource_name == 'vda' or \
-            snapshot_vm_resource.resource_name == 'Hard disk 1':
-
-            LOG.debug('Uploading image ' + restore_file_path)
-            self.restored_image = restored_image = \
+        LOG.debug('Uploading image ' + restore_file_path)
+        self.restored_image = restored_image = \
                       image_service.create(cntx, image_metadata)
-            if restore_obj['restore_type'] == 'test':
-                shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
-                restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
-                with file(restore_file_path) as image_file:
-                    restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
-            else:
-                restored_image = image_service.update(cntx, 
-                                                      restored_image['id'], 
-                                                      image_metadata, 
-                                                      utils.ChunkedFile(restore_file_path,
+        if restore_obj['restore_type'] == 'test':
+            shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
+            restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
+            with file(restore_file_path) as image_file:
+                restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
+        else:
+            restored_image = image_service.update(cntx, 
+                                                  restored_image['id'], 
+                                                  image_metadata, 
+                                                  utils.ChunkedFile(restore_file_path,
                                                               {'function': db.restore_update,
                                                                'context': cntx,
                                                                'id':restore_obj.id})
-                                                      )
-            LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
-            LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
-            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
-        else:
-            if test == False:
-                #TODO(gbasava): Request a feature in cinder to create volume from a file.
-                #As a workaround we will create the image and covert that to cinder volume
-                with file(restore_file_path) as image_file:
-                    LOG.debug('Uploading image ' + restore_file_path)
-                    self.restored_image = restored_image = \
-                            image_service.create(cntx, image_metadata, image_file)
+                                                  )
+        LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
+        LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
+        LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
 
         db.restore_update(cntx, restore_id, {'uploaded_size_incremental': restored_image['size']})
         progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
@@ -524,8 +513,8 @@ class AttachVolume(task.Task):
         self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
         self.volume_serivce = volume_service = cinder.API()
         if restore_type == 'restore':
-            self.restored_volume = volume_service.get(cntx, volumeid)
-            while restored_volume['status'].lower() != 'available' or\
+            self.restored_volume = restored_volume = volume_service.get(cntx, volumeid)
+            while restored_volume['status'].lower() != 'available' and\
                    restored_volume['status'].lower() != 'error':
                     #TODO:(giri) need a timeout to exit
                     LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
@@ -626,8 +615,7 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
         if snapshot_vm_resource.resource_name == 'vda':
             continue
         flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
-                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                                volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                                    rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
                                                 devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
