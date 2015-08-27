@@ -222,7 +222,8 @@ class UploadImageToGlance(task.Task):
             snapshot_vm_resource.resource_name == 'Hard disk 1':
 
             LOG.debug('Uploading image ' + restore_file_path)
-            restored_image = image_service.create(cntx, image_metadata)
+            self.restored_image = restored_image = \
+                      image_service.create(cntx, image_metadata)
             if restore_obj['restore_type'] == 'test':
                 shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
                 restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
@@ -246,7 +247,8 @@ class UploadImageToGlance(task.Task):
                 #As a workaround we will create the image and covert that to cinder volume
                 with file(restore_file_path) as image_file:
                     LOG.debug('Uploading image ' + restore_file_path)
-                    restored_image = image_service.create(cntx, image_metadata, image_file)
+                    self.restored_image = restored_image = \
+                            image_service.create(cntx, image_metadata, image_file)
 
         db.restore_update(cntx, restore_id, {'uploaded_size_incremental': restored_image['size']})
         progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
@@ -301,10 +303,13 @@ class RestoreVolumeFromImage(task.Task):
         LOG.debug('Restoring volume from image ' + imageid)
 
         volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
-        restored_volume = volume_service.create(cntx, volume_size,
+        self.restored_volume = restored_volume = volume_service.create(cntx, volume_size,
                                                 restored_volume_name,
                                                 'from workloadmgr', None,
                                                 imageid, None, None, None)
+
+        if not restored_volume:
+            raise Exception("Cannot create volume from image")
                    
         #delete the image...it is not needed anymore
         #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
@@ -321,10 +326,7 @@ class RestoreVolumeFromImage(task.Task):
             raise Exception("Restoring volume failed")
 
         restore_obj = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
-        if not restored_volume:
-            raise Exception("Cannot create volume from image")
 
-        self.restored_volume = restored_volume
         return restored_volume['id']
 
     @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
@@ -390,12 +392,13 @@ class RestoreInstanceFromVolume(task.Task):
         restored_compute_flavor = compute_service.get_flavor_by_id(cntx, restored_compute_flavor_id)
         block_device_mapping = {u'vda': volumeid+":vol"}
 
-        restored_instance = compute_service.create_server(cntx, restored_instance_name, 
-                                                          None, restored_compute_flavor, 
-                                                          nics=restored_nics,
-                                                          block_device_mapping=block_device_mapping,
-                                                          security_groups=restored_security_group_ids, 
-                                                          availability_zone=availability_zone)
+        self.restored_instance = restored_instance = \
+                     compute_service.create_server(cntx, restored_instance_name, 
+                                                   None, restored_compute_flavor, 
+                                                   nics=restored_nics,
+                                                   block_device_mapping=block_device_mapping,
+                                                   security_groups=restored_security_group_ids, 
+                                                   availability_zone=availability_zone)
 
         if not restored_instance:
             raise Exception("Cannot create instance from image")
@@ -472,11 +475,12 @@ class RestoreInstanceFromImage(task.Task):
             restored_security_group_ids.append(restored_security_group_id)
                      
         restored_compute_flavor = compute_service.get_flavor_by_id(cntx, restored_compute_flavor_id)
-        restored_instance = compute_service.create_server(cntx, restored_instance_name, 
-                                                          restored_compute_image, restored_compute_flavor, 
-                                                          nics=restored_nics,
-                                                          security_groups=restored_security_group_ids, 
-                                                          availability_zone=availability_zone)
+        self.restored_instance = restored_instance = \
+                     compute_service.create_server(cntx, restored_instance_name, 
+                                                   restored_compute_image, restored_compute_flavor, 
+                                                   nics=restored_nics,
+                                                   security_groups=restored_security_group_ids, 
+                                                   availability_zone=availability_zone)
 
         if not restored_instance:
             raise Exception("Cannot create instance from image")
@@ -489,9 +493,7 @@ class RestoreInstanceFromImage(task.Task):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
 
-        self.restored_instance = restored_instance
         return restored_instance['id'] 
-        
 
     @autolog.log_method(Logger, 'RestoreInstanceFromImage.revert')
     def revert_with_log(self, *args, **kwargs):
