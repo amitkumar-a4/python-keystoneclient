@@ -18,7 +18,7 @@
     <div>
         <div class="container">
         <br>
-            <h1 class="center-block text-center">Welcome to trilioVault landing page. trilioVault provides tenant driven data protection for the OpenStack Cloud.</h1>
+            <h1 class="center-block text-center">Welcome to TrilioVault landing page. TrilioVault provides tenant driven data protection for the OpenStack Cloud.</h1>
         <br>
         </div>
 
@@ -67,7 +67,7 @@
                 </ol>
                 <h2>Dashboard</h2>
                 <ol>
-                    <li>trilioVault Dashboard
+                    <li>TrilioVault Dashboard
                         <br>
                         <br>
                         <div class="well">

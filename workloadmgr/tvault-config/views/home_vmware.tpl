@@ -34,7 +34,7 @@
 	</nav>
 	<div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
 	  <!-- Default panel contents -->
-	  <div class="panel-heading"><h3 class="panel-title">trilioVault</h3></div>
+	  <div class="panel-heading"><h3 class="panel-title">TrilioVault</h3></div>
 	  % if len(error_message) > 0:
 		  	<div class="alert alert-danger alert-dismissible" role="alert">
 			  <button type="button" class="close" data-dismiss="alert">
