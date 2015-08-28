@@ -7,6 +7,7 @@ tee: CommandFilter, /usr/bin/tee, root
 chown: CommandFilter, /bin/chown, root
 qemu-img: CommandFilter, /usr/bin/qemu-img, root
 qemu-nbd: CommandFilter, /usr/bin/qemu-nbd, root
+rbd: CommandFilter, /usr/bin/rbd, root
 vmware-vdiskmanager: CommandFilter, /usr/bin/vmware-vdiskmanager, root
 chmod: CommandFilter, /bin/chmod, root
 ssh: CommandFilter, /usr/bin/ssh, root
