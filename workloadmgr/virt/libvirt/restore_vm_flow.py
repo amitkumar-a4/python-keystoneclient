@@ -585,7 +585,7 @@ class RestoreInstanceFromImage(task.Task):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
 
-        return restored_instance['id'] 
+        return restored_instance.id
 
     @autolog.log_method(Logger, 'RestoreInstanceFromImage.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -694,18 +694,25 @@ def RestoreVolumes(context, instance, snapshotobj, restoreid,
 
         if snapshot_vm_resource.resource_name == 'vda':
             fromvolume = (bootdisk == "volume")
-        else:
-            fromvolume =  volumes_direct
-
-        if fromvolume:
-            flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
+            if fromvolume:
+                flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
                                     rebind=dict(restored_file_path='restore_file_path_' +\
                                                            str(snapshot_vm_resource.id),
                                                image_virtual_size='image_virtual_size_'+\
                                                            str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
         else:
-            flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
+            fromvolume =  volumes_direct
+
+            if fromvolume:
+                flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
+                                    rebind=dict(restored_file_path='restore_file_path_' +\
+                                                           str(snapshot_vm_resource.id),
+                                               image_virtual_size='image_virtual_size_'+\
+                                                           str(snapshot_vm_resource.id)),
+                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
+            else:
+                flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                imageid='image_id_' + str(snapshot_vm_resource.id),
                                                image_virtual_size='image_virtual_size_'\
