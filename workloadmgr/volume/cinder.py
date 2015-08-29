@@ -174,6 +174,13 @@ class API(base.Base):
             return exception.InvalidInput(reason=exc_value.message)
         return exc_value
 
+    def get_types(self, context):
+        try:
+            types = cinderclient(context).volume_types.list()
+            return types
+        except Exception:
+            self._reraise_translated_volume_exception(None)
+
     def get(self, context, volume_id):
         try:
             item = cinderclient(context).volumes.get(volume_id)
@@ -228,6 +235,11 @@ class API(base.Base):
 
     def detach(self, context, volume):
         cinderclient(context).volumes.detach(volume['id'])
+
+    def set_bootable(self, context, volume):
+        cinderclient(context).volumes._action('os-set_bootable',
+                                              volume['id'],
+                                              {'bootable': True})
 
     def initialize_connection(self, context, volume, connector):
         return cinderclient(context).\

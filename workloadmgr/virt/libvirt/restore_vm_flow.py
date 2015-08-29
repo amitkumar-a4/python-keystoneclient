@@ -42,11 +42,18 @@ from workloadmgr import flags
 from workloadmgr import autolog
 from workloadmgr import exception
 
+restore_vm_opts = [
+    cfg.StrOpt('ceph_pool_name',
+               default='volumes',
+               help='Ceph pool name configured for Cinder')
+    ]
+
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
 FLAGS = flags.FLAGS
 CONF = cfg.CONF
+CONF.register_opts(restore_vm_opts)
 
 class PrepareBackupImage(task.Task):
     """
@@ -145,11 +152,11 @@ class PrepareBackupImage(task.Task):
         image_info = qemuimages.qemu_img_info(restored_file_path)
         self.virtual_size = image_info.virtual_size
         self.restored_file_path = restored_file_path
-        return restored_file_path, image_info.virtual_size
+
+        return (restored_file_path, image_info.virtual_size)
 
     @autolog.log_method(Logger, 'PrepareBackupImage.revert')
     def revert_with_log(self, *args, **kwargs):
-        # TODO: Remove restored_file_path so we can clear the staging area
         try:
             if self.restored_file_path:
                 os.remove(self.restored_file_path)
@@ -218,37 +225,26 @@ class UploadImageToGlance(task.Task):
                                   'owner_id': cntx.project_id}
                               }
 
-        if snapshot_vm_resource.resource_name == 'vda' or \
-            snapshot_vm_resource.resource_name == 'Hard disk 1':
-
-            LOG.debug('Uploading image ' + restore_file_path)
-            self.restored_image = restored_image = \
+        LOG.debug('Uploading image ' + restore_file_path)
+        self.restored_image = restored_image = \
                       image_service.create(cntx, image_metadata)
-            if restore_obj['restore_type'] == 'test':
-                shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
-                restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
-                with file(restore_file_path) as image_file:
-                    restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
-            else:
-                restored_image = image_service.update(cntx, 
-                                                      restored_image['id'], 
-                                                      image_metadata, 
-                                                      utils.ChunkedFile(restore_file_path,
+        if restore_obj['restore_type'] == 'test':
+            shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
+            restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
+            with file(restore_file_path) as image_file:
+                restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
+        else:
+            restored_image = image_service.update(cntx, 
+                                                  restored_image['id'], 
+                                                  image_metadata, 
+                                                  utils.ChunkedFile(restore_file_path,
                                                               {'function': db.restore_update,
                                                                'context': cntx,
                                                                'id':restore_obj.id})
-                                                      )
-            LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
-            LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
-            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
-        else:
-            if test == False:
-                #TODO(gbasava): Request a feature in cinder to create volume from a file.
-                #As a workaround we will create the image and covert that to cinder volume
-                with file(restore_file_path) as image_file:
-                    LOG.debug('Uploading image ' + restore_file_path)
-                    self.restored_image = restored_image = \
-                            image_service.create(cntx, image_metadata, image_file)
+                                                  )
+        LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
+        LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
+        LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
 
         db.restore_update(cntx, restore_id, {'uploaded_size_incremental': restored_image['size']})
         progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
@@ -286,7 +282,7 @@ class RestoreVolumeFromImage(task.Task):
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
-    @autolog.log_method(Logger, 'UploadImageToGlance.execute')
+    @autolog.log_method(Logger, 'RestoreVolumeFromImage.execute')
     def execute_with_log(self, context, vmid, restore_id,
                          vm_resource_id, imageid, image_virtual_size):
 
@@ -321,11 +317,101 @@ class RestoreVolumeFromImage(task.Task):
                 break
 
         image_service.delete(cntx, imageid)
-        if restored_volume['status'] == 'error':
+        if restored_volume['status'].lower() == 'error':
             LOG.error(_("Volume from image %s could not successfully create") % imageid)
             raise Exception("Restoring volume failed")
 
         restore_obj = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
+
+        return restored_volume['id']
+
+    @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
+    def revert_with_log(self, *args, **kwargs):
+        # TODO: Delete the volume that is created
+        try:
+            self.volume_service.delete(self.cntx, self.restored_volume)
+        except:
+            pass
+
+class RestoreCephVolume(task.Task):
+    """
+       Restore cinder volume from qcow2
+    """
+
+    def create_volume_from_file(self, filename, volume_name):
+        args = [filename]
+        args += [volume_name]
+        kwargs = {'run_as_root':True}
+        out, err = utils.execute('rbd', 'import', *args, **kwargs)
+        return
+
+    def rename_volume(self, source, target):
+        args = [source]
+        args += [target]
+        kwargs = {'run_as_root':True}
+        out, err = utils.execute('rbd', 'mv', *args, **kwargs)
+        return
+
+    def delete_volume(self, volume_name):
+        args = [volume_name]
+        kwargs = {'run_as_root':True}
+        out, err = utils.execute('rbd', 'rm', *args, **kwargs)
+        return
+ 
+    def execute(self, context, restore_id, image_virtual_size,
+                     restored_file_path):
+        return self.execute_with_log(context, restore_id, image_virtual_size,
+                      restored_file_path)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'RestoreCephVolume.execute')
+    def execute_with_log(self, context, restore_id, image_virtual_size,
+                           restored_file_path):
+
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.volume_service = volume_service = cinder.API()
+        restore_obj = db.restore_get(cntx, restore_id)
+     
+        restored_volume_name = uuid.uuid4().hex
+
+        volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
+        self.restored_volume = restored_volume = volume_service.create(cntx, volume_size,
+                                                      restored_volume_name,
+                                                      'from workloadmgr', None,
+                                                      None, 'ceph', None, None)
+
+        if not restored_volume:
+            raise Exception("Cannot create volume from image")
+
+        while True:
+            time.sleep(10)
+            restored_volume = volume_service.get(cntx, restored_volume['id'])
+            if restored_volume['status'].lower() == 'available' or\
+                restored_volume['status'].lower() == 'error':
+                break
+
+        if restored_volume['status'].lower() == 'error':
+            LOG.error(_("Volume from image %s could not successfully create") % imageid)
+            raise Exception("Restoring volume failed")
+
+        # import image to rbd volume
+        volume_name = CONF.ceph_pool_name + '/' + "volume-" + str(uuid.uuid4().hex)
+        self.create_volume_from_file(restored_file_path, volume_name)
+        
+        # delete volume created by cinder
+        cinder_volume_name = CONF.ceph_pool_name + '/' + "volume-" \
+                                + restored_volume['id']
+        self.delete_volume(cinder_volume_name)
+
+	# rename the other volume to cinder created volume name
+        self.rename_volume(volume_name, cinder_volume_name)
+        statinfo = os.stat(restored_file_path)
+
+        restore_obj = db.restore_update(cntx, restore_obj.id,
+                               {'uploaded_size_incremental': statinfo.st_size})
 
         return restored_volume['id']
 
@@ -390,6 +476,12 @@ class RestoreInstanceFromVolume(task.Task):
             restored_security_group_ids.append(restored_security_group_id)
                      
         restored_compute_flavor = compute_service.get_flavor_by_id(cntx, restored_compute_flavor_id)
+
+        self.volume_service = volume_service = cinder.API()
+
+        restored_volume = volume_service.get(cntx, volumeid)
+        volume_service.set_bootable(cntx, restored_volume)
+
         block_device_mapping = {u'vda': volumeid+":vol"}
 
         self.restored_instance = restored_instance = \
@@ -446,7 +538,7 @@ class RestoreInstanceFromImage(task.Task):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = cntx = amqp.RpcContext.from_dict(context)
-        self.compute_serivce = compute_service = nova.API(production = (restore_type == 'restore'))
+        self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
 
         restore_obj = db.restore_get(cntx, restore_id)
         snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
@@ -493,7 +585,7 @@ class RestoreInstanceFromImage(task.Task):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
 
-        return restored_instance['id'] 
+        return restored_instance.id
 
     @autolog.log_method(Logger, 'RestoreInstanceFromImage.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -522,10 +614,10 @@ class AttachVolume(task.Task):
         self.db = db = WorkloadMgrDB().db
         self.cntx = cntx = amqp.RpcContext.from_dict(context)
         self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
-        self.volume_serivce = volume_service = cinder.API()
+        self.volume_service = volume_service = cinder.API()
         if restore_type == 'restore':
-            self.restored_volume = volume_service.get(cntx, volumeid)
-            while restored_volume['status'].lower() != 'available' or\
+            self.restored_volume = restored_volume = volume_service.get(cntx, volumeid)
+            while restored_volume['status'].lower() != 'available' and\
                    restored_volume['status'].lower() != 'error':
                     #TODO:(giri) need a timeout to exit
                     LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
@@ -561,41 +653,77 @@ def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
-def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid):
+def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid,
+                               bootdisk, volumes_direct):
     flow = lf.Flow("uploadimageslf")
     db = WorkloadMgrDB().db
+
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
                                          instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
+        if snapshot_vm_resource.resource_name == 'vda':
+            if bootdisk == "image":
+                flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
+                                    rebind=dict( vm_resource_id=snapshot_vm_resource.id,
+                                             restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
+                                    provides='image_id_' + str(snapshot_vm_resource.id)))
+                continue
+
+        if not volumes_direct:
+            flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
                                     rebind=dict( vm_resource_id=snapshot_vm_resource.id,
                                              restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
                                     provides='image_id_' + str(snapshot_vm_resource.id)))
     return flow
 
-def RestoreVolumes(context, instance, snapshotobj, restoreid):
+def RestoreVolumes(context, instance, snapshotobj, restoreid,
+                   bootdisk, volumes_direct):
     flow = lf.Flow("restorevolumeslf")
+
     db = WorkloadMgrDB().db
+    volume_service = cinder.API()
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
                                          instance['vm_id'], snapshotobj.id)
+
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        disk_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'disk_type')
-        if disk_type == "volume":
-            flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
+        if snapshot_vm_resource.resource_name == 'vda':
+            fromvolume = (bootdisk == "volume")
+            if fromvolume:
+                flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
+                                    rebind=dict(restored_file_path='restore_file_path_' +\
+                                                           str(snapshot_vm_resource.id),
+                                               image_virtual_size='image_virtual_size_'+\
+                                                           str(snapshot_vm_resource.id)),
+                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
+        else:
+            fromvolume =  volumes_direct
+
+            if fromvolume:
+                flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
+                                    rebind=dict(restored_file_path='restore_file_path_' +\
+                                                           str(snapshot_vm_resource.id),
+                                               image_virtual_size='image_virtual_size_'+\
+                                                           str(snapshot_vm_resource.id)),
+                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
+            else:
+                flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                imageid='image_id_' + str(snapshot_vm_resource.id),
                                                image_virtual_size='image_virtual_size_'\
                                                            + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
+
     return flow
 
-def RestoreInstance(context, instance, snapshotobj, restoreid):
+def RestoreInstance(context, instance, snapshotobj, restoreid,
+                    bootdisk, volumes_direct):
+
     flow = lf.Flow("attachvolumeslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
@@ -604,8 +732,7 @@ def RestoreInstance(context, instance, snapshotobj, restoreid):
         if snapshot_vm_resource.resource_type != 'disk':
             continue
         if snapshot_vm_resource.resource_name == 'vda':
-            disk_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'disk_type')
-            if disk_type == "volume":
+            if bootdisk == "volume":
                 flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
                                     rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id)),
                                     provides='restored_instance_id'))
@@ -626,8 +753,7 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
         if snapshot_vm_resource.resource_name == 'vda':
             continue
         flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
-                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                                volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                                    rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
                                                 devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
@@ -646,6 +772,36 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                           for (key, value) in cntx.to_dict().iteritems()])            
     context_dict['conf'] =  None # RpcContext object looks for this during init
 
+    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
+                                         instance['vm_id'], snapshot_obj.id)
+    # find the boot disk type
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+
+        disk_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'disk_type')
+        if snapshot_vm_resource.resource_name == 'vda':
+            if disk_type == "volume":
+                bootdisk = "volume"
+            else:
+                bootdisk = "image"
+            break
+
+    # determine if the attached volumes are created using glance images or 
+    # directly. Right now only ceph and nfs volumes are created directly.
+    # for others we will fall back to glance based volume creation
+    volume_service = volume_service = cinder.API()
+    volume_types = volume_service.get_types(cntx)
+    volumes_direct = volume_types and len(volume_types) and\
+                         volume_types[0].name == 'ceph'
+
+    # if the boot disk is volume based and volume cannot
+    # be directly created then we use glance based
+    # instantiation
+    if bootdisk == "volume" and not volumes_direct:
+        bootdisk = "image"
+   
+    # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
     restore_dict.pop('created_at')
     restore_dict.pop('updated_at')
@@ -662,36 +818,52 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'restored_compute_flavor_id': restored_compute_flavor.id,
                 'restored_nics': restored_nics,
                 'instance_options': instance_options,
+                'bootdisk': bootdisk,
+                'volumes_direct': volumes_direct,
             }
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
-                                         instance['vm_id'], snapshot_obj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
+        #store['image_virtual_size_'+snapshot_vm_resource.id] = snapshot_vm_resource.size
 
     #restore, rebase, commit & upload
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
 
-    _restorevmflow.add(LinearPrepareBackupImages(cntx, instance, snapshot_obj, restore['id']))
+    childflow = LinearPrepareBackupImages(cntx, instance, snapshot_obj, restore['id'])
+    if childflow:
+        _restorevmflow.add(childflow)
 
     # This is a linear uploading all vm images to glance
-    _restorevmflow.add(LinearUploadImagesToGlance(cntx, instance, snapshot_obj, restore['id']))
+    childflow = LinearUploadImagesToGlance(cntx, instance, snapshot_obj, restore['id'],
+                                                  bootdisk, volumes_direct)
+    if childflow:
+        _restorevmflow.add(childflow)
 
     # create nova/cinder objects from image ids
-    _restorevmflow.add(RestoreVolumes(cntx, instance, snapshot_obj, restore['id']))
+    childflow = RestoreVolumes(cntx, instance, snapshot_obj, restore['id'],
+                                      bootdisk, volumes_direct)
+    if childflow:
+        _restorevmflow.add(childflow)
 
     # create nova from image id
-    _restorevmflow.add(RestoreInstance(cntx, instance, snapshot_obj, restore['id']))
+    childflow = RestoreInstance(cntx, instance, snapshot_obj, restore['id'],
+                                       bootdisk, volumes_direct)
+    if childflow:
+        _restorevmflow.add(childflow)
 
     # attach restored volumes to restored instances
-    _restorevmflow.add(AttachVolumes(cntx, instance, snapshot_obj, restore['id']))
+    childflow = AttachVolumes(cntx, instance, snapshot_obj, restore['id'])
+    if childflow:
+        _restorevmflow.add(AttachVolumes(cntx, instance, snapshot_obj, restore['id']))
 
-    result = engines.run(_restorevmflow, engine_conf='serial', backend={'connection': store['connection'] }, store=store)
+    result = engines.run(_restorevmflow, engine_conf='serial',
+                         backend={'connection': store['connection'] }, store=store)
+
     if result and 'restored_instance_id' in result:
         restored_instance_id = result['restored_instance_id']
-        compute_service = nova.API(production = (restore['restore_type'] != 'test'))
+        compute_service = nova.API(production = (not test))
         restored_instance = compute_service.get_server_by_id(cntx, restored_instance_id)
 
         restored_vm_values = {'vm_id': restored_instance_id,
@@ -705,6 +877,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         else:
             LOG.debug(_("Restore Completed"))
          
+        # Cleanup any intermediatory files that were created
+        # should be a separate task?
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
