@@ -124,6 +124,10 @@ def restore_vm_flavor(cntx, db, instance, restore):
 @autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_security_groups')        
 def restore_vm_security_groups(cntx, db, restore):
     return None    
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_security_groups')        
+def delete_vm_security_groups(cntx, security_groups):
+    pass
   
 @autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_nics')
 def get_vm_nics(cntx, db, instance, restore, restored_net_resources): 
@@ -158,11 +162,13 @@ def get_restore_data_size(cntx, db, restore):
 
     return restore_size
 
-@autolog.log_method(Logger, 'vmtasks_vcloud.get_vm_restore_data_size')                    
+@autolog.log_method(Logger, 'vmtasks_vcloud.restore_vm_networks')                    
 def restore_vm_networks(cntx, db, restore):
     return None 
 
-
+@autolog.log_method(Logger, 'vmtasks_vcloud.delete_vm_networks')                    
+def delete_vm_networks(cntx, net_resources):
+    return None 
 
 @autolog.log_method(Logger, 'vmtasks_vcloud.pre_restore_vm')
 def pre_restore_vm(cntx, db, instance, restore):
