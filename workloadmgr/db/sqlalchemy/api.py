@@ -2814,8 +2814,11 @@ def setting_get_all(context, **kwargs):
     if context and not is_admin_context(context):
         return setting_get_all_by_project(context, context.project_id, **kwargs)
     
+    get_hidden = kwargs.get('get_hidden', False)
+ 
     return model_query(context, models.Settings, **kwargs).\
                         options(sa_orm.joinedload(models.Settings.metadata)).\
+                        filter_by(hidden=get_hidden).\
                         order_by(models.Settings.created_at.desc()).all()        
 
 @require_context

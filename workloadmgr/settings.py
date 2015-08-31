@@ -35,7 +35,7 @@ def get_settings(context=None):
     """get settings"""
     try:
         persisted_settings = {}
-        persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no')
+        persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no',get_hidden = False)
         for persisted_setting in persisted_setting_objs:
             persisted_settings[persisted_setting.name] = persisted_setting.value
         for setting, value in default_settings.iteritems():
