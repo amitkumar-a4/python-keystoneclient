@@ -890,8 +890,7 @@ def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("uploadsnapshotuf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict,
-                            provides='previous_snapshot_data_' + str(item['vm_id'])))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
 
@@ -900,8 +899,7 @@ def LinearUploadSnapshot(instances):
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'],
                            snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict,
-                            provides='previous_snapshot_data_' + str(item['vm_id'])))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
 
@@ -909,7 +907,7 @@ def UnorderedPostSnapshot(instances):
     flow = uf.Flow("postsnapshotuf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                           snapshot_data = "previous_snapshot_data_" + str(item['vm_id']))
+                           snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
@@ -918,7 +916,7 @@ def LinearPostSnapshot(instances):
     flow = lf.Flow("postsnapshotlf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                            snapshot_data = "previous_snapshot_data_" + str(item['vm_id']))
+                            snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
