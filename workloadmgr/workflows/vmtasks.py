@@ -63,19 +63,33 @@ class RestoreVMNetworks(task.Task):
     @autolog.log_method(Logger, 'RestoreVMNetworks.execute')
     def execute_with_log(self, context, target_platform, restore):
         # Restore the networking configuration of VMs
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.target_platform = target_platform
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
       
         if target_platform == 'openstack':
-            return vmtasks_openstack.restore_vm_networks(cntx, db, restore)
+            self.restored_net_resources = vmtasks_openstack.restore_vm_networks(cntx, db, restore)
         else:
-            return vmtasks_vcloud.restore_vm_networks(cntx, db, restore)
+            self.restored_net_resources = vmtasks_vcloud.restore_vm_networks(cntx, db, restore)
+
+        return self.restored_net_resources
 
     @autolog.log_method(Logger, 'RestoreVMNetworks.revert') 
     def revert_with_log(self, *args, **kwargs):
-        pass    
+        try:
+            if self.restored_net_resources:
+                if self.target_platform == 'openstack':
+                    vmtasks_openstack.delete_vm_networks(self.cntx,
+                                                         self.restored_net_resources)
+                else:
+                    vmtasks_vcloud.delete_vm_networks(self.cntx,
+                                                      self.restored_net_resources)
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
 
 class RestoreSecurityGroups(task.Task):
     def execute(self, context, target_platform, restore):
@@ -87,19 +101,33 @@ class RestoreSecurityGroups(task.Task):
     @autolog.log_method(Logger, 'RestoreSecurityGroups.execute')
     def execute_with_log(self, context, target_platform, restore):
         # Restore the security groups
-        db = WorkloadMgrDB().db
-        cntx = amqp.RpcContext.from_dict(context)
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.target_platform = target_platform
 
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
         if target_platform == 'openstack':
-            return vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
+            self.security_groups =  vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
         else:
-            return vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
+            self.security_groups =  vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
+
+        return self.security_groups
 
     @autolog.log_method(Logger, 'RestoreSecurityGroups.revert') 
     def revert_with_log(self, *args, **kwargs):
-        pass   
+        try:
+            if self.security_groups:
+                if self.target_platform == 'openstack':
+                    vmtasks_openstack.delete_vm_security_groups(self.cntx,
+                                                        self.security_groups)
+                else:
+                    vmtasks_vcloud.delete_vm_security_groups(self.cntx,
+                                                        self.security_groups)
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
 
 class PreRestore(task.Task):
 
@@ -862,8 +890,7 @@ def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("uploadsnapshotuf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict,
-                            provides='previous_snapshot_data_' + str(item['vm_id'])))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
 
@@ -872,8 +899,7 @@ def LinearUploadSnapshot(instances):
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'],
                            snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict,
-                            provides='previous_snapshot_data_' + str(item['vm_id'])))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
     
     return flow
 
@@ -881,7 +907,7 @@ def UnorderedPostSnapshot(instances):
     flow = uf.Flow("postsnapshotuf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                           snapshot_data = "previous_snapshot_data_" + str(item['vm_id']))
+                           snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow
@@ -890,7 +916,7 @@ def LinearPostSnapshot(instances):
     flow = lf.Flow("postsnapshotlf")
     for index,item in enumerate(instances):
         rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                            snapshot_data = "previous_snapshot_data_" + str(item['vm_id']))
+                            snapshot_data = "snapshot_data_" + str(item['vm_id']))
         flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
 
     return flow

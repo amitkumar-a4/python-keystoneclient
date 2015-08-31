@@ -1051,10 +1051,7 @@ class VMwareVCDriver(VMwareESXDriver):
                              
         return snapshot_data            
 
-    @autolog.log_method(Logger, 'VMwareVCDriver.get_snapshot_disk_info')
-    def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
-        return snapshot_data
-    
+   
     @autolog.log_method(Logger, 'VMwareVCDriver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
         

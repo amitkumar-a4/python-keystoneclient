@@ -176,16 +176,13 @@ def enable_cbt(self, cntx, db, instance):
 def snapshot_vm(self, cntx, db, instance, snapshot): 
     raise NotImplementedError()  
 
-def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
-    raise NotImplementedError()
-
 def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
     raise NotImplementedError()    
 
 def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
     raise NotImplementedError()
 
-def post_snapshot_vm(self, cntx, db, instance, snapshot, previous_snapshot_data):
+def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
     raise NotImplementedError()   
     
 def restore_vm(self, cntx, db, instance, restore, restored_net_resources, 

@@ -394,14 +394,14 @@ def upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex):
         return virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.post_snapshot')
-def post_snapshot(cntx, db, instance, snapshot, previous_snapshot_data):
+def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
         
     if instance['hypervisor_type'] == 'QEMU': 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, previous_snapshot_data)
+        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
     else: 
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, previous_snapshot_data)
+        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.delete_restored_vm')
 def delete_restored_vm(cntx, db, instance, restore):
@@ -525,7 +525,7 @@ def get_restore_data_size(cntx, db, restore):
     restore_options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
     for vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
         instance_options = utils.get_instance_restore_options(restore_options, vm.vm_id, restore_options['type'])
-        if instance_options and instance_options.get('include', True) == False:  
+        if instance_options and instance_options.get('include', True) == False:
             continue
         #restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
         restore_size = restore_size + vm.restore_size        
@@ -758,7 +758,44 @@ def restore_vm_networks(cntx, db, restore):
                         network_service.router_add_gateway(cntx,new_router['id'], new_ext_network['id'])
                     except Exception as err:
                         pass
-    return restored_net_resources                     
+    return restored_net_resources
+
+@autolog.log_method(Logger, 'vmtasks_openstack.delete_networks')                    
+def delete_vm_networks(cntx, restored_net_resources):
+    network_service =  neutron.API(production=True)
+    # Delete routers first
+    for resid, netresource in restored_net_resources.iteritems():
+        try:
+            if 'external_gateway_info' in netresource:
+                network_service.delete_router(cntx, netresource['id'])
+        except:
+            pass
+
+    # Delete public networks
+    for resid, netresource in restored_net_resources.iteritems():
+        try:
+            if 'router:external' in netresource and \
+                netresource['router:external']:
+                network_service.delete_network(cntx, netresource['id'])
+        except:
+            pass
+
+    # Delete private networks
+    for resid, netresource in restored_net_resources.iteritems():
+        try:
+            if 'router:external' in netresource and \
+                not netresource['router:external']:
+                network_service.delete_network(cntx, netresource['id'])
+        except:
+            pass
+
+    # Delete subnets
+    for resid, netresource in restored_net_resources.iteritems():
+        try:
+            if 'cidr' in netresource:
+                network_service.delete_subnet(cntx, netresource['id'])
+        except:
+            pass
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')        
 def restore_vm_security_groups(cntx, db, restore):
@@ -804,6 +841,12 @@ def restore_vm_security_groups(cntx, db, restore):
                                             vm_security_group_rule_values['remote_ip_prefix'],
                                             remote_group_id) 
     return restored_security_groups      
+
+@autolog.log_method(Logger, 'vmtasks_openstack.delete_vm_security_groups')        
+def delete_vm_security_groups(cntx, security_groups):
+    network_service =  neutron.API(production=True)
+    for resid, secid in security_groups.iteritems():
+        network_service.security_group_delete(cntx, secid)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm')                    
 def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_security_groups):

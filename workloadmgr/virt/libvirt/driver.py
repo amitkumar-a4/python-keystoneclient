@@ -59,6 +59,7 @@ from workloadmgr.workloads import workload_utils
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 from nbd import NbdMount as nbd
+import restore_vm_flow
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -494,7 +495,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_vm')
     def snapshot_vm(self, cntx, db, instance, snapshot):
-        
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         
@@ -504,145 +504,113 @@ class LibvirtDriver(driver.ComputeDriver):
         snapshot_data = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
         return snapshot_data 
         
-    @autolog.log_method(Logger, 'libvirt.driver.get_snapshot_disk_info')
-    def get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data): 
+    @autolog.log_method(Logger, 'libvirt.driver._get_snapshot_disk_info')
+    def _get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data):
         compute_service = nova.API(production=True)
-        disks_info = compute_service.vast_get_info(cntx, instance['vm_id'], {})['info']
-        return disks_info 
+        snapshot_data_ex = compute_service.vast_get_info(cntx, instance['vm_id'], snapshot_data)
+        return snapshot_data_ex 
     
     @autolog.log_method(Logger, 'libvirt.driver.get_snapshot_data_size')
-    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):    
-    
+    def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
         vm_data_size = 0;
-        disks_info = self.get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)     
-        for disk_info in disks_info:
+        snapshot_data_ex = self._get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)     
+        for disk_info in snapshot_data_ex['disks_info']:
             LOG.debug(_("    disk: %(disk)s") %{'disk': disk_info['dev'],})
             vm_disk_size = 0
-            pop_backings = True
-            vm_disk_resource_snap_id = None
-            if snapshot['snapshot_type'] != 'full':
-                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
-                if vm_recent_snapshot:
-                    try:
-                        recent_snapshot = db.snapshot_get(cntx, vm_recent_snapshot.snapshot_id)
-                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                                        cntx, 
-                                                                        instance['vm_id'], 
-                                                                        vm_recent_snapshot.snapshot_id, 
-                                                                        disk_info['dev'])
-                    except Exception as ex:
-                        LOG.exception(ex)
-                        LOG.info(_("No previous snapshots found. Performing full snapshot"))
-                        previous_snapshot_vm_resource = None                         
-                    if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
-                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
-                        if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
-                            vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
-                            pop_backings = False                            
-                            
-
-            if len(disk_info['backings']) > 0 and pop_backings == True:
-                base_backing_path = disk_info['backings'].pop()
-            else:
-                base_backing_path = disk_info
-            
-            
-            while (base_backing_path != None):
-                top_backing_path = None
-                if len(disk_info['backings']) > 0 and pop_backings == True:
-                    top_backing_path = disk_info['backings'].pop()
-                vm_disk_size = vm_disk_size + base_backing_path['size']
-                base_backing_path = top_backing_path
-
+            backings = disk_info['backings'][::-1] # reverse the list
+            for i, backing in enumerate(backings): 
+                vm_disk_size = vm_disk_size + backing['size']
+                if snapshot['snapshot_type'] == 'full':
+                    break
             LOG.debug(_("    vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
             LOG.debug(_("    vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
             vm_data_size = vm_data_size + vm_disk_size
             LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
-        
-        snapshot_data['vm_data_size'] = vm_data_size
-        return snapshot_data
+      
+        snapshot_data_ex['vm_data_size'] = vm_data_size
+        return snapshot_data_ex
     
     @autolog.log_method(Logger, 'libvirt.driver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
+        
+        def _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info):
+            snapshot_vm_resource_backing = None
+            vm_disk_resource_snap_backing = None
+            try: 
+                snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id)
+                for snap in snapshots:
+                    if snap.status != "available":
+                        continue
+                    snapshot_vm_resource_backing = db.snapshot_vm_resource_get_by_resource_name(cntx, 
+                                                                                        instance['vm_id'], 
+                                                                                        snap.id, 
+                                                                                        disk_info['dev'])
+                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource_backing.id)
+                    break
+            except Exception as ex:
+                LOG.exception(ex)
+            return snapshot_vm_resource_backing, vm_disk_resource_snap_backing
+        
+        def _get_backing_vm_disk_resource_with_volume_id(disk_info):
+            pass
+            
+        
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
-
-        disks_info = self.get_snapshot_disk_info(cntx, db, instance,
-                                         snapshot, snapshot_data_ex)
-        for disk_info in disks_info:
-
-            db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
-
+        for disk_info in snapshot_data_ex['disks_info']:
             vm_disk_size = 0
+            db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])        
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': instance['vm_id'],
                                            'snapshot_id': snapshot_obj.id,       
                                            'resource_type': 'disk',
                                            'resource_name': disk_info['dev'],
-                                           'metadata': {'snapshot_data': json.dumps(snapshot_data_ex)},
-                                           'status': 'creating'}
+                                           'resource_pit_id': disk_info['path'],
+                                           'metadata': {'disk_info': json.dumps(disk_info)},
+                                           'status': 'creating'}        
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
+            
+            snapshot_vm_resource_backing = None
+            vm_disk_resource_snap_backing = None
+            disk_info['prev_disk_info'] = None
+            
+            try:
+                if snapshot_obj.snapshot_type != 'full':
+                    if 'volume_id' in disk_info and disk_info['volume_id']:
+                        #TODO implement _get_backing_vm_disk_resource_with_volume_id
+                        snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_vm_disk_resource_with_volume_id(disk_info)
+                    else:
+                        snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info)
+                        
+                    for meta in snapshot_vm_resource_backing.metadata:
+                        if meta['key'] == 'disk_info':
+                            disk_info['prev_disk_info'] = json.loads(meta['value'])
+                            break                    
+            except Exception as ex:
+                LOG.info(_("No previous snapshots found. Performing full snapshot"))
+                    
 
-            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,
-                                            snapshot_vm_resource_values)
-
-            pop_backings = True                
-            vm_disk_resource_snap_id = None
-            previous_snapshot_data = None
-            if snapshot['snapshot_type'] != 'full':
-                #TODO(giri): the disk can be a new disk than the previous snapshot  
-                vm_recent_snapshot = db.vm_recent_snapshot_get(cntx, instance['vm_id'])
-                if vm_recent_snapshot:
-                    try:
-                        recent_snapshot = db.snapshot_get(cntx, vm_recent_snapshot.snapshot_id)
-                        previous_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_name(
-                                                                        cntx,
-                                                                        instance['vm_id'],
-                                                                        vm_recent_snapshot.snapshot_id,
-                                                                        disk_info['dev'])
-                    except Exception as ex:
-                        LOG.info(_("No previous snapshots found. Performing full snapshot"))
-                        LOG.exception(ex)
-                        previous_snapshot_vm_resource = None
-
-                    if previous_snapshot_vm_resource and previous_snapshot_vm_resource.status == 'available':
-                        for meta in previous_snapshot_vm_resource.metadata:
-                            if meta['key'] == 'snapshot_data':
-                                previous_snapshot_data = json.loads(meta['value'])
-                        previous_vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, previous_snapshot_vm_resource.id)
-                        if previous_vm_disk_resource_snap and previous_vm_disk_resource_snap.status == 'available':
-                            vm_disk_resource_snap_id = previous_vm_disk_resource_snap.id
-                            pop_backings = False
-
-            if len(disk_info['backings']) > 0 and pop_backings == True:
-                base_backing_path = disk_info['backings'].pop()
-            else:
-                base_backing_path = disk_info
-
-            while (base_backing_path != None):
-                top_backing_path = None
-                if len(disk_info['backings']) > 0 and pop_backings == True:
-                    top_backing_path = disk_info['backings'].pop()
-
-                # create an entry in the vm_disk_resource_snaps table
-                vm_disk_resource_snap_backing_id = vm_disk_resource_snap_id
+            for i, backing in enumerate(disk_info['backings']):
                 vm_disk_resource_snap_id = str(uuid.uuid4())
                 vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
-                if(disk_info['dev'] == 'vda' and top_backing_path == None):
-                    vm_disk_resource_snap_metadata.setdefault('base_image_ref','TODO')
-                vm_disk_resource_snap_metadata.setdefault('disk_format','qcow2')
+                if(disk_info['dev'] == 'vda'):
+                    vm_disk_resource_snap_metadata['base_image_ref'] = 'TODO'
+                vm_disk_resource_snap_metadata['disk_format'] = 'qcow2'
 
-                top = (top_backing_path == None)
+                if vm_disk_resource_snap_backing:
+                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.id
+                else:
+                    vm_disk_resource_snap_backing_id = None
                 vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                  'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
                                                  'metadata': vm_disk_resource_snap_metadata,
-                                                 'top':  top,
-                                                 'size': base_backing_path['size'],                                                     
+                                                 'top':  (i == 0),
+                                                 'size': backing['size'],                                                     
                                                  'status': 'creating'}     
 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)
-
                 #upload to backup store
                 snapshot_vm_disk_resource_metadata = {'workload_id': snapshot['workload_id'],
                                                       'workload_name': workload_obj.display_name,
@@ -654,12 +622,10 @@ class LibvirtDriver(driver.ComputeDriver):
                                                       'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
 
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
-
-                compute_service.vast_data_transfer(cntx, instance['vm_id'], {'path': base_backing_path['path'],
-                                                                             'urls': base_backing_path['urls'],
+                
+                compute_service.vast_data_transfer(cntx, instance['vm_id'], {'path': backing['path'],
                                                                              'metadata': snapshot_vm_disk_resource_metadata,
-                                                                             'snapshot_data': snapshot_data_ex,
-                                                                             'previous_snapshot_data': previous_snapshot_data})
+                                                                             'disk_info': disk_info})
 
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
@@ -667,7 +633,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                     })
 
                 LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + \
-                            '; backing file:' + os.path.basename(base_backing_path['path'])))
+                            '; backing file:' + os.path.basename(backing['path'])))
 
                 start_time = timeutils.utcnow()
                 data_transfer_completed = False
@@ -675,12 +641,15 @@ class LibvirtDriver(driver.ComputeDriver):
                     try:
                         time.sleep(5)
                         data_transfer_status = compute_service.vast_data_transfer_status(cntx, instance['vm_id'],
-                                                                                        {'metadata': {'resource_id' : instance['vm_id']}})
+                                                                                        {'metadata': {'resource_id' : vm_disk_resource_snap_id}})
                         if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):
                             for line in data_transfer_status['status']:
-                                if 'Completed' in line:
+                                if 'Completed' in line or 'Errored' in line:
                                     data_transfer_completed = True
                                     break;
+
+                                if 'Errored' in line:
+                                    raise Exception("Data transfer failed")
                         if data_transfer_completed:
                             break;
                     except Exception as ex:
@@ -689,7 +658,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     now = timeutils.utcnow()
                     if (now - start_time) > datetime.timedelta(minutes=10*60):
                         raise exception.ErrorOccurred(reason='Timeout uploading data')
-
+                
                 snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id,
                                                   {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                    'status': 'uploading'})
@@ -699,9 +668,10 @@ class LibvirtDriver(driver.ComputeDriver):
                                                 'vault_service_metadata' : 'None',
                                                 'status': 'available'}
                 db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
-                vm_disk_size = vm_disk_size + base_backing_path['size']
-                base_backing_path = top_backing_path
-
+                vm_disk_size = vm_disk_size + backing['size']
+                vm_disk_resource_snap_backing = vm_disk_resource_snap
+                if snapshot_vm_resource_backing and snapshot_vm_resource_backing.resource_pit_id == backing['path']:
+                    break;                
 
             snapshot_type = 'incremental'
             vm_disk_resource_snaps = db.vm_disk_resource_snaps_get(cntx, snapshot_vm_resource.id)
@@ -714,12 +684,14 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
-            return previous_snapshot_data
+        return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
-    def post_snapshot_vm(self, cntx, db, instance, snapshot, previous_snapshot_data):
-        compute_service = nova.API(production=True)
-        return compute_service.vast_finalize(cntx, instance['vm_id'], previous_snapshot_data)
+    def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
+        #finalize is already called in the upload
+        #compute_service = nova.API(production=True)
+        #return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data)
+        pass
     
     @autolog.log_method(Logger, 'libvirt.driver.delete_restored_vm')
     def delete_restored_vm(self, cntx, db, instance, restore):
@@ -740,284 +712,9 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         Restores the specified instance from a snapshot
         """
-        restore_obj = db.restore_get(cntx, restore['id'])
-        snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
-    
-        msg = 'Creating VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id  
-        db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg}) 
-    
-        compute_service = nova.API(production = (restore['restore_type'] != 'test')) 
-        image_service = glance.get_default_image_service(production= (restore['restore_type'] != 'test'))
-        volume_service = cinder.API()
-
-        test = (restore['restore_type'] == 'test')
-   
-        restored_image = None
-        device_restored_volumes = {} # Dictionary that holds dev and restored volumes     
-        snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
-    
-        #restore, rebase, commit & upload
-        LOG.info(_('Processing disks'))
-        snapshot_vm_object_store_transfer_time = 0
-        snapshot_vm_data_transfer_time = 0        
-        for snapshot_vm_resource in snapshot_vm_resources:
-            if snapshot_vm_resource.resource_type != 'disk':
-                continue
-            snapshot_vm_resource_object_store_transfer_time = workload_utils.download_snapshot_vm_resource_from_object_store(cntx, 
-                                                                                                                             restore_obj.id, 
-                                                                                                                             restore_obj.snapshot_id,
-                                                                                                                             snapshot_vm_resource.id)
-            snapshot_vm_object_store_transfer_time += snapshot_vm_resource_object_store_transfer_time                                                                                                        
-            snapshot_vm_data_transfer_time  +=  snapshot_vm_resource_object_store_transfer_time
-                                     
-            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
-            try:
-                shutil.rmtree( temp_directory )
-            except OSError as exc:
-                pass
-            fileutils.ensure_tree(temp_directory)
-
-            commit_queue = Queue() # queue to hold the files to be committed                 
-            vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
-            disk_format = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-            disk_filename_extention = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-            restored_file_path =temp_directory + '/' + vm_disk_resource_snap.id + \
-                                '_' + snapshot_vm_resource.resource_name + '.' \
-                                + disk_filename_extention
-            restored_file_path = restored_file_path.replace(" ", "")            
-            image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
-            if disk_format == 'qcow2' and image_attr.file_format == 'raw':
-                qemuimages.convert_image(vm_disk_resource_snap.vault_path, restored_file_path, 'qcow2')
-            else:
-                shutil.copyfile(vm_disk_resource_snap.vault_path, restored_file_path)
-
-            while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
-                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-                disk_format = db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'disk_format')
-                snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                restored_file_path_backing =temp_directory + '/' + vm_disk_resource_snap_backing.id + \
-                                            '_' + snapshot_vm_resource_backing.resource_name + '.' \
-                                            + disk_filename_extention
-                restored_file_path_backing = restored_file_path_backing.replace(" ", "")
-                image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap_backing.vault_path)
-                if disk_format == 'qcow2' and image_attr.file_format == 'raw':
-                    qemuimages.convert_image(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing, 'qcow2')
-                else:
-                    shutil.copyfile(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing)
-  
-                #rebase
-                image_info = qemuimages.qemu_img_info(restored_file_path)
-                image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
-                #increase the size of the base image
-                if image_backing_info.virtual_size < image_info.virtual_size :
-                    qemuimages.resize_image(restored_file_path_backing, image_info.virtual_size)  
-                #rebase the image                            
-                qemuimages.rebase_qcow2(restored_file_path_backing, restored_file_path)
-            
-                commit_queue.put(restored_file_path)                                 
-                vm_disk_resource_snap = vm_disk_resource_snap_backing
-                restored_file_path = restored_file_path_backing
-
-            while commit_queue.empty() is not True:
-                file_to_commit = commit_queue.get_nowait()
-                try:
-                    LOG.debug('Commiting QCOW2 ' + file_to_commit)
-                    qemuimages.commit_qcow2(file_to_commit)
-                except Exception, ex:
-                    LOG.exception(ex)                       
-                if restored_file_path != file_to_commit:
-                    utils.delete_if_exists(file_to_commit)
-            
-            LOG.debug('Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id)        
-            db.restore_update(cntx,  restore['id'], 
-                              {'progress_msg': 'Uploading image and volumes of instance ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
-                               'status': 'uploading' 
-                              })                  
-    
-            #upload to glance
-            if db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format') == 'vmdk':
-                image_metadata = {'is_public': False,
-                                  'status': 'active',
-                                  'name': snapshot_vm_resource.id,
-                                  #'disk_format' : 'ami',
-                                  'disk_format' : 'vmdk', 
-                                  'container_format' : 'bare',
-                                  'properties': {
-                                                 'hw_disk_bus' : 'scsi',
-                                                 'vmware_adaptertype' : 'lsiLogic',
-                                                 'vmware_disktype': 'preallocated',
-                                                 'image_location': 'TODO',
-                                                 'image_state': 'available',
-                                                 'owner_id': cntx.project_id}
-                                  }
-            else:
-                image_metadata = {'is_public': False,
-                                  'status': 'active',
-                                  'name': snapshot_vm_resource.id,
-                                  'disk_format' : 'qcow2',
-                                  'container_format' : 'bare',
-                                  'properties': {
-                                                 'hw_disk_bus' : 'virtio',
-                                                 'image_location': 'TODO',
-                                                 'image_state': 'available',
-                                                 'owner_id': cntx.project_id}
-                                  }
-                
-            
-            if snapshot_vm_resource.resource_name == 'vda' or snapshot_vm_resource.resource_name == 'Hard disk 1':
-                LOG.debug('Uploading image ' + restored_file_path)
-                restored_image = image_service.create(cntx, image_metadata)
-                if restore['restore_type'] == 'test':
-                    shutil.move(restored_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
-                    restored_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
-                    with file(restored_file_path) as image_file:
-                        restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
-                else:
-                    restored_image = image_service.update(cntx, 
-                                                          restored_image['id'], 
-                                                          image_metadata, 
-                                                          utils.ChunkedFile(restored_file_path,
-                                                                            {'function': db.restore_update,
-                                                                             'context': cntx,
-                                                                             'id':restore_obj.id}
-                                                                            )
-                                                      )
-                restore_obj = db.restore_get(cntx, restore_obj.id)
-                LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
-                LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
-                LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
-            else:
-                if test == False:
-                    #TODO(gbasava): Request a feature in cinder to create volume from a file.
-                    #As a workaround we will create the image and covert that to cinder volume
-                    with file(restored_file_path) as image_file:
-                        LOG.debug('Uploading image ' + restored_file_path)
-                        restored_volume_image = image_service.create(cntx, image_metadata, image_file)
-                    restored_volume_name = uuid.uuid4().hex
-                    LOG.debug('Creating volume from image ' + restored_file_path)
-                    volume_size = int(math.ceil(restored_volume_image['size']/(float)(1024*1024*1024)))
-                    restored_volume = volume_service.create(cntx, volume_size,
-                                                            restored_volume_name,
-                                                            'from workloadmgr', None,
-                                                            restored_volume_image['id'],
-                                                            None, None, None)
-                    device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_volume)
-                   
-                    #delete the image...it is not needed anymore
-                    #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
-                    time.sleep(30)
-                    image_service.delete(cntx, restored_volume_image['id'])
-                    
-                    restore_obj = db.restore_update(cntx, restore_obj.id, {'uploaded_size_incremental': restored_image['size']})
-                else:
-                    device_restored_volumes.setdefault(snapshot_vm_resource.resource_name, restored_file_path)                        
-
-            progress = "{message_color} {message} {progress_percent} {normal_color}".format(**{
-                'message_color': autolog.BROWN,
-                'message': "Restore Progress: ",
-                'progress_percent': str(restore_obj.progress_percent),
-                'normal_color': autolog.NORMAL,
-            }) 
-            LOG.debug( progress)    
-                    
-        #create nova instance
-        restored_instance_name = instance['vm_name'] + '_of_snapshot_' + snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
-        if instance_options and 'name' in instance_options:
-            restored_instance_name = instance_options['name']
-        restored_compute_image = compute_service.get_image(cntx, restored_image['id'])
-        LOG.debug('Creating Instance ' + restored_instance_name) 
-        
-        if instance_options and 'availability_zone' in instance_options:
-            availability_zone = instance_options['availability_zone']
-        else:   
-            if test == True:   
-                availability_zone = CONF.default_tvault_availability_zone
-            else:
-                if CONF.default_production_availability_zone == 'None':
-                    availability_zone = None
-                else:
-                    availability_zone = CONF.default_production_availability_zone
-    
-        restored_security_group_ids = []
-        for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
-                     
-        restored_instance = compute_service.create_server(cntx, restored_instance_name, 
-                                                          restored_compute_image, restored_compute_flavor, 
-                                                          nics=restored_nics,
-                                                          security_groups=restored_security_group_ids, 
-                                                          availability_zone=availability_zone)
-        
-        while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
-            LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
-            time.sleep(30)
-            restored_instance =  compute_service.get_server_by_id(cntx, restored_instance.id)
-            if hasattr(restored_instance,'status'):
-                if restored_instance.status == 'ERROR':
-                    raise Exception(_("Error creating instance " + restored_instance.id))
-        
-
-        #attach volumes 
-        for device, restored_volume in device_restored_volumes.iteritems():
-            if device == 'Hard disk 2':
-                devname = 'sdb'
-            elif device == 'Hard disk 3':
-                devname = 'sdc'
-            elif device == 'Hard disk 4':
-                devname = 'sdd'
-            elif device == 'Hard disk 5':
-                devname = 'sde' 
-            else:
-                devname =  device
-            if test == False:
-                while restored_volume['status'] != 'available':
-                    #TODO:(giri) need a timeout to exit
-                    LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
-                    time.sleep(30)
-                    restored_volume = volume_service.get(cntx, restored_volume['id'])
-                LOG.debug('Attaching volume ' + restored_volume['id'])
-                compute_service.attach_volume(cntx, restored_instance.id, restored_volume['id'], ('/dev/' + devname))
-                time.sleep(15)
-            else:
-                params = {'path': restored_volume, 'mountpoint': '/dev/' + devname}
-                compute_service.testbubble_attach_volume(cntx, restored_instance.id, params)
-                
-        if test == True:
-            LOG.debug('Rebooting instance ' + restored_instance.id )
-            compute_service.testbubble_reboot_instance(cntx, restored_instance.id, {'reboot_type':'SIMPLE'})
-            time.sleep(10)
-            LOG.debug(_("Test Restore Completed"))
-        else:
-            LOG.debug(_("Restore Completed"))
-            
-        restored_vm_values = {'vm_id': restored_instance.id,
-                              'vm_name':  restored_instance.name,    
-                              'restore_id': restore_obj.id,
-                              'status': 'available'}
-        restored_vm = db.restored_vm_create(cntx,restored_vm_values)    
-        
-        if test == True:
-            LOG.debug(_("Test Restore Completed"))
-        else:
-            LOG.debug(_("Restore Completed"))
-         
-        #TODO(giri): Execuete teh following in a finally block
-        for snapshot_vm_resource in snapshot_vm_resources:
-            if snapshot_vm_resource.resource_type != 'disk':
-                continue
-            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
-            try:
-                shutil.rmtree(temp_directory)
-            except OSError as exc:
-                pass 
-
-         
-        db.restore_update(cntx,restore_obj.id, 
-                          {'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
-                           'status': 'executing'
-                          })        
-        db.restore_update( cntx, restore_obj.id, {'progress_msg': 'Created VM:' + restored_vm['vm_id'], 'status': 'executing'})
-        return restored_vm          
+        return restore_vm_flow.restore_vm(cntx, db, instance, restore, restored_net_resources,
+                           restored_security_groups, restored_compute_flavor, restored_nics,
+                           instance_options)
 
     @autolog.log_method(Logger, 'libvirt.driver.post_restore_vm')
     def post_restore_vm(self, cntx, db, instance, restore):
