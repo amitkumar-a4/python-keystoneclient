@@ -394,14 +394,14 @@ def upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex):
         return virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.post_snapshot')
-def post_snapshot(cntx, db, instance, snapshot, previous_snapshot_data):
+def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
         
     if instance['hypervisor_type'] == 'QEMU': 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, previous_snapshot_data)
+        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
     else: 
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, previous_snapshot_data)
+        virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.delete_restored_vm')
 def delete_restored_vm(cntx, db, instance, restore):
