@@ -1453,9 +1453,17 @@ def configure_form_vmware():
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
-    config_data['create_file_system'] = 'off'
-    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
-    return config_data
+
+    config_database = {}
+    if 'sql_connection' in config_data:       
+       engine = create_engine(config_data['sql_connection'])
+       for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
+           items = dict(row.items())
+           config_database[items['name']] = items['value']
+    
+    config_database['create_file_system'] = 'off'
+    config_database['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return config_database
 
 @bottle.route('/configure_openstack')
 @bottle.view('configure_form_openstack')
@@ -1954,23 +1962,24 @@ def discover_vcenter():
 @authorize()
 def persist_config():
     try:
-        engine = create_engine(config_data['sql_connection'])
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
             Config.set(None, key, value)
-            name_found = False
-            for persisted_setting in engine.execute(select([models.Settings.__table__])):
-                row_dict = dict(persisted_setting.items())
-                k1 = row_dict.get("name",None)             
-                if k1 == key:
-                    update = models.Settings.__table__.update().where(models.Settings.__table__.name == key).\
-                    values({'value' : value})
-                    engine.execute(update)
-                    name_found = True
-                    break
-            if name_found == False:
-                result = engine.execute(models.Settings.__table__.insert().values({'name' : key,
+            if config_data['nodetype'] == 'Controller':
+               engine = create_engine(config_data['sql_connection'])
+               name_found = False
+               for persisted_setting in engine.execute(select([models.Settings.__table__])):
+                   row_dict = dict(persisted_setting.items())
+                   k1 = row_dict.get("name",None)             
+                   if k1 == key:
+                      update = models.Settings.__table__.update().where(models.Settings.__table__.columns.name == key).\
+                      values({'value' : value})
+                      engine.execute(update)
+                      name_found = True
+                      break
+               if name_found == False:
+                  result = engine.execute(models.Settings.__table__.insert().values({'name' : key,
                                             'value' : value,
                                             'user_id': 'Configurator',
                                             'project_id': 'Configurator',   
