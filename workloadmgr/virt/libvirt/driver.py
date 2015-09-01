@@ -644,12 +644,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                         {'metadata': {'resource_id' : vm_disk_resource_snap_id}})
                         if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):
                             for line in data_transfer_status['status']:
-                                if 'Completed' in line or 'Errored' in line:
+                                if 'Errored' in line:
+                                    raise Exception("Data transfer failed")
+                                if 'Completed' in line:
                                     data_transfer_completed = True
                                     break;
 
-                                if 'Errored' in line:
-                                    raise Exception("Data transfer failed")
                         if data_transfer_completed:
                             break;
                     except Exception as ex:
