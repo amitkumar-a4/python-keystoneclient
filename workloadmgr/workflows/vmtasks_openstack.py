@@ -797,21 +797,53 @@ def delete_vm_networks(cntx, restored_net_resources):
         except:
             pass
 
-@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')        
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')
 def restore_vm_security_groups(cntx, db, restore):
+
+    def security_group_exists(snapshot_vm_resource):
+        existing_secgroups = network_service.security_group_list(cntx)
+        existinggroup = None
+        for secgrp in existing_secgroups['security_groups']:
+            if snapshot_vm_resource.resource_name == secgrp['id']:
+                existinggroup = secgrp
+                break
+        if existinggroup == None:
+            return False
+
+        vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(cntx,
+                                               snapshot_vm_resource.id)
+        if len(vm_security_group_rule_snaps) != \
+               len(existinggroup['security_group_rules']):
+            return False
+
+        for vm_security_group_rule in vm_security_group_rule_snaps:
+            vm_security_group_rule_values = pickle.loads(str(vm_security_group_rule.pickle))
+            found = False
+            for rule in existinggroup['security_group_rules']:
+                if vm_security_group_rule_values['id'] == rule['id']:
+                    found = True
+                    break
+
+            if not found:
+                return False
+
+        return True
+
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
-    
+
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])        
     for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type == 'security_group':
+        if snapshot_vm_resource.resource_type == 'security_group' and \
+            not security_group_exists(snapshot_vm_resource):
+
             name = 'snap_of_' + db.get_metadata_value(snapshot_vm_resource.metadata, 'name')
             description = 'snapshot - ' + db.get_metadata_value(snapshot_vm_resource.metadata, 'description')
             security_group = network_service.security_group_create(cntx, name, description).get('security_group')
             restored_security_groups[snapshot_vm_resource.resource_pit_id] = security_group['id']
             restored_vm_resource_values = {'id': security_group['id'],
                                            'vm_id': restore['id'],
-                                           'restore_id': restore['id'],       
+                                           'restore_id': restore['id'],
                                            'resource_type': 'security_group',
                                            'resource_name':  security_group['name'],
                                            'metadata': {},
@@ -819,10 +851,8 @@ def restore_vm_security_groups(cntx, db, restore):
             restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)
             #delete default rules
             for security_group_rule in security_group['security_group_rules']:
-                network_service.security_group_rule_delete(cntx, security_group_rule['id'])              
-        
-    for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type == 'security_group':      
+                network_service.security_group_rule_delete(cntx, security_group_rule['id'])
+
             vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(cntx, snapshot_vm_resource.id)
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(str(vm_security_group_rule.pickle))
@@ -830,7 +860,7 @@ def restore_vm_security_groups(cntx, db, restore):
                     remote_group_id = restored_security_groups[vm_security_group_rule_values['remote_group_id']]
                 else:
                     remote_group_id = None
-                
+
                 network_service.security_group_rule_create( cntx, 
                                             restored_security_groups[snapshot_vm_resource.resource_pit_id],
                                             vm_security_group_rule_values['direction'],
