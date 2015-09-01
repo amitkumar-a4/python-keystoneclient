@@ -1460,7 +1460,10 @@ def configure_form_vmware():
        for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
            items = dict(row.items())
            config_database[items['name']] = items['value']
-    
+           config_database['refresh'] = 0 
+    else:
+         config_database['refresh'] = 1
+ 
     config_database['create_file_system'] = 'off'
     config_database['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_database
@@ -2005,7 +2008,17 @@ def configure_vmware():
     
     try: 
         config_inputs = bottle.request.POST
-       
+        if config_inputs['refresh'] == '1':
+           config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_inputs['tvault-primary-node'] + '/workloadmgr?charset=utf8' 
+           engine = create_engine(config_data['sql_connection'])
+           for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
+               items = dict(row.items())
+               config_data[items['name']] = items['value']  
+               config_data['refresh'] = 0
+               config_data['nodetype'] = config_inputs['nodetype']
+           persist_config()
+           bottle.redirect("/configure_vmware")
+
         config_data['configuration_type'] = 'vmware'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_primary_node'] = config_inputs['tvault-primary-node']
