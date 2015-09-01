@@ -38,6 +38,10 @@ import workloadmgrclient.v1.client as wlmclient
 from workloadmgr.compute import nova
 from workloadmgr.openstack.common.gettextutils import _
 
+import sqlalchemy 
+from sqlalchemy import *
+from workloadmgr.db.sqlalchemy import models
+
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
@@ -1947,14 +1951,32 @@ def discover_vcenter():
     time.sleep(1)
     return {'status':'Success'}
 
-
 @authorize()
 def persist_config():
     try:
+        engine = create_engine(config_data['sql_connection'])
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
             Config.set(None, key, value)
+            name_found = False
+            for persisted_setting in engine.execute(select([models.Settings.__table__])):
+                row_dict = dict(persisted_setting.items())
+                k1 = row_dict.get("name",None)             
+                if k1 == key:
+                    update = models.Settings.__table__.update().where(models.Settings.__table__.name == key).\
+                    values({'value' : value})
+                    engine.execute(update)
+                    name_found = True
+                    break
+            if name_found == False:
+                result = engine.execute(models.Settings.__table__.insert().values({'name' : key,
+                                            'value' : value,
+                                            'user_id': 'Configurator',
+                                            'project_id': 'Configurator',   
+                                            'status': 'available',
+                                            'hidden': True }))
+
         if not os.path.exists('/etc/tvault-config/'):
             os.makedirs('/etc/tvault-config/')
         with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:

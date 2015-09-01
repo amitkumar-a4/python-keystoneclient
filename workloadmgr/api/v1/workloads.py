@@ -464,6 +464,26 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))       
+
+    def remove_node(self, req, ip):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                self.workload_api.remove_node(context, ip)
+            except Exception as ex:
+                LOG.exception(ex)
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
     
     def get_storage_usage(self, req):
         try:
@@ -617,7 +637,6 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
-      
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
 
