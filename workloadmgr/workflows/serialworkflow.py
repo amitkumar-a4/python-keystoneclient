@@ -44,6 +44,7 @@ def get_vms(cntx, workload_id):
     hypervisors = compute_service.get_hypervisors(cntx)
 
     vms = []
+    workload  = db.workload_get(cntx, workload_id)
     for vm in db.workload_vms_get(cntx, workload_id):
         vm_instance = None
         for instance in instances:
@@ -51,7 +52,10 @@ def get_vms(cntx, workload_id):
                 vm_instance = instance
                 break;
         if vm_instance == None:
-            raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in vCenter inventory") % vm.vm_name)
+            if workload.source_platform == "vmware":
+                raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in vCenter inventory") % vm.vm_name)
+            else:
+                raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in nova inventory") % vm.vm_name)
         
         vm_hypervisor = None
         for hypervisor in hypervisors:
