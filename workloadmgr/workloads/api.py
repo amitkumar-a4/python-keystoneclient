@@ -901,6 +901,7 @@ class API(base.Base):
         Make the RPC call to snapshot a workload.
         """
         try:
+            self.get_tasks(context, None, None, None)
             workload = self.workload_get(context, workload_id)
 
             AUDITLOG.log(context,'Workload Snapshot Requested', workload)
@@ -1476,5 +1477,13 @@ class API(base.Base):
         task = self.db.task_get(context, task_id)
         task_dict = dict(task.iteritems())
         return task_dict  
+
+    @autolog.log_method(logger=Logger)
+    def get_tasks(self, context, status, page, size):
+
+        task = self.db.task_get_all(context, status=status, page=page, size=size)
+        import pdb;pdb.set_trace()
+        task_dict = dict(task.iteritems())
+        return task_dict 
 
       
