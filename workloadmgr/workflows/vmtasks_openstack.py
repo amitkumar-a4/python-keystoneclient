@@ -625,20 +625,23 @@ def restore_vm_networks(cntx, db, restore):
                     break
 
         # Make sure networks and subnets exists
-        if not network_service.get_network(cntx, network_id):
+        try:
+            network_service.get_network(cntx, network_id)
+        except Exception as ex:
             raise Exception("Could not find the network that matches the restore options")
 
-        if not network_service.get_subnet(cntx, subnet_id):
+        try:
+            network_service.get_subnet(cntx, subnet_id)
+        except Exception as ex:
             raise Exception("Could not find the subnet that matches the restore options")
 
         ports = network_service.get_ports(cntx, **{'subnet_id':subnet_id})
         if ports:
             if ip_address and not _is_duplicate_ip(ports, ip_address):
-                new_ip_address = nic_options['ip_address']
+                new_ip_address = ip_address
                 try:
-                    return _create_port(port_name,
-                                        new_ip_address, network_id,
-                                        subnet_id)
+                    return _create_port(port_name, new_ip_address,
+                                        network_id, subnet_id)
                 except Exception as ex:
                     LOG.exception(ex)
 
@@ -647,9 +650,8 @@ def restore_vm_networks(cntx, db, restore):
             if not _is_duplicate_ip(ports, str(ip)):
                 new_ip_address =  str(ip)
                 try:
-                    return _create_port(port_name,
-                                        new_ip_address, network_id,
-                                        subnet_id)
+                    return _create_port(port_name, new_ip_address,
+                                        network_id, subnet_id)
                 except Exception as ex:
                     LOG.exception(ex)
 
