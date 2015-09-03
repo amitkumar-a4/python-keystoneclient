@@ -2643,26 +2643,27 @@ def task_get_all(context, **kwargs):
         return task_get_all_by_project(context, context.project_id, **kwargs)
 
     status = kwargs.get('status',None)    
-    size = kwargs.get('size',None)
-    page = kwargs.get('page',None)
+    size = int(kwargs.get('size',None))
+    page = int(kwargs.get('page',None))
 
-    if status not None:
-       query =  model_query(context, models.Tasks, **kwargs).\
-                       
-                        options(sa_orm.joinedload(models.Tasks.status_messages)).\
-                        filter_by(status=status).\
+    offset = (page - 1) * size
+
+    query =  model_query(context, models.Tasks, **kwargs)
+
+    if status is not None:
+       query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
+       query = query.filter_by(status=status)
     else:
-         query =  model_query(context, models.Tasks, **kwargs).\
+         query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
+         query = query.order_by(models.Tasks.created_at.desc())
 
-                        options(sa_orm.joinedload(models.Tasks.status_messages)).\
-
-    if size not None:
+    if size is not None:
        query = query.limit(size)
 
-    if page not None:
-       query = query.offset(size*page)
+    if page is not None:
+       query = query.offset(offset)
 
-    return query.order_by(models.Tasks.created_at.desc()).all()
+    return query.all()
      
 @require_context
 def task_get_all_by_project(context, project_id, **kwargs):

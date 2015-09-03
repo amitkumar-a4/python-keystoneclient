@@ -51,8 +51,8 @@ class TasksController(wsgi.Controller):
     def get_tasks(self, req, status=None, page=None, size=None):
         try:
             context = req.environ['workloadmgr.context']
-            task = self.workload_api.tasks_get(context, status=status, page=page, size=size)
-            return self._view_builder.detail(req, task)
+            tasks = self.workload_api.tasks_get(context, status=status, page=page, size=size)
+            return self._view_builder.detail_list(req, tasks)
         except exception.TaskNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))

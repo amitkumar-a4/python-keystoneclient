@@ -458,7 +458,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='index',
                        conditions={"method": ['GET']})
 
-        mapper.connect("gettasks",
+        mapper.connect("get_tasks",
                        "/{project_id}/tasks/{status}/{page}/{size}",
                        controller=self.resources['tasks'],
                        action='get_tasks',
