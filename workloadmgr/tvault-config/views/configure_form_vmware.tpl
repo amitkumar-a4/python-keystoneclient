@@ -38,6 +38,10 @@
                form.action = url
                form.submit()
             }
+            else {
+               document.getElementById('refresh').value = 0;                
+            }
+
         } 
 	</script>  
 </head>

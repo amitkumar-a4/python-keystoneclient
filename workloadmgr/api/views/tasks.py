@@ -16,8 +16,10 @@ class ViewBuilder(common.ViewBuilder):
     def __init__(self):
         """Initialize view builder."""
         super(ViewBuilder, self).__init__()
-
-
+   
+    def detail_list(self, request, tasks):
+        return self._list_view(self.detail, request, tasks)
+ 
     def detail(self, request, task):
         msg = {}
         for message in task['status_messages']:
@@ -35,3 +37,9 @@ class ViewBuilder(common.ViewBuilder):
             }
   
         }
+
+    def _list_view(self, func, request, tasks):
+        tasks_list = [func(request, task)['task'] for task in tasks]
+        tasks_dict = dict(tasks=tasks_list)
+
+        return tasks_dict
