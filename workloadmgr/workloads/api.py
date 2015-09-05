@@ -274,10 +274,8 @@ class API(base.Base):
                 else:
                     workload_dict['storage_usage']['full']['snap_count'] = workload_dict['storage_usage']['full']['snap_count'] + 1
                     workload_dict['storage_usage']['full']['usage'] = workload_dict['storage_usage']['full']['usage'] + workload_snapshot.size
-        workload_dict['storage_usage']['usage'] =  utils.sizeof_fmt(workload_dict['storage_usage']['full']['usage'] + workload_dict['storage_usage']['incremental']['usage'])
-        workload_dict['storage_usage']['full']['usage'] = utils.sizeof_fmt(workload_dict['storage_usage']['full']['usage'])
+        workload_dict['storage_usage']['usage'] =  workload_dict['storage_usage']['full']['usage'] + workload_dict['storage_usage']['incremental']['usage']
 
-        workload_dict['storage_usage']['incremental']['usage'] = utils.sizeof_fmt(workload_dict['storage_usage']['incremental']['usage'])
  
         workload_vms = []
         for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
@@ -325,10 +323,7 @@ class API(base.Base):
                 else:
                     workload_dict['storage_usage']['full']['snap_count'] = workload_dict['storage_usage']['full']['snap_count'] + 1
                     workload_dict['storage_usage']['full']['usage'] = workload_dict['storage_usage']['full']['usage'] + workload_snapshot.size
-        workload_dict['storage_usage']['usage'] =  utils.sizeof_fmt(workload_dict['storage_usage']['full']['usage'] + workload_dict['storage_usage']['incremental']['usage'])
-        workload_dict['storage_usage']['full']['usage'] = utils.sizeof_fmt(workload_dict['storage_usage']['full']['usage'])
-
-        workload_dict['storage_usage']['incremental']['usage'] = utils.sizeof_fmt(workload_dict['storage_usage']['incremental']['usage'])
+        workload_dict['storage_usage']['usage'] =  workload_dict['storage_usage']['full']['usage'] + workload_dict['storage_usage']['incremental']['usage']
                 
         workload_vms = []
         for workload_vm_obj in self.db.workload_vms_get(context, workload.id):
@@ -651,7 +646,7 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         total_capacity, total_utilization = vault.get_total_capacity(context)
-        storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': utils.sizeof_fmt(total_capacity), 'total_utilization': utils.sizeof_fmt(total_utilization)}
+        storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}        
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
                 for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes'):
@@ -660,9 +655,7 @@ class API(base.Base):
                             storage_usage['incremental'] = storage_usage['incremental'] + workload_snapshot.size
                         else:
                             storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
-            storage_usage['total'] =  utils.sizeof_fmt(storage_usage['full'] + storage_usage['incremental'])
-            storage_usage['full'] = utils.sizeof_fmt(storage_usage['full'])
-            storage_usage['incremental'] = utils.sizeof_fmt(storage_usage['incremental'])
+            storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
         except Exception as ex:
             LOG.exception(ex)
         return storage_usage
@@ -1476,5 +1469,10 @@ class API(base.Base):
         task = self.db.task_get(context, task_id)
         task_dict = dict(task.iteritems())
         return task_dict  
+
+    @autolog.log_method(logger=Logger)
+    def tasks_get(self, context, status, page, size):
+        tasks = self.db.task_get_all(context, status=status, page=page, size=size)
+        return tasks
 
       

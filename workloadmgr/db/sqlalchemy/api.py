@@ -2641,11 +2641,30 @@ def task_get(context, task_id, **kwargs):
 def task_get_all(context, **kwargs):
     if not is_admin_context(context):
         return task_get_all_by_project(context, context.project_id, **kwargs)
-        
-    return model_query(context, models.Tasks, **kwargs).\
-                        options(sa_orm.joinedload(models.Tasks.status_messages)).\
-                        order_by(models.Tasks.created_at.desc()).all()        
 
+    status = kwargs.get('status',None)    
+    size = int(kwargs.get('size',None))
+    page = int(kwargs.get('page',None))
+
+    offset = (page - 1) * size
+
+    query =  model_query(context, models.Tasks, **kwargs)
+
+    if status is not None:
+       query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
+       query = query.filter_by(status=status)
+    else:
+         query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
+         query = query.order_by(models.Tasks.created_at.desc())
+
+    if size is not None:
+       query = query.limit(size)
+
+    if page is not None:
+       query = query.offset(offset)
+
+    return query.all()
+     
 @require_context
 def task_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:

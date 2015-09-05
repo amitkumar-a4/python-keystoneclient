@@ -394,7 +394,7 @@ class RestoreCephVolume(task.Task):
                 break
 
         if restored_volume['status'].lower() == 'error':
-            LOG.error(_("Volume from image %s could not successfully create") % imageid)
+            LOG.error(_("Volume from image could not successfully create"))
             raise Exception("Restoring volume failed")
 
         # import image to rbd volume

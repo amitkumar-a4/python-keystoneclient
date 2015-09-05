@@ -562,7 +562,9 @@ def restore_vm_networks(cntx, db, restore):
         return None
                 
     
-    def _get_nic_port_from_restore_options(restore_options, instance_id, mac_address):
+    def _get_nic_port_from_restore_options(restore_options,
+                                           snapshot_vm_nic_options,
+                                           instance_id, mac_address):
         
         def _is_duplicate_ip(ports, ip_address):
             if ports and ip_address:
@@ -573,15 +575,15 @@ def restore_vm_networks(cntx, db, restore):
                                 return True
             return False
         
-        def _create_port(ip_address):
+        def _create_port(name, ip_address, network_id,
+                         subnet_id):
             
-            params = {'name': instance_options.get('name',''),
-                      'fixed_ips': [{'ip_address':ip_address,
-                                     'subnet_id':nic_options['network']['subnet']['id']}
-                                    ],
-                      'network_id': nic_options['network']['id'],
+            params = {'name': name,
+                      'fixed_ips': [{'ip_address': ip_address,
+                                     'subnet_id': subnet_id} ],
+                      'network_id': network_id,
                       'tenant_id': cntx.tenant}
-            
+
             new_port = network_service.create_port(cntx, **params)
                
             restored_vm_resource_values = {'id': new_port['id'],
@@ -593,43 +595,83 @@ def restore_vm_networks(cntx, db, restore):
                                            'status': 'available'}
             restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)              
             return new_port
-            
 
-        instance_options = utils.get_instance_restore_options(restore_options, instance_id, 'openstack') 
+        networks_mapping = []
+        if 'networks_mapping' in restore_options['openstack'] and\
+            'private' in restore_options['openstack']['networks_mapping']:
+            networks_mapping = restore_options['openstack']['networks_mapping']['private']
+
+        instance_options = utils.get_instance_restore_options(restore_options,
+                                                     instance_id, 'openstack') 
+        port_name = instance_options.get('name','')
+        ip_address = None
         nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
-        
         if nic_options:
-            ports = network_service.get_ports(cntx, **{'subnet_id':nic_options['network']['subnet']['id']}) 
-            if ports:
-                if not _is_duplicate_ip(ports, nic_options['ip_address']):
-                    new_ip_address = nic_options['ip_address']
-                    try:
-                        return _create_port(new_ip_address)
-                    except Exception as ex:
-                        LOG.exception(ex)
-                   
-            for ip in IPNetwork(nic_options['network']['subnet']['cidr']):
-                if not _is_duplicate_ip(ports, str(ip)):
-                    new_ip_address =  str(ip)
-                    try:
-                        return _create_port(new_ip_address)
-                    except Exception as ex:
-                        LOG.exception(ex)
-                
-        return None    
-          
+            network_id = nic_options['network']['id']
+            subnet_id = nic_options['network']['subnet']['id']
+            if 'ip_address' in nic_options:
+                ip_address = nic_options['ip_address']
+        else:
+            network_id = snapshot_vm_nic_options['network_id']
+            subnet_id = snapshot_vm_nic_options['subnet_id']
+            if 'ip_address' in snapshot_vm_nic_options:
+                 ip_address = snapshot_vm_nic_options['ip_address']
+  
+            for net in networks_mapping:
+                if net['snapshot_network']['id'] == network_id and \
+                   net['snapshot_network']['subnet']['id'] == subnet_id:
+                    network_id = net['target_network']['id']
+                    subnet_id = net['target_network']['subnet']['id']
+                    break
+
+        # Make sure networks and subnets exists
+        try:
+            network_service.get_network(cntx, network_id)
+        except Exception as ex:
+            raise Exception("Could not find the network that matches the restore options")
+
+        try:
+            network_service.get_subnet(cntx, subnet_id)
+        except Exception as ex:
+            raise Exception("Could not find the subnet that matches the restore options")
+
+        ports = network_service.get_ports(cntx, **{'subnet_id':subnet_id})
+        if ports:
+            if ip_address and not _is_duplicate_ip(ports, ip_address):
+                new_ip_address = ip_address
+                try:
+                    return _create_port(port_name, new_ip_address,
+                                        network_id, subnet_id)
+                except Exception as ex:
+                    LOG.exception(ex)
+
+        subnet = network_service.get_subnet(cntx, subnet_id)
+        for ip in IPNetwork(subnet['subnet']['cidr']):
+            if not _is_duplicate_ip(ports, str(ip)):
+                new_ip_address =  str(ip)
+                try:
+                    return _create_port(port_name, new_ip_address,
+                                        network_id, subnet_id)
+                except Exception as ex:
+                    LOG.exception(ex)
+
+        raise Exception("Could not find the network that matches the restore options")
+
     restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
     restore_options = pickle.loads(str(restore_obj.pickle))
     restored_net_resources = {}
+
     network_service =  neutron.API(production=restore['restore_type'] != 'test')  
     snapshot_vm_common_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])           
     for snapshot_vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, snapshot_vm.vm_id, restore['snapshot_id'])        
         for snapshot_vm_resource in snapshot_vm_resources:
-            if snapshot_vm_resource.resource_type == 'nic':                
+            if snapshot_vm_resource.resource_type == 'nic':
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
-                new_port = _get_nic_port_from_restore_options(restore_options, snapshot_vm.vm_id ,nic_data['mac_address'])
+                new_port = _get_nic_port_from_restore_options(restore_options, nic_data,
+                                                              snapshot_vm.vm_id,
+                                                              nic_data['mac_address'])
                 if new_port:
                     restored_net_resources.setdefault(nic_data['mac_address'], new_port)
                     continue
@@ -639,49 +681,15 @@ def restore_vm_networks(cntx, db, restore):
                     if pit_id in restored_net_resources:
                         new_network = restored_net_resources[pit_id]
                     else:
-                        vm_nic_network = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_network_snapshot = db.vm_network_resource_snap_get(cntx, vm_nic_network.id)
-                        network = pickle.loads(str(vm_nic_network_snapshot.pickle))
-                        params = {'name': network['name'] + '_' + restore['id'],
-                                  'tenant_id': cntx.tenant,
-                                  'admin_state_up': network['admin_state_up'],
-                                  'shared': network['shared'],
-                                  'router:external': network['router:external']} 
-                        new_network = network_service.create_network(cntx,**params)
-                        restored_net_resources.setdefault(pit_id,new_network)
-                        restored_vm_resource_values = {'id': new_network['id'],
-                                                       'vm_id': restore['id'],
-                                                       'restore_id': restore['id'],       
-                                                       'resource_type': 'network',
-                                                       'resource_name':  new_network['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)                                        
-                    
+                        raise Exception("Could not find the network that matches the restore options")
+
                 #private subnet
                 pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')
                 if pit_id:
                     if pit_id in restored_net_resources:
                         new_subnet = restored_net_resources[pit_id]
                     else:
-                        vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_subnet_snapshot = db.vm_network_resource_snap_get(cntx, vm_nic_subnet.id)
-                        subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                        params = {'name': subnet['name'] + '_' + restore['id'],
-                                  'network_id': new_network['id'],
-                                  'tenant_id': cntx.tenant,
-                                  'cidr': subnet['cidr'],
-                                  'ip_version': subnet['ip_version']} 
-                        new_subnet = network_service.create_subnet(cntx,**params)
-                        restored_net_resources.setdefault(pit_id,new_subnet)
-                        restored_vm_resource_values = {'id': new_subnet['id'],
-                                                       'vm_id': restore['id'],
-                                                       'restore_id': restore['id'],       
-                                                       'resource_type': 'subnet',
-                                                       'resource_name':  new_subnet['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)                              
+                        raise Exception("Could not find the network that matches the restore options")
 
                 #external network
                 pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_network_id')
@@ -689,23 +697,7 @@ def restore_vm_networks(cntx, db, restore):
                     if pit_id in restored_net_resources:
                         new_ext_network = restored_net_resources[pit_id]
                     else:
-                        vm_nic_ext_network = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_ext_network_snapshot = db.vm_network_resource_snap_get(cntx, vm_nic_ext_network.id)
-                        ext_network = pickle.loads(str(vm_nic_ext_network_snapshot.pickle))
-                        params = {'name': ext_network['name'] + '_' + restore['id'],
-                                  'admin_state_up': ext_network['admin_state_up'],
-                                  'shared': ext_network['shared'],
-                                  'router:external': ext_network['router:external']} 
-                        new_ext_network = network_service.create_network(cntx,**params)
-                        restored_net_resources.setdefault(pit_id,new_ext_network)
-                        restored_vm_resource_values = {'id': new_ext_network['id'],
-                                                       'vm_id': restore['id'],
-                                                       'restore_id': restore['id'],       
-                                                       'resource_type': 'network',
-                                                       'resource_name':  new_ext_network['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)                             
+                        raise Exception("Could not find the network that matches the restore options")
                         
                     #external subnet
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_subnet_id')
@@ -713,51 +705,16 @@ def restore_vm_networks(cntx, db, restore):
                         if pit_id in restored_net_resources:
                             new_ext_subnet = restored_net_resources[pit_id]
                         else:
-                            vm_nic_ext_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                            vm_nic_ext_subnet_snapshot = db.vm_network_resource_snap_get(cntx, vm_nic_ext_subnet.id)
-                            ext_subnet = pickle.loads(str(vm_nic_ext_subnet_snapshot.pickle))
-                            params = {'name': ext_subnet['name'] + '_' + restore['id'],
-                                      'network_id': new_ext_network['id'],
-                                      'cidr': ext_subnet['cidr'],
-                                      'ip_version': ext_subnet['ip_version']} 
-                            new_ext_subnet = network_service.create_subnet(cntx,**params)
-                            restored_net_resources.setdefault(pit_id,new_ext_subnet)
-                            restored_vm_resource_values = {'id': new_ext_subnet['id'],
-                                                           'vm_id': restore['id'],
-                                                           'restore_id': restore['id'],       
-                                                           'resource_type': 'subnet',
-                                                           'resource_name':  new_ext_subnet['name'],
-                                                           'metadata': {},
-                                                           'status': 'available'}
-                            restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)                              
-                    
+                            raise Exception("Could not find the network that matches the restore options")
+
                 #router
                 pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'router_id')
                 if pit_id:
                     if pit_id in restored_net_resources:
                         new_router = restored_net_resources[pit_id]
                     else:
-                        vm_nic_router = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_router_snapshot = db.vm_network_resource_snap_get(cntx, vm_nic_router.id)
-                        router = pickle.loads(str(vm_nic_router_snapshot.pickle))
-                        params = {'name': router['name'] + '_' + restore['id'],
-                                  'tenant_id': cntx.tenant} 
-                        new_router = network_service.create_router(cntx,**params)
-                        restored_net_resources.setdefault(pit_id,new_router)
-                        restored_vm_resource_values = {'id': new_router['id'],
-                                                       'vm_id': restore['id'],
-                                                       'restore_id': restore['id'],       
-                                                       'resource_type': 'router',
-                                                       'resource_name':  new_router['name'],
-                                                       'metadata': {},
-                                                       'status': 'available'}
-                        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)                                   
-                    
-                    try:
-                        network_service.router_add_interface(cntx,new_router['id'], subnet_id=new_subnet['id'])
-                        network_service.router_add_gateway(cntx,new_router['id'], new_ext_network['id'])
-                    except Exception as err:
-                        pass
+                        raise Exception("Could not find the network that matches the restore options")
+
     return restored_net_resources
 
 @autolog.log_method(Logger, 'vmtasks_openstack.delete_networks')                    
