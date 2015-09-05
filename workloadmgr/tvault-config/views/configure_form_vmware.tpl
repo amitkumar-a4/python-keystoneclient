@@ -22,6 +22,27 @@
 	   }
 	  }
 	}
+
+        function refreshData() {
+            nodes = document.getElementsByName('nodetype')
+            var refresh = document.getElementById('refresh').value
+            var val
+            for(i=0;i<nodes.length;i++) {
+              if(nodes[i].checked) {
+                val = nodes[i].value
+              } 
+            }
+            if (val == 'additional' && refresh == 1) {
+               url = window.location.href
+               form = document.forms[0]
+               form.action = url
+               form.submit()
+            }
+            else {
+               document.getElementById('refresh').value = 0;                
+            }
+
+        } 
 	</script>  
 </head>
 
@@ -64,10 +85,14 @@
 			<input name = "nodetype" type="radio"  value="additional" >   Additional Node <br> <br>		
 		%end  
 	      
-	    
+            %if refresh == 1:
+            	<input type="hidden" id="refresh" name="refresh" value="1"/>
+            %else:
+                 <input type="hidden" id="refresh" name="refresh" value="0"/>
+            %end
 	    <div class="input-group">
 	    	<label class="input-group-addon">Controller Node&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-	    	<input name="tvault-primary-node" {{'value=' + tvault_primary_node if defined('tvault_primary_node') else ''}} type="text" required placeholder="192.168.2.216" class="form-control"><br>
+	    	<input name="tvault-primary-node" {{'value=' + tvault_primary_node if defined('tvault_primary_node') else ''}} type="text" required placeholder="192.168.2.216" class="form-control" onblur="refreshData()"><br>
 	    </div><br>
 	   
 	    <div class="input-group">

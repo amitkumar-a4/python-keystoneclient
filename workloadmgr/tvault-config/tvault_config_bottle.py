@@ -51,6 +51,7 @@ if module_dir:
     os.chdir(os.path.dirname(__file__))
     
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
+TVAULT_CONFIGURATION_TYPE = 'vmware'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -147,18 +148,25 @@ def change_password():
     aaa.current_user.update(pwd=post_get('newpassword'), email_addr="info@triliodata.com")
     bottle.redirect("/home")
 
+@bottle.route('/landing_page_openstack')
+@bottle.view('landing_page_openstack')
+def landing_page_openstack():
+    return {}
+    
+@bottle.route('/landing_page_vmware')
+@bottle.view('landing_page_vmware')
+def landing_page_vmware():
+    return {}    
 
 @bottle.route('/')
-@bottle.view('landing_page_vmware')
 def index():
     scheme = bottle.request.urlparts[0]
     if scheme == 'http':
         # request is http; redirect to https
         bottle.redirect(bottle.request.url.replace('http', 'https', 1))
     else:
-        return {}
+        bottle.redirect(bottle.request.url + 'landing_page_' + TVAULT_CONFIGURATION_TYPE)
 
-# Static pages
 @bottle.route('/login')
 @bottle.view('login_form')
 def login_form():
@@ -582,7 +590,8 @@ def _register_service():
                                              enabled=True)
             
             keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-        
+            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['admin_tenant_id'])
+
         except Exception as exception:
             if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
                 pass
@@ -612,6 +621,7 @@ def _register_workloadtypes():
     # Python code here to register workloadtypes
     if config_data['nodetype'] == 'controller':
         time.sleep(5)
+
         wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
@@ -1175,9 +1185,13 @@ def configure_glance():
         subprocess.call(command, shell=False) 
         
 def configure_horizon():
-    if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware': 
-        #configure horizon            
-        replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
+    if config_data['nodetype'] == 'controller': 
+        #configure horizon
+        if config_data['configuration_type'] == 'vmware':
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
+        elif config_data['configuration_type'] == 'openstack':
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            
         command = ['sudo', 'rm', "/etc/init/apache2.override"];
         subprocess.call(command, shell=False)    
         
@@ -1187,7 +1201,8 @@ def configure_horizon():
         command = ['sudo', 'service', 'apache2', 'stop'];
         subprocess.call(command, shell=False)             
         command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
-        subprocess.call(command, shell=False)      
+        subprocess.call(command, shell=False)
+
 
 @bottle.route('/services/<service_display_name>/<action>')
 @authorize()
@@ -1441,9 +1456,8 @@ def logs_vmware():
 @bottle.route('/configure')
 @authorize()
 def configure_form():
-    bottle.redirect("/configure_vmware")
-    bottle.request.environ['beaker.session']['error_message'] = ''    
-    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+    bottle.redirect(bottle.request.url + '_' + TVAULT_CONFIGURATION_TYPE)
+
 
 @bottle.route('/configure_vmware')
 @bottle.view('configure_form_vmware')
@@ -1453,9 +1467,22 @@ def configure_form_vmware():
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
-    config_data['create_file_system'] = 'off'
-    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
-    return config_data
+
+    config_database = {}
+    if 'sql_connection' in config_data:       
+       engine = create_engine(config_data['sql_connection'])
+       for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
+           items = dict(row.items())
+           config_database[items['name']] = items['value']
+       config_database['refresh'] = 0                      
+       if config_data['nodetype'] == 'additional':
+          config_database['nodetype'] = config_data['nodetype']
+    else:
+         config_database['refresh'] = 1
+ 
+    config_database['create_file_system'] = 'off'
+    config_database['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return config_database
 
 @bottle.route('/configure_openstack')
 @bottle.view('configure_form_openstack')
@@ -1535,7 +1562,7 @@ def configure_host():
             pass           
         
         try:
-            command = ['sudo', 'umount', '/opt/stack/data/wlm']
+            command = ['sudo', 'umount', '-l', '/opt/stack/data/wlm']
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass                
@@ -1758,8 +1785,10 @@ def configure_service():
         #configure wlm        
         command = ['sudo', 'rm', "/etc/init/wlm-workloads.override"];
         #shell=FALSE for sudo to work.
-        subprocess.call(command, shell=False) 
+        subprocess.call(command, shell=False)
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'keystone_endpoint_url = ', 'keystone_endpoint_url = ' + config_data['keystone_admin_url'])
+        
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_host = ', 'glance_production_host = ' + config_data['glance_production_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_port = ', 'glance_production_port = ' + str(config_data['glance_production_port']))
         
@@ -1795,8 +1824,11 @@ def configure_service():
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['swift_tenantname'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_container_prefix = ', 'vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
                         
-              
-
+        if config_data['swift_url_template'] and len(config_data['swift_url_template']) > 0:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-i')        
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url_template = ', 'vault_swift_url_template = ' + config_data['swift_url_template'])        
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_container_prefix = ', 'vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
+            
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])
@@ -1954,28 +1986,30 @@ def discover_vcenter():
 @authorize()
 def persist_config():
     try:
-        engine = create_engine(config_data['sql_connection'])
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
             Config.set(None, key, value)
-            name_found = False
-            for persisted_setting in engine.execute(select([models.Settings.__table__])):
-                row_dict = dict(persisted_setting.items())
-                k1 = row_dict.get("name",None)             
-                if k1 == key:
-                    update = models.Settings.__table__.update().where(models.Settings.__table__.name == key).\
-                    values({'value' : value})
-                    engine.execute(update)
-                    name_found = True
-                    break
-            if name_found == False:
-                result = engine.execute(models.Settings.__table__.insert().values({'name' : key,
+            if config_data['nodetype'] == 'controller':
+               engine = create_engine(config_data['sql_connection'])
+               name_found = False
+               for persisted_setting in engine.execute(select([models.Settings.__table__])):
+                   row_dict = dict(persisted_setting.items())
+                   k1 = row_dict.get("name",None)             
+                   if k1 == key:
+                      update = models.Settings.__table__.update().where(models.Settings.__table__.columns.name == key).\
+                      values({'value' : value})
+                      engine.execute(update)
+                      name_found = True
+                      break
+               if name_found == False:
+                  result = engine.execute(models.Settings.__table__.insert().values({'name' : key,
                                             'value' : value,
                                             'user_id': 'Configurator',
                                             'project_id': 'Configurator',   
                                             'status': 'available',
                                             'hidden': True }))
+                 
 
         if not os.path.exists('/etc/tvault-config/'):
             os.makedirs('/etc/tvault-config/')
@@ -1996,11 +2030,21 @@ def configure_vmware():
     
     try: 
         config_inputs = bottle.request.POST
-       
+        if config_inputs['refresh'] == '1':
+           config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_inputs['tvault-primary-node'] + '/workloadmgr?charset=utf8' 
+           engine = create_engine(config_data['sql_connection'])
+           for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
+               items = dict(row.items())
+               config_data[items['name']] = items['value']  
+               config_data['refresh'] = 0
+               config_data['nodetype'] = config_inputs['nodetype']
+           persist_config()
+           bottle.redirect("/configure_vmware")
+
         config_data['configuration_type'] = 'vmware'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_primary_node'] = config_inputs['tvault-primary-node']
-        config_data['tvault_ipaddress'] = config_data['tvault_primary_node']
+        config_data['tvault_ipaddress'] = get_lan_ip()
         config_data['floating_ipaddress'] = config_data['tvault_ipaddress']
         config_data['name_server'] = config_inputs['name-server']
         config_data['domain_search_order'] = config_inputs['domain-search-order']        
@@ -2024,6 +2068,7 @@ def configure_vmware():
         config_data['swift_password'] = config_inputs['swift-password']
         config_data['swift_tenantname'] = config_inputs['swift-tenantname']
         config_data['swift_container_prefix'] = config_inputs['swift-container-prefix']
+        config_data['swift_url_template'] = ''        
         
                
         config_data['ldap_server_url'] = config_inputs['ldap-server-url']
@@ -2107,11 +2152,13 @@ def configure_openstack():
     
     try:    
         config_inputs = bottle.request.POST
-
+        
         config_data['configuration_type'] = 'openstack'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_ipaddress'] = get_lan_ip()
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
+        if config_data['nodetype'] == 'controller':
+            config_data['tvault_primary_node'] = config_data['floating_ipaddress']
         config_data['name_server'] = config_inputs['name-server']
         config_data['domain_search_order'] = config_inputs['domain-search-order']        
         
@@ -2132,8 +2179,25 @@ def configure_openstack():
         config_data['keystone_public_protocol'] = parse_result.scheme
         
         config_data['workloadmgr_user'] = 'triliovault'
-        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD      
- 
+        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD
+
+        config_data['storage_type'] = config_inputs['storage-type']
+        config_data['storage_local_device'] = config_inputs['storage-local-device']
+        if 'create-file-system' in config_inputs:
+            config_data['create_file_system'] = config_inputs['create-file-system']
+        else:
+            config_data['create_file_system'] = 'off'
+        
+        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
+        
+        config_data['swift_auth_version'] = ''
+        config_data['swift_auth_url'] = ''
+        config_data['swift_username'] = ''
+        config_data['swift_password'] = ''
+        config_data['swift_tenantname'] = ''
+        config_data['swift_container_prefix'] = config_inputs['swift-container-prefix']        
+        config_data['swift_url_template'] = config_inputs['swift-url-template']
+        
         bottle.redirect("/task_status_openstack")
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -2157,7 +2221,7 @@ def configure():
            bottle.redirect("/configure")
            
 @bottle.route('/home')
-@bottle.view('home_vmware')
+@bottle.view('home')
 @authorize()
 def home():
     bottle.request.environ['beaker.session']['error_message'] = ''    
@@ -2298,6 +2362,7 @@ def main():
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
+        
         #SSL regeneration     
         prev_hostname = 'none'
         Config = ConfigParser.RawConfigParser()

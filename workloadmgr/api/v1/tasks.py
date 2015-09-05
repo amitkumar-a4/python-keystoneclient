@@ -48,5 +48,18 @@ class TasksController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+    def get_tasks(self, req, status=None, page=None, size=None):
+        try:
+            context = req.environ['workloadmgr.context']
+            tasks = self.workload_api.tasks_get(context, status=status, page=page, size=size)
+            return self._view_builder.detail_list(req, tasks)
+        except exception.TaskNotFound as error:
+            LOG.exception(error)
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+
 def create_resource(ext_mgr):
     return wsgi.Resource(TasksController(ext_mgr)) 

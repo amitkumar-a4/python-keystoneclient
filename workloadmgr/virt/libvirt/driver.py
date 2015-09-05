@@ -590,9 +590,9 @@ class LibvirtDriver(driver.ComputeDriver):
                             break
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
-
-
-            for i, backing in enumerate(disk_info['backings']):
+                    
+            backings = disk_info['backings'][::-1] # reverse the list
+            for i, backing in enumerate(backings):
                 vm_disk_resource_snap_id = str(uuid.uuid4())
                 vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
                 if(disk_info['dev'] == 'vda'):
@@ -603,13 +603,14 @@ class LibvirtDriver(driver.ComputeDriver):
                     vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.id
                 else:
                     vm_disk_resource_snap_backing_id = None
+
                 vm_disk_resource_snap_values = { 'id': vm_disk_resource_snap_id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                  'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
                                                  'metadata': vm_disk_resource_snap_metadata,
-                                                 'top':  (i == 0),
-                                                 'size': backing['size'],
-                                                 'status': 'creating'}
+                                                 'top':  ((i+1) == len(backings)),
+                                                 'size': backing['size'],                                                     
+                                                 'status': 'creating'}     
 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)
                 #upload to backup store

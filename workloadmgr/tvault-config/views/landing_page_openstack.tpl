@@ -39,7 +39,7 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/configure" target="_blank">http://&lt;floating-ipaddress-of-tvault-vm&gt;/configure</a>
+                            <a href="/home" target="_blank">http://&lt;floating-ipaddress-of-tvault-vm&gt;/home</a>
                         </div>
                     </li>
 

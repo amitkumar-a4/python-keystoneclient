@@ -452,3 +452,5 @@ def task_update(context, task_id, values):
 def task_get(context, task_id, **kwargs):
     return IMPL.task_get(context, task_id, **kwargs)
 
+def task_get_all(context, **kwargs):
+    return IMPL.task_get_all(context, **kwargs)
