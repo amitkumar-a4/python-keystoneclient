@@ -39,14 +39,14 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/home" target="_blank">http://&lt;floating-ipaddress-of-tvault-vm&gt;/home</a>
+                            <a href="/home" target="_blank">http://floating-ipaddress-of-tvault-vm/home</a>
                         </div>
                     </li>
 
                     <li>Configure OS Controller</li>
                     <br>
                     <div class="well">
-                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
+                        <code># sudo sh -c "echo 'deb http://floating-ipaddress-of-tvault-vm/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
                         <br>
                         <code># sudo apt-get update</code>
                         <br>
@@ -57,7 +57,7 @@
                     <li>Configure Compute Nodes</li>
                     <br>
                     <div class="well">
-                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
+                        <code># sudo sh -c "echo 'deb http://floating-ipaddress-of-tvault-vm/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
                         <br>
                         <code># sudo apt-get update</code>
                         <br>
@@ -67,18 +67,18 @@
                 </ol>
                 <h2>Dashboard</h2>
                 <ol>
-                    <li>TrilioVault Dashboard
+                    <li>Horizon Dashboard
                         <br>
                         <br>
                         <div class="well">
-                            <a>http://&lt;floating-ipaddress-of-tvault-controller&gt;:3000</a>
+                        	<script>document.write('<a href="http://' + window.location.host + ':3001" target="_blank"> http://floating-ipaddress-of-tvault-vm:3001 </a>')</script>
                         </div>
                     </li>
 
                     <li>Horizon Dashboard Plugin</li>
                     <br>
                     <div class="well">
-                        <code># sudo sh -c "echo 'deb http://&lt;floating-ipaddress-of-tvault-vm&gt;/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
+                        <code># sudo sh -c "echo 'deb http://floating-ipaddress-of-tvault-vm/debs/ amd64/' &gt;&gt; /etc/apt/sources.list"</code>
                         <br>
                         <code># sudo apt-get update</code>
                         <br>

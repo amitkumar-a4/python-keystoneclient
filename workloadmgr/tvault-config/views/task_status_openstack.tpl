@@ -31,6 +31,12 @@ function loadXMLDoc(url, callback)
 
 function taskfunction()
 {
+	var r = confirm("Continuing will configure the appliance.\nWould you like to proceed?");
+	if (r == false) {
+		window.history.back()
+		return	
+	}
+    
 	$("#alert").hide();
    	loadXMLDoc("configure_host", function() {
    	   document.getElementById("configure_host").children[0].classList.add("glyphicon-refresh");
@@ -233,7 +239,8 @@ function taskfunction()
 		                             return;
 		                          }
 		                          document.getElementById("final_status").classList.add("list-group-item-success");
-		                          document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+		                          //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
+                                  document.getElementById("final_status").innerHTML = '<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';          
 		                       });
 		                    });
 		                 });

@@ -577,7 +577,7 @@ def _register_service():
                 if role.name == 'admin':
                     admin_role = role
                     break                
-                      
+        
             try:
                 keystone.users.delete(wlm_user.id)
             except Exception as exception:
@@ -585,7 +585,7 @@ def _register_service():
                    raise exception
             
             
-            wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@trilioData.com',
+            wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@triliodata.com',
                                              tenant_id=config_data['service_tenant_id'],
                                              enabled=True)
             
@@ -1474,9 +1474,7 @@ def configure_form_vmware():
        for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
            items = dict(row.items())
            config_database[items['name']] = items['value']
-       config_database['refresh'] = 0                      
-       if config_data['nodetype'] == 'additional':
-          config_database['nodetype'] = config_data['nodetype']
+           config_database['refresh'] = 0 
     else:
          config_database['refresh'] = 1
  
@@ -1990,7 +1988,7 @@ def persist_config():
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
             Config.set(None, key, value)
-            if config_data['nodetype'] == 'controller':
+            if config_data['nodetype'] == 'Controller':
                engine = create_engine(config_data['sql_connection'])
                name_found = False
                for persisted_setting in engine.execute(select([models.Settings.__table__])):
@@ -2009,7 +2007,6 @@ def persist_config():
                                             'project_id': 'Configurator',   
                                             'status': 'available',
                                             'hidden': True }))
-                 
 
         if not os.path.exists('/etc/tvault-config/'):
             os.makedirs('/etc/tvault-config/')
