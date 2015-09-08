@@ -56,6 +56,12 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         subnets = []
         networks = []
         routers = []
+
+        # refresh the token. token may have been invalidated during long running
+        # tasks during upload and post snapshot processing
+        user_id = cntx.user
+        project_id = cntx.tenant
+        cntx = nova._get_tenant_context(user_id, project_id)
         for instance in instances: 
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             nics = []
