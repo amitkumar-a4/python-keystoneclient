@@ -39,6 +39,7 @@ from eventlet import tpool
 from lxml import etree
 from oslo.config import cfg
 
+from novaclient.exceptions import Unauthorized as nova_unauthorized
 from workloadmgr import utils
 from workloadmgr import exception
 from workloadmgr.virt import qemuimages
@@ -80,10 +81,10 @@ libvirt_opts = [
     cfg.BoolOpt('libvirt_nonblocking',
                 default=True,
                 help='Use a separated OS thread pool to realize non-blocking'
-                     ' libvirt calls'),                
+                     ' libvirt calls'),
     cfg.StrOpt('instances_path',
                default='/opt/stack/data/nova/instances',
-               help='Location where the instances are'),               
+               help='Location where the instances are'),
     cfg.StrOpt('libvirt_snapshots_directory',
                default='$instances_path/snapshots',
                help='Location where libvirt driver will store snapshots '
@@ -93,13 +94,13 @@ libvirt_opts = [
                help='Libvirt domain type (valid options are: kvm)'),
     cfg.StrOpt('glance_images_path',
                default='/opt/stack/data/nova/instances/_base',
-               help='Location of the images for: nova, glance and wlm'),   
+               help='Location of the images for: nova, glance and wlm'),
     cfg.StrOpt('default_tvault_availability_zone',
                default='tvault_az',
-               help='TrilioVault availability zone'),                                      
+               help='TrilioVault availability zone'),
     cfg.StrOpt('default_production_availability_zone',
                default='None',
-               help='TrilioVault availability zone'), 
+               help='TrilioVault availability zone'),
     ]
 
 CONF = cfg.CONF
@@ -341,7 +342,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
             msg = _("Error from libvirt while looking up %(instance_name)s: ""[Error Code %(error_code)s] %(ex)s") % locals()
             raise exception.WorkloadMgrException(msg)
-        
+
     def get_info(self, instance_name):
         """Retrieve information from libvirt for a specific instance name.
 
@@ -359,12 +360,12 @@ class LibvirtDriver(driver.ComputeDriver):
                 'cpu_time': cpu_time,
                 'id': virt_dom.ID(),
                 'uuid': virt_dom.ID()}
-                
+
     def get_disks(self, instance_name):
         """
         Note that this function takes an instance name.
         Returns a list of all block devices( vda, vdb ....) for this domain.
-        
+
         """
         domain = self._lookup_by_name(instance_name)
         xml = domain.XMLDesc(0)
@@ -376,7 +377,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         return filter(bool,
                       [target.get("dev")
-                       for target in doc.findall('devices/disk/target')])  
+                       for target in doc.findall('devices/disk/target')])
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_mount')
     def snapshot_mount(self, cntx, snapshot, diskfiles):
@@ -398,7 +399,7 @@ class LibvirtDriver(driver.ComputeDriver):
             raise
 
         return devpaths
-            
+
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_dismount')
     def snapshot_dismount(self, cntx, snapshot, devpaths):
         for disk, dev in devpaths.iteritems():
@@ -417,9 +418,9 @@ class LibvirtDriver(driver.ComputeDriver):
         base_path, base_filename = os.path.split(base)
         orig_base_path, orig_base_filename = os.path.split(orig_base)
         base_extent_path = base_path
-        base_extent_filename = base_filename + '.extent' 
+        base_extent_filename = base_filename + '.extent'
         if(os.path.isfile(os.path.join(base_extent_path,base_extent_filename)) == False):
-            os.rename(base, os.path.join(base_extent_path,base_extent_filename)) 
+            os.rename(base, os.path.join(base_extent_path,base_extent_filename))
             base_descriptor = base_descriptor.replace((' "' + orig_base_filename +'"'), (' "' + base_extent_filename +'"'))
             if top_descriptor is not None:
                 top_parentCID =  re.search('parentCID=(\w+)', top_descriptor).group(1)
@@ -427,23 +428,23 @@ class LibvirtDriver(driver.ComputeDriver):
             with open(base, "w") as base_descriptor_file:
                 base_descriptor_file.write("%s"%base_descriptor)
 
-        
+
         if top_descriptor is not None:
             top_path, top_filename = os.path.split(top)
             orig_top_path, orig_top_filename = os.path.split(orig_top)
             top_extent_path = top_path
-            top_extent_filename = top_filename + '.extent'             
+            top_extent_filename = top_filename + '.extent'
             if(os.path.isfile(os.path.join(top_extent_path,top_extent_filename))):
                 with open(top, "r") as top_descriptor_file:
-                    top_descriptor =  top_descriptor_file.read() 
+                    top_descriptor =  top_descriptor_file.read()
             else:
                 os.rename(top, os.path.join(top_extent_path,top_extent_filename))
                 top_descriptor = top_descriptor.replace((' "' + orig_top_filename +'"'), (' "' + top_extent_filename +'"'))
- 
+
             top_descriptor = re.sub(r'parentFileNameHint="([^"]*)"', "parentFileNameHint=\"%s\""%base, top_descriptor)
             with open(top, "w") as top_descriptor_file:
-                top_descriptor_file.write("%s"%top_descriptor)                            
- 
+                top_descriptor_file.write("%s"%top_descriptor)
+
     def commit_vmdk(self, file_to_commit, commit_to, test):
         """rebase the backing_file_top to backing_file_base
          :param backing_file_top: top file to commit from to its base
@@ -451,12 +452,12 @@ class LibvirtDriver(driver.ComputeDriver):
         #due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
         #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
         if test:
-            utils.execute( 'env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64', 
+            utils.execute( 'env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
                            'vmware-vdiskmanager', '-r', file_to_commit, '-t 2',  commit_to, run_as_root=False)
         else:
             utils.execute( 'env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
                            'vmware-vdiskmanager', '-r', file_to_commit, '-t 4',  commit_to, run_as_root=False)
-        
+
         utils.chmod(commit_to, '0664')
         utils.chmod(commit_to.replace(".vmdk", "-flat.vmdk"), '0664')
         return commit_to.replace(".vmdk", "-flat.vmdk")
@@ -465,29 +466,29 @@ class LibvirtDriver(driver.ComputeDriver):
             utils.execute('qemu-img', 'convert', '-f', 'vmdk', '-O', 'raw', commit_to, commit_to.replace(".vmdk", ".img"), run_as_root=False)
             return commit_to.replace(".vmdk", ".img")
         else:
-            return commit_to.replace(".vmdk", "-flat.vmdk") 
-        """     
+            return commit_to.replace(".vmdk", "-flat.vmdk")
+        """
 
     @autolog.log_method(Logger, 'libvirt.driver.pre_snapshot_vm')
     def pre_snapshot_vm(self, cntx, db, instance, snapshot):
 
         compute_service = nova.API(production=True)
         vast_params = {'test1': 'test1','test2': 'test2'}
-        compute_service.vast_prepare(cntx, instance['vm_id'], vast_params) 
-        
+        compute_service.vast_prepare(cntx, instance['vm_id'], vast_params)
+
     @autolog.log_method(Logger, 'libvirt.driver.freeze_vm')
     def freeze_vm(self, cntx, db, instance, snapshot):
 
         compute_service = nova.API(production=True)
         vast_params = {'test1': 'test1','test2': 'test2'}
-        compute_service.vast_freeze(cntx, instance['vm_id'], vast_params)    
-        
+        compute_service.vast_freeze(cntx, instance['vm_id'], vast_params)
+
     @autolog.log_method(Logger, 'libvirt.driver.thaw_vm')
     def thaw_vm(self, cntx, db, instance, snapshot):
 
         compute_service = nova.API(production=True)
         vast_params = {'test1': 'test1','test2': 'test2'}
-        compute_service.vast_thaw(cntx, instance['vm_id'], vast_params)               
+        compute_service.vast_thaw(cntx, instance['vm_id'], vast_params)
 
     @autolog.log_method(Logger, 'vmwareapi.driver.enable_cbt')
     def enable_cbt(self, cntx, db, instance):
@@ -497,28 +498,28 @@ class LibvirtDriver(driver.ComputeDriver):
     def snapshot_vm(self, cntx, db, instance, snapshot):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
-        
+
         compute_service = nova.API(production=True)
         vast_params = {'snapshot_id': snapshot_obj.id,
                        'workload_id': workload_obj.id}
         snapshot_data = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
-        return snapshot_data 
-        
+        return snapshot_data
+
     @autolog.log_method(Logger, 'libvirt.driver._get_snapshot_disk_info')
     def _get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data):
         compute_service = nova.API(production=True)
         snapshot_data_ex = compute_service.vast_get_info(cntx, instance['vm_id'], snapshot_data)
-        return snapshot_data_ex 
-    
+        return snapshot_data_ex
+
     @autolog.log_method(Logger, 'libvirt.driver.get_snapshot_data_size')
     def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
         vm_data_size = 0;
-        snapshot_data_ex = self._get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)     
+        snapshot_data_ex = self._get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)
         for disk_info in snapshot_data_ex['disks_info']:
             LOG.debug(_("    disk: %(disk)s") %{'disk': disk_info['dev'],})
             vm_disk_size = 0
             backings = disk_info['backings'][::-1] # reverse the list
-            for i, backing in enumerate(backings): 
+            for i, backing in enumerate(backings):
                 vm_disk_size = vm_disk_size + backing['size']
                 if snapshot['snapshot_type'] == 'full':
                     break
@@ -526,55 +527,60 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.debug(_("    vm_disk_size: %(vm_disk_size)s") %{'vm_disk_size': vm_disk_size,})
             vm_data_size = vm_data_size + vm_disk_size
             LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
-      
+
         snapshot_data_ex['vm_data_size'] = vm_data_size
         return snapshot_data_ex
-    
+
     @autolog.log_method(Logger, 'libvirt.driver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
-        
+
         def _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info):
             snapshot_vm_resource_backing = None
             vm_disk_resource_snap_backing = None
-            try: 
+            try:
                 snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id)
                 for snap in snapshots:
                     if snap.status != "available":
                         continue
-                    snapshot_vm_resource_backing = db.snapshot_vm_resource_get_by_resource_name(cntx, 
-                                                                                        instance['vm_id'], 
-                                                                                        snap.id, 
+                    snapshot_vm_resource_backing = db.snapshot_vm_resource_get_by_resource_name(cntx,
+                                                                                        instance['vm_id'],
+                                                                                        snap.id,
                                                                                         disk_info['dev'])
                     vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource_backing.id)
                     break
             except Exception as ex:
                 LOG.exception(ex)
             return snapshot_vm_resource_backing, vm_disk_resource_snap_backing
-        
+
         def _get_backing_vm_disk_resource_with_volume_id(disk_info):
             pass
-            
-        
+
+
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
         for disk_info in snapshot_data_ex['disks_info']:
+            # Always attempt with a new token to avoid timeouts
+            user_id = cntx.user
+            project_id = cntx.tenant
+            cntx = nova._get_tenant_context(user_id, project_id)
+
             vm_disk_size = 0
-            db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])        
+            db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': instance['vm_id'],
-                                           'snapshot_id': snapshot_obj.id,       
+                                           'snapshot_id': snapshot_obj.id,
                                            'resource_type': 'disk',
                                            'resource_name': disk_info['dev'],
                                            'resource_pit_id': disk_info['path'],
                                            'metadata': {'disk_info': json.dumps(disk_info)},
-                                           'status': 'creating'}        
+                                           'status': 'creating'}
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
-            
+
             snapshot_vm_resource_backing = None
             vm_disk_resource_snap_backing = None
             disk_info['prev_disk_info'] = None
-            
+
             try:
                 if snapshot_obj.snapshot_type != 'full':
                     if 'volume_id' in disk_info and disk_info['volume_id']:
@@ -582,11 +588,11 @@ class LibvirtDriver(driver.ComputeDriver):
                         snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_vm_disk_resource_with_volume_id(disk_info)
                     else:
                         snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info)
-                        
+
                     for meta in snapshot_vm_resource_backing.metadata:
                         if meta['key'] == 'disk_info':
                             disk_info['prev_disk_info'] = json.loads(meta['value'])
-                            break                    
+                            break
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
                     
@@ -623,12 +629,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                                       'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
 
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
-                
+
                 compute_service.vast_data_transfer(cntx, instance['vm_id'], {'path': backing['path'],
                                                                              'metadata': snapshot_vm_disk_resource_metadata,
                                                                              'disk_info': disk_info})
 
-                snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id, 
+                snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
                                                     })
@@ -653,17 +659,23 @@ class LibvirtDriver(driver.ComputeDriver):
 
                         if data_transfer_completed:
                             break;
+                    except nova_unauthorized as ex:
+                        LOG.exception(ex)
+                        # recreate the token here
+                        user_id = cntx.user
+                        project_id = cntx.tenant
+                        cntx = nova._get_tenant_context(user_id, project_id)
                     except Exception as ex:
                         LOG.exception(ex)
                         raise ex
                     now = timeutils.utcnow()
                     if (now - start_time) > datetime.timedelta(minutes=10*60):
                         raise exception.ErrorOccurred(reason='Timeout uploading data')
-                
+
                 snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id,
                                                   {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                    'status': 'uploading'})
-                
+
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_url' :  vault_url.replace(vault.get_vault_local_directory(), '', 1),
                                                 'vault_service_metadata' : 'None',
@@ -672,19 +684,22 @@ class LibvirtDriver(driver.ComputeDriver):
                 vm_disk_size = vm_disk_size + backing['size']
                 vm_disk_resource_snap_backing = vm_disk_resource_snap
                 if snapshot_vm_resource_backing and snapshot_vm_resource_backing.resource_pit_id == backing['path']:
-                    break;                
+                    break;
 
             snapshot_type = 'incremental'
             vm_disk_resource_snaps = db.vm_disk_resource_snaps_get(cntx, snapshot_vm_resource.id)
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 if  vm_disk_resource_snap.vm_disk_resource_snap_backing_id == None:
                     snapshot_type = 'full'
-                     
-            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, 
+
+            db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id,
                                            {'snapshot_type' : snapshot_type,
                                             'status': 'available',
                                             'size': vm_disk_size})
 
+        user_id = cntx.user
+        project_id = cntx.tenant
+        cntx = nova._get_tenant_context(user_id, project_id)
         return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
@@ -693,23 +708,23 @@ class LibvirtDriver(driver.ComputeDriver):
         #compute_service = nova.API(production=True)
         #return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data)
         pass
-    
+
     @autolog.log_method(Logger, 'libvirt.driver.delete_restored_vm')
     def delete_restored_vm(self, cntx, db, instance, restore):
-        vms = db.restored_vms_get(cntx, restore['id']) 
+        vms = db.restored_vms_get(cntx, restore['id'])
         compute_service = nova.API(production=True)
         for vm in vms:
             instance = compute_service.get_server_by_id(cntx, vm.vm_id, admin=True)
             compute_service.force_delete(cntx, instance)
-            db.restored_vm_update( cntx, vm.vm_id, restore['id'], {'status': 'deleted'})            
-    
+            db.restored_vm_update( cntx, vm.vm_id, restore['id'], {'status': 'deleted'})
+
     @autolog.log_method(Logger, 'libvirt.driver.pre_restore_vm')
     def pre_restore_vm(self, cntx, db, instance, restore):
-        pass    
-    
+        pass
+
     @autolog.log_method(Logger, 'libvirt.driver.restore_vm')
     def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_security_groups,
-                   restored_compute_flavor, restored_nics, instance_options):    
+                   restored_compute_flavor, restored_nics, instance_options):
         """
         Restores the specified instance from a snapshot
         """
@@ -719,5 +734,5 @@ class LibvirtDriver(driver.ComputeDriver):
 
     @autolog.log_method(Logger, 'libvirt.driver.post_restore_vm')
     def post_restore_vm(self, cntx, db, instance, restore):
-        pass    
-    
+        pass
+

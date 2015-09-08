@@ -75,27 +75,82 @@
     	<label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
     	<input name="region-name" type="text" required="" placeholder="RegionOne" class="form-control">
     </div><br>    
-    
+	<div class="input-group" >
+		<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+		<input name="name-server" {{'value=' + name_server if (defined('name_server') and len(name_server)) else ''}} type="text" placeholder="192.168.2.1" class="form-control">
+		
+		<label class="input-group-addon">Domain Search Order</label>
+		<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
+	</div><br>   	      
+	
 	<div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel1">
-	    <div class="panel-heading">
-	      <h4 class="panel-title">
-	        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">
-	          Optional
-	        </a>
-	      </h4>
-	    </div>
-	    <div id="collapseOne" class="panel-collapse collapse">
-	      <div class="panel-body">
-    		<div class="input-group" >
-		    	<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-		    	<input name="name-server" type="text" placeholder="192.168.2.1" class="form-control">
-		    	
-		    	<label class="input-group-addon">Domain Search Order</label>
-		    	<input name="domain-search-order" type="text" placeholder="example.com example.net" class="form-control">
-    		</div><br>   	      
-	      </div>
-	    </div>
+	  <div class="panel panel-default" id="panel3">
+		<div class="panel-heading">
+		  <h4 class="panel-title">
+			<a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree">
+			  Storage
+			</a>
+		  </h4>
+		</div>
+		<div id="collapseThree" class="panel-collapse collapse in">
+		  <div class="panel-body">
+			<div class="input-group" >
+				%if 'storage_type' in locals() and storage_type == 'local':
+					<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device
+				%elif 'storage_type' not in locals():
+					<input name="storage-type" checked id="storage-type-local" type="radio"  value="local"> Local Device						
+				%else:
+					<input name="storage-type" id="storage-type-local" type="radio"  value="local"> Local Device
+				%end
+				<div class="row"> 
+					<div class="col-md-12"> 
+						<input name="storage-local-device" {{'value=' + storage_local_device if defined('storage_local_device') else ''}} id="storage-local-device" type="text" required placeholder="/dev/vdb" value="/dev/vdb" class="form-control" />
+						%if 'create_file_system' in locals() and create_file_system == 'on':
+							<input name="create-file-system" checked id="create-file-system" type="checkbox" onclick='warnCreateFileSystem(this)';> Create File System
+						%else:
+							<input name="create-file-system" id="create-file-system" type="checkbox" onclick='warnCreateFileSystem(this)';> Create File System
+						%end    					
+					</div>
+				</div>
+				<br/>
+				<div class="row"> 
+					<div class="col-md-12"> 				
+						%if 'storage_type' in locals() and storage_type == 'nfs':
+							<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs" checked> NFS Export
+						%else:
+							<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs" > NFS Export
+						%end      			
+						<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" value="server:/var/nfs" class="form-control" />
+					</div>
+				</div>
+				<br/>
+			</div>
+		  </div>
+		</div>
+	  </div>
+	</div>
+
+	<div class="panel-group" id="accordion">
+	  <div class="panel panel-default" id="panel5">
+		<div class="panel-heading">
+		  <h4 class="panel-title">
+			<a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
+			  Swift Object Storage (Optional)
+			</a>
+		  </h4>
+		</div>
+		<div id="collapseFive" class="panel-collapse">
+		  <div class="panel-body">
+			<div class="input-group">
+				<label class="input-group-addon">URL Template&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<input name="swift-url-template" {{'value=' + swift_url_template if (defined('swift_url_template') and len(swift_url_template)) else ''}} type="text" placeholder="http://swifthost:8080/v1/AUTH_%(project_id)s" class="form-control"><br>
+			</div><br>
+			<div class="input-group">
+				<label class="input-group-addon">Container Prefix&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<input name="swift-container-prefix" type="text" {{'value=' + swift_container_prefix if (defined('swift_container_prefix') and len(swift_container_prefix)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
+			</div><br>  			
+		  </div>
+		</div>
 	  </div>
 	</div>
     

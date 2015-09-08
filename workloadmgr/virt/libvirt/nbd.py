@@ -79,14 +79,14 @@ class NbdMount(object):
                 if not os.path.exists('/var/lock/qemu-nbd-%s' % device):
                     return device
                 else:
-                    LOG.error(_LE('NBD error - previous umount did not '
+                    LOG.error(_('NBD error - previous umount did not '
                                   'cleanup /var/lock/qemu-nbd-%s.'), device)
         LOG.warning(_('No free nbd devices'))
         return None
 
     def _allocate_nbd(self):
         if not os.path.exists('/sys/block/nbd0'):
-            LOG.error(_LE('nbd module not loaded'))
+            LOG.error(_('nbd module not loaded'))
             self.error = _('nbd unavailable: module not loaded')
             return None
 
