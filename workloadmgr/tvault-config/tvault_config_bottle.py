@@ -1970,7 +1970,11 @@ def persist_config():
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
+<<<<<<< Updated upstream
             Config.set(None, key, value)
+=======
+            Config.set(None, key, value)           
+>>>>>>> Stashed changes
             if config_data['nodetype'] == 'controller':
                engine = create_engine(config_data['sql_connection'])
                name_found = False

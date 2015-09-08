@@ -2646,8 +2646,10 @@ def task_get_all(context, **kwargs):
     size = int(kwargs.get('size',None))
     page = int(kwargs.get('page',None))
 
-    offset = (page - 1) * size
-
+    offset = 0
+    if page is not None and size is not None:
+       offset = (page - 1) * size
+ 
     query =  model_query(context, models.Tasks, **kwargs)
 
     if status is not None:
