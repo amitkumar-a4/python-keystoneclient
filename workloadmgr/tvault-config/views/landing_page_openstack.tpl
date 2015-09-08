@@ -42,7 +42,24 @@
                             <a href="/home" target="_blank">http://floating-ipaddress-of-tvault-vm/home</a>
                         </div>
                     </li>
-
+                    
+                    <li>Configure OS Controller and Compute Nodes
+                        <br>
+                        <br>
+                        <div class="well">
+                            <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a><br>
+                            <br>
+                            <b>Set the following values and run the above script as sudo...</b><br>
+                            #IP Address of tvault appliance<br>
+                            TVAULT_APPLIANCE_NODE=192.168.1.XXX<br>
+                            #On OpenStack Controller Node, Set TVAULT_CONTEGO_API as True<br>
+                            TVAULT_CONTEGO_API=False<br>
+                            #On OpenStack Controller Node, Set TVAULT_CONTEGO_API as True<br>
+                            TVAULT_CONTEGO_EXT=False<br>                      
+                        </div>                    
+                    </li>
+                   
+                    <!-- Enable deb and rpm packages later on 
                     <li>Configure OS Controller</li>
                     <br>
                     <div class="well">
@@ -64,6 +81,8 @@
                         <code># sudo apt-get install tvault-contego</code>
                         <br>
                     </div>
+                    -->
+                    
                 </ol>
                 <h2>Dashboard</h2>
                 <ol>
@@ -75,6 +94,7 @@
                         </div>
                     </li>
 
+                    <!-- Enable deb and rpm packages later on 
                     <li>Horizon Dashboard Plugin</li>
                     <br>
                     <div class="well">
@@ -84,7 +104,8 @@
                         <br>
                         <code># sudo apt-get install tvault-horizon-plugin</code>
                         <br>
-                    </div>                
+                    </div>
+                    -->
                 </ol>
                 <h2>Support</h2>
                 <ol>

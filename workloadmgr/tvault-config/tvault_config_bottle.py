@@ -51,7 +51,7 @@ if module_dir:
     os.chdir(os.path.dirname(__file__))
     
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
-TVAULT_CONFIGURATION_TYPE = 'vmware'
+TVAULT_CONFIGURATION_TYPE = 'openstack'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -264,6 +264,10 @@ def send_neutron_logs1(filename):
 @authorize()
 def send_keystone_logs(filename):
     return static_file(filename, root='/var/log/keystone', mimetype='text/plain', download=True)
+    
+@bottle.route('/tvault-contego-install.sh')
+def send_tvault_contego_install():
+    return static_file('tvault-contego-install.sh', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)    
 
 @bottle.route('/tvault/tvaultlogs')
 @authorize()
