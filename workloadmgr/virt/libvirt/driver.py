@@ -560,6 +560,11 @@ class LibvirtDriver(driver.ComputeDriver):
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
         for disk_info in snapshot_data_ex['disks_info']:
+            # Always attempt with a new token to avoid timeouts
+            user_id = cntx.user
+            project_id = cntx.tenant
+            cntx = nova._get_tenant_context(user_id, project_id)
+
             vm_disk_size = 0
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
@@ -692,6 +697,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
+        user_id = cntx.user
+        project_id = cntx.tenant
+        cntx = nova._get_tenant_context(user_id, project_id)
         return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
