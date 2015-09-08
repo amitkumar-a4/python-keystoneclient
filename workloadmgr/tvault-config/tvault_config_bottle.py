@@ -1477,8 +1477,10 @@ def configure_form_vmware():
        engine = create_engine(config_data['sql_connection'])
        for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
            items = dict(row.items())
-           config_database[items['name']] = items['value']
-           config_database['refresh'] = 0 
+           config_database[items['name']] = items['value']      
+       config_database['refresh'] = 0 
+       if config_data['nodetype'] == 'additional':
+          config_database['nodetype'] = config_data['nodetype']
     else:
          config_database['refresh'] = 1
  
@@ -1991,8 +1993,8 @@ def persist_config():
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         for key, value in config_data.iteritems():
-            Config.set(None, key, value)
-            if config_data['nodetype'] == 'Controller':
+            Config.set(None, key, value)           
+            if config_data['nodetype'] == 'controller':
                engine = create_engine(config_data['sql_connection'])
                name_found = False
                for persisted_setting in engine.execute(select([models.Settings.__table__])):
