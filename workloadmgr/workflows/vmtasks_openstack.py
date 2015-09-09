@@ -853,6 +853,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
     instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'],'openstack')
          
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+  
+    # call with new context
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
     return virtdriver.restore_vm( cntx, db, instance, restore, 
                                   restored_net_resources,
                                   restored_security_groups,
