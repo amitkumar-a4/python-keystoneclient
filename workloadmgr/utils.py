@@ -1367,7 +1367,7 @@ def get_instance_restore_options(restore_options, instance_id, platform):
             for instance in restore_options[platform]['instances']:
                 if instance['id'] == instance_id:
                     return instance
-    return None
+    return {}
 
 def last_completed_audit_period(unit=None):
     """This method gives you the most recently *completed* audit period.
