@@ -10,6 +10,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
 from oslo.config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
+from workloadmgr.openstack.common import log as logging
  
 auditlog_opts = [
     cfg.StrOpt('auditlog_admin_user',
@@ -20,6 +21,7 @@ auditlog_opts = [
                help='keystone endpoint url for connecting to keystone'),                                   
 ]
 
+LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
 CONF.register_opts(auditlog_opts) 
 
@@ -84,8 +86,12 @@ class AuditLog(object):
                 for line in auditlogfile:
                     values = line.split(",") 
                     record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
+                    epoch = time.mktime(record_time.timetuple())
+                    offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
+                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S %p") 
+                    # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
                     if (now - record_time) < timedelta(minutes=time_in_minutes):
-                        record = {'Timestamp' : values[0],
+                        record = {'Timestamp' : local_time,
                                   'UserName': values[1],
                                   'UserId': values[2],
                                   'ObjectName': values[3],
@@ -98,8 +104,12 @@ class AuditLog(object):
                 for line in auditlogfile:
                     values = line.split(",")
                     record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
+                    epoch = time.mktime(record_time.timetuple())
+                    offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
+                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S %p") 
+                    # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
                     if record_time >= time_from and record_time <= time_to:
-                        record = {'Timestamp' : values[0],
+                        record = {'Timestamp' : local_time,
                                   'UserName': values[1],
                                   'UserId': values[2],
                                   'ObjectName': values[3],
