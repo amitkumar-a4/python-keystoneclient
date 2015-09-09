@@ -11,7 +11,7 @@ from cgi import parse_qs, escape
 from workloadmgr.api import common
 from workloadmgr.api import wsgi
 from workloadmgr.api import xmlutil
-from workloadmgr import exception as wlm_exceptions
+from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import strutils
@@ -48,10 +48,17 @@ class TasksController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
-    def get_tasks(self, req, status=None, page=None, size=None):
+    def get_tasks(self, req):
         try:
             context = req.environ['workloadmgr.context']
-            tasks = self.workload_api.tasks_get(context, status=status, page=page, size=size)
+            if ('QUERY_STRING' in req.environ):
+                qs=parse_qs(req.environ['QUERY_STRING'])
+                var = parse_qs(req.environ['QUERY_STRING'])
+                time_in_minutes = var.get('time_in_minutes',[None])[0]
+                status = var.get('status',[None])[0]
+                page = var.get('page',[None])[0]
+                size = var.get('size',[None])[0]
+            tasks = self.workload_api.tasks_get(context, status=status, page=page, size=size, time_in_minutes=time_in_minutes)
             return self._view_builder.detail_list(req, tasks)
         except exception.TaskNotFound as error:
             LOG.exception(error)

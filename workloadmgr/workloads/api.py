@@ -1471,8 +1471,8 @@ class API(base.Base):
         return task_dict  
 
     @autolog.log_method(logger=Logger)
-    def tasks_get(self, context, status, page, size):
-        tasks = self.db.task_get_all(context, status=status, page=page, size=size)
+    def tasks_get(self, context, status, page, size, time_in_minutes):
+        tasks = self.db.task_get_all(context, status=status, page=page, size=size, time_in_minutes=time_in_minutes)
         return tasks
 
       

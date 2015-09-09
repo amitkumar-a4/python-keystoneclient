@@ -35,7 +35,6 @@ from workloadmgr.apscheduler import job
 from workloadmgr.vault import vault
 from workloadmgr.openstack.common.gettextutils import _
 
-
 FLAGS = flags.FLAGS
 
 LOG = logging.getLogger(__name__)
@@ -2643,24 +2642,28 @@ def task_get_all(context, **kwargs):
         return task_get_all_by_project(context, context.project_id, **kwargs)
 
     status = kwargs.get('status',None)    
-    size = int(kwargs.get('size',None))
-    page = int(kwargs.get('page',None))
+    size = kwargs.get('size',None)
+    page = kwargs.get('page',None)
+    time_in_minutes = kwargs.get('time_in_minutes',None)   
 
     offset = 0
     if page is not None and size is not None:
-       offset = (page - 1) * size
+       offset = (int(page) - 1) * int(size)
  
     query =  model_query(context, models.Tasks, **kwargs)
+    query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
 
     if status is not None:
-       query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
        query = query.filter_by(status=status)
-    else:
-         query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
-         query = query.order_by(models.Tasks.created_at.desc())
-
+    
+    if time_in_minutes is not None:
+       now = timeutils.utcnow()
+       minutes_ago = now - timedelta(minutes=int(time_in_minutes))
+       query = query.filter(models.Tasks.created_at > minutes_ago)  
+ 
+    query = query.order_by(models.Tasks.created_at.desc())
     if size is not None:
-       query = query.limit(size)
+       query = query.limit(int(size))
 
     if page is not None:
        query = query.offset(offset)
