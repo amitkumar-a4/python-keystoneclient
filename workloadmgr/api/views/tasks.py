@@ -32,7 +32,7 @@ class ViewBuilder(common.ViewBuilder):
                 'display_name': task.get('display_name'),
                 'display_description': task.get('display_description'),
                 'finished_at': task.get('finished_at'), 
-                'status': workload.get('status'),
+                'status': task.get('status'),
                 'status_messages': msg,
             }
   
