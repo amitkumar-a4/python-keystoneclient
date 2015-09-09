@@ -72,7 +72,7 @@ wlm_vault_opts = [
                default='password',
                help='Swift password'),                                                         
     cfg.StrOpt('vault_swift_container_prefix',
-               default='Trilio',
+               default='TrilioVault',
                help='Swift Container Prefix'), 
     cfg.StrOpt('vault_swift_segment_size',
                #default='5368709120', 5GB

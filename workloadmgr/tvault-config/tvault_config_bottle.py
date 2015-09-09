@@ -657,7 +657,10 @@ def _register_workloadtypes():
                                       name= 'Hadoop', description = 'Hadoop workload',
                                       id = '09f7b42e-75da-4f77-8c34-0aef60b3d62e')
             """
-        if workload_type_names['MongoDB'] == False:
+        if config_data['configuration_type'] == 'openstack' and workload_type_names['MongoDB'] == True:
+            wlm.workload_types.delete('11b71eeb-8b69-42e2-9862-872ae5b2afce')
+            
+        if config_data['configuration_type'] == 'vmware' and workload_type_names['MongoDB'] == False:
             #MongoDB
             time.sleep(2)
             metadata = {'HostUsername':'{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}', 
@@ -674,7 +677,10 @@ def _register_workloadtypes():
                                       name= 'MongoDB', description = 'MongoDB workload',
                                       id = '11b71eeb-8b69-42e2-9862-872ae5b2afce')
             
-        if workload_type_names['Cassandra'] == False:                
+        if config_data['configuration_type'] == 'openstack' and workload_type_names['Cassandra'] == True:
+            wlm.workload_types.delete('2c1f45ec-e53b-49cd-b554-228404ece244')
+            
+        if config_data['configuration_type'] == 'vmware' and workload_type_names['Cassandra'] == False:                
             #Cassandra
             time.sleep(2)
             metadata = {'CassandraNode':'{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Cassandra node", "restore_option": "False", "group_name": "Host Settings", "index":3}', 
@@ -713,7 +719,10 @@ def _register_workloadtypes():
             wlm.workload_types.create(metadata=metadata, is_public = True, 
                                       name= 'Composite', description = 'A workload that consists of other workloads',
                                       id = '54947065-2a59-494a-ab64-b6501c139a82')
-        
+    
+    if config_data['configuration_type'] == 'openstack':
+        config_data['config_status'] = 'success'
+        persist_config()    
     return {'status':'Success'}
 
 def _workloads_import():
