@@ -1249,7 +1249,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 vm_disk_resource_snap_restore_size = vault.get_restore_size(copy_to_file_path,'vmdk', disk_type)                
                 
                 # update the entry in the vm_disk_resource_snap table
-                vm_disk_resource_snap_values = {'vault_url' : copy_to_file_path.replace(vault.get_vault_local_directory(), '', 1),
+                vm_disk_resource_snap_values = {'vault_url' : copy_to_file_path.replace(vault.get_vault_data_directory(), '', 1),
                                                 'vault_service_metadata' : 'None',
                                                 'finished_at' : timeutils.utcnow(),
                                                 'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),

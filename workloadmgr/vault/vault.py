@@ -47,7 +47,7 @@ wlm_vault_opts = [
                default='none',
                help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'), 
     # swift-i: integrated(keystone), swift-s: standalone
-    cfg.StrOpt('vault_local_directory',
+    cfg.StrOpt('vault_data_directory',
                default='/opt/stack/data/wlm',
                help='Location where snapshots will be stored'),
     cfg.StrOpt('vault_storage_nfs_export',
@@ -128,19 +128,19 @@ def run_async(func):
 
     return async_func
 
-def get_vault_local_directory():
-    vault_local_directory = ''
+def get_vault_data_directory():
+    vault_data_directory = ''
     if CONF.vault_storage_type == 'local' or \
        CONF.vault_storage_type == 'vault' or \
        CONF.vault_storage_type == 'nfs' or \
        CONF.vault_storage_type == 'das':
-            vault_local_directory = CONF.vault_local_directory
+            vault_data_directory = CONF.vault_data_directory
     else:
-        vault_local_directory = CONF.vault_local_directory + "/staging/"  +  socket.gethostname()
+        vault_data_directory = CONF.vault_data_directory + "/staging/"  +  socket.gethostname()
     
-    head, tail = os.path.split(vault_local_directory + '/')
+    head, tail = os.path.split(vault_data_directory + '/')
     fileutils.ensure_tree(head)
-    return vault_local_directory    
+    return vault_data_directory    
     
 def commit_supported():
     if CONF.vault_storage_type == 'local' or \
@@ -155,19 +155,19 @@ def commit_supported():
 def mount_backup_media():
     """ mounts storage """
     try:
-        command = ['sudo', 'umount', CONF.vault_local_directory]
+        command = ['sudo', 'umount', CONF.vault_data_directory]
         subprocess.call(command, shell=False)
     except Exception as exception:
         pass
     
     try:
-        command = ['sudo', 'umount', CONF.vault_local_directory]
+        command = ['sudo', 'umount', CONF.vault_data_directory]
         subprocess.call(command, shell=False)
     except Exception as exception:
         pass           
     
     try:
-        command = ['sudo', 'umount', CONF.vault_local_directory]
+        command = ['sudo', 'umount', CONF.vault_data_directory]
         subprocess.call(command, shell=False)
     except Exception as exception:
         pass                
@@ -177,19 +177,19 @@ def mount_backup_media():
     elif CONF.vault_storage_type == 'vault':
         pass  
     elif CONF.vault_storage_type == 'nfs':        
-        command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_local_directory]
+        command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_data_directory]
         subprocess.check_call(command, shell=False) 
     else: # das, swift-i, swift-s, s3
         if CONF.vault_storage_das_device != 'none':      
             try:
-                command = ['sudo', 'mount', CONF.vault_storage_das_device, CONF.vault_local_directory]
+                command = ['sudo', 'mount', CONF.vault_storage_das_device, CONF.vault_data_directory]
                 _returncode = subprocess.check_call(command, shell=False) 
             except Exception as ex:
                 LOG.exception(ex)
                 pass
             
 def get_workload_path(workload_metadata):
-    workload_path = os.path.join(get_vault_local_directory() + '/workload_%s' % (workload_metadata['workload_id']))
+    workload_path = os.path.join(get_vault_data_directory() + '/workload_%s' % (workload_metadata['workload_id']))
     return workload_path   
 
 def get_snapshot_path(snapshot_metadata):                 
@@ -285,14 +285,14 @@ def put_object(path, json_data):
 
 @autolog.log_method(logger=Logger)     
 def get_object(path):
-    path = get_vault_local_directory() + '/' + path
+    path = get_vault_data_directory() + '/' + path
     with open(path, 'r') as json_file:
         return json_file.read()
  
 @autolog.log_method(logger=Logger)     
 def get_workloads(context):
     download_metadata_from_object_store(context)
-    parent_path = get_vault_local_directory()
+    parent_path = get_vault_data_directory()
     workload_urls = []
     try:
         for name in os.listdir(parent_path):
@@ -314,7 +314,7 @@ def upload_snapshot_metatdata_to_object_store(context, snapshot_metadata):
         container = get_swift_container(context, snapshot_metadata)
         try:
             WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Uploading snapshot metadata to object store'}) 
-            swift_upload_files(context, [get_vault_local_directory() + "/settings_db"], container)
+            swift_upload_files(context, [get_vault_data_directory() + "/settings_db"], container)
             swift_upload_files(context, [workload_path + '/workload_db'], container)
             swift_upload_files(context, [workload_path + '/workload_vms_db'], container)
             for dirName, subdirList, fileList in os.walk(snapshot_path):
@@ -330,7 +330,7 @@ def upload_snapshot_metatdata_to_object_store(context, snapshot_metadata):
         except Exception as ex:
             LOG.exception(ex)
             WorkloadMgrDB().db.snapshot_update(context, snapshot_metadata['snapshot_id'], {'progress_msg': 'Retrying to upload snapshot metadata to object store'}) 
-            swift_upload_files(context, [get_vault_local_directory() + "/settings_db"], container)
+            swift_upload_files(context, [get_vault_data_directory() + "/settings_db"], container)
             swift_upload_files(context, [workload_path + '/workload_db'], container)
             swift_upload_files(context, [workload_path + '/workload_vms_db'], container)
             for dirName, subdirList, fileList in os.walk(snapshot_path):
@@ -386,7 +386,9 @@ def upload_snapshot_vm_resource_to_object_store(context, snapshot_vm_resource_me
 
 @run_async 
 @autolog.log_method(logger=Logger)
-def upload_snapshot_vm_disk_resource_to_object_store(context, snapshot_vm_disk_resource_metadata, snapshot_vm_disk_resource_path=None):
+def upload_snapshot_vm_disk_resource_to_object_store(context, 
+                                                     snapshot_vm_disk_resource_metadata, 
+                                                     snapshot_vm_disk_resource_path):
     fileutils.ensure_tree('/var/run/workloadmgr')
     progress_tracking_file_path = '/var/run/workloadmgr' + '/' + snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id']
     with open(progress_tracking_file_path, "w+") as progress_tracking_file:
@@ -394,11 +396,8 @@ def upload_snapshot_vm_disk_resource_to_object_store(context, snapshot_vm_disk_r
     if CONF.vault_storage_type == 'swift-i' or CONF.vault_storage_type == 'swift-s': 
         progress_msg = "Uploading '"+ snapshot_vm_disk_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_disk_resource_metadata['snapshot_vm_name'] + "' to object store"
         LOG.info(progress_msg)
-        if snapshot_vm_disk_resource_path:
-            object_name = get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
-            object_name = object_name.replace(get_vault_local_directory(), '', 1)
-        else:
-            snapshot_vm_disk_resource_path = get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
+        object_name = get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
+        object_name = object_name.replace(get_vault_data_directory(), '', 1)
         container = get_swift_container(context, snapshot_vm_disk_resource_metadata)
         try:
             swift_upload_files(context, [snapshot_vm_disk_resource_path], container, object_name=object_name)
@@ -584,12 +583,12 @@ def swift_upload_files(context, files, container, object_name = None):
             else:
                 objs = [
                     SwiftUploadObject(
-                        o, object_name=o.replace(get_vault_local_directory(), '', 1)
+                        o, object_name=o.replace(get_vault_data_directory(), '', 1)
                     ) for o in objs
                 ]
                 dir_markers = [
                     SwiftUploadObject(
-                        None, object_name=d.replace(get_vault_local_directory(), '', 1), options={'dir_marker': True}
+                        None, object_name=d.replace(get_vault_data_directory(), '', 1), options={'dir_marker': True}
                     ) for d in dir_markers
                 ]                
 
@@ -727,7 +726,7 @@ def swift_delete_container(context, container):
     LOG.debug(cmd_delete_str)                                  
     for i in range(0,CONF.vault_retry_count):
         try:                                
-            subprocess.check_call(cmd_delete, shell=False, cwd=get_vault_local_directory())
+            subprocess.check_call(cmd_delete, shell=False, cwd=get_vault_data_directory())
             break
         except Exception as ex:
             LOG.exception(ex)
@@ -742,7 +741,7 @@ def swift_delete_folder(context, folder, container):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
         for line in content:
-            if folder.replace(get_vault_local_directory() + '/', '', 1) in line:
+            if folder.replace(get_vault_data_directory() + '/', '', 1) in line:
                 cmd_delete = cmd + [ "delete", container, line.replace('\n', '')]
                 cmd_delete_str = " ".join(cmd_delete)
                 for idx, opt in enumerate(cmd_delete):
@@ -755,7 +754,7 @@ def swift_delete_folder(context, folder, container):
                 LOG.debug(cmd_delete_str)                                  
                 for i in range(0,CONF.vault_retry_count):
                     try:                                
-                        subprocess.check_call(cmd_delete, shell=False, cwd=get_vault_local_directory())
+                        subprocess.check_call(cmd_delete, shell=False, cwd=get_vault_data_directory())
                         break
                     except Exception as ex:
                         LOG.exception(ex)
@@ -770,11 +769,11 @@ def swift_download_folder(context, folder, container):
         with open("/tmp/swift.out") as f:
             content = f.readlines()
         if len(content) <= 0:
-            msg = 'Error downloading objects from ' + folder.replace(get_vault_local_directory() + '/', '', 1)
+            msg = 'Error downloading objects from ' + folder.replace(get_vault_data_directory() + '/', '', 1)
             msg = msg + ' in container ' + container
             raise exception.ErrorOccurred(reason=msg)
         for line in content:
-            if folder.replace(get_vault_local_directory() + '/', '', 1) in line:
+            if folder.replace(get_vault_data_directory() + '/', '', 1) in line:
                 cmd_download = cmd + [ "download", container, line.replace('\n', '')]
                 cmd_download_str = " ".join(cmd_download)
                 for idx, opt in enumerate(cmd_download):
@@ -787,7 +786,7 @@ def swift_download_folder(context, folder, container):
                 LOG.debug(cmd_download_str)                                  
                 for i in range(0,CONF.vault_retry_count):
                     try:                                
-                        subprocess.check_call(cmd_download, shell=False, cwd=get_vault_local_directory())
+                        subprocess.check_call(cmd_download, shell=False, cwd=get_vault_data_directory())
                         break
                     except Exception as ex:
                         LOG.exception(ex)
@@ -800,7 +799,7 @@ def purge_staging_area(context):
         if CONF.vault_storage_type == 'swift-i':
             pass
         elif CONF.vault_storage_type == 'swift-s':
-            shutil.rmtree(get_vault_local_directory())   
+            shutil.rmtree(get_vault_data_directory())   
         elif CONF.vault_storage_type == 's3':
             pass                      
     except Exception as ex:
@@ -920,7 +919,7 @@ def swift_download_metadata_from_object_store(context, container):
                     LOG.debug(cmd_download_str)
                     for i in range(0,CONF.vault_retry_count):
                         try:                                
-                            subprocess.check_call(cmd_download, shell=False, cwd=get_vault_local_directory())
+                            subprocess.check_call(cmd_download, shell=False, cwd=get_vault_data_directory())
                             break
                         except Exception as ex:
                             LOG.exception(ex)
@@ -936,7 +935,7 @@ def get_total_capacity(context):
            CONF.vault_storage_type == 'vault' or \
            CONF.vault_storage_type == 'nfs' or \
            CONF.vault_storage_type == 'das':   
-                stdout, stderr = utils.execute('df', get_vault_local_directory())
+                stdout, stderr = utils.execute('df', get_vault_data_directory())
                 if stderr != '':
                     msg = _('Could not execute df command successfully. Error %s'), (stderr)
                     raise exception.ErrorOccurred(reason=msg)
@@ -950,7 +949,7 @@ def get_total_capacity(context):
                 total_capacity = int(values[1]) * 1024
                 total_utilization = int(values[2]) * 1024
                 try:
-                    stdout, stderr = utils.execute('du', '-shb', get_vault_local_directory(), run_as_root=True)
+                    stdout, stderr = utils.execute('du', '-shb', get_vault_data_directory(), run_as_root=True)
                     if stderr != '':
                         msg = _('Could not execute du command successfully. Error %s'), (stderr)
                         raise exception.ErrorOccurred(reason=msg)

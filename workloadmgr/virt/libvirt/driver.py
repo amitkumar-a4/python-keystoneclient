@@ -677,7 +677,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                    'status': 'uploading'})
 
                 # update the entry in the vm_disk_resource_snap table
-                vm_disk_resource_snap_values = {'vault_url' :  vault_url.replace(vault.get_vault_local_directory(), '', 1),
+                vm_disk_resource_snap_values = {'vault_url' :  vault_url.replace(vault.get_vault_data_directory(), '', 1),
                                                 'vault_service_metadata' : 'None',
                                                 'status': 'available'}
                 db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
