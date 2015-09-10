@@ -371,14 +371,12 @@ class API(base.Base):
     def get_servers(self, context, search_opts=None, admin=False):
         return self._get_servers(context, search_opts, admin)
     
-    
     @synchronized(novalock)
     def get_server(self, context, name, admin=False):
         """
         Get the server given the name
         :rtype: :class:`Server`
-        """   
-    
+        """
         server = None
         try:
             client = novaclient(context, self._production, admin)
@@ -392,6 +390,42 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception 
             return 
     
+    @synchronized(novalock)
+    def get_security_group_by_id(self, context, secid, admin=False):
+        """
+        Get the security group given the name
+        :rtype: :int:`secuirty id`
+        """
+        try:
+            client = novaclient(context, self._production, admin)
+            return client.security_groups.get(secid)
+        except nova_exception.Unauthorized as unauth_ex:
+            client.client.unauthenticate()
+            client = novaclient(context, self._production, admin=admin)
+            return client.security_groups.get(secid)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception 
+            return 
+
+    @synchronized(novalock)
+    def get_security_groups(self, context, admin=False):
+        """
+        Get the security group given the name
+        :rtype: :int:`secuirty id`
+        """
+        try:
+            client = novaclient(context, self._production, admin)
+            return client.security_groups.list()
+        except nova_exception.Unauthorized as unauth_ex:
+            client.client.unauthenticate()
+            client = novaclient(context, self._production, admin=admin)
+            return client.security_groups.list()
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception 
+            return 
+
     @synchronized(novalock)    
     def get_server_by_id(self, context, id, admin=False, search_opts=None):
         """
@@ -747,6 +781,10 @@ class API(base.Base):
             client.client.unauthenticate()
             client = novaclient(context, self._production)
             return client.servers.interface_list(server=server) 
+        except nova_exception.HTTPNotImplemented:
+            # This is configured to use nova network
+            server = client.servers.get(server)
+            return server._info['addresses']
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   

@@ -16,6 +16,8 @@ import cPickle as pickle
 from netaddr import IPNetwork
 import threading
 
+from neutronclient.common import exceptions as neutron_exceptions
+
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
 from workloadmgr.compute import nova
@@ -62,7 +64,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
-        for instance in instances: 
+        def _snapshot_neutron_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             nics = []
             for interface in interfaces:
@@ -130,7 +132,30 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                                 nic.setdefault('ext_network_id', ext_network['id'])
                                 nic.setdefault('ext_network_name', ext_network['name'])
                 nics.append(nic)
-            #Store the nics in the DB
+        def _snapshot_nova_networks(instance):
+            interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
+            nics = []
+            if 'private' in interfaces:
+                for interface in interfaces['private']:
+                    nic = {} #nic is dictionary to hold the following data
+                
+                    nic.setdefault('ip_address', interface['addr'])
+                    nic.setdefault('mac_address', interface['OS-EXT-IPS-MAC:mac_addr'])
+                    nics.append(nic)
+            return nics
+
+        #Store the nics in the DB
+        network_type = ""
+        for instance in instances: 
+            try:
+                network_service.get_networks(cntx)
+                nics = _snapshot_neutron_networks(instance)
+                network_type = "neutron"
+            except neutron_exceptions.EndpointNotFound:
+                # This is configured to use nova network
+                nics = _snapshot_nova_networks(instance)
+                network_type = "nova"
+
             for nic in nics:
                 snapshot_vm_resource_values = { 'id': str(uuid.uuid4()),
                                                 'vm_id': instance['vm_id'],
@@ -138,10 +163,10 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                                                 'resource_type': 'nic',
                                                 'resource_name':  nic['mac_address'],
                                                 'resource_pit_id': '',
-                                                'metadata': {},
+                                                'metadata': {'network_type': network_type},
                                                 'status': 'available'}
                 snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                                    snapshot_vm_resource_values)                                                
+                                                    snapshot_vm_resource_values)
                 # create an entry in the vm_network_resource_snaps table
                 vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
                 #ip_address, mac_address, subnet_id, network_id, router_id, ext_subnet_id, ext_network_id
@@ -165,7 +190,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                                            'metadata': {},
                                            'status': 'available'}
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                                snapshot_vm_resource_values)                                                
+                                                snapshot_vm_resource_values)
             # create an entry in the vm_network_resource_snaps table
             vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
             vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
@@ -244,51 +269,110 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
     network_service =  neutron.API(production=True)  
     
     security_group_ids = []
-    for instance in instances:
-        server_security_group_ids = network_service.server_security_groups(cntx, instance['vm_id'])
-        security_group_ids += server_security_group_ids
-        for security_group_id in server_security_group_ids:
+    def _snapshot_neutron_security_groups():
+        for instance in instances:
+            server_security_group_ids = network_service.server_security_groups(cntx, instance['vm_id'])
+            security_group_ids += server_security_group_ids
+            for security_group_id in server_security_group_ids:
+                security_group = network_service.security_group_get(cntx, security_group_id)
+                snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                               'vm_id': instance['vm_id'],
+                                               'snapshot_id': snapshot['id'],       
+                                               'resource_type': 'security_group',
+                                               'resource_name':  security_group['id'],
+                                               'resource_pit_id': security_group['id'],
+                                               'metadata': {'name': security_group['name'],
+                                                            'security_group_type': 'neutron',
+                                                            'description' : security_group['description']},
+                                               'status': 'available'}
+                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)        
+        
+        unique_security_group_ids = list(set(security_group_ids))
+        for security_group_id in unique_security_group_ids:
             security_group = network_service.security_group_get(cntx, security_group_id)
-            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': instance['vm_id'],
+            security_group_rules = security_group['security_group_rules']
+            vm_security_group_snap_values = {'id': str(uuid.uuid4()),
+                                           'vm_id': snapshot['id'],
                                            'snapshot_id': snapshot['id'],       
                                            'resource_type': 'security_group',
                                            'resource_name':  security_group['id'],
                                            'resource_pit_id': security_group['id'],
                                            'metadata': {'name': security_group['name'],
+                                                        'security_group_type': 'neutron',
                                                         'description' : security_group['description']},
                                            'status': 'available'}
-            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)        
+            vm_security_group_snap = db.snapshot_vm_resource_create(cntx,  vm_security_group_snap_values)
         
-    unique_security_group_ids = list(set(security_group_ids))
-    for security_group_id in unique_security_group_ids:
-        security_group = network_service.security_group_get(cntx, security_group_id)
-        security_group_rules = security_group['security_group_rules']
-        vm_security_group_snap_values = {'id': str(uuid.uuid4()),
-                                       'vm_id': snapshot['id'],
-                                       'snapshot_id': snapshot['id'],       
-                                       'resource_type': 'security_group',
-                                       'resource_name':  security_group['id'],
-                                       'resource_pit_id': security_group['id'],
-                                       'metadata': {'name': security_group['name'],
-                                                    'description' : security_group['description']},
-                                       'status': 'available'}
-        vm_security_group_snap = db.snapshot_vm_resource_create(cntx,  vm_security_group_snap_values)
-        
-        for security_group_rule in security_group_rules:
-            vm_security_group_rule_snap_metadata = {} # Dictionary to hold the metadata
-            vm_security_group_rule_snap_values = {  'id': str(uuid.uuid4()),
-                                                    'vm_security_group_snap_id': vm_security_group_snap.id,
-                                                    'pickle': pickle.dumps(security_group_rule, 0),
-                                                    'metadata': vm_security_group_rule_snap_metadata,       
-                                                    'status': 'available'}     
+            for security_group_rule in security_group_rules:
+                vm_security_group_rule_snap_metadata = {'security_group_type': 'neutron',}
+                vm_security_group_rule_snap_values = {  'id': str(uuid.uuid4()),
+                                                        'vm_security_group_snap_id': vm_security_group_snap.id,
+                                                        'pickle': pickle.dumps(security_group_rule, 0),
+                                                        'metadata': vm_security_group_rule_snap_metadata,       
+                                                        'status': 'available'}     
                                                          
-            vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)
-            if security_group_rule['remote_group_id']:
-                if (security_group_rule['remote_group_id'] in unique_security_group_ids) == False:
-                    unique_security_group_ids.append(vm_security_group_snap['remote_group_id'])
-                           
-            
+                vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)
+                if security_group_rule['remote_group_id']:
+                    if (security_group_rule['remote_group_id'] in unique_security_group_ids) == False:
+                        unique_security_group_ids.append(vm_security_group_snap['remote_group_id'])
+
+    def _snapshot_nova_security_groups():
+        security_group_ids = []
+        security_groups = compute_service.get_security_groups(cntx)
+        for instance in instances:
+            server = compute_service.get_server_by_id(cntx, instance['vm_id'])
+
+            for secgrp in server.security_groups:
+                for group in security_groups:
+                    if secgrp['name'] == group.name:
+                        security_group_ids.append(secgrp['name'])
+                        snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
+                                               'vm_id': instance['vm_id'],
+                                               'snapshot_id': snapshot['id'],       
+                                               'resource_type': 'security_group',
+                                               'resource_name':  group.id,
+                                               'resource_pit_id': group.id,
+                                               'metadata': {'name': group.name,
+                                                            'security_group_type': 'nova',
+                                                            'description' : group.description},
+                                               'status': 'available'}
+                        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)        
+                        break
+        
+        unique_security_group_ids = list(set(security_group_ids))
+        for security_group_id in unique_security_group_ids:
+            for group in security_groups:
+                if security_group_id == group.name:
+                    security_group_rules = group.rules
+                    vm_security_group_snap_values = {'id': str(uuid.uuid4()),
+                                                  'vm_id': snapshot['id'],
+                                                  'snapshot_id': snapshot['id'],       
+                                                  'resource_type': 'security_group',
+                                                  'resource_name':  group.id,
+                                                  'resource_pit_id': group.id,
+                                                  'metadata': {'name': group.name,
+                                                               'security_group_type': 'nova',
+                                                               'description' : group.description},
+                                                  'status': 'available'}
+                    vm_security_group_snap = db.snapshot_vm_resource_create(cntx,  vm_security_group_snap_values)
+        
+                    for security_group_rule in security_group_rules:
+                        vm_security_group_rule_snap_metadata = {'security_group_type': 'nova',}
+                        vm_security_group_rule_snap_values = {  'id': str(uuid.uuid4()),
+                                                                'vm_security_group_snap_id': vm_security_group_snap.id,
+                                                                'pickle': pickle.dumps(security_group_rule, 0),
+                                                                'metadata': vm_security_group_rule_snap_metadata,       
+                                                                'status': 'available'}     
+                                                         
+                        vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)
+
+    try:
+        network_service.get_networks(cntx)
+        _snapshot_neutron_security_groups()
+    except neutron_exceptions.EndpointNotFound:
+        # This is configured to use nova network
+        _snapshot_nova_security_groups()
+
 @autolog.log_method(Logger, 'vmtasks_openstack.pause_vm')
 def pause_vm(cntx, db, instance):
     compute_service = nova.API(production=True)
@@ -493,6 +577,12 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'nic':
             vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
+            
+            network_type = db.get_metadata_value(vm_nic_snapshot.metadata,
+                                                  'network_type')
+            if network_type != 'neutron':
+                continue
+
             nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
             if nic_data['mac_address'] in restored_net_resources:
@@ -673,6 +763,11 @@ def restore_vm_networks(cntx, db, restore):
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, snapshot_vm.vm_id, restore['snapshot_id'])        
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'nic':
+                network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
+                                                       'network_type')
+                if network_type != 'neutron':
+                    continue
+
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
                 new_port = _get_nic_port_from_restore_options(restore_options, nic_data,
@@ -797,8 +892,14 @@ def restore_vm_security_groups(cntx, db, restore):
 
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])        
     for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type == 'security_group' and \
-            not security_group_exists(snapshot_vm_resource):
+        if snapshot_vm_resource.resource_type == 'security_group':
+
+            security_group_type = db.get_metadata_value(snapshot_vm_resource.metadata,
+                                                         'security_group_type')
+            if security_group_type != 'neutron':
+                continue
+            if  security_group_exists(snapshot_vm_resource):
+                continue
 
             name = 'snap_of_' + db.get_metadata_value(snapshot_vm_resource.metadata, 'name')
             description = 'snapshot - ' + db.get_metadata_value(snapshot_vm_resource.metadata, 'description')
