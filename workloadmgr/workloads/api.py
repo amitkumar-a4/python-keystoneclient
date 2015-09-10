@@ -1068,10 +1068,10 @@ class API(base.Base):
             try:
                 workload_lock.acquire()
                 workload = self.workload_get(context, snapshot['workload_id'])
-                if workload['status'].lower() != 'available':
+                if workload['status'].lower() != 'available' and workload['status'].lower() != 'locked_for_delete':
                     msg = _("Workload must be in the 'available' state to delete a snapshot")
                     raise wlm_exceptions.InvalidState(reason=msg)
-                self.db.workload_update(context, snapshot['workload_id'], {'status': 'locked'})
+                self.db.workload_update(context, snapshot['workload_id'], {'status': 'locked_for_delete'})
             finally:
                 workload_lock.release()                    
             
