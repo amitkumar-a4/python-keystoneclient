@@ -132,6 +132,8 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                                 nic.setdefault('ext_network_id', ext_network['id'])
                                 nic.setdefault('ext_network_name', ext_network['name'])
                 nics.append(nic)
+
+            return nics
         def _snapshot_nova_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             nics = []
@@ -268,8 +270,8 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
     compute_service = nova.API(production=True)
     network_service =  neutron.API(production=True)  
     
-    security_group_ids = []
     def _snapshot_neutron_security_groups():
+        security_group_ids = []
         for instance in instances:
             server_security_group_ids = network_service.server_security_groups(cntx, instance['vm_id'])
             security_group_ids += server_security_group_ids
