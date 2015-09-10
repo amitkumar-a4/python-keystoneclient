@@ -21,7 +21,7 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
                 kvpair['value'] = '******'
     settings_jason = jsonutils.dumps(settings_db)            
-    path = vault.get_vault_local_directory() + "/settings_db"
+    path = vault.get_vault_data_directory() + "/settings_db"
     vault.put_object(path, settings_jason)
 
     snapshot = db.snapshot_get(cntx, snapshot_id, read_deleted='yes')
