@@ -385,7 +385,10 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     
     @property
     def vault_path(self):
-        return vault.get_vault_local_directory() + self.vault_url    
+        if self.vault_url:
+            return vault.get_vault_data_directory() + self.vault_url
+        else:
+            return None    
 
     snapshot_vm_resource_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'))
     vm_disk_resource_snap_backing_id = Column(String(255))
