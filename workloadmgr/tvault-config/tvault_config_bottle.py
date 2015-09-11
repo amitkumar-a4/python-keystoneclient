@@ -51,7 +51,7 @@ if module_dir:
     os.chdir(os.path.dirname(__file__))
     
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
-TVAULT_CONFIGURATION_TYPE = 'vmware'
+TVAULT_CONFIGURATION_TYPE = 'openstack'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -269,7 +269,6 @@ def send_keystone_logs(filename):
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.sh', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)    
 
-@bottle.route('/tvault/tvaultlogs')
 @authorize()
 def send_tvault_logs():
     try:
@@ -494,10 +493,14 @@ def _authenticate_with_keystone():
     config_data['glance_production_port'] = parse_result.port
     
     
-    #network       
-    kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-    network_public_url = keystone.service_catalog.url_for(**kwargs)
-    config_data['neutron_production_url'] = network_public_url
+    #network
+    try:
+        kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        network_public_url = keystone.service_catalog.url_for(**kwargs)
+        config_data['neutron_production_url'] = network_public_url
+    except Exception as ex:
+        config_data['neutron_production_url'] = "unavailable"
+        
     config_data['neutron_admin_auth_url'] = config_data['keystone_public_url']
     config_data['neutron_admin_username'] = config_data['admin_username']
     config_data['neutron_admin_password'] = config_data['admin_password']
