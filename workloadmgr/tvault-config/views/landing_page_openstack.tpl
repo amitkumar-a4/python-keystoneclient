@@ -47,19 +47,18 @@
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a><br>
+                            <b>Download <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a>, set the following values and run as sudo...</b><br>
                             <br>
-                            <b>Set the following values in the above script and run as sudo...</b><br>
-                            #IP Address of tvault appliance
-                            TVAULT_APPLIANCE_NODE=192.168.1.XXX
+                            #IP Address of tvault appliance<br>
+                            TVAULT_APPLIANCE_NODE=192.168.1.XXX<br>
                             <br>
-                            #On OpenStack Controller Node, Set TVAULT_CONTEGO_API as True
-                            TVAULT_CONTEGO_API=False
+                            #On OpenStack Controller Node, Set TVAULT_CONTEGO_API as True<br>
+                            TVAULT_CONTEGO_API=False<br>
                             <br>
-                            #On OpenStack Compute Node, Set TVAULT_CONTEGO_API as True
-                            TVAULT_CONTEGO_EXT=False
-                            TVAULT_CONTEGO_EXT_BIN=/usr/local/bin/tvault-contego
-                            TVAULT_CONTEGO_EXT_USER=nova                   
+                            #On OpenStack Compute Node, Set TVAULT_CONTEGO_API as True<br>
+                            TVAULT_CONTEGO_EXT=False<br>
+                            TVAULT_CONTEGO_EXT_BIN=/usr/local/bin/tvault-contego<br>
+                            TVAULT_CONTEGO_EXT_USER=nova<br>                   
                         </div>                    
                     </li>
                    
