@@ -51,7 +51,7 @@ if module_dir:
     os.chdir(os.path.dirname(__file__))
     
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
-TVAULT_CONFIGURATION_TYPE = 'openstack'
+TVAULT_CONFIGURATION_TYPE = 'vmware'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
