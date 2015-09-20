@@ -184,7 +184,7 @@ class UploadImageToGlance(task.Task):
         self.cntx = cntx = amqp.RpcContext.from_dict(context)
         self.restore_obj = restore_obj = db.restore_get(cntx, restore_id)
         snapshot_id = restore_obj.snapshot_id
-        self.image_service = image_service = glance.get_default_image_service(\
+        self.image_service = glance.get_default_image_service(\
                                   production= (restore_obj['restore_type'] != 'test'))
 
         progressmsg = _('Uploading image and volumes of instance %(vmid)s from \
@@ -208,7 +208,6 @@ class UploadImageToGlance(task.Task):
                                   'hw_disk_bus' : 'scsi',
                                   'vmware_adaptertype' : 'lsiLogic',
                                   'vmware_disktype': 'preallocated',
-                                  'image_location': 'TODO',
                                   'image_state': 'available',
                                   'owner_id': cntx.project_id}
                              }
@@ -220,21 +219,20 @@ class UploadImageToGlance(task.Task):
                               'container_format' : 'bare',
                               'properties': {
                                   'hw_disk_bus' : 'virtio',
-                                  'image_location': 'TODO',
                                   'image_state': 'available',
                                   'owner_id': cntx.project_id}
                               }
 
         LOG.debug('Uploading image ' + restore_file_path)
         self.restored_image = restored_image = \
-                      image_service.create(cntx, image_metadata)
+                      self.image_service.create(cntx, image_metadata)
         if restore_obj['restore_type'] == 'test':
             shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
             restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
             with file(restore_file_path) as image_file:
-                restored_image = image_service.update(cntx, restored_image['id'], image_metadata, image_file)
+                restored_image = self.image_service.update(cntx, restored_image['id'], image_metadata, image_file)
         else:
-            restored_image = image_service.update(cntx, 
+            restored_image = self.image_service.update(cntx, 
                                                   restored_image['id'], 
                                                   image_metadata, 
                                                   utils.ChunkedFile(restore_file_path,
@@ -265,7 +263,7 @@ class UploadImageToGlance(task.Task):
     def revert_with_log(self, *args, **kwargs):
         # TODO: Delete image from the glance
         try:
-            image_service.delete(self.cntx, self.imageid)
+            self.image_service.delete(self.cntx, self.imageid)
         except:
             pass
 
@@ -290,10 +288,10 @@ class RestoreVolumeFromImage(task.Task):
         self.cntx = cntx = amqp.RpcContext.from_dict(context)
         self.restore_obj = restore_obj = db.restore_get(cntx, restore_id)
 
-        image_service = glance.get_default_image_service(production= (restore_obj['restore_type'] != 'test'))
+        self.image_service = glance.get_default_image_service(production= (restore_obj['restore_type'] != 'test'))
         self.volume_service = volume_service = cinder.API()
 
-        restored_image = image_service.show(cntx, imageid)
+        restored_image = self.image_service.show(cntx, imageid)
 
         restored_volume_name = uuid.uuid4().hex
         LOG.debug('Restoring volume from image ' + imageid)
@@ -301,7 +299,7 @@ class RestoreVolumeFromImage(task.Task):
         volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
         self.restored_volume = restored_volume = volume_service.create(cntx, volume_size,
                                                 restored_volume_name,
-                                                'from workloadmgr', None,
+                                                'from Trilio Vault', None,
                                                 imageid, None, None, None)
 
         if not restored_volume:
@@ -316,7 +314,7 @@ class RestoreVolumeFromImage(task.Task):
                 restored_volume['status'].lower() == 'error':
                 break
 
-        image_service.delete(cntx, imageid)
+        self.image_service.delete(cntx, imageid)
         if restored_volume['status'].lower() == 'error':
             LOG.error(_("Volume from image %s could not successfully create") % imageid)
             raise Exception("Restoring volume failed")
@@ -380,7 +378,7 @@ class RestoreCephVolume(task.Task):
         volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
         self.restored_volume = restored_volume = volume_service.create(cntx, volume_size,
                                                       restored_volume_name,
-                                                      'from workloadmgr', None,
+                                                      'from Trilio Vault', None,
                                                       None, 'ceph', None, None)
 
         if not restored_volume:

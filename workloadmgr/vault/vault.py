@@ -167,7 +167,7 @@ def mount_backup_media():
         pass           
     
     try:
-        command = ['sudo', 'umount', CONF.vault_data_directory]
+        command = ['sudo', 'umount', '-l', CONF.vault_data_directory]
         subprocess.call(command, shell=False)
     except Exception as exception:
         pass                
