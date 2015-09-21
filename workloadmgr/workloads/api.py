@@ -642,7 +642,53 @@ class API(base.Base):
                     LOG.exception(ex)
         except Exception as ex:
             LOG.exception(ex)
-    
+
+    @autolog.log_method(logger=Logger)
+    def add_node(self, context, ip):
+        try:
+            for node_record in self.db.service_get_all_by_topic(context, topic='workloadmgr-workloads'):
+                try:
+                    ipaddress = ''
+                    ip_addresses = node_record.ip_addresses.split(';')
+                    if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
+                        ipaddress = ip_addresses[0]
+                    if socket.gethostname() == node_record.host:
+                       controller_ip = ipaddress
+                    if any([ipaddress == ip , node_record.host == ip]):
+                       msg = _("Other node with same ip addresss exists")
+                       raise wlm_exceptions.ErrorOccurred(reason=msg)
+                except Exception as ex:
+                    LOG.exception(ex)
+            import subprocess           
+            command = ['sudo', 'curl', '-k', '--cookie-jar', "file.txt", '--data', "username=admin&password=password", "https://"+ip+"/login"];
+            subprocess.call(command, shell=False)                      
+            config_inputs = {}
+            for setting in self.db.setting_get_all_by_project(context, "Configurator"):
+                config_inputs[setting.name] = setting.value
+            if not config_inputs:
+               msg = _("No configurations found")
+               raise wlm_exceptions.ErrorOccurred(reason=msg)                 
+            command = ['sudo', 'curl', '-k', '--cookie', "file.txt", '--data', "refresh=1&from=api&tvault-primary-node="+controller_ip+"1&nodetype=additional", "https://"+ip+"/configure_vmware"];
+            subprocess.call(command, shell=False)
+            urls = ['configure_host','authenticate_with_vcenter','authenticate_with_swift','register_service','configure_api','configure_scheduler','configure_service','start_api','start_scheduler','start_service','register_workloadtypes','workloads_import','discover_vcenter']
+            if len(config_inputs['swift_auth_url']) == 0:
+               urls.remove('authenticate_with_swift')
+            if config_inputs['import_workloads'] == 'off':
+               urls.remove('workloads_import') 
+            for url in urls:
+                command = ['sudo', 'curl', '-k', '--cookie', "file.txt",  "https://"+ip+"/"+url];
+                res = subprocess.check_output(command)          
+                if res != '{"status": "Success"}':
+                   command = ['sudo', 'rm', '-rf', "file.txt"];
+                   subprocess.call(command, shell=False)         
+                   msg = _(res) 
+                   raise wlm_exceptions.ErrorOccurred(reason=msg) 
+            command = ['sudo', 'rm', '-rf', "file.txt"];
+            subprocess.call(command, shell=False)
+
+        except Exception as ex:
+            LOG.exception(ex)
+ 
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         total_capacity, total_utilization = vault.get_total_capacity(context)
@@ -1082,6 +1128,8 @@ class API(base.Base):
                     msg = _('This workload snapshot contains testbubbles')
                     raise wlm_exceptions.InvalidState(reason=msg)      
 
+            self.db.snapshot_update(context, snapshot_id, {'status': 'deleting'})
+
             status_messages = {'message': 'Snapshot delete operation starting'} 
             options = {
                        'display_name': "Snapshot Delete",
@@ -1113,7 +1161,9 @@ class API(base.Base):
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
-        
+       
+            self.db.snapshot_update(context, snapshot_id, {'status': 'restoring'})
+ 
             restore_type = "restore"
             if test:
                 restore_type = "test"

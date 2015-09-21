@@ -59,7 +59,6 @@ aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.mag
 # alias the authorization decorator with defaults
 authorize = aaa.make_auth_decorator(fail_redirect="/login", role="user")
 
-
 def get_https_app(app):
     def https_app(environ, start_response):
         environ['wsgi.url_scheme'] = 'https'
@@ -77,7 +76,6 @@ session_opts = {
     'session.validate_key': True,
 }
 app = SessionMiddleware(app, session_opts)
-
 class SSLWSGIRefServer(ServerAdapter):
     def run(self, handler):
         from wsgiref.simple_server import make_server, WSGIRequestHandler
@@ -2039,7 +2037,6 @@ def configure_vmware():
     global config_data
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
-    
     try: 
         config_inputs = bottle.request.POST
         if config_inputs['refresh'] == '1':
@@ -2048,10 +2045,12 @@ def configure_vmware():
            for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
                items = dict(row.items())
                config_data[items['name']] = items['value']  
-               config_data['refresh'] = 0
-               config_data['nodetype'] = config_inputs['nodetype']
+               config_inputs[items['name'].replace('_','-')] = items['value']
+           config_data['refresh'] = 0
+           config_data['nodetype'] = config_inputs['nodetype']
            persist_config()
-           bottle.redirect("/configure_vmware")
+           if 'from' not in config_inputs.keys():
+              bottle.redirect("/configure_vmware")
 
         config_data['configuration_type'] = 'vmware'
         config_data['nodetype'] = config_inputs['nodetype']
@@ -2140,13 +2139,10 @@ def configure_vmware():
         config_data['workloadmgr_user'] = config_data['vcenter_username']
         config_data['workloadmgr_user_password'] = config_data['vcenter_password']
         
-        
-        
         if 'import-workloads' in config_inputs:
             config_data['import_workloads'] = config_inputs['import-workloads']
         else:
             config_data['import_workloads'] = 'off'
-        
         bottle.redirect("/task_status_vmware")
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
