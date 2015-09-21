@@ -119,8 +119,14 @@ def _untranslate_volume_summary_view(context, vol):
     else:
         d['attach_status'] = 'detached'
 
-    d['display_name'] = vol.display_name
-    d['display_description'] = vol.display_description
+    if hasattr(vol, 'display_name'):
+        d['display_name'] = vol.display_name
+    else:
+        d['display_name'] = ''
+    if hasattr(vol, 'display_description'):
+        d['display_description'] = vol.display_description
+    else:
+        d['display_description'] = '' 
 
     # TODO(jdg): Information may be lost in this translation
     d['volume_type_id'] = vol.volume_type

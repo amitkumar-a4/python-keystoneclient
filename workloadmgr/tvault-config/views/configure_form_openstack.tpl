@@ -44,36 +44,41 @@
   % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
   <form role="form" class="form-configure" action="/configure_openstack" method="post">
-    <input name = "nodetype" type="radio"  value="controller" checked>  Controller Node
-    <input name = "nodetype" type="radio"  value="additional">   Additional Node <br> <br>
-   
+	%if 'nodetype' in locals() and nodetype == 'additional':
+		<input name = "nodetype" type="radio"  value="controller" >  Controller Node&nbsp;&nbsp;
+		<input name = "nodetype" type="radio"  value="additional" checked>   Additional Node <br> <br>		
+	%else:
+		<input name = "nodetype" type="radio"  value="controller" checked>  Controller Node&nbsp;&nbsp;
+		<input name = "nodetype" type="radio"  value="additional" >   Additional Node <br> <br>		
+	%end  
+		   
     <div class="input-group">
     	<label class="input-group-addon">Floating IP Address	</label>
-    	<input name="floating-ipaddress" type="text" required="" placeholder="192.168.2.200" class="form-control"><br>
+    	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control"><br>
     </div><br>
     <div class="input-group">    
     	<label class="input-group-addon">Keystone Admin Url</label>
-    	<input name="keystone-admin-url" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
+    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Keystone Public Url</label>
-    	<input name="keystone-public-url" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="admin-username" type="text" required="" placeholder="admin" class="form-control"> <br>
+    	<input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> <br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="admin-password" type="password" required="" placeholder="password" class="form-control"> <br>
+    	<input name="admin-password" type="password" required="" placeholder="" class="form-control"> <br>
     </div><br>
     	<div class="input-group">
     	<label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="admin-tenant-name" type="text" required="" placeholder="admin" class="form-control">
+    	<input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control">
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="region-name" type="text" required="" placeholder="RegionOne" class="form-control">
+    	<input name="region-name" {{'value=' + region_name if defined('region_name') else ''}} type="text" required="" placeholder="RegionOne" class="form-control">
     </div><br>    
 	<div class="input-group" >
 		<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
