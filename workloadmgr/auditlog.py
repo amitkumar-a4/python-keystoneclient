@@ -88,7 +88,7 @@ class AuditLog(object):
                     record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
                     epoch = time.mktime(record_time.timetuple())
                     offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S %p") 
+                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
                     # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
                     if (now - record_time) < timedelta(minutes=time_in_minutes):
                         record = {'Timestamp' : local_time,
@@ -106,7 +106,7 @@ class AuditLog(object):
                     record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
                     epoch = time.mktime(record_time.timetuple())
                     offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S %p") 
+                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
                     # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
                     if record_time >= time_from and record_time <= time_to:
                         record = {'Timestamp' : local_time,

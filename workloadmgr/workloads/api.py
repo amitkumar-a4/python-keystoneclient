@@ -1199,6 +1199,8 @@ class API(base.Base):
         """
         try:
             snapshot = self.db.snapshot_get(context, snapshot_id)
+            workload = self.workload_get(context, snapshot['workload_id'])
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot['display_name'] + '\' Cancel Requested', snapshot)
             if snapshot.status in ['available','cancelled','error']:
                return
 
@@ -1210,8 +1212,7 @@ class API(base.Base):
                                      'metadata': metadata,
                                      'status': 'cancelling'
                                     })
-
-            #AUDITLOG.log(context,'Snapshot Cancel Requested', snapshot_id)
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot['display_name'] + '\' Cancelled', snapshot)
 
             return True
 
