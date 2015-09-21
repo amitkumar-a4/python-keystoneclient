@@ -660,7 +660,8 @@ class API(base.Base):
                 except Exception as ex:
                     LOG.exception(ex)
             import subprocess           
-            command = ['sudo', 'curl', '-k', '--cookie-jar', "file.txt", '--data', "username=admin&password=password", "https://"+ip+"/login"];
+            file_name = context.user_id+'.txt'
+            command = ['sudo', 'curl', '-k', '--cookie-jar', file_name, '--data', "username=admin&password=password", "https://"+ip+"/login"];
             subprocess.call(command, shell=False)                      
             config_inputs = {}
             for setting in self.db.setting_get_all_by_project(context, "Configurator"):
@@ -668,7 +669,7 @@ class API(base.Base):
             if not config_inputs:
                msg = _("No configurations found")
                raise wlm_exceptions.ErrorOccurred(reason=msg)                 
-            command = ['sudo', 'curl', '-k', '--cookie', "file.txt", '--data', "refresh=1&from=api&tvault-primary-node="+controller_ip+"1&nodetype=additional", "https://"+ip+"/configure_vmware"];
+            command = ['sudo', 'curl', '-k', '--cookie', file_name, '--data', "refresh=1&from=api&tvault-primary-node="+controller_ip+"1&nodetype=additional", "https://"+ip+"/configure_vmware"];
             subprocess.call(command, shell=False)
             urls = ['configure_host','authenticate_with_vcenter','authenticate_with_swift','register_service','configure_api','configure_scheduler','configure_service','start_api','start_scheduler','start_service','register_workloadtypes','workloads_import','discover_vcenter']
             if len(config_inputs['swift_auth_url']) == 0:
@@ -676,14 +677,14 @@ class API(base.Base):
             if config_inputs['import_workloads'] == 'off':
                urls.remove('workloads_import') 
             for url in urls:
-                command = ['sudo', 'curl', '-k', '--cookie', "file.txt",  "https://"+ip+"/"+url];
+                command = ['sudo', 'curl', '-k', '--cookie', file_name,  "https://"+ip+"/"+url];
                 res = subprocess.check_output(command)          
                 if res != '{"status": "Success"}':
-                   command = ['sudo', 'rm', '-rf', "file.txt"];
+                   command = ['sudo', 'rm', '-rf', file_name];
                    subprocess.call(command, shell=False)         
                    msg = _(res) 
                    raise wlm_exceptions.ErrorOccurred(reason=msg) 
-            command = ['sudo', 'rm', '-rf', "file.txt"];
+            command = ['sudo', 'rm', '-rf', file_name];
             subprocess.call(command, shell=False)
 
         except Exception as ex:
