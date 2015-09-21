@@ -213,6 +213,27 @@ def get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata):
     snapshot_vm_disk_resource_path = snapshot_vm_resource_path + '/' + snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id']
     return snapshot_vm_disk_resource_path
 
+def get_restore_staging_path(restore_metadata):
+    vault_data_directory = CONF.vault_data_directory + "/staging/"  +  socket.gethostname()
+    restore_staging_path = os.path.join(vault_data_directory + '/restore_%s' % (restore_metadata['restore_id']))
+    return restore_staging_path                 
+
+def get_restore_vm_staging_path(restore_vm_metadata): 
+    restore_staging_path = get_restore_staging_path(restore_vm_metadata)
+    restore_vm_staging_path = restore_staging_path + '/vm_id_%s' % (restore_vm_metadata['snapshot_vm_id'])
+    return restore_vm_staging_path
+                    
+def get_restore_vm_resource_staging_path(restore_vm_resource_metadata):                 
+    restore_vm_staging_path = get_restore_vm_staging_path(restore_vm_resource_metadata)
+    restore_vm_resource_staging_path = restore_vm_staging_path + '/vm_res_id_%s_%s' % (restore_vm_resource_metadata['snapshot_vm_resource_id'], 
+                                                                    restore_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ',''))
+    return restore_vm_resource_staging_path  
+            
+def get_restore_vm_disk_resource_staging_path(restore_vm_disk_resource_metadata):
+    restore_vm_resource_staging_path = get_restore_vm_resource_staging_path(restore_vm_disk_resource_metadata)
+    restore_vm_disk_resource_staging_path = restore_vm_resource_staging_path + '/' + restore_vm_disk_resource_metadata['vm_disk_resource_snap_id']
+    return restore_vm_disk_resource_staging_path
+
 def get_swift_container(context, workload_metadata):
     swift_list_all(context, container = None)
     if os.path.isfile('/tmp/swift.out'):
@@ -796,12 +817,11 @@ def swift_download_folder(context, folder, container):
 @autolog.log_method(logger=Logger) 
 def purge_staging_area(context):
     try:
-        if CONF.vault_storage_type == 'swift-i':
-            pass
-        elif CONF.vault_storage_type == 'swift-s':
+        if CONF.vault_storage_type == 'swift-s' or \
+           CONF.vault_storage_type == 'swift-i' or \
+           CONF.vault_storage_type == 's3':     
             shutil.rmtree(get_vault_data_directory())   
-        elif CONF.vault_storage_type == 's3':
-            pass                      
+                   
     except Exception as ex:
         LOG.exception(ex) 
         
@@ -809,13 +829,12 @@ def purge_staging_area(context):
 def purge_workload_from_staging_area(context, workload_metadata):
     try:
         workload_path  = get_workload_path(workload_metadata)
-        if CONF.vault_storage_type == 'swift-i':
-            pass
-        elif CONF.vault_storage_type == 'swift-s':
+        if CONF.vault_storage_type == 'swift-s' or \
+           CONF.vault_storage_type == 'swift-i' or \
+           CONF.vault_storage_type == 's3':     
             if os.path.isdir(workload_path):
                 shutil.rmtree(workload_path)            
-        elif CONF.vault_storage_type == 's3':
-            pass                      
+              
     except Exception as ex:
         LOG.exception(ex) 
 
@@ -823,13 +842,12 @@ def purge_workload_from_staging_area(context, workload_metadata):
 def purge_snapshot_from_staging_area(context, snapshot_metadata):
     try:
         snapshot_path  = get_snapshot_path(snapshot_metadata)
-        if CONF.vault_storage_type == 'swift-i':
-            pass
-        elif CONF.vault_storage_type == 'swift-s':
+        if CONF.vault_storage_type == 'swift-s' or \
+           CONF.vault_storage_type == 'swift-i' or \
+           CONF.vault_storage_type == 's3':     
             if os.path.isdir(snapshot_path):
                 shutil.rmtree(snapshot_path)     
-        elif CONF.vault_storage_type == 's3':
-            pass                      
+              
     except Exception as ex:
         LOG.exception(ex) 
 
@@ -837,13 +855,12 @@ def purge_snapshot_from_staging_area(context, snapshot_metadata):
 def purge_snapshot_vm_from_staging_area(context, snapshot_vm_metadata):
     try:
         snapshot_vm_path  = get_snapshot_vm_path(snapshot_vm_metadata)
-        if CONF.vault_storage_type == 'swift-i':
-            pass
-        elif CONF.vault_storage_type == 'swift-s':
+        if CONF.vault_storage_type == 'swift-s' or \
+           CONF.vault_storage_type == 'swift-i' or \
+           CONF.vault_storage_type == 's3':           
             if os.path.isdir(snapshot_vm_path):
                 shutil.rmtree(snapshot_vm_path)     
-        elif CONF.vault_storage_type == 's3':
-            pass                      
+                   
     except Exception as ex:
         LOG.exception(ex)  
         
@@ -851,15 +868,44 @@ def purge_snapshot_vm_from_staging_area(context, snapshot_vm_metadata):
 def purge_snapshot_vm_resource_from_staging_area(context, snapshot_vm_resource_metadata):
     try:
         snapshot_vm_resource_path  = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
-        if CONF.vault_storage_type == 'swift-i':
-            pass
-        elif CONF.vault_storage_type == 'swift-s':
+        if CONF.vault_storage_type == 'swift-s' or \
+           CONF.vault_storage_type == 'swift-i' or \
+           CONF.vault_storage_type == 's3':     
             if os.path.isdir(snapshot_vm_resource_path):
                 shutil.rmtree(snapshot_vm_resource_path)     
-        elif CONF.vault_storage_type == 's3':
-            pass                      
+                 
     except Exception as ex:
-        LOG.exception(ex)          
+        LOG.exception(ex) 
+        
+@autolog.log_method(logger=Logger) 
+def purge_restore_from_staging_area(context, restore_metadata):
+    try:
+        restore_staging_path  = get_restore_staging_path(restore_metadata)
+        if os.path.isdir(restore_staging_path):
+            shutil.rmtree(restore_staging_path)     
+              
+    except Exception as ex:
+        LOG.exception(ex) 
+
+@autolog.log_method(logger=Logger)                 
+def purge_restore_vm_from_staging_area(context, restore_vm_metadata):
+    try:
+        restore_vm_staging_path  = get_restore_vm_staging_path(restore_vm_metadata)
+        if os.path.isdir(restore_vm_staging_path):
+            shutil.rmtree(restore_vm_staging_path)     
+                   
+    except Exception as ex:
+        LOG.exception(ex)  
+        
+@autolog.log_method(logger=Logger)                 
+def purge_restore_vm_resource_from_staging_area(context, restore_vm_resource_metadata):
+    try:
+        restore_vm_resource_staging_path  = get_restore_vm_resource_staging_path(restore_vm_resource_metadata)
+        if os.path.isdir(restore_vm_resource_staging_path):
+            shutil.rmtree(restore_vm_resource_staging_path)      
+                 
+    except Exception as ex:
+        LOG.exception(ex)                   
 
 @autolog.log_method(logger=Logger)         
 def get_size(vault_path):
