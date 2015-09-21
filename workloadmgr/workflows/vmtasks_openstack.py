@@ -137,13 +137,16 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         def _snapshot_nova_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             nics = []
+            uniquemacs = set()
             if 'private' in interfaces:
                 for interface in interfaces['private']:
-                    nic = {} #nic is dictionary to hold the following data
+                    if not interface['OS-EXT-IPS-MAC:mac_addr'] in uniquemacs: 
+                        nic = {} #nic is dictionary to hold the following data
                 
-                    nic.setdefault('ip_address', interface['addr'])
-                    nic.setdefault('mac_address', interface['OS-EXT-IPS-MAC:mac_addr'])
-                    nics.append(nic)
+                        nic.setdefault('ip_address', interface['addr'])
+                        nic.setdefault('mac_address', interface['OS-EXT-IPS-MAC:mac_addr'])
+                        nics.append(nic)
+                        uniquemacs.add(interface['OS-EXT-IPS-MAC:mac_addr'])
             return nics
 
         #Store the nics in the DB
