@@ -272,3 +272,43 @@ def purge_snapshot_vm_resource_from_staging_area(context, snapshot_id, snapshot_
             snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap.snapshot_vm_resource_id)
         else:
             snapshot_vm_resource = None
+            
+def purge_restore_vm_from_staging_area(context, restore_id, snapshot_id, snapshot_vm_id):
+    snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
+    vault.purge_restore_vm_from_staging_area(context, { 'restore_id': restore_id,
+                                                        'workload_id': snapshot.workload_id,
+                                                        'snapshot_id': snapshot_id,
+                                                        'snapshot_vm_id': snapshot_vm_id})
+    """
+    parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
+   
+    for parent_snapshot_id in parent_snapshots:
+        parent_snapshot_vms = db.snapshot_vms_get(context, parent_snapshot_id) 
+        for parent_snapshot_vm in parent_snapshot_vms:
+            if  parent_snapshot_vm.vm_id == snapshot_vm_id:
+                vault.purge_restore_vm_from_staging_area(context, { 'restore_id': restore_id, 
+                                                                    'workload_id': snapshot.workload_id,
+                                                                    'snapshot_id': parent_snapshot_id,
+                                                                    'snapshot_vm_id': snapshot_vm_id})
+    """                               
+               
+def purge_restore_vm_resource_from_staging_area(context, restore_id, snapshot_id, snapshot_vm_resource_id):
+    snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')    
+    snapshot_vm_resource = db.snapshot_vm_resource_get(context, snapshot_vm_resource_id)
+    snapshot_vm = db.snapshot_vm_get(context, snapshot_vm_resource.vm_id, snapshot.id)    
+
+    while snapshot_vm_resource:
+        vault.purge_restore_vm_resource_from_staging_area(context,{ 'restore_id': restore_id,
+                                                                    'workload_id': snapshot.workload_id,
+                                                                    'snapshot_id': snapshot_vm_resource.snapshot_id,
+                                                                    'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                                                                    'snapshot_vm_name': snapshot_vm.vm_name,
+                                                                    'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                                    'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
+        if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
+            vm_disk_resource_snap = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+            snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap.snapshot_vm_resource_id)
+        else:
+            snapshot_vm_resource = None
+            

@@ -547,9 +547,18 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                         snap.id,
                                                                                         disk_info['dev'])
                     vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource_backing.id)
+                    for meta in snapshot_vm_resource_backing.metadata:
+                        if meta['key'] == 'disk_info':
+                            backing_disk_info = json.loads(meta['value'])
+                            if disk_info['backend'] == 'qcow2':
+                                if backing_disk_info['path'] != (disk_info['backings'][0]['path']):
+                                    return None, None
+                            disk_info['prev_disk_info'] = json.loads(meta['value'])
+                            break                    
                     break
             except Exception as ex:
                 LOG.exception(ex)
+                return None, None
             return snapshot_vm_resource_backing, vm_disk_resource_snap_backing
 
         def _get_backing_vm_disk_resource_with_volume_id(disk_info):
@@ -588,15 +597,13 @@ class LibvirtDriver(driver.ComputeDriver):
                         snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_vm_disk_resource_with_volume_id(disk_info)
                     else:
                         snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info)
-
-                    for meta in snapshot_vm_resource_backing.metadata:
-                        if meta['key'] == 'disk_info':
-                            disk_info['prev_disk_info'] = json.loads(meta['value'])
-                            break
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
-                    
-            backings = disk_info['backings'][::-1] # reverse the list
+            
+            if snapshot_vm_resource_backing:
+                backings = [disk_info['backings'][0]]
+            else:
+                backings = disk_info['backings'][::-1] # reverse the list
             for i, backing in enumerate(backings):
                 vm_disk_resource_snap_id = str(uuid.uuid4())
                 vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
@@ -683,8 +690,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 vm_disk_size = vm_disk_size + backing['size']
                 vm_disk_resource_snap_backing = vm_disk_resource_snap
-                if snapshot_vm_resource_backing and snapshot_vm_resource_backing.resource_pit_id == backing['path']:
-                    break;
+                
 
             snapshot_type = 'incremental'
             vm_disk_resource_snaps = db.vm_disk_resource_snaps_get(cntx, snapshot_vm_resource.id)
@@ -728,9 +734,25 @@ class LibvirtDriver(driver.ComputeDriver):
         """
         Restores the specified instance from a snapshot
         """
-        return restore_vm_flow.restore_vm(cntx, db, instance, restore, restored_net_resources,
-                           restored_security_groups, restored_compute_flavor, restored_nics,
-                           instance_options)
+        try:
+            restore_obj = db.restore_get(cntx, restore['id'])
+            result =  restore_vm_flow.restore_vm(cntx, db, instance, restore, restored_net_resources,
+                                   restored_security_groups, restored_compute_flavor, restored_nics,
+                                   instance_options)
+            return result
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+        finally:
+            try:
+                #workload_utils.purge_snapshot_vm_from_staging_area(cntx, restore_obj.snapshot_id, instance['vm_id'])
+                pass
+            except Exception as ex:
+                LOG.exception(ex)
+            try:
+                workload_utils.purge_restore_vm_from_staging_area(cntx, restore_obj.id, restore_obj.snapshot_id, instance['vm_id'])
+            except Exception as ex:
+                LOG.exception(ex)                                      
 
     @autolog.log_method(Logger, 'libvirt.driver.post_restore_vm')
     def post_restore_vm(self, cntx, db, instance, restore):

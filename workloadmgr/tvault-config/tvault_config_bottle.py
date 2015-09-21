@@ -1504,8 +1504,12 @@ def configure_form_vmware():
 @bottle.view('configure_form_openstack')
 @authorize()
 def configure_form_openstack():
-    bottle.request.environ['beaker.session']['error_message'] = ''    
-    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+    bottle.request.environ['beaker.session']['error_message'] = '' 
+    Config = ConfigParser.RawConfigParser()
+    Config.read('/etc/tvault-config/tvault-config.conf')
+    config_data = dict(Config._defaults)
+    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return config_data
 
 @bottle.route('/task_status_vmware')
 @bottle.view('task_status_vmware')

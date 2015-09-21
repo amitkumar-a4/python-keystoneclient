@@ -818,6 +818,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)  
             
             try:
+                vault.purge_restore_from_staging_area(context, {'restore_id': restore_id})
+            except Exception as ex:
+                LOG.exception(ex)             
+            
+            try:
                 import gc
                 gc.collect() 
             except Exception as ex:
