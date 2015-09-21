@@ -198,7 +198,6 @@ class SnapshotsController(wsgi.Controller):
             snapshots = self._view_builder.detail_list(req, snapshots)
         else:
             snapshots = self._view_builder.summary_list(req, snapshots)
-
         return snapshots
     
    
