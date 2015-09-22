@@ -686,8 +686,20 @@ class LibvirtDriver(driver.ComputeDriver):
                 # update the entry in the vm_disk_resource_snap table
                 vm_disk_resource_snap_values = {'vault_url' :  vault_url.replace(vault.get_vault_data_directory(), '', 1),
                                                 'vault_service_metadata' : 'None',
+                                                'finished_at' : timeutils.utcnow(),
+                                                'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),
+                                                'size' : backing['size'],
                                                 'status': 'available'}
                 db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+                if vm_disk_resource_snap_backing:
+                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(cntx, 
+                                                                                    vm_disk_resource_snap_backing.id,
+                                                                                    {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
+                    # Upload snapshot metadata to the vault
+                    snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+                    workload_utils.upload_snapshot_db_entry(cntx, snapshot_vm_resource_backing.snapshot_id)                  
+                
+                
                 vm_disk_size = vm_disk_size + backing['size']
                 vm_disk_resource_snap_backing = vm_disk_resource_snap
                 
