@@ -192,7 +192,7 @@ class API(base.Base):
         """
         Create a workload_type. No RPC call is made
         """
-        AUDITLOG.log(context,'WorkloadType Create Requested', None)
+        AUDITLOG.log(context,'WorkloadType \'' + name + '\' Create Requested', None)
         options = {'user_id': context.user_id,
                    'project_id': context.project_id,
                    'id': id,
@@ -203,7 +203,7 @@ class API(base.Base):
                    'metadata': metadata,}
 
         workload_type = self.db.workload_type_create(context, options)
-        AUDITLOG.log(context,'WorkloadType Created', workload_type)
+        AUDITLOG.log(context,'WorkloadType \'' + name + '\' Created', workload_type)
         return workload_type
     
     @autolog.log_method(logger=Logger)
@@ -212,7 +212,7 @@ class API(base.Base):
         Delete a workload_type. No RPC call is made
         """
         workload_type = self.workload_type_get(context, workload_type_id)
-        AUDITLOG.log(context,'WorkloadType Delete Requested', workload_type)
+        AUDITLOG.log(context,'WorkloadType \'' + workload_type['display_name'] + '\' Delete Requested', workload_type)
         if workload_type['status'] not in ['available', 'error']:
             msg = _("WorkloadType status must be 'available' or 'error'")
             raise wlm_exceptions.InvalidState(reason=msg)
@@ -220,7 +220,7 @@ class API(base.Base):
         #TODO(giri): check if this workload_type is referenced by other workloads
                     
         self.db.workload_type_delete(context, workload_type_id)
-        AUDITLOG.log(context,'WorkloadType Deleted', workload_type)
+        AUDITLOG.log(context,'WorkloadType \'' + workload_type['display_name'] + '\' Deleted', workload_type)
     
     @autolog.log_method(logger=Logger)   
     def workload_type_discover_instances(self, context, workload_type_id, metadata):
@@ -385,7 +385,7 @@ class API(base.Base):
         Make the RPC call to create a workload.
         """
         try:
-            AUDITLOG.log(context,'Workload Create Requested', None)
+            AUDITLOG.log(context,'Workload \'' + name + '\' Create Requested', None)
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context,admin=True)
 
@@ -461,7 +461,7 @@ class API(base.Base):
             except Exception as ex:
                 LOG.exception(ex)    
                 
-            AUDITLOG.log(context, "Workload Created", workload)        
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' Created', workload)        
             return workload
         except Exception as ex:
             LOG.exception(ex)
@@ -483,7 +483,8 @@ class API(base.Base):
         """
         Make the RPC call to modify a workload.
         """
-        AUDITLOG.log(context,'Workload Modify Requested', None)
+        workloadobj = self.workload_get(context, workload_id)
+        AUDITLOG.log(context,'Workload \'' + workloadobj['display_name'] + '\' Modify Requested', None)
         
         purge_metadata = False
         options = {}
@@ -519,7 +520,7 @@ class API(base.Base):
 
         workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
             
-        AUDITLOG.log(context,'Workload Modified', workload_obj)
+        AUDITLOG.log(context,'Workload \'' + workload_obj['display_name'] + '\' Modified', workload_obj)
             
     @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
@@ -528,7 +529,8 @@ class API(base.Base):
         """
         try:
             workload = self.workload_get(context, workload_id)
-            AUDITLOG.log(context,'Workload Delete Requested', workload)
+            display_name = workload['display_name']
+            AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Requested', workload)
             if workload['status'] not in ['available', 'error']:
                 msg = _("Workload status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
@@ -562,7 +564,7 @@ class API(base.Base):
                     break
     
             self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
-            AUDITLOG.log(context,'Workload Deleted', workload)
+            AUDITLOG.log(context,'Workload \'' + display_name + '\' Deleted', workload)
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
@@ -899,19 +901,19 @@ class API(base.Base):
         Pause workload job schedule. No RPC call is made
         """
         workload = self.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload Pause Requested', workload)
+        AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Pause Requested', workload)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 self._scheduler.unschedule_job(job)
                 break
-        AUDITLOG.log(context,'Workload Paused', workload)
+        AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Paused', workload)
             
 
     @autolog.log_method(logger=Logger)
     def workload_resume(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload Resume Requested', workload)
+        AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Requested', workload)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
@@ -925,15 +927,16 @@ class API(base.Base):
                                                 kwargs={'workload_id':workload_id,  
                                                         'user_id': workload['user_id'],
                                                         'project_id':workload['project_id']})
-            AUDITLOG.log(context,'Workload Resumed', workload)
+            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resumed', workload)
 
     @autolog.log_method(logger=Logger)
     def workload_unlock(self, context, workload_id):
         workload = self.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload Unlock Requested', workload)
+        display_name = workload['display_name']
+        AUDITLOG.log(context,'Workload \'' + display_name + '\' Unlock Requested', workload)
         if not workload['deleted']:
             self.db.workload_update(context, workload_id, {'status': 'available'})         
-        AUDITLOG.log(context,'Workload Unlocked', workload)
+        AUDITLOG.log(context,'Workload \'' + display_name + '\' Unlocked', workload)
 
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
@@ -942,8 +945,10 @@ class API(base.Base):
         """
         try:
             workload = self.workload_get(context, workload_id)
-
-            AUDITLOG.log(context,'Workload Snapshot Requested', workload)
+            snapshot_display_name = ''
+            if len(name) > 0:
+                snapshot_display_name = '\'' + name + '\''
+            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' ' + snapshot_type + ' Snapshot ' + snapshot_display_name + ' Requested', workload)
         
             workloads = self.db.workload_get_all(context)
             for workload in workloads:
@@ -984,6 +989,11 @@ class API(base.Base):
                        'status': 'creating',
                        'metadata': metadata, }
             snapshot = self.db.snapshot_create(context, options)
+            snapshot_display_name = snapshot['display_name']
+            if snapshot_display_name ==  'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at']) 
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' ' + snapshot['snapshot_type'] + ' Snapshot \'' + snapshot_display_name + '\' Created', workload)
 
             self.db.snapshot_update(context, 
                                     snapshot.id, 
@@ -1106,7 +1116,14 @@ class API(base.Base):
         """
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
-            AUDITLOG.log(context,'Snapshot Delete Requested', snapshot)
+            workload = self.workload_get(context, snapshot['workload_id'])
+            snapshot_display_name = snapshot['display_name']
+            if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at']) 
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            snapshot_snapshot_type = snapshot['snapshot_type']
+            workload_display_name = workload['display_name']
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Delete Requested', snapshot)
             
             if snapshot['status'] not in ['available', 'error', 'cancelled']:
                 msg = _("Snapshot status must be 'available' or 'error' or 'cancelled'")
@@ -1114,7 +1131,6 @@ class API(base.Base):
             
             try:
                 workload_lock.acquire()
-                workload = self.workload_get(context, snapshot['workload_id'])
                 if workload['status'].lower() != 'available' and workload['status'].lower() != 'locked_for_delete':
                     msg = _("Workload must be in the 'available' state to delete a snapshot")
                     raise wlm_exceptions.InvalidState(reason=msg)
@@ -1142,7 +1158,7 @@ class API(base.Base):
             task = self.db.task_create(context, options)
  
             self.workloads_rpcapi.snapshot_delete(context, workload['host'], snapshot_id, task.id)
-            AUDITLOG.log(context,'Snapshot Deleted', snapshot)
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Deleted', snapshot)
 
             return task.id
             
@@ -1157,8 +1173,18 @@ class API(base.Base):
         """
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
-            AUDITLOG.log(context,'Snapshot Restore Requested', snapshot)
             workload = self.workload_get(context, snapshot['workload_id'])
+            workload_display_name = workload['display_name']
+            snapshot_display_name = snapshot['display_name']
+            snapshot_snapshot_type = snapshot['snapshot_type']
+            if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at'])
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            restore_display_name = ''
+            if len(name) > 0:
+                restore_display_name = '\'' + name + '\''
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Requested', snapshot)
+
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
@@ -1186,7 +1212,12 @@ class API(base.Base):
                                      'status': 'restoring'
                                     })
             self.workloads_rpcapi.snapshot_restore(context, workload['host'], restore['id'])
-            AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Restored', restore)
+            restore_display_name = restore['display_name']
+            restore_restore_type = restore['restore_type']
+            if restore_display_name == 'One Click Restore':
+                local_time = self.get_local_time(context, restore['created_at']) 
+                restore_display_name = local_time + ' (' + restore['display_name'] + ')'
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Completed', restore)
             return restore
         except Exception as ex:
             LOG.exception(ex)
@@ -1200,7 +1231,11 @@ class API(base.Base):
         try:
             snapshot = self.db.snapshot_get(context, snapshot_id)
             workload = self.workload_get(context, snapshot['workload_id'])
-            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot['display_name'] + '\' Cancel Requested', snapshot)
+            snapshot_display_name = snapshot['display_name']
+            if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at'])
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Cancel Requested', snapshot)
             if snapshot.status in ['available','cancelled','error']:
                return
 
@@ -1212,7 +1247,7 @@ class API(base.Base):
                                      'metadata': metadata,
                                      'status': 'cancelling'
                                     })
-            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot['display_name'] + '\' Cancelled', snapshot)
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Cancelled', snapshot)
 
             return True
 
@@ -1232,14 +1267,19 @@ class API(base.Base):
                 msg = _('Invalid snapshot id')
                 raise wlm_exceptions.Invalid(reason=msg)
 
-            AUDITLOG.log(context,'Snapshot Mount Requested', snapshot)
             workload = self.workload_get(context, snapshot['workload_id'])
+            snapshot_display_name = snapshot['display_name']
+            if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at'])
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Mount Requested', snapshot)
+
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
             mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id)
                         
-            AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Mounted', snapshot)
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Mounted', snapshot)
             return mounturl
         except Exception as ex:
             LOG.exception(ex)
@@ -1255,13 +1295,17 @@ class API(base.Base):
             if not snapshot:
                 msg = _('Invalid snapshot id')
                 raise wlm_exceptions.Invalid(reason=msg)
-            AUDITLOG.log(context,'Snapshot Dismount Requested', snapshot)
             workload = self.workload_get(context, snapshot['workload_id'])
+            snapshot_display_name = snapshot['display_name']
+            if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at'])
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Dismount Requested', snapshot)
             if snapshot['status'] != 'mounted':
                 msg = _('Snapshot status must be mounted')
                 raise wlm_exceptions.InvalidState(reason=msg)
             self.workloads_rpcapi.snapshot_dismount(context, workload['host'], snapshot_id)
-            AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Dismounted', snapshot)
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Dismounted', snapshot)
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
@@ -1362,11 +1406,24 @@ class API(base.Base):
         Delete a workload restore. RPC call may be required
         """
         restore_details = self.restore_show(context, restore_id)
-        AUDITLOG.log(context,'Restore Delete Requested', restore_details)
-        
+
+        restore = self.db.restore_get(context, restore_id)
+        snapshot = self.db.snapshot_get(context, restore['snapshot_id'])
+        workload = self.workload_get(context, snapshot['workload_id'])
+        restore_display_name = restore['display_name']
+        if restore_display_name == 'One Click Restore':
+            local_time = self.get_local_time(context, restore['created_at']) 
+            restore_display_name = local_time + ' (' + restore['display_name'] + ')'
+        snapshot_display_name = snapshot['display_name']
+        if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+            local_time = self.get_local_time(context, snapshot['created_at'])
+            snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+        workload_display_name = workload['display_name']            
+        AUDITLOG.log(context, 'Workload \'' + workload_display_name + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Delete Requested', snapshot)
+
         if restore_details['target_platform'] == 'vmware':
             self.db.restore_delete(context, restore_id)
-            AUDITLOG.log(context,'Restore Deleted', restore_details)
+            AUDITLOG.log(context, 'Workload \'' + workload_display_name + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Deleted', snapshot)
             return
             
         
@@ -1443,7 +1500,7 @@ class API(base.Base):
                 LOG.exception(exception)
 
         self.db.restore_delete(context, restore_id)
-        AUDITLOG.log(context,'Restore Deleted', restore_details)
+        AUDITLOG.log(context, 'Workload \'' + workload_display_name + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Deleted', snapshot)
        
     @autolog.log_method(logger=Logger)
     def restore_cancel(self, context, restore_id):
@@ -1452,6 +1509,19 @@ class API(base.Base):
         """
         try:
             restore = self.db.restore_get(context, restore_id)
+            snapshot = self.db.snapshot_get(context, restore['snapshot_id'])
+            workload = self.workload_get(context, snapshot['workload_id'])
+            restore_display_name = restore['display_name']
+            if restore_display_name == 'One Click Restore':
+                local_time = self.get_local_time(context, restore['created_at']) 
+                restore_display_name = local_time + ' (' + restore['display_name'] + ')'
+            snapshot_display_name = snapshot['display_name']
+            if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
+                local_time = self.get_local_time(context, snapshot['created_at'])
+                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+            workload_display_name = workload['display_name']            
+            AUDITLOG.log(context, 'Workload \'' + workload_display_name + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Cancel Requested', snapshot)
+            
             if restore.status in ['available','cancelled','error']:
                return
 
@@ -1465,7 +1535,7 @@ class API(base.Base):
                                      'status': 'cancelling'
                                     })
 
-            #AUDITLOG.log(context,'Restore Cancel Requested', restore_id)
+            AUDITLOG.log(context, 'Workload \'' + workload_display_name + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Cancelled', snapshot)
 
             return True
 
@@ -1526,5 +1596,20 @@ class API(base.Base):
     def tasks_get(self, context, status, page, size, time_in_minutes):
         tasks = self.db.task_get_all(context, status=status, page=page, size=size, time_in_minutes=time_in_minutes)
         return tasks
+
+    
+    @autolog.log_method(logger=Logger)
+    def get_local_time(self, context, record_time):
+        """
+        Convert and return the date and time - from GMT to local time 
+        """
+        try:
+            epoch = time.mktime(record_time.timetuple())
+            offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
+            local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M %p") 
+            return local_time
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
       
