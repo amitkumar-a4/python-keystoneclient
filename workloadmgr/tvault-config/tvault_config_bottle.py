@@ -2242,6 +2242,30 @@ def home():
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
 
+@bottle.route('/reinitialize')
+@bottle.view('home')
+@authorize()
+def reinitialize():
+    try:
+        bottle.request.environ['beaker.session']['error_message'] = ''
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        config_data = dict(Config._defaults)
+
+        if 'sql_connection' in config_data:
+           engine = create_engine(config_data['sql_connection'])
+           tables = engine.table_names() 
+           engine.execute("SET FOREIGN_KEY_CHECKS=0")
+           for table in tables:
+               engine.execute("TRUNCATE TABLE "+str(table))
+           engine.execute("SET FOREIGN_KEY_CHECKS=1") 
+           return dict(success_message = 'Reinitialized successfully')
+        else:
+             return dict(error_message = 'No database found')
+    except Exception as exception:
+           return dict(error_message = "Error: %(exception)s" %{'exception': exception,})  
+
+    
 def findXmlSection(dom, sectionName):
     sections = dom.getElementsByTagName(sectionName)
     return sections[0]

@@ -35,13 +35,21 @@
 	<div class="panel panel-primary" style="width:70%;text-align:left;margin-left:auto; margin-right:auto;margin-top:100px">
 	  <!-- Default panel contents -->
 	  <div class="panel-heading"><h3 class="panel-title">TrilioVault</h3></div>
-	  % if len(error_message) > 0:
+	  % if 'error_message' in locals() and len(error_message) > 0:
 		  	<div class="alert alert-danger alert-dismissible" role="alert">
 			  <button type="button" class="close" data-dismiss="alert">
 			  <span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
 			  <strong>{{error_message}}</strong>
 	 		</div>
 	  % end
+
+          % if 'success_message' in locals() and len(success_message) > 0:
+                        <div class="alert alert-success alert-dismissible" role="alert">
+                          <button type="button" class="close" data-dismiss="alert">
+                          <span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                          <strong>{{success_message}}</strong>
+                        </div>
+          % end
   	<div style="margin-left:auto; margin-right:auto; padding:20px">	
     <div class="container">
         <!-- Example row of columns -->
@@ -49,6 +57,8 @@
             <div>
                 <a href="/configure">Configuration</a>
             	<br><br>                       
+                <a href="/reinitialize" onclick='return confirm("Are you sure want to reinitialize? \n (This will empty all data)")'>Reinitialize</a>
+                <br><br>
                 <a href="/services">Services</a>
             	<br><br>
                 <a href="/logs">Logs</a>
