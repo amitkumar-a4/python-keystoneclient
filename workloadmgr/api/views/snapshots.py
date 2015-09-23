@@ -103,6 +103,8 @@ class ViewBuilder(common.ViewBuilder):
         #snapshots_links = self._get_collection_links(request,
         #                                           snapshots,
         #                                           self._collection_name)
+        snapshots_list = sorted(snapshots_list,
+                           key=lambda snapshot: snapshot['created_at'])
         snapshots_dict = dict(snapshots=snapshots_list)
 
         #if snapshots_links:

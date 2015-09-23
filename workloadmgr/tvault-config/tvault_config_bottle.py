@@ -703,7 +703,7 @@ def _register_workloadtypes():
             #Serial
             time.sleep(2)
             wlm.workload_types.create(metadata={}, is_public = True, 
-                                      name= 'Serial', description = 'Serial workload that snapshots VM in the order they are recieved',
+                                      name= 'Serial', description = 'Serial workload that snapshots VM in the specified order',
                                       id = 'f82ce76f-17fe-438b-aa37-7a023058e50d')
         
         if workload_type_names['Parallel'] == False:    
