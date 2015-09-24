@@ -764,6 +764,7 @@ class API(base.Base):
                         continue
                 elif now - snapshot.created_at < timedelta(minutes=time_in_minutes):
                     workload = self.db.workload_get(context, snapshot.workload_id)
+                    activity_type = 'create'
                     if snapshot.status == 'error':
                         activity_description =  "Snapshot '%s' of Workload '%s' failed" %\
                                                 ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
@@ -772,11 +773,16 @@ class API(base.Base):
                         activity_description =  "Snapshot '%s' of Workload '%s' created" %\
                                                 ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name) 
+                    elif snapshot.status == 'cancelled':
+                        activity_type = 'cancel'
+                        activity_description =  "Snapshot '%s' of Workload '%s' cancelled" %\
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
+                                                 workload.display_name) 
                     else:
                         activity_description =  "Snapshot '%s' of Workload '%s' is in progress" %\
                                                 ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)                                                                  
-                    recentactivity = {'activity_type': 'create',
+                    recentactivity = {'activity_type': activity_type,
                                       'activity_time': snapshot.created_at,
                                       'activity_result': snapshot.status,
                                       'activity_description': activity_description,
@@ -809,6 +815,7 @@ class API(base.Base):
                 elif now - restore.created_at < timedelta(minutes=time_in_minutes):
                     snapshot = self.db.snapshot_get(context, restore.snapshot_id)
                     workload = self.db.workload_get(context, snapshot.workload_id)
+                    activity_type = 'create'
                     if restore.status == 'error':
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
                                                 ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
@@ -817,12 +824,17 @@ class API(base.Base):
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
                                                 ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)   
+                    elif restore.status == 'cancelled':
+                        activity_type = 'cancel'
+                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' cancelled" %\
+                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
+                                                 workload.display_name)   
                     else:
                         activity_description =  "Restore of Snapshot '%s' of Workload '%s' is in progress" %\
                                                 ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
                                                  workload.display_name)   
                           
-                    recentactivity = {'activity_type': 'create',
+                    recentactivity = {'activity_type': activity_type,
                                       'activity_time': restore.created_at,
                                       'activity_result': restore.status,
                                       'activity_description': activity_description,
