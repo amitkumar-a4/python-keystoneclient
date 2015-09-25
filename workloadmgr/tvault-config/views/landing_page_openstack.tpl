@@ -49,16 +49,27 @@
                         <div class="well">
                             <b>Download <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a>, set the following values and run as sudo...</b><br>
                             <br>
-                            #IP Address of tvault appliance<br>
-                            TVAULT_APPLIANCE_NODE=192.168.1.XXX<br>
-                            <br>
-                            #On OpenStack Controller Node, Set TVAULT_CONTEGO_API as True<br>
-                            TVAULT_CONTEGO_API=False<br>
-                            <br>
-                            #On OpenStack Compute Node, Set TVAULT_CONTEGO_API as True<br>
-                            TVAULT_CONTEGO_EXT=False<br>
-                            TVAULT_CONTEGO_EXT_BIN=/usr/local/bin/tvault-contego<br>
-                            TVAULT_CONTEGO_EXT_USER=nova<br>                   
+							####### IP Address of Trilio Vault Appliance ################################<br>
+							TVAULT_APPLIANCE_NODE=192.168.1.XXX<br>
+							TVAULT_CONTEGO_VERSION=1.0.150<br>
+							<br>
+							####### Nova Configuration Files ########################################<br> 
+							NOVA_CONF_FILE=/etc/nova/nova.conf<br>
+							#Nova distribution specific configuration file path<br>
+							NOVA_DIST_CONF_FILE=/usr/share/nova/nova-dist.conf<br>
+							#Nova compute.filters file path<br> 
+							NOVA_COMPUTE_FILTERS_FILE=/usr/share/nova/rootwrap/compute.filters<br>
+							<br>
+							####### OpenStack Controller Node: Set TVAULT_CONTEGO_API as True #######<br>
+							TVAULT_CONTEGO_API=False<br>
+							<br>
+							####### OpenStack Compute Node: Set TVAULT_CONTEGO_API as True ########<br>
+							TVAULT_CONTEGO_EXT=False<br>
+							TVAULT_CONTEGO_EXT_USER=nova<br>
+							<br>
+							VAULT_STORAGE_TYPE=nfs<br>
+							VAULT_DATA_DIR=/var/triliovault<br>
+							<br>                 
                         </div>                    
                     </li>
                    

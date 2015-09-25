@@ -120,7 +120,7 @@ def log_method(logger, method_name=None, log_args=True, log_retval=True, passwor
                 arg_str = ''
             message_enter = "{method_color}{method_name}{message_color} ENTER {normal_color}({arg_str}) {file_name} {line_num}".format(**{
                 'method_color': BROWN,
-                'method_name': "{}".format(method_name or method.__name__),
+                'method_name': "{0}".format(method_name or method.__name__),
                 'message_color': PURPLE,
                 'normal_color': NORMAL,
                 'arg_str': arg_str,
@@ -139,7 +139,7 @@ def log_method(logger, method_name=None, log_args=True, log_retval=True, passwor
 
             message_exit = "{method_color}{method_name}{message_color} EXIT {normal_color}(Return Value(s):{ret_val}) {file_name} {line_num}".format(**{
                 'method_color': BROWN,
-                'method_name': "{}".format(method_name or method.__name__),
+                'method_name': "{0}".format(method_name or method.__name__),
                 'message_color': BLUE,
                 'normal_color': NORMAL,
                 'ret_val': ret_val_to_log or ret_val,

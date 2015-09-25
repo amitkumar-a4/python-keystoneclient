@@ -819,6 +819,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)  
             
             try:
+                vault.purge_restore_from_staging_area(context, {'restore_id': restore_id})
+            except Exception as ex:
+                LOG.exception(ex)             
+            
+            try:
                 import gc
                 gc.collect() 
             except Exception as ex:
@@ -826,6 +831,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             try:
                 restore = self.db.restore_get(context, restore_id)
+                self.db.snapshot_update(context, restore.snapshot_id, {'status': 'available'})
                 if settings.get_settings(context).get('smtp_email_enable') == 'yes':
                     self.send_email(context,restore,'restore')       
             except Exception as ex:
@@ -842,6 +848,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #unlock the workload
             snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
             self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            self.db.snapshot_update(context, snapshot_id, {'status': 'available'})
 
             status_messages = {'message': 'Snapshot delete operation completed'}
             self.db.task_update(context,task_id,{'status': 'done','finished_at': timeutils.utcnow(),
