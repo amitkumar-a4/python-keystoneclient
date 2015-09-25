@@ -2239,9 +2239,45 @@ def configure():
 @bottle.view('home')
 @authorize()
 def home():
-    bottle.request.environ['beaker.session']['error_message'] = ''    
-    return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
+    if not 'error_message' in bottle.request.environ['beaker.session']:
+       bottle.request.environ['beaker.session']['error_message'] = '' 
+    if not 'success_message' in bottle.request.environ['beaker.session']:
+       bottle.request.environ['beaker.session']['success_message'] = '' 
+     
+    msgs =  dict(error_message = bottle.request.environ['beaker.session']['error_message'],success_message = bottle.request.environ['beaker.session']['success_message'])
+    bottle.request.environ['beaker.session']['error_message'] = ''
+    bottle.request.environ['beaker.session']['success_message'] = ''
+    return msgs
+  
+@bottle.route('/reinitialize')
+@authorize()
+def reinitialize():
+    try:
+        bottle.request.environ['beaker.session']['error_message'] = ''
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        config_data = dict(Config._defaults)
 
+        if 'sql_connection' in config_data:
+           engine = create_engine(config_data['sql_connection'])
+           connection = engine.connect()
+           trans = connection.begin()
+           tables = engine.table_names() 
+           connection.execute("SET FOREIGN_KEY_CHECKS=0")
+           for table in tables:
+               connection.execute("TRUNCATE TABLE "+str(table))
+           connection.execute("SET FOREIGN_KEY_CHECKS=1") 
+           trans.commit()
+           bottle.request.environ['beaker.session']['success_message'] = 'Reinitialized successfully'
+        else:
+             bottle.request.environ['beaker.session']['error_message'] = 'No database found'
+    except Exception as exception:
+           trans.rollback()
+           bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+
+    bottle.redirect("/home")
+
+    
 def findXmlSection(dom, sectionName):
     sections = dom.getElementsByTagName(sectionName)
     return sections[0]

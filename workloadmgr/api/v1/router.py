@@ -140,14 +140,14 @@ class APIRouter(workloadmgr.api.APIRouter):
 
         #remove workloadmanager node
         mapper.connect("workload_remove_node",
-                       "/{project_id}/workloads/metrics/remove_nodes/{ip}",
+                       "/{project_id}/workloads/remove_node/{ip}",
                        controller=self.resources['workloads'],
                        action='remove_node',
                        conditions={"method": ['DELETE']})
 
         #remove workloadmanager node
         mapper.connect("workload_add_node",
-                       "/{project_id}/workloads/metrics/add_node",
+                       "/{project_id}/workloads/add_node",
                        controller=self.resources['workloads'],
                        action='add_node',
                        conditions={"method": ['POST']})
