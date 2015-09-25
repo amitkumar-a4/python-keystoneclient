@@ -39,6 +39,9 @@ from keystoneclient.v2_0 import client as keystone_v2
 
 from oslo.config import cfg
 
+from taskflow.patterns import linear_flow as lf
+from taskflow import engines
+
 from workloadmgr import context
 from workloadmgr import flags
 from workloadmgr import manager
@@ -53,6 +56,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
+
 import  workloadmgr.workflows
 from workloadmgr.workflows import vmtasks_openstack
 from workloadmgr.workflows import vmtasks_vcloud
@@ -724,9 +728,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                 restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                 restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
-                                   
-                                        
-
             if restore_type == 'test':
                 self.db.restore_update( context,
                             restore_id,
@@ -853,9 +854,67 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Mount an existing snapshot
         """
+        def _prepare_snapshot_for_mount(cntx, db, snapshot_id):
+
+            pervmdisks = {}
+            snapshot_obj = db.snapshot_get(cntx, snapshot_id)
+            snapshotvms = self.db.snapshot_vms_get(context, snapshot_id)
+            if not FLAGS.vault_storage_type in ("nfs", "local"):
+
+                context_dict = dict([('%s' % key, value)
+                                      for (key, value) in cntx.to_dict().iteritems()])            
+                context_dict['conf'] =  None # RpcContext object looks for this during init
+
+                #restore, rebase, commit & upload
+                LOG.info(_('Processing disks'))
+                _preparevmflow = lf.Flow(snapshot_id + "DownloadInstance")
+                store = {
+                           'connection': FLAGS.sql_connection,
+                           'context': context_dict,
+                           'snapshot_id': snapshot_id,
+                           'mount_id': str(uuid.uuid4()),
+                        }
+                for instance in snapshotvms:
+                    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
+                                                     instance['vm_id'], snapshot_obj.id)
+   
+
+                    for snapshot_vm_resource in snapshot_vm_resources:
+                        store[snapshot_vm_resource.id] = snapshot_vm_resource.id
+                        store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
+
+                    childflow = vmtasks.LinearPrepareBackupImages(cntx, instance, snapshot_obj)
+                    if childflow:
+                        _preparevmflow.add(childflow)
+
+                # execute the workflow
+                result = engines.run(_preparevmflow, engine_conf='serial',
+                                 backend={'connection': store['connection'] }, store=store)
+                snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
+                                                     instance['vm_id'], snapshot_obj.id)
+                snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
+                for snapshot_vm_resource in snapshot_vm_resources:
+                    if snapshot_vm_resource.resource_type == 'disk':
+                        if not snapshot_vm_resource.vm_id in pervmdisks:
+                            pervmdisks[snapshot_vm_resource.vm_id] = []
+                        if 'restore_file_path_'+snapshot_vm_resource.id in result:
+                            path = result['restore_file_path_'+snapshot_vm_resource.id]
+                            pervmdisks[snapshot_vm_resource.vm_id].append(path)
+            else:
+                for instance in snapshotvms:
+                    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
+                                                     instance['vm_id'], snapshot_obj.id)
+                    snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
+                    for snapshot_vm_resource in snapshot_vm_resources:
+                        if snapshot_vm_resource.resource_type == 'disk':
+                            if not snapshot_vm_resource.vm_id in pervmdisks:
+                                pervmdisks[snapshot_vm_resource.vm_id] = []
+                            vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
+                            pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
+            return pervmdisks
+
         try:
             devpaths = {}
-            pervmdisks = {}
             logicalobjects = {}
             snapshot_metadata = {}
             
@@ -868,13 +927,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
-            snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot['id'])
-            for snapshot_vm_resource in snapshot_vm_resources:
-                if snapshot_vm_resource.resource_type == 'disk':
-                    if not snapshot_vm_resource.vm_id in pervmdisks:
-                        pervmdisks[snapshot_vm_resource.vm_id] = []
-                    vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
-                    pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
+
+            pervmdisks = _prepare_snapshot_for_mount(context, self.db, snapshot_id)
 
             for vmid, diskfiles in pervmdisks.iteritems():
                 # the goal is to mount as many artifacts as possible from snapshot
@@ -967,7 +1021,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     LOG.exception(ex)
                     pass
  
-
         for vmid, paths in devpaths.iteritems():
             try:
                 virtdriver.snapshot_dismount(context, snapshot, paths)
@@ -975,6 +1028,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 # always cleanup as much as possible
                 LOG.exception(ex)
                 pass
+        if not FLAGS.vault_storage_type in ("nfs", "local"):
+            for vmid, paths in devpaths.iteritems():
+                try:
+                    os.remove(paths.keys()[0])
+                except:
+                    pass
+            parent = os.path.dirname(paths.keys()[0])
+            parent = os.path.dirname(parent)
+            shutil.rmtree(parent)
+
         snapshot_metadata = {}
         snapshot_metadata['devpaths'] = ""
         snapshot_metadata['logicalobjects'] = ""

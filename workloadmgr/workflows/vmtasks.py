@@ -12,7 +12,9 @@ specific flows
 import os
 import uuid
 import cPickle as pickle
+from Queue import Queue
 import json
+import shutil
 
 from taskflow import engines
 from taskflow.listeners import printing
@@ -26,11 +28,15 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.virt import driver
+from workloadmgr.virt import qemuimages
 from workloadmgr.vault import vault
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import fileutils
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import timeutils
+from workloadmgr.workloads import workload_utils
 from workloadmgr import autolog
+from workloadmgr import utils
 
 import vmtasks_openstack
 import vmtasks_vcloud
@@ -777,6 +783,113 @@ class ApplyRetentionPolicy(task.Task):
     def revert_with_log(self, *args, **kwargs):       
         pass    
     
+class PrepareBackupImage(task.Task):
+    """
+       Downloads objects in the backup chain and creates linked qcow2 image
+    """
+
+    def execute(self, context, mount_id, snapshot_id, vm_resource_id):
+        return self.execute_with_log(context, mount_id, snapshot_id, vm_resource_id)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'PrepareBackupImage.execute')
+    def execute_with_log(self, context, mount_id, snapshot_id, vm_resource_id):
+
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+
+        snapshot_obj = db.snapshot_get(cntx, snapshot_id)
+        snapshot_vm_resource = db.snapshot_vm_resource_get(cntx, vm_resource_id)
+
+        snapshot_vm_resource_object_store_transfer_time =\
+              workload_utils.download_snapshot_vm_resource_from_object_store(cntx,
+                                                                             mount_id,
+                                                                             snapshot_id,
+                                                                             snapshot_vm_resource.id)
+
+        snapshot_vm_object_store_transfer_time = snapshot_vm_resource_object_store_transfer_time
+        snapshot_vm_data_transfer_time  =  snapshot_vm_resource_object_store_transfer_time
+        temp_directory = os.path.join("/opt/stack/data/wlm", mount_id, vm_resource_id)
+        try:
+            shutil.rmtree( temp_directory )
+        except OSError as exc:
+            pass
+        fileutils.ensure_tree(temp_directory)
+
+        commit_queue = Queue() # queue to hold the files to be committed
+
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
+        disk_format = db.get_metadata_value(vm_disk_resource_snap.metadata, 'disk_format')
+        disk_filename_extention = db.get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
+
+        restored_file_path =temp_directory + '/' + vm_disk_resource_snap.id + \
+                                '_' + snapshot_vm_resource.resource_name + '.' \
+                                + disk_filename_extention
+        restored_file_path = restored_file_path.replace(" ", "")            
+
+        image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
+        if disk_format == 'qcow2' and image_attr.file_format == 'raw':
+            qemuimages.convert_image(vm_disk_resource_snap.vault_path, restored_file_path, 'qcow2')
+        else:
+            shutil.copyfile(vm_disk_resource_snap.vault_path, restored_file_path)
+
+        while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx,
+                                                    vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+            disk_format = db.get_metadata_value(vm_disk_resource_snap_backing.metadata,'disk_format')
+            snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+            restored_file_path_backing =temp_directory + '/' + vm_disk_resource_snap_backing.id + \
+                                            '_' + snapshot_vm_resource_backing.resource_name + '.' \
+                                            + disk_filename_extention
+            restored_file_path_backing = restored_file_path_backing.replace(" ", "")
+            image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap_backing.vault_path)
+            if disk_format == 'qcow2' and image_attr.file_format == 'raw':
+                qemuimages.convert_image(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing, 'qcow2')
+            else:
+                shutil.copyfile(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing)
+  
+            #rebase
+            image_info = qemuimages.qemu_img_info(restored_file_path)
+            image_backing_info = qemuimages.qemu_img_info(restored_file_path_backing)
+
+            #increase the size of the base image
+            if image_backing_info.virtual_size < image_info.virtual_size :
+                qemuimages.resize_image(restored_file_path_backing, image_info.virtual_size)  
+
+            #rebase the image                            
+            qemuimages.rebase_qcow2(restored_file_path_backing, restored_file_path)
+
+            commit_queue.put(restored_file_path)
+            vm_disk_resource_snap = vm_disk_resource_snap_backing
+            restored_file_path = restored_file_path_backing
+
+        while commit_queue.empty() is not True:
+            file_to_commit = commit_queue.get_nowait()
+            try:
+                LOG.debug('Commiting QCOW2 ' + file_to_commit)
+                qemuimages.commit_qcow2(file_to_commit)
+            except Exception, ex:
+                LOG.exception(ex)                       
+
+            if restored_file_path != file_to_commit:
+                utils.delete_if_exists(file_to_commit)
+
+        image_info = qemuimages.qemu_img_info(restored_file_path)
+        self.virtual_size = image_info.virtual_size
+        self.restored_file_path = restored_file_path
+
+        return (restored_file_path, image_info.virtual_size)
+
+    @autolog.log_method(Logger, 'PrepareBackupImage.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            if self.restored_file_path:
+                os.remove(self.restored_file_path)
+        except:
+            pass
+
 def UnorderedPreSnapshot(instances):
     flow = uf.Flow("presnapshotuf")
     for index,item in enumerate(instances):
@@ -980,4 +1093,19 @@ def UnorderedPostRestore(instances):
         rebind_dict = dict(instance = "instance_" + str(index))
         flow.add(PostRestore("PostRestore_" + item['vm_id'], rebind=rebind_dict))
 
+    return flow
+
+def LinearPrepareBackupImages(context, instance, snapshotobj):
+    flow = lf.Flow("processbackupimageslf")
+    db = WorkloadMgrDB().db
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
+                                         instance['vm_id'], snapshotobj.id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+
+        flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
+                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id),
+                                    provides=('restore_file_path_' + str(snapshot_vm_resource.id),
+                                              'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow

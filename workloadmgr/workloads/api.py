@@ -1017,19 +1017,22 @@ class API(base.Base):
                         nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
                         nic = {'mac_address': nic_data['mac_address'],
                                'ip_address': nic_data['ip_address'],}
-                        nic['network'] = {'id': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'),
-                                          'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name')}
+
+                        if self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'):
+                            # if the network is neutron network
+                            nic['network'] = {'id': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'),
+                                              'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name')}
                         
-                        pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')                        
-                        vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
-                        subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                        nic['network']['subnet'] = { 'id' :subnet.get('id', None),
-                                                     'name':subnet.get('name', None),
-                                                     'cidr':subnet.get('cidr', None),
-                                                     'ip_version':subnet.get('ip_version', None),
-                                                     'gateway_ip':subnet.get('gateway_ip', None),
-                                                     }
+                            pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')                        
+                            vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
+                            vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
+                            subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
+                            nic['network']['subnet'] = { 'id' :subnet.get('id', None),
+                                                         'name':subnet.get('name', None),
+                                                         'cidr':subnet.get('cidr', None),
+                                                         'ip_version':subnet.get('ip_version', None),
+                                                         'gateway_ip':subnet.get('gateway_ip', None),
+                                                         }
                         snapshot_vm['nics'].append(nic)
                     """ vdisks """
                     if snapshot_vm_resource.resource_type == 'disk':
@@ -1182,9 +1185,11 @@ class API(base.Base):
 
             AUDITLOG.log(context,'Snapshot Mount Requested', snapshot)
             workload = self.workload_get(context, snapshot['workload_id'])
+
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
+
             mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id)
                         
             AUDITLOG.log(context,'Workload(' + workload['display_name'] + ') ' + 'Snapshot Mounted', snapshot)

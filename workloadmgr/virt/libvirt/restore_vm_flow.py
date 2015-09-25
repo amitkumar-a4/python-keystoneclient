@@ -638,7 +638,7 @@ class AttachVolume(task.Task):
         except:
             pass
 
-def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
+def LinearPrepareBackupImages(context, instance, snapshotobj):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
@@ -831,7 +831,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
 
-    childflow = LinearPrepareBackupImages(cntx, instance, snapshot_obj, restore['id'])
+    childflow = LinearPrepareBackupImages(cntx, instance, snapshot_obj)
     if childflow:
         _restorevmflow.add(childflow)
 
@@ -897,3 +897,4 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         return restored_vm          
     else:
         raise Exception("Restoring VM instance failed")
+

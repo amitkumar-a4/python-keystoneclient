@@ -362,6 +362,8 @@ def mountlvmvgs(mountinfo):
     vgs = []
     pvs = []
     lvs = []
+    purgedlvs = []
+    purgedvgs = []
     try:
         # explore VGs and volumes on the disk
         vgs = getvgs()
@@ -376,7 +378,6 @@ def mountlvmvgs(mountinfo):
                             pvs[index]['filename'] = key
             
         # purge vms based on pvlist
-        purgedvgs = []
         # if pv list does not have any reference to vg, purge the vg
         for vg in vgs:
             for pv in pvs:
@@ -384,7 +385,6 @@ def mountlvmvgs(mountinfo):
                     purgedvgs.append(vg)
                     break
  
-        purgedlvs = []
         for lv in lvs:
             found = False
             for vg in purgedvgs:
@@ -407,6 +407,7 @@ def mountlvmvgs(mountinfo):
                 deactivatevgs(vg['LVM2_VG_NAME'])
             except:
                 pass
+        return pvs, purgedvgs, purgedlvs, mountinfo
 
 def discover_lvs_and_partitions(devicepaths, partitions):
 
@@ -489,6 +490,15 @@ def mount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
         except Exception as ex:
             LOG.exception(ex)
 
+    for rawdisk in logicalobjects['rawdisks']:
+        try:
+            diskpath = vmdir + rawdisk['filename']
+            os.makedirs(diskpath)
+            cmd = ["mount", rawdisk['filename'], diskpath]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        except Exception as ex:
+            LOG.exception(ex)
+
 def umount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
     # umount
     snapshotdir = os.path.join(mountdir, snapshot_id)
@@ -509,6 +519,14 @@ def umount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
             cmd = ["umount", lvpath]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             os.removedirs(lvpath)
+        except Exception as ex:
+            LOG.exception(ex)
+
+    for rawdisk in logicalobjects['rawdisks']:
+        try:
+            diskpath = vmdir + rawdisk['filename']
+            cmd = ["umount", diskpath]
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         except Exception as ex:
             LOG.exception(ex)
 
