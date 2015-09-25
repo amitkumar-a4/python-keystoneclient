@@ -2330,49 +2330,52 @@ def main_http():
 def main():
     #configure the networking
     try:
-        ovfEnv = subprocess.Popen("echo `vmtoolsd --cmd \"info-get guestinfo.ovfenv\"`", shell=True, stdout=subprocess.PIPE).stdout.read()
-        propertyMap = getPropertyMap(ovfEnv)
-        
-        ip1 = propertyMap["ip1"]
-        ip2 = propertyMap.get('ip2', '192.168.3.100')
-        hostname    = propertyMap["hostname"]
-        
-        #adjust hostname       
-        fh, abs_path = mkstemp()
-        new_file = open(abs_path,'w')
-        new_file.write(hostname)
-        #close temp file
-        new_file.close()
-        close(fh)
-        #Move new file
-        command = ['sudo', 'mv', abs_path, "/etc/hostname"];
-        subprocess.call(command, shell=False)
-        os.chmod('/etc/hostname', 0644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
-        subprocess.call(command, shell=False)
-
-        command = ['sudo', 'hostname', hostname];
-        subprocess.call(command, shell=False)        
-                
-        # adjust hosts file
-        fh, abs_path = mkstemp()
-        new_file = open(abs_path,'w')
-        new_file.write('127.0.0.1 localhost\n')
-        new_file.write('127.0.0.1 ' + hostname + '\n')
-        new_file.write(ip1 + ' ' + hostname + '\n')
-        new_file.write(ip2 + ' ' + hostname + '\n')
-        
-        #close temp file
-        new_file.close()
-        close(fh)
-        #Move new file
-        command = ['sudo', 'mv', abs_path, "/etc/hosts"];
-        subprocess.call(command, shell=False)
-        os.chmod('/etc/hosts', 0644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
-        subprocess.call(command, shell=False)
-        
-        set_network_interfaces(propertyMap)
+        try:
+            ovfEnv = subprocess.Popen("echo `vmtoolsd --cmd \"info-get guestinfo.ovfenv\"`", shell=True, stdout=subprocess.PIPE).stdout.read()
+            propertyMap = getPropertyMap(ovfEnv)
+            
+            ip1 = propertyMap["ip1"]
+            ip2 = propertyMap.get('ip2', '192.168.3.100')
+            hostname    = propertyMap["hostname"]
+            
+            #adjust hostname       
+            fh, abs_path = mkstemp()
+            new_file = open(abs_path,'w')
+            new_file.write(hostname)
+            #close temp file
+            new_file.close()
+            close(fh)
+            #Move new file
+            command = ['sudo', 'mv', abs_path, "/etc/hostname"];
+            subprocess.call(command, shell=False)
+            os.chmod('/etc/hostname', 0644)
+            command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+            subprocess.call(command, shell=False)
+    
+            command = ['sudo', 'hostname', hostname];
+            subprocess.call(command, shell=False)        
+                    
+            # adjust hosts file
+            fh, abs_path = mkstemp()
+            new_file = open(abs_path,'w')
+            new_file.write('127.0.0.1 localhost\n')
+            new_file.write('127.0.0.1 ' + hostname + '\n')
+            new_file.write(ip1 + ' ' + hostname + '\n')
+            new_file.write(ip2 + ' ' + hostname + '\n')
+            
+            #close temp file
+            new_file.close()
+            close(fh)
+            #Move new file
+            command = ['sudo', 'mv', abs_path, "/etc/hosts"];
+            subprocess.call(command, shell=False)
+            os.chmod('/etc/hosts', 0644)
+            command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+            subprocess.call(command, shell=False)
+            
+            set_network_interfaces(propertyMap)
+        except Exception as ex:
+            pass
         
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
