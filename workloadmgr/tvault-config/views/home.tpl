@@ -11,6 +11,12 @@
 	<!-- Latest compiled and minified JavaScript -->
 	<script src="js/bootstrap.min.js"></script>
 	
+	<script>
+	function warnReinitialize() {
+	   return confirm("Reinitializing will erase the backup metadata from the the appliance. \nThis operation can't be undone. Proceed to reinitialize?");
+	}
+	</script>
+	
 </head>
 
 <body>
@@ -56,8 +62,8 @@
         <div class="row">
             <div>
                 <a href="/configure">Configuration</a>
-            	<br><br>                       
-                <a href="/reinitialize" onclick='return confirm("Are you sure want to reinitialize? \n (This will empty all data)")'>Reinitialize</a>
+            	<br><br>
+            	<a href="/reinitialize" onclick='return warnReinitialize(this)';>Reinitialize</a>                       
                 <br><br>
                 <a href="/services">Services</a>
             	<br><br>
