@@ -162,6 +162,10 @@ class WorkloadMgrsController(wsgi.Controller):
             description = ''
             if (body and 'snapshot' in body):
                 name = body['snapshot'].get('name', '')
+                if not name:
+                    name = ''
+                if not description:
+                    description = ''                    
                 description = body['snapshot'].get('description', '')
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)                
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
