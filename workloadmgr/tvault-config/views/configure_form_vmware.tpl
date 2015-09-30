@@ -114,6 +114,47 @@
 	    	<label class="input-group-addon">Domain Search Order</label>
 	    	<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
 		</div><br>   	      
+
+               <div class="panel-group" id="accordion">
+		  <div class="panel panel-default" id="panel9">
+		    <div class="panel-heading">
+		      <h4 class="panel-title">
+		        <a data-toggle="collapse" data-target="#collapseNine" href="#collapseNine">
+		          NTP
+		        </a>
+		      </h4>
+		    </div>
+		    <div id="collapseNine" class="panel-collapse collapse in">
+		      <div class="panel-body">
+                        <div class="input-group">
+                             %if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+								<input name="ntp-enabled" checked id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px;">(List ntp servers separated by comma) </span>
+							%else:
+								<input name="ntp-enabled" id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px">(List ntp servers separated by comma) </span>
+							%end    		
+                        </div>
+                        <br />
+	    		<div class="input-group" >                                        
+					<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+	    			        <input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" required placeholder="pool.ntp.org" class="form-control" />
+	    		</div>
+                        <br />
+                        <div class="input-group">
+	                     <label class="input-group-addon">Timezone&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                             <select name="timezone" id="timezone" class="form-control">
+                             %for tz in timezones:
+                                   %if tz==timezone:
+                                       <option value="{{tz}}" selected>{{tz}}</option>
+                                   %else:
+                                        <option value="{{tz}}">{{tz}}</option>
+                                   %end
+                            %end
+                            </select>
+                        </div>
+	 	      </div>
+		    </div>
+		  </div>
+		</div> 
 	    
 		<div class="panel-group" id="accordion">
 		  <div class="panel panel-default" id="panel3">
