@@ -1499,9 +1499,7 @@ def configure_form_vmware():
     pip.main(['install', 'pytz'])
     pip.main(['install', 'tzlocal'])
     from pytz import all_timezones
-    import platform
     from tzlocal import get_localzone
-    type_os = platform.linux_distribution()
     timezone = get_localzone().zone
     config_database['timezones'] = all_timezones
     config_database['timezone'] = timezone
