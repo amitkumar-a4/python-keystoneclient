@@ -136,15 +136,22 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             return nics
         def _snapshot_nova_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
+            networks = compute_service.get_networks(cntx)
+
             nics = []
             uniquemacs = set()
-            if 'private' in interfaces:
-                for interface in interfaces['private']:
+            for networkname, interfaceinfo in interfaces.iteritems():
+                for interface in interfaceinfo:
                     if not interface['OS-EXT-IPS-MAC:mac_addr'] in uniquemacs: 
                         nic = {} #nic is dictionary to hold the following data
                 
                         nic.setdefault('ip_address', interface['addr'])
                         nic.setdefault('mac_address', interface['OS-EXT-IPS-MAC:mac_addr'])
+                        nic.setdefault('network_name', networkname)
+                        for net in networks:
+                            if net.label == networkname:
+                                nic.setdefault('network_id', net.id)
+                                break
                         nics.append(nic)
                         uniquemacs.add(interface['OS-EXT-IPS-MAC:mac_addr'])
             return nics
@@ -585,21 +592,23 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             
             network_type = db.get_metadata_value(vm_nic_snapshot.metadata,
                                                   'network_type')
-            if network_type != 'neutron':
-                continue
 
             nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
-            if nic_data['mac_address'] in restored_net_resources:
-                nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
+            if network_type != 'neutron':
+                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+                nic_info.setdefault('net-id', db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'))
             else:
-                #private network
-                pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
-                new_network = restored_net_resources[pit_id]
-                nic_info.setdefault('net-id', new_network['id']) 
-                #TODO(giri): the ip address sometimes may not be available due to one of the router or network
-                #interfaces taking them over
-                #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+                if nic_data['mac_address'] in restored_net_resources:
+                    nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
+                else:
+                    #private network
+                    pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
+                    new_network = restored_net_resources[pit_id]
+                    nic_info.setdefault('net-id', new_network['id']) 
+                    #TODO(giri): the ip address sometimes may not be available due to one of the router or network
+                    #interfaces taking them over
+                    #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
             restored_nics.append(nic_info) 
     return restored_nics 
 
@@ -770,56 +779,57 @@ def restore_vm_networks(cntx, db, restore):
             if snapshot_vm_resource.resource_type == 'nic':
                 network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
                                                        'network_type')
-                if network_type != 'neutron':
-                    continue
 
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
-                new_port = _get_nic_port_from_restore_options(restore_options, nic_data,
-                                                              snapshot_vm.vm_id,
-                                                              nic_data['mac_address'])
-                if new_port:
-                    restored_net_resources.setdefault(nic_data['mac_address'], new_port)
-                    continue
-                #private network
-                pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
-                if pit_id:
-                    if pit_id in restored_net_resources:
-                        new_network = restored_net_resources[pit_id]
-                    else:
-                        raise Exception("Could not find the network that matches the restore options")
-
-                #private subnet
-                pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')
-                if pit_id:
-                    if pit_id in restored_net_resources:
-                        new_subnet = restored_net_resources[pit_id]
-                    else:
-                        raise Exception("Could not find the network that matches the restore options")
-
-                #external network
-                pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_network_id')
-                if pit_id:
-                    if pit_id in restored_net_resources:
-                        new_ext_network = restored_net_resources[pit_id]
-                    else:
-                        raise Exception("Could not find the network that matches the restore options")
-                        
-                    #external subnet
-                    pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_subnet_id')
+                if network_type != 'neutron':
+                    restored_net_resources.setdefault(nic_data['mac_address'], nic_data)
+                else:
+                    new_port = _get_nic_port_from_restore_options(restore_options, nic_data,
+                                                               snapshot_vm.vm_id,
+                                                               nic_data['mac_address'])
+                    if new_port:
+                        restored_net_resources.setdefault(nic_data['mac_address'], new_port)
+                        continue
+                    #private network
+                    pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
                     if pit_id:
                         if pit_id in restored_net_resources:
-                            new_ext_subnet = restored_net_resources[pit_id]
+                            new_network = restored_net_resources[pit_id]
                         else:
                             raise Exception("Could not find the network that matches the restore options")
 
-                #router
-                pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'router_id')
-                if pit_id:
-                    if pit_id in restored_net_resources:
-                        new_router = restored_net_resources[pit_id]
-                    else:
-                        raise Exception("Could not find the network that matches the restore options")
+                    #private subnet
+                    pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')
+                    if pit_id:
+                        if pit_id in restored_net_resources:
+                            new_subnet = restored_net_resources[pit_id]
+                        else:
+                            raise Exception("Could not find the network that matches the restore options")
+
+                    #external network
+                    pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_network_id')
+                    if pit_id:
+                        if pit_id in restored_net_resources:
+                            new_ext_network = restored_net_resources[pit_id]
+                        else:
+                            raise Exception("Could not find the network that matches the restore options")
+                        
+                        #external subnet
+                        pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_subnet_id')
+                        if pit_id:
+                            if pit_id in restored_net_resources:
+                                new_ext_subnet = restored_net_resources[pit_id]
+                            else:
+                                raise Exception("Could not find the network that matches the restore options")
+
+                    #router
+                    pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'router_id')
+                    if pit_id:
+                        if pit_id in restored_net_resources:
+                            new_router = restored_net_resources[pit_id]
+                        else:
+                            raise Exception("Could not find the network that matches the restore options")
 
     return restored_net_resources
 

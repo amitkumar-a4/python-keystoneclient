@@ -789,6 +789,25 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return              
+    @synchronized(novalock)
+    def get_networks(self, context):
+        """
+        Get the list of nova networks
+
+        :param is_public: public networks
+        :rtype: :class:`Network`
+        """
+        try:
+            client = novaclient(context, self._production)
+            return client.networks.list()
+        except nova_exception.Unauthorized as unauth_ex:
+            client.client.unauthenticate()
+            client = novaclient(context, self._production)
+            return client.networks.list()
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
 
     @synchronized(novalock)
     def vast_prepare(self, context, server, params):
