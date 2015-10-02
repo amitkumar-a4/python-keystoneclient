@@ -42,6 +42,8 @@ import sqlalchemy
 from sqlalchemy import *
 from workloadmgr.db.sqlalchemy import models
 
+import pip
+
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
@@ -1493,7 +1495,14 @@ def configure_form_vmware():
           config_database['nodetype'] = config_data['nodetype']
     else:
          config_database['refresh'] = 1
- 
+
+    pip.main(['install', 'pytz'])
+    pip.main(['install', 'tzlocal'])
+    from pytz import all_timezones
+    from tzlocal import get_localzone
+    timezone = get_localzone().zone
+    config_database['timezones'] = all_timezones
+    config_database['timezone'] = timezone
     config_database['create_file_system'] = 'off'
     config_database['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_database
@@ -2037,6 +2046,92 @@ def persist_config():
         raise exception                    
     time.sleep(1)
     return {'status':'Success'}    
+
+@bottle.route('/ntp_setup')
+@authorize()
+def ntp_setup():
+    try:
+        import platform
+        type_os = platform.linux_distribution() 
+        if type_os[0].lower() == "ubuntu":
+           command = ['sudo', 'apt-get', 'install', "ntp"]
+        else:
+             command = ['sudo', 'yum', 'install', "ntp"] 
+        subprocess.call(command, shell=False)
+        contents = open('/etc/ntp.conf', 'r').read()
+        new_contents = ""
+        detect = 0
+        ntps = config_data['ntp_servers']
+        ntp_str = ""
+        count = 0
+        for ntp in ntps.split(','):
+            if count > 5:
+               break
+            ntp_str += "server "+ntp.strip()+" \n" 
+
+        for line in contents.splitlines():
+            line = line.strip()
+            if (line.find('#server ') != -1 or line.find('server ') != -1) and (detect == 0 or detect == 1):
+               detect = 1
+            else:
+                 if line.find('fallback') != -1 and detect == 1:
+                    detect = 2
+                    new_contents += ntp_str
+                 elif detect == 1:
+                      detect = 3
+                      new_contents += ntp_str
+
+                 new_contents += line+"\n"
+
+        conf_file = open('/etc/ntp.conf', 'w')
+        conf_file.write(new_contents)
+        conf_file.close()
+    
+        if type_os[0].lower() == "ubuntu":       
+           timezone_file = open('/etc/timezone', 'w')
+           timezone_file.write(config_data['timezone']+"\n")
+           timezone_file.close()
+           command = ['sudo', 'dpkg-reconfigure', '-f', 'noninteractive', 'tzdata']
+           subprocess.call(command, shell=False)
+     
+        command = ['sudo', 'service', 'ntp', 'stop']
+        subprocess.call(command, shell=False)
+        current_time = time.time()
+        delay = current_time + 300
+        status = 0
+        while delay > current_time:
+              if os.system('ping -c 1 8.8.8.8') == 0:
+                 for ntp in ntps.split(','):
+                     if os.system("ping -c 1 " + ntp.strip()) == 0: 
+                        if count > 5:
+                           break;
+                        if status == 0:
+                           command = ['sudo', 'ntpdate', '-s', ntp.strip()]
+                           subprocess.call(command, shell=False)
+                           status = 1
+                        count = count + 1
+                 break;
+              else:
+                   error_msg = "Network connection unavailabe to update time instantly"
+        
+        if status == 0:
+           error_msg = "NTP servers unavailable to update time instantly <b> Enter valid servers </b>"
+        
+        if count > 5:
+           errro_msg = "Maximum 5 servers allowed <b> Suppressed rest </b>"
+ 
+        command = ['sudo', 'service', 'ntp', 'restart']
+        subprocess.call(command, shell=False) 
+
+        if 'error_msg' in vars():
+           return {'status':error_msg} 
+             
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        config_data['config_status'] = 'failed'
+        raise exception
+    time.sleep(1)
+    return {'status':'Success'}
     
 @bottle.post('/configure_vmware')
 @authorize()
@@ -2070,7 +2165,14 @@ def configure_vmware():
         config_data['vcenter'] = config_inputs['vcenter']
         config_data['vcenter_username'] = config_inputs['vcenter-username']
         config_data['vcenter_password'] = config_inputs['vcenter-password']
+
+        if 'ntp-enabled' in config_inputs:
+            config_data['ntp_enabled'] = config_inputs['ntp-enabled']
+        else:
+            config_data['ntp_enabled'] = 'off'
         
+        config_data['ntp_servers'] = config_inputs['ntp-servers']
+        config_data['timezone'] = config_inputs['timezone']
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']
         if 'create-file-system' in config_inputs:

@@ -14,6 +14,7 @@
 
 <script>
 var xmlhttp;
+var ntp_note = "";
 function loadXMLDoc(url, callback)
 {
   	if (window.XMLHttpRequest)
@@ -299,9 +300,39 @@ function taskfunction()
 													//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
 													return;
 												}
+
+                                                                 loadXMLDoc("ntp_setup",function() {
+                                                                                        document.getElementById("ntp_setup").children[0].classList.add("glyphicon-refresh");
+                                                                                        if (xmlhttp.readyState != 4) return;
+                                                                                        document.getElementById("ntp_setup").children[0].classList.remove("glyphicon-refresh");
+                                                                                        if (xmlhttp.readyState==4 && xmlhttp.status==200)
+                                                                                        {
+                                                                                                obj = jQuery.parseJSON(xmlhttp.responseText)
+                                                                                                if(obj.status != 'Success') {
+                                                                                                  ntp_note = obj.status
+                                                                                                } 
+                                                                                                document.getElementById("ntp_setup").classList.add("list-group-item-success");
+                                                                                                document.getElementById("ntp_setup").children[0].classList.add("glyphicon-ok");
+                                                                                        }
+                                                                                        else
+                                                                                        {
+                                                                                                $("#error_message").html(xmlhttp.responseText);
+                                                                                                $("#alert").show();
+                                                                                                document.getElementById("ntp_setup").classList.add("list-group-item-danger");
+                                                                                                document.getElementById("ntp_setup").children[0].classList.add("glyphicon-remove");
+                                                                                                document.getElementById("final_status").classList.add("list-group-item-danger");
+                                                                                                //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
+                                                                                                return;
+                                                                                        }
+  
 						                        document.getElementById("final_status").classList.add("list-group-item-success");
 						                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-						                        document.getElementById("final_status").innerHTML = "<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> TrilioVault Dashboard</a> </b>";
+                                                                        if(ntp_note != "") {
+                                                                           ntp_note = "Note: "+ntp_note+" <br />"
+                                                                        }
+						                        document.getElementById("final_status").innerHTML = ntp_note+"<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> TrilioVault Dashboard</a> </b>";
+
+                                                                      });
 	
 						                   });
 						               });
@@ -386,6 +417,13 @@ $( document ).ready(function() {
     %end      			
     <li id="discover_vcenter" class="list-group-item"><span class="glyphicon"></span>
                 Discover vCenter inventory</li>                
+     %if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+        <li id="ntp_setup" class="list-group-item"><span class="glyphicon"></span>
+        NTP setup</li>
+     %else:
+        <li id="ntp_setup" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+        NTP setup</li>
+     %end
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>

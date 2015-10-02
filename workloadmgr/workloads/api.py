@@ -673,15 +673,17 @@ class API(base.Base):
                raise wlm_exceptions.ErrorOccurred(reason=msg)                 
             command = ['sudo', 'curl', '-k', '--cookie', file_name, '--data', "refresh=1&from=api&tvault-primary-node="+controller_ip+"1&nodetype=additional", "https://"+ip+"/configure_vmware"];
             subprocess.call(command, shell=False)
-            urls = ['configure_host','authenticate_with_vcenter','authenticate_with_swift','register_service','configure_api','configure_scheduler','configure_service','start_api','start_scheduler','start_service','register_workloadtypes','workloads_import','discover_vcenter']
+            urls = ['configure_host','authenticate_with_vcenter','authenticate_with_swift','register_service','configure_api','configure_scheduler','configure_service','start_api','start_scheduler','start_service','register_workloadtypes','workloads_import','discover_vcenter','ntp_setup']
             if len(config_inputs['swift_auth_url']) == 0:
                urls.remove('authenticate_with_swift')
             if config_inputs['import_workloads'] == 'off':
                urls.remove('workloads_import') 
+            if config_inputs['ntp_enabled'] == 'off':
+               urls.remove('ntp_setup') 
             for url in urls:
                 command = ['sudo', 'curl', '-k', '--cookie', file_name,  "https://"+ip+"/"+url];
                 res = subprocess.check_output(command)          
-                if res != '{"status": "Success"}':
+                if res != '{"status": "Success"}' and url != 'ntp_setup':
                    command = ['sudo', 'rm', '-rf', file_name];
                    subprocess.call(command, shell=False)         
                    msg = _(res) 
