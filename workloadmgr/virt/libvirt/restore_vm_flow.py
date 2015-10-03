@@ -534,6 +534,11 @@ class RestoreInstanceFromImage(task.Task):
         if instance_options and 'name' in instance_options:
             restored_instance_name = instance_options['name']
 
+        # refresh the token
+        user_id = self.cntx.user
+        project_id = self.cntx.tenant
+        self.cntx = nova._get_tenant_context(user_id, project_id)
+
         restored_compute_image = compute_service.get_image(self.cntx, imageid)
         LOG.debug('Creating Instance ' + restored_instance_name) 
         
@@ -850,7 +855,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     if result and 'restored_instance_id' in result:
         restored_instance_id = result['restored_instance_id']
         compute_service = nova.API(production = (not test))
-        restored_instance = compute_service.get_server_by_id(cntx, restored_instance_id)
+        restored_instance = compute_service.get_server_by_id(cntx,
+                                         restored_instance_id, admin=True)
 
         restored_vm_values = {'vm_id': restored_instance_id,
                               'vm_name':  restored_instance.name,    
@@ -868,7 +874,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
-            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'], snapshot_vm_resource.id)
+            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'],
+                                           snapshot_vm_resource.id)
             try:
                 shutil.rmtree(temp_directory)
             except OSError as exc:
