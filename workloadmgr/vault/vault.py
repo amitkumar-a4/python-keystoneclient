@@ -474,8 +474,12 @@ def download_snapshot_vm_from_object_store(context, snapshot_vm_metadata):
 def download_snapshot_vm_resource_from_object_store(context, snapshot_vm_resource_metadata):
     start_time = timeutils.utcnow()    
     if CONF.vault_storage_type == 'swift-i' or CONF.vault_storage_type == 'swift-s': 
-        progress_msg = "Downloading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
-        WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+        try:
+            progress_msg = "Downloading '" + snapshot_vm_resource_metadata['snapshot_vm_resource_name'] +\
+                           "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
+            WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+        except:
+            pass
         snapshot_vm_resource_folder = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
         container = get_swift_container(context, snapshot_vm_resource_metadata)
         swift_download_folder(context, snapshot_vm_resource_folder, container)

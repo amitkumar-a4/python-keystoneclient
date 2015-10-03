@@ -33,6 +33,10 @@ from workloadmgr import exception
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
 
+from workloadmgr import autolog
+
+LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 nova_opts = [
     cfg.StrOpt('nova_admin_auth_url',
@@ -329,8 +333,7 @@ class API(base.Base):
             #Perform translation required if any
             return item 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             item = client.servers.create(  name, image, flavor, 
                                            meta=meta, files=files,
                                            reservation_id=reservation_id, min_count=min_count,
@@ -362,8 +365,7 @@ class API(base.Base):
             client = novaclient(context, self._production, admin=admin)
             servers = client.servers.list(True, search_opts)
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production, admin=admin)
+            client = novaclient(context, self._production, admin=True)
             servers = client.servers.list(True, search_opts)
         return servers
         
@@ -382,8 +384,7 @@ class API(base.Base):
             client = novaclient(context, self._production, admin)
             return client.servers.find(name=name) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production, admin=admin)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.find(name=name) 
         except Exception as ex:
             LOG.exception(ex)
@@ -400,8 +401,7 @@ class API(base.Base):
             client = novaclient(context, self._production, admin)
             return client.security_groups.get(secid)
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production, admin=admin)
+            client = novaclient(context, self._production, admin=True)
             return client.security_groups.get(secid)
         except Exception as ex:
             LOG.exception(ex)
@@ -418,8 +418,7 @@ class API(base.Base):
             client = novaclient(context, self._production, admin)
             return client.security_groups.list()
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production, admin=admin)
+            client = novaclient(context, self._production, admin=True)
             return client.security_groups.list()
         except Exception as ex:
             LOG.exception(ex)
@@ -456,7 +455,6 @@ class API(base.Base):
                     server = client.servers._get("/servers/%s%s" % (id, query_string), "server")
                     return server
             except nova_exception.Unauthorized as unauth_ex:
-                client.client.unauthenticate()
                 retries -= 1
                 if not retries:
                     raise
@@ -476,8 +474,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.stop(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.stop(server=server) 
         except Exception  as ex:
             LOG.exception(ex)
@@ -495,8 +492,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.start(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.start(server=server) 
         except Exception  as ex:
             LOG.exception(ex)
@@ -514,8 +510,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.suspend(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.suspend(server=server) 
         except Exception  as ex:
             LOG.exception(ex)
@@ -533,8 +528,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.resume(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.resume(server=server) 
         except Exception as ex:
             LOG.exception(ex)
@@ -552,8 +546,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.pause(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.pause(server=server) 
         except Exception as ex:
             LOG.exception(ex)
@@ -571,8 +564,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.unpause(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.unpause(server=server) 
         except Exception as ex:
             LOG.exception(ex)
@@ -590,8 +582,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.delete(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.delete(server=server) 
         except Exception as ex:
             LOG.exception(ex)
@@ -609,8 +600,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.force_delete(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.force_delete(server=server) 
         except Exception as ex:
             LOG.exception(ex)
@@ -632,8 +622,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.volumes.create_server_volume(server_id, volume_id, device) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.volumes.create_server_volume(server_id, volume_id, device) 
         except Exception as ex:
             LOG.exception(ex)
@@ -653,8 +642,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.images.find(id=id) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.images.find(id=id) 
         except Exception as ex:
             LOG.exception(ex)
@@ -673,8 +661,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.flavors.list(is_public=is_public) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.list(is_public=is_public) 
         except Exception as ex:
             LOG.exception(ex)
@@ -694,8 +681,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.flavors.find(name=name) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.find(name=name) 
         except Exception as ex:
             LOG.exception(ex)
@@ -715,8 +701,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.flavors.get(id) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.get(id) 
         except Exception as ex:
             LOG.exception(ex)
@@ -734,13 +719,12 @@ class API(base.Base):
         """   
    
         try:
-            client = novaclient(context, self._production, True)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.create(name, 
                                          memory, vcpus, root_gb, flavorid="auto", 
                                          ephemeral = ephemeral_gb)
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production, True)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.create(name, 
                                          memory, vcpus, root_gb, flavorid="auto", 
                                          ephemeral = ephemeral_gb)
@@ -756,11 +740,10 @@ class API(base.Base):
         """   
     
         try:
-            client = novaclient(context, self._production, True)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.delete(id) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production, True)
+            client = novaclient(context, self._production, admin=True)
             return client.flavors.delete(id) 
         except Exception as ex:
             LOG.exception(ex)
@@ -778,8 +761,7 @@ class API(base.Base):
             client = novaclient(context, self._production)
             return client.servers.interface_list(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client = novaclient(context, self._production)
+            client = novaclient(context, self._production, admin=True)
             return client.servers.interface_list(server=server) 
         except nova_exception.HTTPNotImplemented:
             # This is configured to use nova network
@@ -789,6 +771,24 @@ class API(base.Base):
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
             return              
+    @synchronized(novalock)
+    def get_networks(self, context):
+        """
+        Get the list of nova networks
+
+        :param is_public: public networks
+        :rtype: :class:`Network`
+        """
+        try:
+            client = novaclient(context, self._production)
+            return client.networks.list()
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.networks.list()
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
 
     @synchronized(novalock)
     def vast_prepare(self, context, server, params):
@@ -801,8 +801,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_prepare(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_prepare(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -820,8 +819,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_freeze(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_freeze(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -839,8 +837,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_thaw(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_thaw(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -858,8 +855,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_instance(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_instance(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -877,8 +873,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_get_info(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_get_info(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -896,8 +891,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True) 
         except Exception as ex:
             LOG.exception(ex)
@@ -915,8 +909,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_data_transfer_status(server=server, params=params, do_checksum=True) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_data_transfer_status(server=server, params=params, do_checksum=True) 
         except Exception as ex:
             LOG.exception(ex)
@@ -924,6 +917,7 @@ class API(base.Base):
             raise   
         
     @synchronized(novalock)
+    @autolog.log_method(logger=Logger)    
     def vast_finalize(self, context, server, params):
         """
         Finalize the VAST
@@ -934,8 +928,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.vast_finalize(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_finalize(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -953,8 +946,7 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.testbubble_attach_volume(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.testbubble_attach_volume(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
@@ -972,8 +964,8 @@ class API(base.Base):
             client =  novaclient(context, self._production, extensions=extensions)
             return client.contego.testbubble_reboot_instance(server=server, params=params) 
         except nova_exception.Unauthorized as unauth_ex:
-            client.client.unauthenticate()
-            client =  novaclient(context, self._production, extensions=extensions)
+            client =  novaclient(context, self._production,
+                                  extensions=extensions, admin=True)
             return client.contego.testbubble_reboot_instance(server=server, params=params) 
         except Exception as ex:
             LOG.exception(ex)
