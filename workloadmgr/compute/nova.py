@@ -33,6 +33,10 @@ from workloadmgr import exception
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
 
+from workloadmgr import autolog
+
+LOG = logging.getLogger(__name__)
+Logger = autolog.Logger(LOG)
 
 nova_opts = [
     cfg.StrOpt('nova_admin_auth_url',
@@ -943,6 +947,7 @@ class API(base.Base):
             raise   
         
     @synchronized(novalock)
+    @autolog.log_method(logger=Logger)    
     def vast_finalize(self, context, server, params):
         """
         Finalize the VAST

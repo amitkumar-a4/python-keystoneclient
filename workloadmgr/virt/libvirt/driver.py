@@ -637,6 +637,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
 
+                # Get a new token, just to be safe
+                user_id = cntx.user
+                project_id = cntx.tenant
+                cntx = nova._get_tenant_context(user_id, project_id)
                 compute_service.vast_data_transfer(cntx, instance['vm_id'], {'path': backing['path'],
                                                                              'metadata': snapshot_vm_disk_resource_metadata,
                                                                              'disk_info': disk_info})
@@ -653,7 +657,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 data_transfer_completed = False
                 while True:
                     try:
-                        time.sleep(5)
+                        time.sleep(15)
                         data_transfer_status = compute_service.vast_data_transfer_status(cntx, instance['vm_id'],
                                                                                         {'metadata': {'resource_id' : vm_disk_resource_snap_id}})
                         if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):

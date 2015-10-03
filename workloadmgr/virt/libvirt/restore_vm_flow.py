@@ -208,6 +208,12 @@ class UploadImageToGlance(task.Task):
                               }
 
         LOG.debug('Uploading image ' + restore_file_path)
+
+        # refresh the token
+        user_id = self.cntx.user
+        project_id = self.cntx.tenant
+        self.cntx = nova._get_tenant_context(user_id, project_id)
+
         self.restored_image = restored_image = \
                       self.image_service.create(self.cntx, image_metadata)
         if restore_obj['restore_type'] == 'test':
@@ -618,7 +624,7 @@ class AttachVolume(task.Task):
         except:
             pass
 
-def LinearPrepareBackupImages(context, instance, snapshotobj):
+def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
@@ -811,7 +817,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
 
-    childflow = LinearPrepareBackupImages(cntx, instance, snapshot_obj)
+    childflow = LinearPrepareBackupImages(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 

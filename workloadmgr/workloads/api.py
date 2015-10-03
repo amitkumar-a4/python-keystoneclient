@@ -958,7 +958,7 @@ class API(base.Base):
         try:
             workload = self.workload_get(context, workload_id)
             snapshot_display_name = ''
-            if len(name) > 0:
+            if name and len(name) > 0:
                 snapshot_display_name = '\'' + name + '\''
             AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' ' + snapshot_type + ' Snapshot ' + snapshot_display_name + ' Create Requested', workload)
         
@@ -1194,7 +1194,7 @@ class API(base.Base):
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
             restore_display_name = ''
-            if len(name) > 0:
+            if name and len(name) > 0:
                 restore_display_name = '\'' + name + '\''
             AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Create Requested', snapshot)
 
