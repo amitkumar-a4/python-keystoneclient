@@ -960,6 +960,8 @@ class API(base.Base):
             snapshot_display_name = ''
             if name and len(name) > 0:
                 snapshot_display_name = '\'' + name + '\''
+            else:
+                snapshot_display_name = '\'' + 'Undefined' + '\''
             AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' ' + snapshot_type + ' Snapshot ' + snapshot_display_name + ' Create Requested', workload)
         
             workloads = self.db.workload_get_all(context)
@@ -1196,6 +1198,8 @@ class API(base.Base):
             restore_display_name = ''
             if name and len(name) > 0:
                 restore_display_name = '\'' + name + '\''
+            else:
+                restore_display_name = '\'' + 'Undefined' + '\''
             AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Create Requested', snapshot)
 
             if snapshot['status'] != 'available':

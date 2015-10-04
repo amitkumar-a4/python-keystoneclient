@@ -571,6 +571,7 @@ class RestoreInstanceFromImage(task.Task):
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
             time.sleep(10)
+
             restored_instance =  compute_service.get_server_by_id(self.cntx, restored_instance.id)
             if hasattr(restored_instance,'status'):
                 if restored_instance.status == 'ERROR':
@@ -890,4 +891,3 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         return restored_vm          
     else:
         raise Exception("Restoring VM instance failed")
-
