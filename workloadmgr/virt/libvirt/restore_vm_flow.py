@@ -874,7 +874,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
-            temp_directory = os.path.join("/opt/stack/data/wlm", restore['id'],
+            temp_directory = os.path.join("/var/triliovault", restore['id'],
                                            snapshot_vm_resource.id)
             try:
                 shutil.rmtree(temp_directory)

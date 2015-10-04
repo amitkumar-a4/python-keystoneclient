@@ -657,13 +657,15 @@ class LibvirtDriver(driver.ComputeDriver):
                 data_transfer_completed = False
                 while True:
                     try:
-                        time.sleep(15)
-                        data_transfer_status = compute_service.vast_data_transfer_status(cntx, instance['vm_id'],
-                                                                                        {'metadata': {'resource_id' : vm_disk_resource_snap_id}})
-                        if data_transfer_status and 'status' in data_transfer_status and len(data_transfer_status['status']):
-                            for line in data_transfer_status['status']:
-                                if 'Errored' in line:
-                                    raise Exception("Data transfer failed")
+                        time.sleep(10)
+                        async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                                   instance['vm_id'],
+                                                                                   {'metadata': {'snapshot_id': snapshot['id'],
+                                                                                                 'resource_id' : vm_disk_resource_snap_id}})
+                        if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
+                            for line in async_task_status['status']:
+                                if 'Error' in line:
+                                    raise Exception("Data transfer failed - " + line)
                                 if 'Completed' in line:
                                     data_transfer_completed = True
                                     break;
@@ -694,16 +696,17 @@ class LibvirtDriver(driver.ComputeDriver):
                                                 'time_taken' : int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),
                                                 'size' : backing['size'],
                                                 'status': 'available'}
-                db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+                vm_disk_resource_snap = db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 if vm_disk_resource_snap_backing:
                     vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(cntx, 
                                                                                     vm_disk_resource_snap_backing.id,
                                                                                     {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
                     # Upload snapshot metadata to the vault
                     snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                    workload_utils.upload_snapshot_db_entry(cntx, snapshot_vm_resource_backing.snapshot_id)                  
-                
-                
+                    workload_utils.upload_snapshot_db_entry(cntx, snapshot_vm_resource_backing.snapshot_id) 
+                    # Update the qcow2 backings
+                    qemuimages.rebase_qcow2(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap.vault_path)
+                    
                 vm_disk_size = vm_disk_size + backing['size']
                 vm_disk_resource_snap_backing = vm_disk_resource_snap
                 
@@ -722,7 +725,39 @@ class LibvirtDriver(driver.ComputeDriver):
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
-        return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+        snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'], 'snapshot_vm_id': instance['vm_id']}
+        compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+        start_time = timeutils.utcnow()
+        async_task_completed = False
+        while True:
+            try:
+                time.sleep(15)
+                async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                           instance['vm_id'],
+                                                                           {'metadata': {'snapshot_id': snapshot['id'],
+                                                                                         'resource_id' : instance['vm_id']}})
+                if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
+                    for line in async_task_status['status']:
+                        if 'Error' in line:
+                            raise Exception("Finalizing the snapshot failed - " + line)
+                        if 'Completed' in line:
+                            async_task_completed = True
+                            break;
+
+                if async_task_completed:
+                    break;
+            except nova_unauthorized as ex:
+                LOG.exception(ex)
+                # recreate the token here
+                user_id = cntx.user
+                project_id = cntx.tenant
+                cntx = nova._get_tenant_context(user_id, project_id)
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=10*60):
+                raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')        
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):

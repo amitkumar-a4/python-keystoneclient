@@ -15,7 +15,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 LOG = logging.getLogger(__name__)
 db = WorkloadMgrDB().db
 
-settings_file_dir = '/opt/stack/data/wlm/settings/'
+settings_file_dir = '/var/triliovault/settings/'
 settings_file_name = 'workloadmgr-settings.conf'
 
 default_settings = {

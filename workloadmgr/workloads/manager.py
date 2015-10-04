@@ -76,7 +76,7 @@ Logger = autolog.Logger(LOG)
 
 workloads_manager_opts = [
     cfg.StrOpt('mountdir',
-               default='/opt/stack/data/wlm/tvault-mounts',
+               default='/var/triliovault/tvault-mounts',
                help='Root directory where all snapshots are mounted.'),
 ]
 

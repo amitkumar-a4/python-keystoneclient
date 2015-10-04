@@ -811,7 +811,7 @@ class PrepareBackupImage(task.Task):
 
         snapshot_vm_object_store_transfer_time = snapshot_vm_resource_object_store_transfer_time
         snapshot_vm_data_transfer_time  =  snapshot_vm_resource_object_store_transfer_time
-        temp_directory = os.path.join("/opt/stack/data/wlm", mount_id, vm_resource_id)
+        temp_directory = os.path.join("/var/triliovault", mount_id, vm_resource_id)
         try:
             shutil.rmtree( temp_directory )
         except OSError as exc:
