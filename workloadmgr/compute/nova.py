@@ -435,7 +435,7 @@ class API(base.Base):
         :param id to query.
         :rtype: :class:`Server`
         """   
-        retries = 2
+        retries = 3
         while retries:
             try:
                 if search_opts == None:
@@ -460,6 +460,7 @@ class API(base.Base):
                     return server
             except nova_exception.Unauthorized as unauth_ex:
                 retries -= 1
+                admin = True
                 if not retries:
                     raise
             except Exception as ex:

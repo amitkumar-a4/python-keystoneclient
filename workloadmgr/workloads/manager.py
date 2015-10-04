@@ -375,7 +375,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       {'status': 'error',
                                        'fail_reason': unicode(err)})
         
-    @synchronized(workloadlock)
+    #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
         """

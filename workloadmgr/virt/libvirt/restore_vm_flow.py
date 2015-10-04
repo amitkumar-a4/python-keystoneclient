@@ -252,6 +252,9 @@ class UploadImageToGlance(task.Task):
     @autolog.log_method(Logger, 'UploadImageToGlance.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
+            user_id = self.cntx.user
+            project_id = self.cntx.tenant
+            self.cntx = nova._get_tenant_context(user_id, project_id)
             self.image_service.delete(self.cntx, self.imageid)
         except:
             pass
@@ -571,6 +574,7 @@ class RestoreInstanceFromImage(task.Task):
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
             time.sleep(10)
+
             restored_instance =  compute_service.get_server_by_id(self.cntx, restored_instance.id)
             if hasattr(restored_instance,'status'):
                 if restored_instance.status == 'ERROR':
@@ -890,4 +894,3 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         return restored_vm          
     else:
         raise Exception("Restoring VM instance failed")
-
