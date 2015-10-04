@@ -252,6 +252,9 @@ class UploadImageToGlance(task.Task):
     @autolog.log_method(Logger, 'UploadImageToGlance.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
+            user_id = self.cntx.user
+            project_id = self.cntx.tenant
+            self.cntx = nova._get_tenant_context(user_id, project_id)
             self.image_service.delete(self.cntx, self.imageid)
         except:
             pass

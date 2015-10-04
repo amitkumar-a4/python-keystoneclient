@@ -780,24 +780,33 @@ def snapshot_mark_incomplete_as_error(context, host):
                             filter_by(host=host).all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error' and \
-           snapshot.status != 'mounted' and snapshot.status != 'cancelled':
+           snapshot.status != 'restoring' and snapshot.status != 'mounted' and \
+           snapshot.status != 'cancelled':
             values =  {'progress_percent': 100, 'progress_msg': '',
                        'error_msg': 'Snapshot did not finish successfully',
                        'status': 'error' }
             snapshot.update(values)
+            snapshot.save(session=session)
+
+        if snapshot.status == 'restoring':
+            values =  { 'status': 'available' }
             snapshot.save(session=session)
             
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error' and\
-           snapshot.status != 'mounted' and snapshot.status != 'cancelled':
+           snapshot.status != 'restoring' and snapshot.status != 'mounted' and \
+           snapshot.status != 'cancelled':
             if (snapshot.host is not None) and snapshot.host == '':
                 values =  {'progress_percent': 100, 'progress_msg': '',
                            'error_msg': 'Snapshot did not finish successfully',
                            'status': 'error' }
                 snapshot.update(values)
                 snapshot.save(session=session)
+        if snapshot.status == 'restoring':
+            values =  { 'status': 'available' }
+            snapshot.save(session=session)
 
 #### Snapshot ################################################################
 """ snapshot functions """

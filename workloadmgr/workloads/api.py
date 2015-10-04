@@ -1196,11 +1196,14 @@ class API(base.Base):
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
             restore_display_name = ''
-            if name and len(name) > 0:
-                restore_display_name = '\'' + name + '\''
-            else:
-                restore_display_name = '\'' + 'Undefined' + '\''
-            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Create Requested', snapshot)
+
+            if not name or len(name) == 0:
+                name = 'Undefined'
+            restore_display_name = '\'' + name + '\''
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + \
+                         snapshot_snapshot_type + ' Snapshot \'' + \
+                         snapshot_display_name + '\' Restore \'' + \
+                         restore_display_name + '\' Create Requested', snapshot)
 
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
@@ -1234,7 +1237,10 @@ class API(base.Base):
             if restore_display_name == 'One Click Restore':
                 local_time = self.get_local_time(context, restore['created_at']) 
                 restore_display_name = local_time + ' (' + restore['display_name'] + ')'
-            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Create Submitted', restore)
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + \
+                         snapshot_snapshot_type + ' Snapshot \'' + \
+                         snapshot_display_name + '\' Restore \'' + \
+                         restore_display_name + '\' Create Submitted', restore)
             return restore
         except Exception as ex:
             LOG.exception(ex)
