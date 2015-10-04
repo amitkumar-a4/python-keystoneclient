@@ -1577,19 +1577,19 @@ def configure_host():
             subprocess.call(command, shell=False)
         
         try:
-            command = ['sudo', 'umount', '/opt/stack/data/wlm']
+            command = ['sudo', 'umount', '/var/triliovault']
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass
         
         try:
-            command = ['sudo', 'umount', '/opt/stack/data/wlm']
+            command = ['sudo', 'umount', '/var/triliovault']
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass           
         
         try:
-            command = ['sudo', 'umount', '-l', '/opt/stack/data/wlm']
+            command = ['sudo', 'umount', '-l', '/var/triliovault']
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass                
@@ -1599,7 +1599,7 @@ def configure_host():
             replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
             command = ['sudo', 'service', 'rpcbind', 'restart']
             subprocess.call(command, shell=False)            
-            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/opt/stack/data/wlm']
+            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
             subprocess.check_call(command, shell=False) 
         else:       
             command = ['sudo', 'rescan-scsi-bus']
@@ -1609,10 +1609,10 @@ def configure_host():
                 command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
                 subprocess.call(command, shell=False) 
             
-            command = ['sudo', 'mkdir', '/opt/stack/data/wlm']
+            command = ['sudo', 'mkdir', '/var/triliovault']
             subprocess.call(command, shell=False)
             
-            command = ['sudo', 'mount', config_data['storage_local_device'], '/opt/stack/data/wlm']
+            command = ['sudo', 'mount', config_data['storage_local_device'], '/var/triliovault']
             subprocess.check_call(command, shell=False) 
 
     except Exception as exception:

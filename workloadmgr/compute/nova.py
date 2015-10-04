@@ -72,7 +72,7 @@ nova_opts = [
                help='auth system for connecting to '
                     'nova in admin context'),
     cfg.IntOpt('nova_url_timeout',
-               default=600,
+               default=60,
                help='timeout value for connecting to nova in seconds'),
 
               
@@ -209,7 +209,8 @@ def novaclient(context, production, admin=False, extensions = None):
                                    project_id=httpclient.tenant_id,
                                    auth_url=url,
                                    insecure=CONF.nova_api_insecure,
-                                   extensions = extensions)            
+                                   extensions = extensions,
+                                   timeout=CONF.nova_url_timeout)            
         else:
             url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
             c = nova_client.Client(CONF.nova_admin_username,
@@ -217,7 +218,8 @@ def novaclient(context, production, admin=False, extensions = None):
                                    project_id=httpclient.tenant_id,
                                    auth_url=url,
                                    insecure=CONF.nova_api_insecure,
-                                   extensions = extensions)                 
+                                   extensions = extensions,
+                                   timeout=CONF.nova_url_timeout)                 
         LOG.debug(_('Novaclient connection created using URL: %s') % url)
         c.client.auth_token = httpclient.auth_token
         c.client.management_url = url
@@ -232,7 +234,8 @@ def novaclient(context, production, admin=False, extensions = None):
                                project_id=context.project_id,
                                auth_url=url,
                                insecure=CONF.nova_api_insecure,
-                               extensions = extensions)
+                               extensions = extensions,
+                               timeout=CONF.nova_url_timeout)
         # noauth extracts user_id:tenant_id from auth_token
         c.client.auth_token = context.auth_token or '%s:%s' % (context.user_id, context.project_id)
         c.client.management_url = url
@@ -258,7 +261,8 @@ def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_templat
                            project_id=httpclient.tenant_id,
                            auth_url=url,
                            insecure=CONF.nova_api_insecure,
-                           extensions = None)            
+                           extensions = None,
+                           timeout=CONF.nova_url_timeout)            
     LOG.debug(_('Novaclient connection created using URL: %s') % url)
     c.client.auth_token = httpclient.auth_token
     c.client.management_url = url
@@ -899,7 +903,7 @@ class API(base.Base):
             raise   
 
     @synchronized(novalock)
-    def vast_data_transfer_status(self, context, server, params):
+    def vast_async_task_status(self, context, server, params):
         """
         Get data transfer status of VASTed instance component
         :param server: The :class:`Server` (or its ID) to query.
@@ -907,10 +911,10 @@ class API(base.Base):
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_data_transfer_status(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True) 
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_data_transfer_status(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True) 
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception   
