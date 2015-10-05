@@ -29,6 +29,7 @@ from workloadmgr import settings as settings_module
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib
+import socket
 
 FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
@@ -476,6 +477,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 self.workload_api.remove_node(context, ip)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -498,6 +500,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 self.workload_api.add_node(context, ip)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -634,6 +637,21 @@ class WorkloadMgrsController(wsgi.Controller):
             html += 'Test email</body></html>'
 
             try:
+                 settings = settings_module.get_settings() 
+                 import re
+                 for setting in settings:
+                     if setting.strip().find('smtp_') >= 0:
+                        value = settings_module.get_settings().get(setting)
+                        if value == "" or len(value) <= 1:
+                           if settings_module.get_settings().get('smtp_server_name') == 'localhost' and (setting == 'smtp_server_password' or setting == 'smtp_server_username'):
+                              continue
+                           else:
+                                 raise exception.ErrorOccurred("Mandatory field "+setting+" cannot be empty") 
+                        elif (setting == 'smtp_default_sender' or setting == 'smtp_default_recipient') and not re.search(r'[\w.-]+@[\w.-]+.\w+', value):
+                             raise exception.ErrorOccurred("Please enter valid email address for "+setting)                                  
+                        elif setting == 'smtp_timeout' and int(value) > 10:
+                             raise exception.ErrorOccurred(setting+" cannot be greater than 10") 
+
                  msg = MIMEMultipart('alternative')
                  msg['From'] = settings_module.get_settings().get('smtp_default_sender')
                  if settings_module.get_settings().get('smtp_default_recipient') is None: 
@@ -644,18 +662,29 @@ class WorkloadMgrsController(wsgi.Controller):
                  msg['Subject'] = 'Testing email configuration'
                  part2 = MIMEText(html, 'html')
                  msg.attach(part2)
-                 s = smtplib.SMTP(settings_module.get_settings().get('smtp_server_name'),int(settings_module.get_settings().get('smtp_port')))
-                 if settings_module.get_settings().get('smtp_server_name') != 'localhost':
-                    s.ehlo()
-                    s.starttls()
-                    s.ehlo
-                    s.login(settings_module.get_settings().get('smtp_server_username'),settings_module.get_settings().get('smtp_server_password'))
-                 s.sendmail(msg['From'], msg['To'], msg.as_string())
-                 s.quit()
-
+                 try:
+                     socket.setdefaulttimeout(int(settings_module.get_settings().get('smtp_timeout')))
+                     s = smtplib.SMTP(settings_module.get_settings().get('smtp_server_name'),int(settings_module.get_settings().get('smtp_port')))
+                     if settings_module.get_settings().get('smtp_server_name') != 'localhost':
+                        s.ehlo()
+                        s.starttls()
+                        s.ehlo
+                        s.login(settings_module.get_settings().get('smtp_server_username'),settings_module.get_settings().get('smtp_server_password'))
+                     s.sendmail(msg['From'], msg['To'], msg.as_string())
+                     s.quit()
+                 except smtplib.SMTPException as ex:
+                        if ex.smtp_code == 535:
+                           msg = ex.smtp_error
+                        else:
+                             msg = "Error authenticating with specified username and password"
+                        raise exception.ErrorOccurred(msg)
             except Exception as error:
-                   raise exception.ErrorOccurred("Not able to send email with this configuration")
-
+                   msg = error
+                   if error.message[0] == -5:
+                      msg = 'smtp_server_name is not valid'
+                   if error.message.__class__.__name__ == 'timeout':
+                      msg = 'smtp server unreachable with this smtp_server_name and smtp_port values' 
+                   raise exception.ErrorOccurred(msg)
         except exception.InvalidState as error:
             LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
