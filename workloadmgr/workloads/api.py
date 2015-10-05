@@ -962,8 +962,10 @@ class API(base.Base):
         try:
             workload = self.workload_get(context, workload_id)
             snapshot_display_name = ''
-            if len(name) > 0:
+            if name and len(name) > 0:
                 snapshot_display_name = '\'' + name + '\''
+            else:
+                snapshot_display_name = '\'' + 'Undefined' + '\''
             AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' ' + snapshot_type + ' Snapshot ' + snapshot_display_name + ' Create Requested', workload)
         
             workloads = self.db.workload_get_all(context)
@@ -1094,15 +1096,16 @@ class API(base.Base):
                                           'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name')}
                         
                         pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')                        
-                        vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
-                        vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
-                        subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
-                        nic['network']['subnet'] = { 'id' :subnet.get('id', None),
-                                                     'name':subnet.get('name', None),
-                                                     'cidr':subnet.get('cidr', None),
-                                                     'ip_version':subnet.get('ip_version', None),
-                                                     'gateway_ip':subnet.get('gateway_ip', None),
-                                                     }
+                        if pit_id:
+                            vm_nic_subnet = _get_pit_resource(snapshot_vm_common_resources, pit_id)
+                            vm_nic_subnet_snapshot = self.db.vm_network_resource_snap_get(context, vm_nic_subnet.id)
+                            subnet = pickle.loads(str(vm_nic_subnet_snapshot.pickle))
+                            nic['network']['subnet'] = { 'id' :subnet.get('id', None),
+                                                         'name':subnet.get('name', None),
+                                                         'cidr':subnet.get('cidr', None),
+                                                         'ip_version':subnet.get('ip_version', None),
+                                                         'gateway_ip':subnet.get('gateway_ip', None),
+                                                       }
                         snapshot_vm['nics'].append(nic)
                     """ vdisks """
                     if snapshot_vm_resource.resource_type == 'disk':
@@ -1197,9 +1200,14 @@ class API(base.Base):
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
             restore_display_name = ''
-            if len(name) > 0:
-                restore_display_name = '\'' + name + '\''
-            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Create Requested', snapshot)
+
+            if not name or len(name) == 0:
+                name = 'Undefined'
+            restore_display_name = '\'' + name + '\''
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + \
+                         snapshot_snapshot_type + ' Snapshot \'' + \
+                         snapshot_display_name + '\' Restore \'' + \
+                         restore_display_name + '\' Create Requested', snapshot)
 
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
@@ -1233,7 +1241,10 @@ class API(base.Base):
             if restore_display_name == 'One Click Restore':
                 local_time = self.get_local_time(context, restore['created_at']) 
                 restore_display_name = local_time + ' (' + restore['display_name'] + ')'
-            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + snapshot_snapshot_type + ' Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Create Submitted', restore)
+            AUDITLOG.log(context,'Workload \'' + workload_display_name + '\' ' + \
+                         snapshot_snapshot_type + ' Snapshot \'' + \
+                         snapshot_display_name + '\' Restore \'' + \
+                         restore_display_name + '\' Create Submitted', restore)
             return restore
         except Exception as ex:
             LOG.exception(ex)

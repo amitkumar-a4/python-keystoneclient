@@ -610,7 +610,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             Config = ConfigParser.RawConfigParser()
-            Config.read('/opt/stack/data/wlm/settings/workloadmgr-settings.conf')
+            Config.read('/var/triliovault/settings/workloadmgr-settings.conf')
             
             settings = None            
             if (body and 'settings' in body):

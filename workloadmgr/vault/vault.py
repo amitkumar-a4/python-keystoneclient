@@ -48,7 +48,7 @@ wlm_vault_opts = [
                help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'), 
     # swift-i: integrated(keystone), swift-s: standalone
     cfg.StrOpt('vault_data_directory',
-               default='/opt/stack/data/wlm',
+               default='/var/triliovault',
                help='Location where snapshots will be stored'),
     cfg.StrOpt('vault_storage_nfs_export',
                default='local',
@@ -127,6 +127,22 @@ def run_async(func):
         return func_hl
 
     return async_func
+
+def get_progress_tracker_path(tracker_metadata):
+    progress_tracker_directory = ''
+    if CONF.vault_storage_type == 'local' or \
+       CONF.vault_storage_type == 'vault' or \
+       CONF.vault_storage_type == 'nfs' or \
+       CONF.vault_storage_type == 'das':
+        progress_tracker_directory = os.path.join(CONF.vault_data_directory + "/contego_tasks") + \
+                                    '/snapshot_%s' % (tracker_metadata['snapshot_id'])
+    else:
+        return None
+           
+    fileutils.ensure_tree(progress_tracker_directory)
+    progress_tracking_file_path = os.path.join(progress_tracker_directory + '/' + tracker_metadata['resource_id'])    
+    return progress_tracking_file_path        
+
 
 def get_vault_data_directory():
     vault_data_directory = ''
@@ -474,8 +490,12 @@ def download_snapshot_vm_from_object_store(context, snapshot_vm_metadata):
 def download_snapshot_vm_resource_from_object_store(context, snapshot_vm_resource_metadata):
     start_time = timeutils.utcnow()    
     if CONF.vault_storage_type == 'swift-i' or CONF.vault_storage_type == 'swift-s': 
-        progress_msg = "Downloading '"+ snapshot_vm_resource_metadata['snapshot_vm_resource_name'] + "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
-        WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+        try:
+            progress_msg = "Downloading '" + snapshot_vm_resource_metadata['snapshot_vm_resource_name'] +\
+                           "' of '" + snapshot_vm_resource_metadata['snapshot_vm_name'] + "' from object store"
+            WorkloadMgrDB().db.restore_update(context, snapshot_vm_resource_metadata['restore_id'], {'progress_msg': progress_msg})  
+        except:
+            pass
         snapshot_vm_resource_folder = get_snapshot_vm_resource_path(snapshot_vm_resource_metadata)
         container = get_swift_container(context, snapshot_vm_resource_metadata)
         swift_download_folder(context, snapshot_vm_resource_folder, container)
@@ -999,7 +1019,7 @@ def get_total_capacity(context):
                     if stderr != '':
                         msg = _('Could not execute du command successfully. Error %s'), (stderr)
                         raise exception.ErrorOccurred(reason=msg)
-                    #196022926557    /opt/stack/data/wlm
+                    #196022926557    /var/triliovault
                     du_values = stdout.split()                
                     total_utilization = int(du_values[0])
                 except Exception as ex:
@@ -1031,16 +1051,3 @@ def get_total_capacity(context):
     except Exception as ex:
         LOG.exception(ex)    
     return total_capacity,total_utilization                                           
-   
-@autolog.log_method(logger=Logger) 
-def get_data_transfer_status(context, metadata):
-    data_transfer_status = {'status' : []}
-    try:
-        progress_tracking_file_path = '/var/run/workloadmgr' + '/' + metadata['resource_id']
-        with open(progress_tracking_file_path, "r") as progress_tracking_file:
-            data_transfer_status['status'] = progress_tracking_file.readlines()
-            
-    except:
-        """ TODO let the caller know, or we will go into a loop """
-        pass
-    return data_transfer_status     

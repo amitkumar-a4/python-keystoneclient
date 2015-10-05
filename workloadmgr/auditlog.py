@@ -28,7 +28,7 @@ CONF.register_opts(auditlog_opts)
 _auditloggers = {}
 lock = threading.Lock()
 
-def getAuditLogger(name='auditlog', version='unknown', filepath='/opt/stack/data/wlm/auditlogs/auditlog.log'):
+def getAuditLogger(name='auditlog', version='unknown', filepath='/var/triliovault/auditlogs/auditlog.log'):
     if name not in _auditloggers:
         _auditloggers[name] = AuditLog(name, version, filepath)
     
