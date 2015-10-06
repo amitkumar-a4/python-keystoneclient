@@ -423,11 +423,41 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))                       
 
-    def import_workloads(self, req):
+    def get_import_workloads_list(self, req):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                workloads = self.workload_api.import_workloads(context)
+                workloads = self.workload_api.get_import_workloads_list(context)
+                return self._view_builder.detail_list(req, workloads) 
+            except exception.WorkloadNotFound as error:
+                LOG.exception(error)
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            except exception.InvalidState as error:
+                LOG.exception(error)
+                raise exc.HTTPBadRequest(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def import_workloads(self, req, body={}):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                workload_ids = body['workload_ids']
+            except KeyError:
+                   workload_ids = []
+
+            try:
+                workloads = self.workload_api.import_workloads(context, workload_ids)
                 return self._view_builder.detail_list(req, workloads)
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
