@@ -644,6 +644,7 @@ class API(base.Base):
                     LOG.exception(ex)
         except Exception as ex:
             LOG.exception(ex)
+            raise ex
 
     @autolog.log_method(logger=Logger)
     def add_node(self, context, ip):
@@ -671,7 +672,7 @@ class API(base.Base):
             if not config_inputs:
                msg = _("No configurations found")
                raise wlm_exceptions.ErrorOccurred(reason=msg)                 
-            command = ['sudo', 'curl', '-k', '--cookie', file_name, '--data', "refresh=1&from=api&tvault-primary-node="+controller_ip+"1&nodetype=additional", "https://"+ip+"/configure_vmware"];
+            command = ['sudo', 'curl', '-k', '--cookie', file_name, '--data', "refresh=1&from=api&tvault-primary-node="+controller_ip+"&nodetype=additional", "https://"+ip+"/configure_vmware"];
             subprocess.call(command, shell=False)
             urls = ['configure_host','authenticate_with_vcenter','authenticate_with_swift','register_service','configure_api','configure_scheduler','configure_service','start_api','start_scheduler','start_service','register_workloadtypes','workloads_import','discover_vcenter','ntp_setup']
             if len(config_inputs['swift_auth_url']) == 0:
@@ -693,11 +694,12 @@ class API(base.Base):
 
         except Exception as ex:
             LOG.exception(ex)
+            raise ex
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         total_capacity, total_utilization = vault.get_total_capacity(context)
-        storage_usage = {'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}        
+        storage_usage = {'storage_type':vault.CONF.vault_storage_type,'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}        
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes'):
                 for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes'):

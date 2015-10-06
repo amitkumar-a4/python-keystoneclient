@@ -2146,6 +2146,8 @@ def configure_vmware():
            engine = create_engine(config_data['sql_connection'])
            for row in engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator')):
                items = dict(row.items())
+               if config_inputs['nodetype'] == 'additional' and items['name'] == 'nodetype':
+                  items['value'] = 'additional'
                config_data[items['name']] = items['value']  
                config_inputs[items['name'].replace('_','-')] = items['value']
            config_data['refresh'] = 0
