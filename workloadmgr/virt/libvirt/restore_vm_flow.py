@@ -145,7 +145,7 @@ class PrepareBackupImage(task.Task):
     
             image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
             self.restored_file_path = vm_disk_resource_snap_staging_path
-            return (self.vm_disk_resource_snap_staging_path, image_info.virtual_size)
+            return (self.restored_file_path, image_info.virtual_size)
         
     @autolog.log_method(Logger, 'PrepareBackupImage.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -448,7 +448,7 @@ class RestoreNFSVolume(task.Task):
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         
         time_offset = datetime.now() - datetime.utcnow()
-        desciption = 'Restored from Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'display_name')
@@ -725,7 +725,6 @@ class AttachVolume(task.Task):
         self.volume_service = volume_service = cinder.API()
         if restore_type == 'restore':
             self.restored_volume = restored_volume = volume_service.get(self.cntx, volumeid)
-            import pdb; pdb.set_trace()
             while restored_volume['status'].lower() != 'available' and restored_volume['status'].lower() != 'error':
                 #TODO:(giri) need a timeout to exit
                 LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
@@ -811,7 +810,7 @@ def RestoreInstance(context, instance, snapshotobj, restoreid):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if snapshot_vm_resource.resource_name == 'vda':
+        if snapshot_vm_resource.resource_name != 'vda':
             continue        
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
