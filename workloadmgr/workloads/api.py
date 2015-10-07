@@ -645,9 +645,13 @@ class API(base.Base):
                     ip_addresses = node_record.ip_addresses.split(';')
                     if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
                         ipaddress = ip_addresses[0]
+                    is_controller = False
+                    if socket.gethostname() == node_record.host:
+                       is_controller = True
                     nodes.append({'node':node_record.host, 
                                   'version':node_record.version, 
-                                  'ipaddress': ipaddress})
+                                  'ipaddress': ipaddress,
+                                  'is_controller': is_controller})
                 except Exception as ex:
                     LOG.exception(ex)                      
         except Exception as ex:
