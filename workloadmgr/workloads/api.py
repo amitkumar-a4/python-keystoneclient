@@ -568,14 +568,40 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
+   
+    @autolog.log_method(logger=Logger)
+    def get_import_workloads_list(self, context):
+        AUDITLOG.log(context,'Get Import Workloads List Requested', None)
+        try:
+            workloads = []
+            for workload_url in vault.get_workloads(context):
+                try:
+                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
+                    workloads.append(workload_values)
+                except Exception as ex:
+                    LOG.exception(ex)
+                    continue
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            vault.purge_staging_area(context)
+        AUDITLOG.log(context,'Get Import Workloads List Completed', None)
+        return workloads
     
     @autolog.log_method(logger=Logger)    
-    def import_workloads(self, context):
+    def import_workloads(self, context, workload_ids=[]):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         try:
             workloads = []
             import_workload_module = None
-            for workload_url in vault.get_workloads(context):
+            workload_url = vault.get_workloads(context)
+            workload_url_iterate = []
+            if len(workload_ids) > 0:
+               for workload in workload_url:
+                   if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
+                      workload_url_iterate.append(workload)
+            del workload_url[:]
+            for workload_url in workload_url_iterate:
                 try:
                     workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
                 except Exception as ex:
