@@ -568,11 +568,43 @@ class LibvirtDriver(driver.ComputeDriver):
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
+        image_service = glance.GlanceImageService()
+        volume_service = cinder.API()
+        
+        import pdb; pdb.set_trace()        
+        nova_instance = compute_service.get_server_by_id(cntx, instance['vm_id'])
+        cinder_volumes = []
+        for volume in getattr(nova_instance, 'os-extended-volumes:volumes_attached'):
+            cinder_volumes.append(volume_service.get(cntx, volume['id']))
+        
+        
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
             user_id = cntx.user
             project_id = cntx.tenant
             cntx = nova._get_tenant_context(user_id, project_id)
+            
+            snapshot_vm_resource_metadata =  {'disk_info': json.dumps(disk_info)}
+            if disk_info['dev'] == 'vda' and nova_instance.image and len(nova_instance.image) > 0:
+                glance_image = image_service.show(cntx, nova_instance.image)
+                snapshot_vm_resource_metadata['image_id'] = glance_image['id']
+                snapshot_vm_resource_metadata['image_name'] = glance_image['name']
+                snapshot_vm_resource_metadata['container_format'] = glance_image['container_format']
+                snapshot_vm_resource_metadata['disk_format'] = glance_image['disk_format']
+                snapshot_vm_resource_metadata['min_ram'] = glance_image['min_ram']
+                snapshot_vm_resource_metadata['min_disk'] = glance_image['min_disk']                                                                  
+            else:
+                snapshot_vm_resource_metadata['image_id'] = None
+
+                
+            for cinder_volume in cinder_volumes:
+                if disk_info['dev'] in cinder_volume['mountpoint']:
+                    snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
+                    snapshot_vm_resource_metadata['display_name'] = cinder_volume['display_name']
+                    snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
+                    snapshot_vm_resource_metadata['volume_type_id'] = cinder_volume['volume_type_id']
+                    snapshot_vm_resource_metadata['volume_mountpoint'] = cinder_volume['mountpoint']
+                    break
 
             vm_disk_size = 0
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
@@ -582,7 +614,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                            'resource_type': 'disk',
                                            'resource_name': disk_info['dev'],
                                            'resource_pit_id': disk_info['path'],
-                                           'metadata': {'disk_info': json.dumps(disk_info)},
+                                           'metadata': snapshot_vm_resource_metadata,
                                            'status': 'creating'}
             snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, snapshot_vm_resource_values)
 

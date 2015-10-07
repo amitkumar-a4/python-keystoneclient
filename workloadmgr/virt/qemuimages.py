@@ -173,7 +173,7 @@ def qemu_img_info(path):
 
 def convert_image(source, dest, out_format, run_as_root=False):
     """Convert image to other format."""
-    cmd = ('qemu-img', 'convert', '-o', 'compat=0.10', '-O',
+    cmd = ('qemu-img', 'convert', '-t', 'none', '-O',
            out_format, source, dest)
     utils.execute(*cmd, run_as_root=run_as_root)
 
@@ -255,3 +255,4 @@ def get_disk_backing_file(path, basename=True):
         backing_file = os.path.basename(backing_file)
 
     return backing_file    
+

@@ -6,7 +6,9 @@ import json
 import shutil
 import math
 import time
-import datetime
+from datetime import datetime
+import subprocess
+from subprocess import check_output
 
 from oslo.config import cfg
 
@@ -45,7 +47,10 @@ from workloadmgr import exception
 restore_vm_opts = [
     cfg.StrOpt('ceph_pool_name',
                default='volumes',
-               help='Ceph pool name configured for Cinder')
+               help='Ceph pool name configured for Cinder'),
+    cfg.StrOpt('cinder_nfs_mount_point_base',
+               default='/opt/stack/data/mnt',
+               help='Dir where the nfs volume is mounted for restore'),                   
     ]
 
 LOG = logging.getLogger(__name__)
@@ -74,71 +79,74 @@ class PrepareBackupImage(task.Task):
         restore_obj = db.restore_get(self.cntx, restore_id)
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
-
-        snapshot_vm_resource_object_store_transfer_time =\
-              workload_utils.download_snapshot_vm_resource_from_object_store(self.cntx,
-                                                                             restore_obj.id,
-                                                                             restore_obj.snapshot_id,
-                                                                             snapshot_vm_resource.id)
-
-        snapshot_vm_object_store_transfer_time = snapshot_vm_resource_object_store_transfer_time
-        snapshot_vm_data_transfer_time  =  snapshot_vm_resource_object_store_transfer_time
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
         
-        
-        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id)
-        vm_disk_resource_snap_staging_path = vault.get_restore_vm_disk_resource_staging_path(\
-                                                {'restore_id' : restore_obj.id,
-                                                 'workload_id': snapshot_obj.workload_id,
-                                                 'snapshot_id': snapshot_obj.id,
-                                                 'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                 'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                 'snapshot_vm_resource_name':  snapshot_vm_resource.resource_name,
-                                                 'vm_disk_resource_snap_id' : vm_disk_resource_snap.id,   
-                                                 })
-        head, tail = os.path.split(vm_disk_resource_snap_staging_path)
-        fileutils.ensure_tree(head)
-        shutil.copyfile(vm_disk_resource_snap.vault_path, vm_disk_resource_snap_staging_path)
-        
-
-        to_commit = []            
-        while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
-            to_commit.append(vm_disk_resource_snap_staging_path)           
-            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(self.cntx, \
-                                                vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-            vm_disk_resource_snap_backing_staging_path = vault.get_restore_vm_disk_resource_staging_path(\
-                                                        {'restore_id' : restore_obj.id,
-                                                         'workload_id': snapshot_obj.workload_id,
-                                                         'snapshot_id': snapshot_obj.id,
-                                                         'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                         'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                         'snapshot_vm_resource_name':  snapshot_vm_resource.resource_name,
-                                                         'vm_disk_resource_snap_id' : vm_disk_resource_snap_backing.id,   
-                                                         })
-            head, tail = os.path.split(vm_disk_resource_snap_backing_staging_path)
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') == None and vault.commit_supported() == True:
+            image_info = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
+            return (vm_disk_resource_snap.vault_path, image_info.virtual_size)                           
+        else:
+            # Need to stage the files and commit
+            snapshot_vm_resource_object_store_transfer_time =\
+                  workload_utils.download_snapshot_vm_resource_from_object_store(self.cntx,
+                                                                                 restore_obj.id,
+                                                                                 restore_obj.snapshot_id,
+                                                                                 snapshot_vm_resource.id)
+    
+            snapshot_vm_object_store_transfer_time = snapshot_vm_resource_object_store_transfer_time
+            snapshot_vm_data_transfer_time  =  snapshot_vm_resource_object_store_transfer_time            
+            
+            vm_disk_resource_snap_staging_path = vault.get_restore_vm_disk_resource_staging_path(\
+                                                    {'restore_id' : restore_obj.id,
+                                                     'workload_id': snapshot_obj.workload_id,
+                                                     'snapshot_id': snapshot_obj.id,
+                                                     'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                                                     'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                     'snapshot_vm_resource_name':  snapshot_vm_resource.resource_name,
+                                                     'vm_disk_resource_snap_id' : vm_disk_resource_snap.id,   
+                                                     })
+            head, tail = os.path.split(vm_disk_resource_snap_staging_path)
             fileutils.ensure_tree(head)
-            shutil.copyfile(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap_backing_staging_path)
+            shutil.copyfile(vm_disk_resource_snap.vault_path, vm_disk_resource_snap_staging_path)
             
-            #adjust virtual size
-            image_info_vm_disk_resource_snap = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
-            image_info_vm_disk_resource_snap_backing = qemuimages.qemu_img_info(vm_disk_resource_snap_backing_staging_path)
-            if image_info_vm_disk_resource_snap_backing.virtual_size < image_info_vm_disk_resource_snap.virtual_size :
-                qemuimages.resize_image(vm_disk_resource_snap_backing_staging_path, image_info_vm_disk_resource_snap.virtual_size)               
-            
-            #rebase and commit
-            qemuimages.rebase_qcow2(vm_disk_resource_snap_backing_staging_path, vm_disk_resource_snap_staging_path)
-
-            vm_disk_resource_snap_staging_path = vm_disk_resource_snap_backing_staging_path
-            vm_disk_resource_snap = vm_disk_resource_snap_backing  
-       
-        for qcow2file in to_commit:    
-            qemuimages.commit_qcow2(qcow2file)
-            utils.delete_if_exists(qcow2file)
-
-        image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
-        self.virtual_size = image_info.virtual_size
-        self.vm_disk_resource_snap_staging_path = vm_disk_resource_snap_staging_path
-
-        return (self.vm_disk_resource_snap_staging_path, self.virtual_size)
+    
+            to_commit = []            
+            while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+                to_commit.append(vm_disk_resource_snap_staging_path)           
+                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(self.cntx, \
+                                                    vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                vm_disk_resource_snap_backing_staging_path = vault.get_restore_vm_disk_resource_staging_path(\
+                                                            {'restore_id' : restore_obj.id,
+                                                             'workload_id': snapshot_obj.workload_id,
+                                                             'snapshot_id': snapshot_obj.id,
+                                                             'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                                                             'snapshot_vm_resource_name':  snapshot_vm_resource.resource_name,
+                                                             'vm_disk_resource_snap_id' : vm_disk_resource_snap_backing.id,   
+                                                             })
+                head, tail = os.path.split(vm_disk_resource_snap_backing_staging_path)
+                fileutils.ensure_tree(head)
+                shutil.copyfile(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap_backing_staging_path)
+                
+                #adjust virtual size
+                image_info_vm_disk_resource_snap = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
+                image_info_vm_disk_resource_snap_backing = qemuimages.qemu_img_info(vm_disk_resource_snap_backing_staging_path)
+                if image_info_vm_disk_resource_snap_backing.virtual_size < image_info_vm_disk_resource_snap.virtual_size :
+                    qemuimages.resize_image(vm_disk_resource_snap_backing_staging_path, image_info_vm_disk_resource_snap.virtual_size)               
+                
+                #rebase and commit
+                qemuimages.rebase_qcow2(vm_disk_resource_snap_backing_staging_path, vm_disk_resource_snap_staging_path)
+    
+                vm_disk_resource_snap_staging_path = vm_disk_resource_snap_backing_staging_path
+                vm_disk_resource_snap = vm_disk_resource_snap_backing  
+           
+            for qcow2file in to_commit:    
+                qemuimages.commit_qcow2(qcow2file)
+                utils.delete_if_exists(qcow2file)
+    
+            image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
+            self.restored_file_path = vm_disk_resource_snap_staging_path
+            return (self.vm_disk_resource_snap_staging_path, image_info.virtual_size)
+        
     @autolog.log_method(Logger, 'PrepareBackupImage.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
@@ -171,7 +179,7 @@ class UploadImageToGlance(task.Task):
         self.image_service = glance.get_default_image_service(\
                                   production= (restore_obj['restore_type'] != 'test'))
 
-        progressmsg = _('Uploading image and volumes of instance %(vmid)s from \
+        progressmsg = _('Uploading image of instance %(vmid)s from \
                         snapshot %(snapshot_id)s') % \
                         {'vmid': vmid, 'snapshot_id': snapshot_id}
 
@@ -201,10 +209,7 @@ class UploadImageToGlance(task.Task):
                               'name': snapshot_vm_resource.id,
                               'disk_format' : 'qcow2',
                               'container_format' : 'bare',
-                              'properties': {
-                                  'hw_disk_bus' : 'virtio',
-                                  'image_state': 'available',
-                                  'owner_id': self.cntx.project_id}
+                              'properties': {}
                               }
 
         LOG.debug('Uploading image ' + restore_file_path)
@@ -356,8 +361,11 @@ class RestoreCephVolume(task.Task):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreCephVolume.execute')
-    def execute_with_log(self, context, restore_id, image_virtual_size,
-                           restored_file_path):
+    def execute_with_log(self, 
+                         context, 
+                         restore_id, 
+                         image_virtual_size,
+                         restored_file_path):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -406,12 +414,119 @@ class RestoreCephVolume(task.Task):
 
     @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
     def revert_with_log(self, *args, **kwargs):
-        # TODO: Delete the volume that is created
         try:
             self.volume_service.delete(self.cntx, self.restored_volume)
         except:
             pass
 
+class RestoreNFSVolume(task.Task):
+    """
+       Restore cinder nfs volume from qcow2
+    """
+
+    def execute(self, context, restore_id, vm_resource_id, restored_file_path):
+        return self.execute_with_log(context, 
+                                     restore_id, 
+                                     vm_resource_id,
+                                     restored_file_path)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'RestoreNFSVolume.execute')
+    def execute_with_log(self, 
+                         context, 
+                         restore_id, 
+                         vm_resource_id,
+                         restored_file_path):
+
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = amqp.RpcContext.from_dict(context)
+        self.volume_service = volume_service = cinder.API()
+        restore_obj = db.restore_get(self.cntx, restore_id)
+        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)        
+        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
+        
+        time_offset = datetime.now() - datetime.utcnow()
+        desciption = 'Restored from Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id')
+        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'display_name')
+        
+        self.restored_volume = volume_service.create(self.cntx, 
+                                                     volume_size,
+                                                     volume_name,
+                                                     desciption, 
+                                                     volume_type = volume_type)
+
+        if not self.restored_volume:
+            raise Exception("Failed to create volume type " + volume_type)
+
+        while True:
+            time.sleep(10)
+            self.restored_volume = volume_service.get(self.cntx, self.restored_volume['id'])
+            if self.restored_volume['status'].lower() == 'available' or\
+                self.restored_volume['status'].lower() == 'error':
+                break
+
+        if self.restored_volume['status'].lower() == 'error':
+            raise Exception("Failed to create volume type " + volume_type)
+
+        connection = volume_service.initialize_connection(self.cntx, self.restored_volume, {})
+        if 'data' in connection and \
+           'export' in connection['data'] and \
+           'name' in connection['data']:
+            fileutils.ensure_tree(CONF.cinder_nfs_mount_point_base)
+            
+            try:
+                command = ['sudo', 'umount', CONF.cinder_nfs_mount_point_base]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
+            
+            try:
+                command = ['sudo', 'umount', '-l', CONF.cinder_nfs_mount_point_base]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
+                        
+            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', connection['data']['export'], CONF.cinder_nfs_mount_point_base]
+            subprocess.check_call(command, shell=False)
+            os.remove(CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name'])
+            qemuimages.convert_image(restored_file_path, 
+                               CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name'], 
+                               'raw', run_as_root=True)
+            qemuimages.resize_image(CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name'],
+                                    '%sG' % volume_size,
+                                    run_as_root=True)
+            try:
+                command = ['sudo', 'umount', CONF.cinder_nfs_mount_point_base]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
+            
+            try:
+                command = ['sudo', 'umount', '-l', CONF.cinder_nfs_mount_point_base]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
+        else:
+            raise Exception("Failed to get NFS export details for volume")                            
+
+        statinfo = os.stat(restored_file_path)
+        restore_obj = db.restore_update(self.cntx, 
+                                        restore_obj.id,
+                                        {'uploaded_size_incremental': statinfo.st_size})
+
+        return self.restored_volume['id']
+
+    @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            self.volume_service.delete(self.cntx, self.restored_volume)
+        except:
+            pass
+        
 class RestoreInstanceFromVolume(task.Task):
     """
        Restore instance from cinder volume
@@ -442,8 +557,7 @@ class RestoreInstanceFromVolume(task.Task):
         restore_obj = db.restore_get(self.cntx, restore_id)
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
 
-        restored_instance_name = vmname + '_of_snapshot_' +\
-                                 snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
+        restored_instance_name = vmname
         if instance_options and 'name' in instance_options:
             restored_instance_name = instance_options['name']
 
@@ -532,8 +646,7 @@ class RestoreInstanceFromImage(task.Task):
         restore_obj = db.restore_get(self.cntx, restore_id)
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
 
-        restored_instance_name = vmname + '_of_snapshot_' +\
-                                 snapshot_obj.id + '_' + uuid.uuid4().hex[:6]
+        restored_instance_name = vmname
         if instance_options and 'name' in instance_options:
             restored_instance_name = instance_options['name']
 
@@ -612,12 +725,12 @@ class AttachVolume(task.Task):
         self.volume_service = volume_service = cinder.API()
         if restore_type == 'restore':
             self.restored_volume = restored_volume = volume_service.get(self.cntx, volumeid)
-            while restored_volume['status'].lower() != 'available' and\
-                   restored_volume['status'].lower() != 'error':
-                    #TODO:(giri) need a timeout to exit
-                    LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
-                    time.sleep(10)
-                    restored_volume = volume_service.get(self.cntx, volumeid)
+            import pdb; pdb.set_trace()
+            while restored_volume['status'].lower() != 'available' and restored_volume['status'].lower() != 'error':
+                #TODO:(giri) need a timeout to exit
+                LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
+                time.sleep(10)
+                restored_volume = volume_service.get(self.cntx, volumeid)
             LOG.debug('Attaching volume ' + volumeid)
             compute_service.attach_volume(self.cntx, restored_instance_id, volumeid, ('/dev/' + devname))
             time.sleep(15)
@@ -648,93 +761,66 @@ def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
-def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid,
-                               bootdisk, volumes_direct):
+def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid):
     flow = lf.Flow("uploadimageslf")
     db = WorkloadMgrDB().db
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context, instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        if snapshot_vm_resource.resource_name == 'vda':
-            if bootdisk == "image":
-                flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
-                                    rebind=dict( vm_resource_id=snapshot_vm_resource.id,
-                                             restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
-                                    provides='image_id_' + str(snapshot_vm_resource.id)))
-                continue
-
-        if not volumes_direct:
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
-                                    rebind=dict( vm_resource_id=snapshot_vm_resource.id,
-                                             restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
-                                    provides='image_id_' + str(snapshot_vm_resource.id)))
+                                         rebind=dict( vm_resource_id=snapshot_vm_resource.id,
+                                         restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
+                                         provides='image_id_' + str(snapshot_vm_resource.id)))
+
     return flow
 
-def RestoreVolumes(context, instance, snapshotobj, restoreid,
-                   bootdisk, volumes_direct):
+def RestoreVolumes(context, instance, snapshotobj, restoreid):
     flow = lf.Flow("restorevolumeslf")
 
     db = WorkloadMgrDB().db
     volume_service = cinder.API()
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context, instance['vm_id'], snapshotobj.id)
 
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        if snapshot_vm_resource.resource_name == 'vda':
-            fromvolume = (bootdisk == "volume")
-            if fromvolume:
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
+            if 'ceph' in db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id'):
                 flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
-                                    rebind=dict(restored_file_path='restore_file_path_' +\
-                                                           str(snapshot_vm_resource.id),
-                                               image_virtual_size='image_virtual_size_'+\
-                                                           str(snapshot_vm_resource.id)),
-                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
-        else:
-            fromvolume =  volumes_direct
-
-            if fromvolume:
-                flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
-                                    rebind=dict(restored_file_path='restore_file_path_' +\
-                                                           str(snapshot_vm_resource.id),
-                                               image_virtual_size='image_virtual_size_'+\
-                                                           str(snapshot_vm_resource.id)),
-                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
+                        rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
+                        image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id)),
+                        provides='volume_id_' + str(snapshot_vm_resource.id)))
             else:
-                flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
-                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                               imageid='image_id_' + str(snapshot_vm_resource.id),
-                                               image_virtual_size='image_virtual_size_'\
-                                                           + str(snapshot_vm_resource.id)),
-                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
+                flow.add(RestoreNFSVolume("RestoreNFSVolume" + snapshot_vm_resource.id,
+                        rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
+                                    restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
+                        provides='volume_id_' + str(snapshot_vm_resource.id)))                               
 
     return flow
 
-def RestoreInstance(context, instance, snapshotobj, restoreid,
-                    bootdisk, volumes_direct):
+def RestoreInstance(context, instance, snapshotobj, restoreid):
 
     flow = lf.Flow("attachvolumeslf")
     db = WorkloadMgrDB().db
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context, instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
         if snapshot_vm_resource.resource_name == 'vda':
-            if bootdisk == "volume":
-                flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
-                                    rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id)),
-                                    provides='restored_instance_id'))
-            else:
-                flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
-                                    rebind=dict(imageid='image_id_' + str(snapshot_vm_resource.id)),
-                                    provides='restored_instance_id'))
+            continue        
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
+            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
+                                rebind=dict(imageid='image_id_' + str(snapshot_vm_resource.id)),
+                                provides='restored_instance_id'))            
+        else:
+            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
+                                rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id)),
+                                provides='restored_instance_id'))
     return flow
 
 def AttachVolumes(context, instance, snapshotobj, restoreid):
@@ -748,8 +834,8 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
         if snapshot_vm_resource.resource_name == 'vda':
             continue
         flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
-                                    rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
-                                                devname='devname_' + str(snapshot_vm_resource.id),)))
+                              rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                              devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
@@ -767,35 +853,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                           for (key, value) in cntx.to_dict().iteritems()])            
     context_dict['conf'] =  None # RpcContext object looks for this during init
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
-                                         instance['vm_id'], snapshot_obj.id)
-    # find the boot disk type
-    for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type != 'disk':
-            continue
+    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
 
-        disk_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'disk_type')
-        if snapshot_vm_resource.resource_name == 'vda':
-            if disk_type == "volume":
-                bootdisk = "volume"
-            else:
-                bootdisk = "image"
-            break
-
-    # determine if the attached volumes are created using glance images or 
-    # directly. Right now only ceph and nfs volumes are created directly.
-    # for others we will fall back to glance based volume creation
-    volume_service = volume_service = cinder.API()
-    volume_types = volume_service.get_types(cntx)
-    volumes_direct = volume_types and len(volume_types) and\
-                         volume_types[0].name == 'ceph'
-
-    # if the boot disk is volume based and volume cannot
-    # be directly created then we use glance based
-    # instantiation
-    if bootdisk == "volume" and not volumes_direct:
-        bootdisk = "image"
-   
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
     restore_dict.pop('created_at')
@@ -813,16 +872,12 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'restored_compute_flavor_id': restored_compute_flavor.id,
                 'restored_nics': restored_nics,
                 'instance_options': instance_options,
-                'bootdisk': bootdisk,
-                'volumes_direct': volumes_direct,
             }
 
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
-        #store['image_virtual_size_'+snapshot_vm_resource.id] = snapshot_vm_resource.size
 
-    #restore, rebase, commit & upload
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
 
@@ -831,20 +886,17 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         _restorevmflow.add(childflow)
 
     # This is a linear uploading all vm images to glance
-    childflow = LinearUploadImagesToGlance(cntx, instance, snapshot_obj, restore['id'],
-                                                  bootdisk, volumes_direct)
+    childflow = LinearUploadImagesToGlance(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 
     # create nova/cinder objects from image ids
-    childflow = RestoreVolumes(cntx, instance, snapshot_obj, restore['id'],
-                                      bootdisk, volumes_direct)
+    childflow = RestoreVolumes(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 
     # create nova from image id
-    childflow = RestoreInstance(cntx, instance, snapshot_obj, restore['id'],
-                                       bootdisk, volumes_direct)
+    childflow = RestoreInstance(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 
@@ -878,8 +930,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
-            temp_directory = os.path.join("/var/triliovault", restore['id'],
-                                           snapshot_vm_resource.id)
+            temp_directory = os.path.join("/var/triliovault", restore['id'], snapshot_vm_resource.id)
             try:
                 shutil.rmtree(temp_directory)
             except OSError as exc:

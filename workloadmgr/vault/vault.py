@@ -165,7 +165,10 @@ def commit_supported():
        CONF.vault_storage_type == 'das':
             return True
     else:
-        return False    
+        return False  
+    
+def get_storage_type():
+    return CONF.vault_storage_type
 
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
