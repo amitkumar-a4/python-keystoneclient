@@ -333,7 +333,6 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
         security_groups = compute_service.get_security_groups(cntx)
         for instance in instances:
             server = compute_service.get_server_by_id(cntx, instance['vm_id'])
-            volume_service = cinder.API()
 
             for secgrp in server.security_groups:
                 for group in security_groups:
