@@ -908,16 +908,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             path = result['restore_file_path_'+snapshot_vm_resource.id]
                             pervmdisks[snapshot_vm_resource.vm_id].append(path)
             else:
-                for instance in snapshotvms:
-                    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
-                                                     instance['vm_id'], snapshot_obj.id)
-                    snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
-                    for snapshot_vm_resource in snapshot_vm_resources:
-                        if snapshot_vm_resource.resource_type == 'disk':
-                            if not snapshot_vm_resource.vm_id in pervmdisks:
-                                pervmdisks[snapshot_vm_resource.vm_id] = []
-                            vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
-                            pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
+                snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
+                for snapshot_vm_resource in snapshot_vm_resources:
+                    if snapshot_vm_resource.resource_type == 'disk':
+                        if not snapshot_vm_resource.vm_id in pervmdisks:
+                            pervmdisks[snapshot_vm_resource.vm_id] = []
+                        vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
+                        pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
             return pervmdisks
 
         try:
@@ -930,54 +927,60 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
             workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+            pervmdisks = _prepare_snapshot_for_mount(context, self.db, snapshot_id)
+
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+
+                virtdriver.snapshot_mount(context, snapshot, pervmdisks)
+                self.db.snapshot_update(context, snapshot['id'],
+                                 {'status': 'mounted', 'metadata': {}})
+                return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
 
-            pervmdisks = _prepare_snapshot_for_mount(context, self.db, snapshot_id)
 
-            for vmid, diskfiles in pervmdisks.iteritems():
-                # the goal is to mount as many artifacts as possible from snapshot
-                devpaths[vmid] = virtdriver.snapshot_mount(context, snapshot, diskfiles)
+                for vmid, diskfiles in pervmdisks.iteritems():
+                    # the goal is to mount as many artifacts as possible from snapshot
+                    devpaths[vmid] = virtdriver.snapshot_mount(context, snapshot, diskfiles)
 
-                try:
-                    partitions = {}
+                    try:
+                        partitions = {}
 
-                    for diskpath, mountpath in devpaths[vmid].iteritems():
-                        partitions[mountpath] = mountutils.read_partition_table(mountpath)
+                        for diskpath, mountpath in devpaths[vmid].iteritems():
+                            partitions[mountpath] = mountutils.read_partition_table(mountpath)
 
-                    logicalobjects[vmid] = mountutils.discover_lvs_and_partitions(devpaths[vmid], partitions)
+                        logicalobjects[vmid] = mountutils.discover_lvs_and_partitions(devpaths[vmid], partitions)
 
-                    mountutils.mount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, logicalobjects[vmid])
-                except Exception as ex:
-                    if vmid in logicalobjects:
-                        for vg in logicalobjects[vmid]['vgs']:
-                            mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
-                        logicalobjects.pop(vmid)
-                    LOG.exception(ex)
+                        mountutils.mount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, logicalobjects[vmid])
+                    except Exception as ex:
+                        if vmid in logicalobjects:
+                            for vg in logicalobjects[vmid]['vgs']:
+                                mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                            logicalobjects.pop(vmid)
+                        LOG.exception(ex)
 
-            snapshot_metadata['devpaths'] = json.dumps(devpaths)
-            snapshot_metadata['logicalobjects'] = json.dumps(logicalobjects)
-            snapshot_metadata['fsmanagerpid'] = -1
+                snapshot_metadata['devpaths'] = json.dumps(devpaths)
+                snapshot_metadata['logicalobjects'] = json.dumps(logicalobjects)
+                snapshot_metadata['fsmanagerpid'] = -1
             
-            self.db.snapshot_update(context, snapshot['id'],
-                             {'metadata': snapshot_metadata})
-
-            ## TODO: Spin up php webserver
-            try:
-                snapshot_metadata = {}
-                snapshot_metadata['fsmanagerpid'] = \
-                      mountutils.start_filemanager_server(FLAGS.mountdir)
-                snapshot_metadata['mounturl'] = "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
                 self.db.snapshot_update(context, snapshot['id'],
-                             {'status': 'mounted', 'metadata': snapshot_metadata})
-            except Exception as ex:
-                LOG.error(_("Could not start file manager server"))
-                LOG.exception(ex)
-                raise
+                                 {'metadata': snapshot_metadata})
 
-            return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+                ## TODO: Spin up php webserver
+                try:
+                    snapshot_metadata = {}
+                    snapshot_metadata['fsmanagerpid'] = \
+                          mountutils.start_filemanager_server(FLAGS.mountdir)
+                    snapshot_metadata['mounturl'] = "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+                    self.db.snapshot_update(context, snapshot['id'],
+                                 {'status': 'mounted', 'metadata': snapshot_metadata})
+                except Exception as ex:
+                    LOG.error(_("Could not start file manager server"))
+                    LOG.exception(ex)
+                    raise
+
+                return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
 
         except Exception as ex:
             self.snapshot_dismount(context, snapshot['id'])
@@ -993,64 +996,69 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
         if workload.source_platform == 'openstack': 
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+            virtdriver.snapshot_dismount(context, snapshot, None)
+            self.db.snapshot_update(context, snapshot_id,
+                         {'status': 'available', 'metadata': {}})
         elif workload.source_platform == 'vmware': 
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')        
-        devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
-        if devpaths_json:
-            devpaths = json.loads(devpaths_json)
-        else:
-            devpaths = {}
+            devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
+            if devpaths_json:
+                devpaths = json.loads(devpaths_json)
+            else:
+                devpaths = {}
        
-        fspid = self.db.get_metadata_value(snapshot.metadata, 'fsmanagerpid')
-        if (fspid and int(fspid) != -1):
-            mountutils.stop_filemanager_server(FLAGS.mountdir, fspid)
+            fspid = self.db.get_metadata_value(snapshot.metadata, 'fsmanagerpid')
+            if (fspid and int(fspid) != -1):
+                mountutils.stop_filemanager_server(FLAGS.mountdir, fspid)
 
-        logicalobjects_json = self.db.get_metadata_value(snapshot.metadata, 'logicalobjects')
-        if logicalobjects_json:
-            logicalobjects = json.loads(logicalobjects_json)
-        else:
-            logicalobjects = {}
+            logicalobjects_json = self.db.get_metadata_value(snapshot.metadata, 'logicalobjects')
+            if logicalobjects_json:
+                logicalobjects = json.loads(logicalobjects_json)
+            else:
+                logicalobjects = {}
 
-        for vmid, objects in logicalobjects.iteritems():
-            try:
-                mountutils.umount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, objects)
-            except Exception as ex:
-                # always cleanup as much as possible
-                LOG.exception(ex)
-                pass
-
-            vgs = objects['vgs']
-            for vg in vgs:
+            for vmid, objects in logicalobjects.iteritems():
                 try:
-                    mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                    mountutils.umount_logicalobjects(FLAGS.mountdir, snapshot_id, vmid, objects)
                 except Exception as ex:
                     # always cleanup as much as possible
                     LOG.exception(ex)
                     pass
+
+                vgs = objects['vgs']
+                for vg in vgs:
+                    try:
+                        mountutils.deactivatevgs(vg['LVM2_VG_NAME'])
+                    except Exception as ex:
+                        # always cleanup as much as possible
+                        LOG.exception(ex)
+                        pass
  
-        for vmid, paths in devpaths.iteritems():
-            try:
-                virtdriver.snapshot_dismount(context, snapshot, paths)
-            except Exception as ex:
-                # always cleanup as much as possible
-                LOG.exception(ex)
-                pass
-        if not FLAGS.vault_storage_type in ("nfs", "local"):
             for vmid, paths in devpaths.iteritems():
                 try:
-                    os.remove(paths.keys()[0])
-                except:
+                    virtdriver.snapshot_dismount(context, snapshot, paths)
+                except Exception as ex:
+                    # always cleanup as much as possible
+                    LOG.exception(ex)
                     pass
-            parent = os.path.dirname(paths.keys()[0])
-            parent = os.path.dirname(parent)
-            shutil.rmtree(parent)
+            if not FLAGS.vault_storage_type in ("nfs", "local"):
+                for vmid, paths in devpaths.iteritems():
+                    try:
+                        os.remove(paths.keys()[0])
+                    except:
+                        pass
+                parent = os.path.dirname(paths.keys()[0])
+                parent = os.path.dirname(parent)
+                shutil.rmtree(parent)
 
-        snapshot_metadata = {}
-        snapshot_metadata['devpaths'] = ""
-        snapshot_metadata['logicalobjects'] = ""
-        snapshot_metadata['mounturl'] = ""
-        snapshot_metadata['fsmanagerpid'] = -1
-        self.db.snapshot_update(context, snapshot_id, {'status': 'available', 'metadata': snapshot_metadata})
+            snapshot_metadata = {}
+            snapshot_metadata['devpaths'] = ""
+            snapshot_metadata['logicalobjects'] = ""
+            snapshot_metadata['mounturl'] = ""
+            snapshot_metadata['fsmanagerpid'] = -1
+
+            self.db.snapshot_update(context, snapshot_id,
+                         {'status': 'available', 'metadata': snapshot_metadata})
 
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):

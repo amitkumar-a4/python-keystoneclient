@@ -41,10 +41,10 @@ Logger = autolog.Logger(LOG)
 nova_opts = [
     cfg.StrOpt('nova_admin_auth_url',
                default='http://localhost:5000/v2.0',
-               help='auth url for connecting to nova in admin context'),               
+               help='auth url for connecting to nova in admin context'),
     cfg.StrOpt('nova_admin_username',
                default='admin',
-               help='tenant name for connecting to nova in admin context'),   
+               help='tenant name for connecting to nova in admin context'),
     cfg.StrOpt('nova_admin_password',
                default='password',
                help='password for connecting to nova in admin context',
@@ -60,7 +60,7 @@ nova_opts = [
                help='nova tvault endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_production_region_name',
                default=None,
-               help='region name for connecting to nova in admin context'),             
+               help='region name for connecting to nova in admin context'),
     cfg.StrOpt('nova_tvault_region_name',
                default=None,
                help='region name for connecting to nova in admin context'),
@@ -72,10 +72,10 @@ nova_opts = [
                help='auth system for connecting to '
                     'nova in admin context'),
     cfg.IntOpt('nova_url_timeout',
-               default=60,
+               default=600,
                help='timeout value for connecting to nova in seconds'),
 
-              
+
 ]
 
 CONF = cfg.CONF
@@ -95,7 +95,7 @@ def synchronized(lock):
                 lock.release()
         return new_function
     return wrap
-  
+
 def _discover_extensions(version):
     extensions = []
     for name, module in itertools.chain(
@@ -192,13 +192,13 @@ def _get_httpclient(production):
                 auth_url=CONF.nova_admin_auth_url,
                 timeout=CONF.nova_url_timeout,
                 auth_system=CONF.nova_auth_system,
-                insecure=CONF.nova_api_insecure)            
+                insecure=CONF.nova_api_insecure)
         httpclient.authenticate()
     except Exception:
         with excutils.save_and_reraise_exception():
             LOG.exception(_("_get_auth_token() failed"))
     return httpclient
-    
+
 def novaclient(context, production, admin=False, extensions = None):
     if admin:
         httpclient = _get_httpclient(production)
@@ -210,7 +210,7 @@ def novaclient(context, production, admin=False, extensions = None):
                                    auth_url=url,
                                    insecure=CONF.nova_api_insecure,
                                    extensions = extensions,
-                                   timeout=CONF.nova_url_timeout)            
+                                   timeout=CONF.nova_url_timeout)
         else:
             url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
             c = nova_client.Client(CONF.nova_admin_username,
@@ -219,7 +219,7 @@ def novaclient(context, production, admin=False, extensions = None):
                                    auth_url=url,
                                    insecure=CONF.nova_api_insecure,
                                    extensions = extensions,
-                                   timeout=CONF.nova_url_timeout)                 
+                                   timeout=CONF.nova_url_timeout)
         LOG.debug(_('Novaclient connection created using URL: %s') % url)
         c.client.auth_token = httpclient.auth_token
         c.client.management_url = url
@@ -262,7 +262,7 @@ def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_templat
                            auth_url=url,
                            insecure=CONF.nova_api_insecure,
                            extensions = None,
-                           timeout=CONF.nova_url_timeout)            
+                           timeout=CONF.nova_url_timeout)
     LOG.debug(_('Novaclient connection created using URL: %s') % url)
     c.client.auth_token = httpclient.auth_token
     c.client.management_url = url
@@ -271,15 +271,15 @@ def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_templat
 
 class API(base.Base):
     """API for interacting with the volume manager."""
-    
+
     def __init__(self, production = True):
-        self._production = production   
-    
-    @synchronized(novalock)    
+        self._production = production
+
+    @synchronized(novalock)
     def get_hypervisors(self,context):
         hypervisors = novaclient(context, self._production, True).hypervisors.list()
-        return hypervisors         
-    
+        return hypervisors
+
     @synchronized(novalock)
     def create_server(self, context, name, image, flavor,
                meta=None, files=None,
@@ -322,26 +322,26 @@ class API(base.Base):
         :param config_drive: (optional extension) value for config drive
                             either boolean, or volume-id
         """
-        
+
         try:
             client = novaclient(context, self._production)
-            item = client.servers.create(  name, image, flavor, 
+            item = client.servers.create(  name, image, flavor,
                                            meta=meta, files=files,
                                            reservation_id=reservation_id, min_count=min_count,
-                                           max_count=max_count, security_groups=security_groups, 
+                                           max_count=max_count, security_groups=security_groups,
                                            userdata=userdata, key_name=key_name,
                                            availability_zone=availability_zone,block_device_mapping=block_device_mapping,
                                            nics=nics, scheduler_hints=scheduler_hints,
                                            config_drive=config_drive, **kwargs)
             time.sleep(15)#TODO(gbasava): Creation is asynchronous. Wait and check for the status
             #Perform translation required if any
-            return item 
+            return item
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            item = client.servers.create(  name, image, flavor, 
+            item = client.servers.create(  name, image, flavor,
                                            meta=meta, files=files,
                                            reservation_id=reservation_id, min_count=min_count,
-                                           max_count=max_count, security_groups=security_groups, 
+                                           max_count=max_count, security_groups=security_groups,
                                            userdata=userdata, key_name=key_name,
                                            availability_zone=availability_zone,block_device_mapping=block_device_mapping,
                                            nics=nics, scheduler_hints=scheduler_hints,
@@ -349,14 +349,14 @@ class API(base.Base):
             time.sleep(15)#TODO(gbasava): Creation is asynchronous. Wait and check for the status
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return       
-    
+            #TODO(gbasava): Handle the exception
+            return
+
     def _get_servers(self, context, search_opts=None, admin=False):
         """
-        Get all the servers for a particular tenant or all tenants 
+        Get all the servers for a particular tenant or all tenants
         :rtype: :class:`Server`
-        """        
+        """
         if search_opts is None:
             search_opts = {}
         if admin:
@@ -372,11 +372,11 @@ class API(base.Base):
             client = novaclient(context, self._production, admin=True)
             servers = client.servers.list(True, search_opts)
         return servers
-        
-    @synchronized(novalock)    
+
+    @synchronized(novalock)
     def get_servers(self, context, search_opts=None, admin=False):
         return self._get_servers(context, search_opts, admin)
-    
+
     @synchronized(novalock)
     def get_server(self, context, name, admin=False):
         """
@@ -386,15 +386,15 @@ class API(base.Base):
         server = None
         try:
             client = novaclient(context, self._production, admin)
-            return client.servers.find(name=name) 
+            return client.servers.find(name=name)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.find(name=name) 
+            return client.servers.find(name=name)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return 
-    
+            #TODO(gbasava): Handle the exception
+            return
+
     @synchronized(novalock)
     def get_security_group_by_id(self, context, secid, admin=False):
         """
@@ -409,8 +409,8 @@ class API(base.Base):
             return client.security_groups.get(secid)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return 
+            #TODO(gbasava): Handle the exception
+            return
 
     @synchronized(novalock)
     def get_security_groups(self, context, admin=False):
@@ -426,15 +426,15 @@ class API(base.Base):
             return client.security_groups.list()
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return 
+            #TODO(gbasava): Handle the exception
+            return
 
-    @synchronized(novalock)    
+    @synchronized(novalock)
     def get_server_by_id(self, context, id, admin=False, search_opts=None):
         """
         :param id to query.
         :rtype: :class:`Server`
-        """   
+        """
         retries = 3
         while retries:
             try:
@@ -442,7 +442,7 @@ class API(base.Base):
                     servers = self._get_servers(context, search_opts, admin=admin)
                     for server in servers:
                         if server.id == id:
-                            return server 
+                            return server
                     return None
                 else:
                     qparams = {}
@@ -465,47 +465,65 @@ class API(base.Base):
                     raise
             except Exception as ex:
                 LOG.exception(ex)
-                #TODO(gbasava): Handle the exception 
+                #TODO(gbasava): Handle the exception
                 raise
-    
-    @synchronized(novalock)     
+
+    @synchronized(novalock)
     def stop(self, context, server):
         """
         Stop the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.stop(server=server) 
+            return client.servers.stop(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.stop(server=server) 
+            return client.servers.stop(server=server)
         except Exception  as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return         
-    
-    @synchronized(novalock)    
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def start(self, context, server):
         """
         Start the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.start(server=server) 
+            return client.servers.start(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.start(server=server) 
+            return client.servers.start(server=server)
         except Exception  as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return                 
-    
-    @synchronized(novalock)    
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def suspend(self, context, server):
+        """
+        Suspend the server given the id
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+
+        try:
+            client = novaclient(context, self._production)
+            return client.servers.suspend(server=server)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.servers.suspend(server=server)
+        except Exception  as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
+    def reboot(self, context, server, reboot_type='SOFT'):
         """
         Suspend the server given the id
         :param server: The :class:`Server` (or its ID) to query.
@@ -516,103 +534,103 @@ class API(base.Base):
             return client.servers.suspend(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.suspend(server=server) 
+            return client.servers.reboot(server=server, reboot_type=reboot_type)
         except Exception  as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
+            #TODO(gbasava): Handle the exception
             return
-    
-    @synchronized(novalock)    
+
+    @synchronized(novalock)
     def resume(self, context, server):
         """
         Resume the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.resume(server=server) 
+            return client.servers.resume(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.resume(server=server) 
+            return client.servers.resume(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return            
-    
-    @synchronized(novalock)    
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def pause(self, context, server):
         """
         Pause the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.pause(server=server) 
+            return client.servers.pause(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.pause(server=server) 
+            return client.servers.pause(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return                   
-    
+            #TODO(gbasava): Handle the exception
+            return
+
     @synchronized(novalock)
     def unpause(self, context, server):
         """
         UnPause the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.unpause(server=server) 
+            return client.servers.unpause(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.unpause(server=server) 
+            return client.servers.unpause(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
+            #TODO(gbasava): Handle the exception
             return
-    
-    @synchronized(novalock)    
+
+    @synchronized(novalock)
     def delete(self, context, server):
         """
         Delete the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.delete(server=server) 
+            return client.servers.delete(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.delete(server=server) 
+            return client.servers.delete(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
+            #TODO(gbasava): Handle the exception
             return
-    
-    @synchronized(novalock)    
+
+    @synchronized(novalock)
     def force_delete(self, context, server):
         """
         Force Delete the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.servers.force_delete(server=server) 
+            return client.servers.force_delete(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.force_delete(server=server) 
+            return client.servers.force_delete(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return 
-    
-    @synchronized(novalock)                
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def attach_volume(self, context, server_id, volume_id, device):
         """
         Attach a volume identified by the volume ID to the given server ID
@@ -621,161 +639,161 @@ class API(base.Base):
         :param volume_id: The ID of the volume to attach.
         :param device: The device name
         :rtype: :class:`Volume`
-        """   
-  
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.volumes.create_server_volume(server_id, volume_id, device) 
+            return client.volumes.create_server_volume(server_id, volume_id, device)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.volumes.create_server_volume(server_id, volume_id, device) 
+            return client.volumes.create_server_volume(server_id, volume_id, device)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            return 
-    
-    @synchronized(novalock)                
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def get_image(self, context, id):
         """
         Get the image given the name
 
         :param name: name of the image
         :rtype: :class:`Image`
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.images.find(id=id) 
+            return client.images.find(id=id)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.images.find(id=id) 
+            return client.images.find(id=id)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
-            return 
-    
-    @synchronized(novalock)    
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def get_flavors(self, context, is_public=True):
         """
-        Get the list of flavors 
+        Get the list of flavors
 
         :param is_public: public flavors
         :rtype: :class:`Flavor`
-        """   
+        """
         try:
             client = novaclient(context, self._production)
-            return client.flavors.list(is_public=is_public) 
+            return client.flavors.list(is_public=is_public)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.list(is_public=is_public) 
+            return client.flavors.list(is_public=is_public)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            return         
-    
-    @synchronized(novalock)                  
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def get_flavor_by_name(self, context, name):
         """
         Get the flavors given the name
 
         :param name: name of the flavors
         :rtype: :class:`Flavor`
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.flavors.find(name=name) 
+            return client.flavors.find(name=name)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.find(name=name) 
+            return client.flavors.find(name=name)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            return 
-    
-    @synchronized(novalock)     
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def get_flavor_by_id(self, context, id):
         """
         Get the flavor given the id
 
         :param name: id of the flavors
         :rtype: :class:`Flavor`
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production)
-            return client.flavors.get(id) 
+            return client.flavors.get(id)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.get(id) 
+            return client.flavors.get(id)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            return 
-    
+            #TODO(gbasava): Handle the exception
+            return
+
     @synchronized(novalock)
-    def create_flavor(self, context, name, memory, vcpus, 
+    def create_flavor(self, context, name, memory, vcpus,
                       root_gb, ephemeral_gb):
-        
+
         """
         Create a new flavor
-        
+
         :rtype: :class:`Flavor`
-        """   
-   
+        """
+
         try:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.create(name, 
-                                         memory, vcpus, root_gb, flavorid="auto", 
+            return client.flavors.create(name,
+                                         memory, vcpus, root_gb, flavorid="auto",
                                          ephemeral = ephemeral_gb)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.create(name, 
-                                         memory, vcpus, root_gb, flavorid="auto", 
+            return client.flavors.create(name,
+                                         memory, vcpus, root_gb, flavorid="auto",
                                          ephemeral = ephemeral_gb)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            return         
+            #TODO(gbasava): Handle the exception
+            return
 
     @synchronized(novalock)
     def delete_flavor(self, context, id):
         """
         Delete the falvor given the flavor name
-        """   
-    
+        """
+
         try:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.delete(id) 
+            return client.flavors.delete(id)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.flavors.delete(id) 
+            return client.flavors.delete(id)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception 
+            #TODO(gbasava): Handle the exception
             return
-    
-    @synchronized(novalock)           
-    def get_interfaces(self, context, server):   
+
+    @synchronized(novalock)
+    def get_interfaces(self, context, server):
         """
         List attached network interfaces
 
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             client = novaclient(context, self._production)
-            return client.servers.interface_list(server=server) 
+            return client.servers.interface_list(server=server)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
-            return client.servers.interface_list(server=server) 
+            return client.servers.interface_list(server=server)
         except nova_exception.HTTPNotImplemented:
             # This is configured to use nova network
             server = client.servers.get(server)
             return server._info['addresses']
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            return              
+            #TODO(gbasava): Handle the exception
+            return
     @synchronized(novalock)
     def get_networks(self, context):
         """
@@ -796,183 +814,201 @@ class API(base.Base):
             return
 
     @synchronized(novalock)
+    def map_snapshot_files(self, context, server, params):
+        """
+        Map snapshot volume images to file manager instance
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        try:
+            extensions = _discover_extensions('1.1')
+            client =  novaclient(context, self._production, extensions=extensions)
+            return client.contego.map_snapshot_files(server=server, params=params)
+        except nova_exception.Unauthorized as unauth_ex:
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
+            return client.contego.map_snapshot_files(server=server, params=params)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            raise
+
+    @synchronized(novalock)
     def vast_prepare(self, context, server, params):
         """
         PREPARE to VAST an instance
         :param server: The :class:`Server` (or its ID) to prepare.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_prepare(server=server, params=params) 
+            return client.contego.vast_prepare(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_prepare(server=server, params=params) 
+            return client.contego.vast_prepare(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise         
-        
+            #TODO(gbasava): Handle the exception
+            raise
+
     @synchronized(novalock)
     def vast_freeze(self, context, server, params):
         """
         FREEZE an instance
         :param server: The :class:`Server` (or its ID) to freeze.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_freeze(server=server, params=params) 
+            return client.contego.vast_freeze(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_freeze(server=server, params=params) 
+            return client.contego.vast_freeze(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-                
-        
+            #TODO(gbasava): Handle the exception
+
+
     @synchronized(novalock)
     def vast_thaw(self, context, server, params):
         """
         Thaw an instance
         :param server: The :class:`Server` (or its ID) to thaw.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_thaw(server=server, params=params) 
+            return client.contego.vast_thaw(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_thaw(server=server, params=params) 
+            return client.contego.vast_thaw(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-                
-                          
+            #TODO(gbasava): Handle the exception
+
+
     @synchronized(novalock)
     def vast_instance(self, context, server, params):
         """
         VAST an instance
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_instance(server=server, params=params) 
+            return client.contego.vast_instance(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_instance(server=server, params=params) 
+            return client.contego.vast_instance(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise  
-        
+            #TODO(gbasava): Handle the exception
+            raise
+
     @synchronized(novalock)
     def vast_get_info(self, context, server, params):
         """
         Get components of a VASTed instance
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_get_info(server=server, params=params) 
+            return client.contego.vast_get_info(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_get_info(server=server, params=params) 
+            return client.contego.vast_get_info(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise          
-        
+            #TODO(gbasava): Handle the exception
+            raise
+
     @synchronized(novalock)
     def vast_data_transfer(self, context, server, params):
         """
         Transfer a component of a VASTed instance to backup store
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise   
+            #TODO(gbasava): Handle the exception
+            raise
 
     @synchronized(novalock)
     def vast_async_task_status(self, context, server, params):
         """
         Get data transfer status of VASTed instance component
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True) 
+            return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise   
-        
+            #TODO(gbasava): Handle the exception
+            raise
+
     @synchronized(novalock)
-    @autolog.log_method(logger=Logger)    
+    @autolog.log_method(logger=Logger)
     def vast_finalize(self, context, server, params):
         """
         Finalize the VAST
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.vast_finalize(server=server, params=params) 
+            return client.contego.vast_finalize(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.vast_finalize(server=server, params=params) 
+            return client.contego.vast_finalize(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise  
-                            
+            #TODO(gbasava): Handle the exception
+            raise
+
     @synchronized(novalock)
     def testbubble_attach_volume(self, context, server, params):
         """
         Attach a volume to testbubble instance
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.testbubble_attach_volume(server=server, params=params) 
+            return client.contego.testbubble_attach_volume(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.testbubble_attach_volume(server=server, params=params) 
+            return client.contego.testbubble_attach_volume(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise                      
+            #TODO(gbasava): Handle the exception
+            raise
 
     @synchronized(novalock)
     def testbubble_reboot_instance(self, context, server, params):
         """
         Simple reboot of a testbubble instance
         :param server: The :class:`Server` (or its ID) to query.
-        """        
+        """
         try:
             extensions = _discover_extensions('1.1')
             client =  novaclient(context, self._production, extensions=extensions)
-            return client.contego.testbubble_reboot_instance(server=server, params=params) 
+            return client.contego.testbubble_reboot_instance(server=server, params=params)
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production,
                                   extensions=extensions, admin=True)
-            return client.contego.testbubble_reboot_instance(server=server, params=params) 
+            return client.contego.testbubble_reboot_instance(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception   
-            raise                      
+            #TODO(gbasava): Handle the exception
+            raise
