@@ -42,8 +42,6 @@ import sqlalchemy
 from sqlalchemy import *
 from workloadmgr.db.sqlalchemy import models
 
-import pip
-
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
@@ -1496,8 +1494,6 @@ def configure_form_vmware():
     else:
          config_database['refresh'] = 1
 
-    pip.main(['install', 'pytz'])
-    pip.main(['install', 'tzlocal'])
     from pytz import all_timezones
     from tzlocal import get_localzone
     timezone = get_localzone().zone
@@ -2173,7 +2169,7 @@ def configure_vmware():
         else:
             config_data['ntp_enabled'] = 'off'
         
-        config_data['ntp_servers'] = config_inputs['ntp-servers']
+        config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
         config_data['timezone'] = config_inputs['timezone']
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']
