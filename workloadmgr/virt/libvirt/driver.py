@@ -381,35 +381,70 @@ class LibvirtDriver(driver.ComputeDriver):
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_mount')
     def snapshot_mount(self, cntx, snapshot, diskfiles):
+        
+        def _reboot_fminstance():
+            # reboot the file manager server 
+            # If the server does not exists, create a server
+            instances = compute_service.get_servers(cntx)
+            fminstance = None
+            for instance in instances:
+                if instance.image['id'] == "6635f177-01b7-4909-a8ca-2260976a295a":
+                    fminstance = instance
+                    break
 
-        devpaths = {}
-        try:
-            for disk in diskfiles:
-                nbddevice = nbd(disk, None)
-                nbddevice.get_dev()
-                devpaths[disk] = nbddevice.device
+            if fminstance == None:
+                raise Exception("TrilioVault File Manager does not exists")
 
-        except Exception as ex:
-            for dev in devpaths:
-                try:
-                    nbddevice.unget_dev()
-                except:
-                    pass
-            LOG.exception(ex)
-            raise
+            compute_service.reboot(cntx, fminstance)
+            while True:
+                time.sleep(1)
+                fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
+                                                            admin=True)
+                if not fminstance.__dict__['OS-EXT-STS:task_state']:
+                    break
 
-        return devpaths
+            if fminstance.status.lower() != "active":
+                raise Exception("File Manager VM is not rebooted successfully")
+
+            return fminstance
+
+        def _map_snapshot_images(fminstance):
+            compute_service.map_snapshot_files(cntx, fminstance.id, diskfiles)
+            pass
+
+        compute_service = nova.API(production=True)
+        fminstance = _reboot_fminstance()
+        _map_snapshot_images(fminstance)
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_dismount')
     def snapshot_dismount(self, cntx, snapshot, devpaths):
-        for disk, dev in devpaths.iteritems():
-            try:
-                nbddevice = nbd(disk, None)
-                nbddevice.device = dev
-                nbddevice.linked = True
-                nbddevice.unget_dev()
-            except:
-                pass
+        def _reboot_fminstance():
+            # reboot the file manager server 
+            # If the server does not exists, create a server
+            instances = compute_service.get_servers(cntx)
+            fminstance = None
+            for instance in instances:
+                if instance.image['id'] == "6635f177-01b7-4909-a8ca-2260976a295a":
+                    fminstance = instance
+                    break
+
+            if fminstance == None:
+                raise Exception("TrilioVault File Manager does not exists")
+
+            compute_service.reboot(cntx, fminstance, reboot_type='HARD')
+            while True:
+                time.sleep(1)
+                fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
+                                                            admin=True)
+                if not fminstance.__dict__['OS-EXT-STS:task_state']:
+                    break
+
+            if fminstance.status.lower() != "active":
+                raise Exception("File Manager VM is not rebooted successfully")
+
+            return fminstance
+        compute_service = nova.API(production=True)
+        fminstance = _reboot_fminstance()
 
     def rebase_vmdk(self, base, orig_base, base_descriptor, top, orig_top, top_descriptor):
         """
