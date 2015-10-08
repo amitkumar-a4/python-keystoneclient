@@ -531,7 +531,7 @@ class API(base.Base):
     
         try:
             client = novaclient(context, self._production)
-            return client.servers.suspend(server=server) 
+            return client.servers.reboot(server=server) 
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
             return client.servers.reboot(server=server, reboot_type=reboot_type)
