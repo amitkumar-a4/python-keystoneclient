@@ -792,7 +792,7 @@ def snapshot_mark_incomplete_as_error(context, host):
             values =  { 'status': 'available' }
             snapshot.save(session=session)
             
-    snapshots =  model_query(context, models.Snapshots, session=session).\
+    """snapshots =  model_query(context, models.Snapshots, session=session).\
                             all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error' and\
@@ -806,7 +806,7 @@ def snapshot_mark_incomplete_as_error(context, host):
                 snapshot.save(session=session)
         if snapshot.status == 'restoring':
             values =  { 'status': 'available' }
-            snapshot.save(session=session)
+            snapshot.save(session=session)"""
 
 #### Snapshot ################################################################
 """ snapshot functions """

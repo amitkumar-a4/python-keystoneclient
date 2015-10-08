@@ -685,6 +685,7 @@ class API(base.Base):
                     ip_addresses = node_record.ip_addresses.split(';')
                     if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
                         ipaddress = ip_addresses[0]
+                    import pdb;pdb.set_trace()
                     if socket.gethostname() == node_record.host:
                        controller_ip = ipaddress
                     if any([ipaddress == ip , node_record.host == ip]):
@@ -692,6 +693,7 @@ class API(base.Base):
                        raise wlm_exceptions.ErrorOccurred(reason=msg)
                 except Exception as ex:
                     LOG.exception(ex)
+                    raise ex
             import subprocess           
             file_name = context.user_id+'.txt'
             command = ['sudo', 'curl', '-k', '--cookie-jar', file_name, '--data', "username=admin&password=password", "https://"+ip+"/login"];
