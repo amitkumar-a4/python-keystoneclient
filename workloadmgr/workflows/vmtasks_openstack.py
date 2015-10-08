@@ -64,6 +64,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
+        
         def _snapshot_neutron_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             nics = []
@@ -134,6 +135,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 nics.append(nic)
 
             return nics
+        
         def _snapshot_nova_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             networks = compute_service.get_networks(cntx)
@@ -157,6 +159,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             return nics
 
         #Store the nics in the DB
+
         network_type = ""
         for instance in instances: 
             try:
@@ -596,7 +599,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
             if network_type != 'neutron':
-                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+                #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
                 nic_info.setdefault('net-id', db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'))
             else:
                 if nic_data['mac_address'] in restored_net_resources:
