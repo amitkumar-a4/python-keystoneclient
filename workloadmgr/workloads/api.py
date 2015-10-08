@@ -685,7 +685,6 @@ class API(base.Base):
                     ip_addresses = node_record.ip_addresses.split(';')
                     if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
                         ipaddress = ip_addresses[0]
-                    import pdb;pdb.set_trace()
                     if socket.gethostname() == node_record.host:
                        controller_ip = ipaddress
                     if any([ipaddress == ip , node_record.host == ip]):
