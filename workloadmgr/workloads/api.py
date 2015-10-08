@@ -696,6 +696,11 @@ class API(base.Base):
             import subprocess           
             file_name = context.user_id+'.txt'
             command = ['sudo', 'curl', '-k', '--cookie-jar', file_name, '--data', "username=admin&password=password", "https://"+ip+"/login"];
+            try:
+                res = subprocess.check_output(command)
+            except Exception as ex:
+                   msg = _("Error resolving "+ip)
+                   raise wlm_exceptions.ErrorOccurred(reason=msg)                    
             subprocess.call(command, shell=False)                      
             config_inputs = {}
             for setting in self.db.setting_get_all_by_project(context, "Configurator"):
