@@ -460,7 +460,7 @@ def _authenticate_with_keystone():
                                tenant_name=config_data['admin_tenant_name'])
     tenants = keystone.tenants.list()
     for tenant in tenants:
-        if tenant.name == 'service' or 'services':
+        if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
