@@ -41,6 +41,8 @@ from workloadmgr.openstack.common.gettextutils import _
 import sqlalchemy 
 from sqlalchemy import *
 from workloadmgr.db.sqlalchemy import models
+from pytz import all_timezones
+from tzlocal import get_localzone
 
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
@@ -458,7 +460,7 @@ def _authenticate_with_keystone():
                                tenant_name=config_data['admin_tenant_name'])
     tenants = keystone.tenants.list()
     for tenant in tenants:
-        if tenant.name == 'service':
+        if tenant.name == 'service' or 'services':
             config_data['service_tenant_id'] = tenant.id
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
@@ -1494,8 +1496,6 @@ def configure_form_vmware():
     else:
          config_database['refresh'] = 1
 
-    from pytz import all_timezones
-    from tzlocal import get_localzone
     timezone = get_localzone().zone
     config_database['timezones'] = all_timezones
     config_database['timezone'] = timezone
@@ -2047,13 +2047,6 @@ def persist_config():
 @authorize()
 def ntp_setup():
     try:
-        import platform
-        type_os = platform.linux_distribution() 
-        if type_os[0].lower() == "ubuntu":
-           command = ['sudo', 'apt-get', 'install', "ntp"]
-        else:
-             command = ['sudo', 'yum', 'install', "ntp"] 
-        subprocess.call(command, shell=False)
         contents = open('/etc/ntp.conf', 'r').read()
         new_contents = ""
         detect = 0
@@ -2083,12 +2076,11 @@ def ntp_setup():
         conf_file.write(new_contents)
         conf_file.close()
     
-        if type_os[0].lower() == "ubuntu":       
-           timezone_file = open('/etc/timezone', 'w')
-           timezone_file.write(config_data['timezone']+"\n")
-           timezone_file.close()
-           command = ['sudo', 'dpkg-reconfigure', '-f', 'noninteractive', 'tzdata']
-           subprocess.call(command, shell=False)
+        timezone_file = open('/etc/timezone', 'w')
+        timezone_file.write(config_data['timezone']+"\n")
+        timezone_file.close()
+        command = ['sudo', 'dpkg-reconfigure', '-f', 'noninteractive', 'tzdata']
+        subprocess.call(command, shell=False)
      
         command = ['sudo', 'service', 'ntp', 'stop']
         subprocess.call(command, shell=False)

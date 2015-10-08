@@ -175,6 +175,7 @@ class UploadImageToGlance(task.Task):
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
         self.restore_obj = restore_obj = db.restore_get(self.cntx, restore_id)
+        snapshot_obj = db.snapshot_get(self.cntx, self.restore_obj.snapshot_id)
         snapshot_id = restore_obj.snapshot_id
         self.image_service = glance.get_default_image_service(\
                                   production= (restore_obj['restore_type'] != 'test'))
@@ -190,10 +191,13 @@ class UploadImageToGlance(task.Task):
         #upload to glance
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id)
+        image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_name')
+        time_offset = datetime.now() - datetime.utcnow()
+        image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         if db.get_metadata_value(vm_disk_resource_snap.metadata, 'disk_format') == 'vmdk':
             image_metadata = {'is_public': False,
                               'status': 'active',
-                              'name': snapshot_vm_resource.id,
+                              'name': image_name,
                               'disk_format' : 'vmdk', 
                               'container_format' : 'bare',
                               'properties': {
@@ -206,7 +210,7 @@ class UploadImageToGlance(task.Task):
         else:
             image_metadata = {'is_public': False,
                               'status': 'active',
-                              'name': snapshot_vm_resource.id,
+                              'name': image_name,
                               'disk_format' : 'qcow2',
                               'container_format' : 'bare',
                               'properties': {}
@@ -219,8 +223,7 @@ class UploadImageToGlance(task.Task):
         project_id = self.cntx.tenant
         self.cntx = nova._get_tenant_context(user_id, project_id)
 
-        self.restored_image = restored_image = \
-                      self.image_service.create(self.cntx, image_metadata)
+        self.restored_image = restored_image = self.image_service.create(self.cntx, image_metadata)
         if restore_obj['restore_type'] == 'test':
             shutil.move(restore_file_path, os.path.join(CONF.glance_images_path, restored_image['id']))
             restore_file_path = os.path.join(CONF.glance_images_path, restored_image['id'])
@@ -228,13 +231,13 @@ class UploadImageToGlance(task.Task):
                 restored_image = self.image_service.update(self.cntx, restored_image['id'], image_metadata, image_file)
         else:
             restored_image = self.image_service.update(self.cntx, 
-                                                  restored_image['id'], 
-                                                  image_metadata, 
-                                                  utils.ChunkedFile(restore_file_path,
-                                                              {'function': db.restore_update,
-                                                               'context': self.cntx,
-                                                               'id':restore_obj.id})
-                                                  )
+                                                       restored_image['id'], 
+                                                       image_metadata, 
+                                                       utils.ChunkedFile(restore_file_path,
+                                                                          {'function': db.restore_update,
+                                                                           'context': self.cntx,
+                                                                           'id':restore_obj.id})
+                                                       )
         LOG.debug(_("restore_size: %(restore_size)s") %{'restore_size': restore_obj.size,})
         LOG.debug(_("uploaded_size: %(uploaded_size)s") %{'uploaded_size': restore_obj.uploaded_size,})
         LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': restore_obj.progress_percent,})                
@@ -412,7 +415,7 @@ class RestoreCephVolume(task.Task):
 
         return restored_volume['id']
 
-    @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
+    @autolog.log_method(Logger, 'RestoreCephVolume.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
             self.volume_service.delete(self.cntx, self.restored_volume)
@@ -520,7 +523,7 @@ class RestoreNFSVolume(task.Task):
 
         return self.restored_volume['id']
 
-    @autolog.log_method(Logger, 'RestoreVolumeFromImage.revert')
+    @autolog.log_method(Logger, 'RestoreNFSVolume.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
             self.volume_service.delete(self.cntx, self.restored_volume)
