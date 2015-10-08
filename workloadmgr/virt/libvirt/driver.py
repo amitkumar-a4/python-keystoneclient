@@ -599,6 +599,10 @@ class LibvirtDriver(driver.ComputeDriver):
         def _get_backing_vm_disk_resource_with_volume_id(disk_info):
             pass
 
+        # Always attempt with a new token to avoid timeouts
+        user_id = cntx.user
+        project_id = cntx.tenant
+        cntx = nova._get_tenant_context(user_id, project_id)
 
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
