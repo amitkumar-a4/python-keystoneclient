@@ -932,10 +932,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
 
-                virtdriver.snapshot_mount(context, snapshot, pervmdisks)
+                fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks)
                 self.db.snapshot_update(context, snapshot['id'],
                                  {'status': 'mounted', 'metadata': {}})
-                return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+                urls = []
+                for netname, addresses in fminstance.addresses.iteritems():
+                    for addr in addresses:
+                        if 'addr' in addr:
+                            urls.append("http://" + addr['addr'] + ":8000")
+ 
+                return {"urls": urls}
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
 
