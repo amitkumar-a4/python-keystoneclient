@@ -483,9 +483,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 msg = _("Failed creating workload snapshot with following error(s):")
                 if hasattr(ex, '_causes'):
-                   for cause in ex._causes:
-                       if cause._exception_str not in msg:
-                           msg = msg + ' ' + cause._exception_str
+                    for cause in ex._causes:
+                        if cause._exception_str not in msg:
+                            msg = msg + ' ' + cause._exception_str
                 LOG.error(msg)  
                 status = 'error'
             
@@ -531,6 +531,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
                 
         finally:
+            try:
+                vault.purge_snapshot_from_staging_area(context, {'workload_id' : workload.id,
+                                                                 'snapshot_id' : snapshot.id})
+            except Exception as ex:
+                LOG.exception(ex) 
+                                           
             try:
                 vault.purge_staging_area(context)
             except Exception as ex:
