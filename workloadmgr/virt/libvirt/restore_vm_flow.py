@@ -453,8 +453,8 @@ class RestoreNFSVolume(task.Task):
         time_offset = datetime.now() - datetime.utcnow()
         desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id')
-        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'display_name')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
@@ -792,7 +792,7 @@ def RestoreVolumes(context, instance, snapshotobj, restoreid):
             continue
 
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-            if 'ceph' in db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id'):
+            if 'ceph' in db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type'):
                 flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
                         rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                         image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id)),

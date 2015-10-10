@@ -187,10 +187,13 @@ class API(base.Base):
         except Exception:
             self._reraise_translated_volume_exception(None)
 
-    def get(self, context, volume_id):
+    def get(self, context, volume_id, no_translate=False):
         try:
             item = cinderclient(context).volumes.get(volume_id)
-            return _untranslate_volume_summary_view(context, item)
+            if no_translate:
+                return item
+            else:
+                return _untranslate_volume_summary_view(context, item)
         except Exception:
             self._reraise_translated_volume_exception(volume_id)
 
