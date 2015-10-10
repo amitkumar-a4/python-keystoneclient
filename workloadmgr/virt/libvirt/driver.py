@@ -396,12 +396,16 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise Exception("TrilioVault File Manager does not exists")
 
             compute_service.reboot(cntx, fminstance)
+            start_time = timeutils.utcnow()
             while True:
                 time.sleep(1)
                 fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
                                                             admin=True)
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
+                now = timeutils.utcnow()
+                if (now - start_time) > datetime.timedelta(minutes=4*60):
+                    raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                
 
             if fminstance.status.lower() != "active":
                 raise Exception("File Manager VM is not rebooted successfully")
@@ -433,15 +437,20 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise Exception("TrilioVault File Manager does not exists")
 
             compute_service.reboot(cntx, fminstance, reboot_type='HARD')
+            start_time = timeutils.utcnow()
             while True:
                 time.sleep(1)
                 fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
                                                             admin=True)
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
+                now = timeutils.utcnow()
+                if (now - start_time) > datetime.timedelta(minutes=4*60):
+                    raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                   
 
             if fminstance.status.lower() != "active":
                 raise Exception("File Manager VM is not rebooted successfully")
+             
 
             return fminstance
         compute_service = nova.API(production=True)
@@ -668,11 +677,6 @@ class LibvirtDriver(driver.ComputeDriver):
                 if 'volume_id' in snapshot_vm_resource_metadata:
                     break
             
-            if ('volume_id' not in snapshot_vm_resource_metadata) and \
-                ('image_id' not in snapshot_vm_resource_metadata):
-                raise exception.ErrorOccurred(reason='Failed to either volume or image for device: ' + disk_info['dev'])    
-                
-
             vm_disk_size = 0
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),

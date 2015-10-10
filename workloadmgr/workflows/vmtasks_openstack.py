@@ -15,10 +15,13 @@ import time
 import cPickle as pickle
 from netaddr import IPNetwork
 import threading
+import time
+import datetime
 
 from neutronclient.common import exceptions as neutron_exceptions
 
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import timeutils
 from workloadmgr import autolog
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
@@ -27,6 +30,8 @@ from workloadmgr.image import glance
 from workloadmgr.vault import vault
 from workloadmgr.virt import driver
 from workloadmgr import utils
+from workloadmgr import exception
+
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -399,10 +404,15 @@ def pause_vm(cntx, db, instance):
     else:
         compute_service.pause(cntx, instance['vm_id'])
         instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+        start_time = timeutils.utcnow()
         while hasattr(instance_ref,'status') and instance_ref.status != 'PAUSED':
+            time.sleep(5)
             instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
             if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
-                raise Exception(_("Error suspending instance " + instance_ref.id))        
+                raise Exception(_("Error suspending instance " + instance_ref.id))
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4*60):
+                raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')                       
 
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
 def unpause_vm(cntx, db, instance):
@@ -421,11 +431,15 @@ def suspend_vm(cntx, db, instance):
     compute_service = nova.API(production=True)
     compute_service.suspend(cntx, instance['vm_id'])
     instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+    start_time = timeutils.utcnow()
     while hasattr(instance_ref,'status') and instance_ref.status != 'SUSPENDED':
         time.sleep(5)
         instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
         if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
             raise Exception(_("Error suspending instance " + instance_ref.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=4*60):
+            raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')         
     
 @autolog.log_method(Logger, 'vmtasks_openstack.resume_vm')
 def resume_vm(cntx, db, instance):

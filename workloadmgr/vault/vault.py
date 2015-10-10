@@ -950,6 +950,7 @@ def get_size(vault_path):
     try:
         statinfo = os.stat(vault_path)
         size = statinfo.st_size
+        LOG.debug('size of ' + vault_path + ': ' + str(size))
     except Exception as ex:
         LOG.exception(ex)
     return size            
