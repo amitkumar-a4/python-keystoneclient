@@ -632,7 +632,7 @@ class LibvirtDriver(driver.ComputeDriver):
         nova_instance = compute_service.get_server_by_id(cntx, instance['vm_id'])
         cinder_volumes = []
         for volume in getattr(nova_instance, 'os-extended-volumes:volumes_attached'):
-            cinder_volumes.append(volume_service.get(cntx, volume['id']))
+            cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
         
         
         for disk_info in snapshot_data_ex['disks_info']:
@@ -653,15 +653,25 @@ class LibvirtDriver(driver.ComputeDriver):
             else:
                 snapshot_vm_resource_metadata['image_id'] = None
 
-                
             for cinder_volume in cinder_volumes:
-                if disk_info['dev'] in cinder_volume['mountpoint']:
-                    snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
-                    snapshot_vm_resource_metadata['display_name'] = cinder_volume['display_name']
-                    snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
-                    snapshot_vm_resource_metadata['volume_type_id'] = cinder_volume['volume_type_id']
-                    snapshot_vm_resource_metadata['volume_mountpoint'] = cinder_volume['mountpoint']
+                cinder_volume = cinder_volume.__dict__
+                for attachment in cinder_volume['attachments']:
+                    if attachment['server_id'] == instance['vm_id']:
+                        if disk_info['dev'] in attachment['device']:
+                            snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
+                            snapshot_vm_resource_metadata['volume_name'] = cinder_volume['display_name'] or \
+                                snapshot_vm_resource_metadata['volume_id']
+                            snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
+                            snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']
+                            snapshot_vm_resource_metadata['volume_mountpoint'] = attachment['device']
+                            break
+                if 'volume_id' in snapshot_vm_resource_metadata:
                     break
+            
+            if ('volume_id' not in snapshot_vm_resource_metadata) and \
+                ('image_id' not in snapshot_vm_resource_metadata):
+                raise exception.ErrorOccurred(reason='Failed to either volume or image for device: ' + disk_info['dev'])    
+                
 
             vm_disk_size = 0
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
@@ -846,6 +856,7 @@ class LibvirtDriver(driver.ComputeDriver):
         progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)        
         while True:
             try:
+                LOG.debug(_('Waiting for the status of VAST finalize for '+ instance['vm_id']))
                 time.sleep(10)
                 async_task_status = {}
                 if progress_tracking_file_path:
@@ -882,7 +893,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise ex
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=10*60):
-                raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')        
+                raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')
+        LOG.debug(_('VAST finalize completed for '+ instance['vm_id']))        
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
