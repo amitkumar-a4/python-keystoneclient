@@ -419,6 +419,7 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         fminstance = _reboot_fminstance()
         _map_snapshot_images(fminstance)
+        return fminstance
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_dismount')
     def snapshot_dismount(self, cntx, snapshot, devpaths):
