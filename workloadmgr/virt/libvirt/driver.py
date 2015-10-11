@@ -404,7 +404,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
                 now = timeutils.utcnow()
-                if (now - start_time) > datetime.timedelta(minutes=4*60):
+                if (now - start_time) > datetime.timedelta(minutes=4):
                     raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                
 
             if fminstance.status.lower() != "active":
@@ -444,7 +444,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
                 now = timeutils.utcnow()
-                if (now - start_time) > datetime.timedelta(minutes=4*60):
+                if (now - start_time) > datetime.timedelta(minutes=4):
                     raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                   
 
             if fminstance.status.lower() != "active":
@@ -848,6 +848,11 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
+
+        #snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
+        #                                    {'progress_msg': 'Finalizing snapshot of VM: '+ instance['vm_id'],
+        #                                     'status': 'finalizing'
+        #                                    })
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)

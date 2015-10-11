@@ -702,7 +702,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 if target_platform == 'openstack':
                     restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
-                    restore = self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
+                    restore = self.db.restore_update( context, restore_id, {'size': (restore_size)})
                 else:
                     restore_size = vmtasks_vcloud.get_restore_data_size( context, self.db, dict(restore.iteritems()))
                     restore = self.db.restore_update( context, restore_id, {'size': (restore_size)})
