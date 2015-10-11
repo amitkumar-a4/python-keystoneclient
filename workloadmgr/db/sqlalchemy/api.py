@@ -1052,16 +1052,26 @@ def snapshot_type_time_size_update(context, snapshot_id):
             disk_type = get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
             vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
             snapshot_vm_resource_size = 0
-            snapshot_vm_resource_restore_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
+                vm_disk_resource_snap_restore_size = 0
                 if vm_disk_resource_snap.vault_path:
                     vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_path)
                     if vm_disk_resource_snap_size == 0:
                         vm_disk_resource_snap_size = vm_disk_resource_snap.size
                     
                     disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
-                                                                                disk_format, disk_type)
+                    if disk_format == 'vmdk':
+                        vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
+                                                                                    disk_format, disk_type)
+                    else:
+                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
+                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
+                        while vm_disk_resource_snap_backing_id:
+                            vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                                                
+                    #For vmdk   
                     if vm_disk_resource_snap_restore_size == 0:
                         vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
                         vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
@@ -1076,7 +1086,9 @@ def snapshot_type_time_size_update(context, snapshot_id):
                     vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
                                                                                      'restore_size' : vm_disk_resource_snap_restore_size}) 
                     snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
-                    snapshot_vm_resource_restore_size = snapshot_vm_resource_restore_size + vm_disk_resource_snap_restore_size
+                    
+            vm_disk_resource_snap_top = vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
+            snapshot_vm_resource_restore_size = vm_disk_resource_snap_top.restore_size
             snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size,
                                                                            'restore_size' : snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
@@ -1266,7 +1278,7 @@ def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, ses
     if vm_id:
         snapshot_vm_ref = _snapshot_vm_get(context, vm_id, snapshot_id, session)
         if snapshot_vm_ref is None:
-           return
+            return
     else:
         snapshot_vm_ref = models.SnapshotVMs()
         if not values.get('id'):
@@ -2020,7 +2032,7 @@ def get_metadata_value(metadata, key, default=None):
 @require_admin_context
 def restore_mark_incomplete_as_error(context, host):
     """
-    mark the snapshots that are left hanging from previous run on host as 'error'
+    mark the restores that are left hanging from previous run on host as 'error'
     """
     session = get_session()
     restores =  model_query(context, models.Restores, session=session).\
@@ -2033,6 +2045,7 @@ def restore_mark_incomplete_as_error(context, host):
                        'status': 'error' }
             restore.update(values)
             restore.save(session=session)
+            return snapshot_update(context, restore.snapshot_id, {'status': 'available' })            
             
 def _set_metadata_for_restore(context, restore_ref, metadata,
                                     purge_metadata, session):

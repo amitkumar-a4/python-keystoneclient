@@ -1466,7 +1466,7 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
         """
-        Delete a workload restore. RPC call may be required
+        Delete a workload restore.
         """
         restore_details = self.restore_show(context, restore_id)
 
@@ -1494,6 +1494,7 @@ class API(base.Base):
             msg = _("Status of the requested resource status must be 'available' or 'error' or 'cancelled'")
             raise wlm_exceptions.InvalidState(reason=msg)
 
+        """
         if restore_details['restore_type'] == 'test':
             network_service =  neutron.API(production=False)
             compute_service = nova.API(production=False)
@@ -1561,6 +1562,7 @@ class API(base.Base):
                 msg = _("Error deleting security_group %(security_group_id)s with failure: %(exception)s")
                 LOG.debug(msg, {'security_group_id': security_group['id'], 'exception': exception})
                 LOG.exception(exception)
+        """
 
         self.db.restore_delete(context, restore_id)
         AUDITLOG.log(context, 'Workload \'' + workload_display_name + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Restore \'' + restore_display_name + '\' Delete Submitted', restore)

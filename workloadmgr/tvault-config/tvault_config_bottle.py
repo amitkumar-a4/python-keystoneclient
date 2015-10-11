@@ -1571,6 +1571,13 @@ def configure_host():
             subprocess.call(command, shell=False)
             command = ['sudo', 'resolvconf',  '-u']
             subprocess.call(command, shell=False)
+            
+            try:
+                #dhcp
+                replace_line('/etc/dhcp/dhclient.conf', 'prepend domain-name-servers ', 
+                             'prepend domain-name-servers ' + config_data['name_server'] + ';') 
+            except:
+                pass
         
         try:
             command = ['sudo', 'umount', '/var/triliovault']

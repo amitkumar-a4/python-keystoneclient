@@ -781,7 +781,7 @@ class ApplyRetentionPolicy(task.Task):
           
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.revert')
     def revert_with_log(self, *args, **kwargs):       
-        pass    
+        pass
     
 class PrepareBackupImage(task.Task):
     """
@@ -889,7 +889,8 @@ class PrepareBackupImage(task.Task):
                 os.remove(self.restored_file_path)
         except:
             pass
-
+        
+    
 def UnorderedPreSnapshot(instances):
     flow = uf.Flow("presnapshotuf")
     for index,item in enumerate(instances):

@@ -128,7 +128,7 @@ def run_async(func):
 
     return async_func
 
-def get_progress_tracker_path(tracker_metadata):
+def get_progress_tracker_directory(tracker_metadata):
     progress_tracker_directory = ''
     if CONF.vault_storage_type == 'local' or \
        CONF.vault_storage_type == 'vault' or \
@@ -140,10 +140,16 @@ def get_progress_tracker_path(tracker_metadata):
         return None
            
     fileutils.ensure_tree(progress_tracker_directory)
-    progress_tracking_file_path = os.path.join(progress_tracker_directory + '/' + tracker_metadata['resource_id'])    
-    return progress_tracking_file_path        
+    return progress_tracker_directory
 
-
+def get_progress_tracker_path(tracker_metadata):
+    progress_tracker_directory = get_progress_tracker_directory(tracker_metadata)
+    if progress_tracker_directory:
+        progress_tracking_file_path = os.path.join(progress_tracker_directory + '/' + tracker_metadata['resource_id'])    
+        return progress_tracking_file_path
+    else:
+        return None      
+    
 def get_vault_data_directory():
     vault_data_directory = ''
     if CONF.vault_storage_type == 'local' or \
@@ -873,6 +879,14 @@ def purge_snapshot_from_staging_area(context, snapshot_metadata):
               
     except Exception as ex:
         LOG.exception(ex) 
+        
+    try:
+        progress_tracker_directory = get_progress_tracker_directory(snapshot_metadata)        
+        if os.path.isdir(progress_tracker_directory):
+            shutil.rmtree(progress_tracker_directory)     
+              
+    except Exception as ex:
+        LOG.exception(ex)         
 
 @autolog.log_method(logger=Logger)                 
 def purge_snapshot_vm_from_staging_area(context, snapshot_vm_metadata):
@@ -936,6 +950,7 @@ def get_size(vault_path):
     try:
         statinfo = os.stat(vault_path)
         size = statinfo.st_size
+        #LOG.debug('size of ' + vault_path + ': ' + str(size))
     except Exception as ex:
         LOG.exception(ex)
     return size            

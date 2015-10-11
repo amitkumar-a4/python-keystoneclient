@@ -56,6 +56,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
+from workloadmgr import utils
 
 import  workloadmgr.workflows
 from workloadmgr.workflows import vmtasks_openstack
@@ -483,9 +484,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 msg = _("Failed creating workload snapshot with following error(s):")
                 if hasattr(ex, '_causes'):
-                   for cause in ex._causes:
-                       if cause._exception_str not in msg:
-                           msg = msg + ' ' + cause._exception_str
+                    for cause in ex._causes:
+                        if cause._exception_str not in msg:
+                            msg = msg + ' ' + cause._exception_str
                 LOG.error(msg)  
                 status = 'error'
             
@@ -531,6 +532,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
                 
         finally:
+            try:
+                vault.purge_snapshot_from_staging_area(context, {'workload_id' : workload.id,
+                                                                 'snapshot_id' : snapshot.id})
+            except Exception as ex:
+                LOG.exception(ex) 
+                                           
             try:
                 vault.purge_staging_area(context)
             except Exception as ex:
@@ -689,14 +696,28 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 values['pickle'] = pickle.dumps(options, 0)
 
             restore = self.db.restore_update(context, restore.id, values)
-
+            
+            if options and target_platform == 'openstack':
+                compute_service = nova.API(production=True)                
+                for vm in self.db.snapshot_vms_get(context, restore.snapshot_id):
+                    instance_options = utils.get_instance_restore_options(options, vm.vm_id, target_platform)
+                    if instance_options and instance_options.get('include', True) == False:
+                        continue
+                    else:
+                        instance = compute_service.get_server_by_id(context, vm.vm_id, admin=True)
+                        if instance:
+                            msg = _('Original instance ' +  vm.vm_name + ' is still present. Please delete this instance and try again')
+                            raise wlm_exceptions.InvalidState(reason=msg)
+                                                
+                        
+                        
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':
                 self.db.restore_update( context, restore_id, {'size': restore_size})
             else:
                 if target_platform == 'openstack':
                     restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
-                    restore = self.db.restore_update( context, restore_id, {'size': (restore_size * 2)})
+                    restore = self.db.restore_update( context, restore_id, {'size': (restore_size)})
                 else:
                     restore_size = vmtasks_vcloud.get_restore_data_size( context, self.db, dict(restore.iteritems()))
                     restore = self.db.restore_update( context, restore_id, {'size': (restore_size)})
@@ -932,10 +953,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
 
-                virtdriver.snapshot_mount(context, snapshot, pervmdisks)
+                fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks)
                 self.db.snapshot_update(context, snapshot['id'],
                                  {'status': 'mounted', 'metadata': {}})
-                return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+                urls = []
+                for netname, addresses in fminstance.addresses.iteritems():
+                    for addr in addresses:
+                        if 'addr' in addr:
+                            urls.append("http://" + addr['addr'] + ":8000")
+ 
+                return {"urls": urls}
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
 

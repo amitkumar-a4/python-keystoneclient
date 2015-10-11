@@ -1,4 +1,4 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
+ # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
@@ -16,6 +16,7 @@ from workloadmgr import exception
 from workloadmgr.image import glance
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import utils
+from workloadmgr import async_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -170,9 +171,9 @@ def qemu_img_info(path):
                              'qemu-img', 'info', path)
     return QemuImgInfo(out)
 
-
+@async_utils.run_async
 def convert_image(source, dest, out_format, run_as_root=False):
-    """Convert image to other format."""
+    """Async Convert image to other format."""
     cmd = ('qemu-img', 'convert', '-t', 'none', '-O',
            out_format, source, dest)
     utils.execute(*cmd, run_as_root=run_as_root)

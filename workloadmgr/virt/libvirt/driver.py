@@ -396,12 +396,16 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise Exception("TrilioVault File Manager does not exists")
 
             compute_service.reboot(cntx, fminstance)
+            start_time = timeutils.utcnow()
             while True:
                 time.sleep(1)
                 fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
                                                             admin=True)
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
+                now = timeutils.utcnow()
+                if (now - start_time) > datetime.timedelta(minutes=4):
+                    raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                
 
             if fminstance.status.lower() != "active":
                 raise Exception("File Manager VM is not rebooted successfully")
@@ -415,6 +419,7 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         fminstance = _reboot_fminstance()
         _map_snapshot_images(fminstance)
+        return fminstance
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_dismount')
     def snapshot_dismount(self, cntx, snapshot, devpaths):
@@ -432,15 +437,20 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise Exception("TrilioVault File Manager does not exists")
 
             compute_service.reboot(cntx, fminstance, reboot_type='HARD')
+            start_time = timeutils.utcnow()
             while True:
                 time.sleep(1)
                 fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
                                                             admin=True)
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
+                now = timeutils.utcnow()
+                if (now - start_time) > datetime.timedelta(minutes=4):
+                    raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                   
 
             if fminstance.status.lower() != "active":
                 raise Exception("File Manager VM is not rebooted successfully")
+             
 
             return fminstance
         compute_service = nova.API(production=True)
@@ -546,14 +556,63 @@ class LibvirtDriver(driver.ComputeDriver):
         snapshot_data_ex = compute_service.vast_get_info(cntx, instance['vm_id'], snapshot_data)
         return snapshot_data_ex
 
+    @autolog.log_method(Logger, 'libvirt.driver._get_backing_snapshot_vm_resource_vm_disk_resource_snap')
+    def _get_backing_snapshot_vm_resource_vm_disk_resource_snap(self, cntx, db, instance, snapshot, disk_info):
+        snapshot_vm_resource_backing = None
+        vm_disk_resource_snap_backing = None
+        try:
+            snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+            workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)            
+            snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id)
+            for snap in snapshots:
+                if snap.status != "available":
+                    continue
+                snapshot_vm_resource_backing = db.snapshot_vm_resource_get_by_resource_name(cntx,
+                                                                                    instance['vm_id'],
+                                                                                    snap.id,
+                                                                                    disk_info['dev'])
+                vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource_backing.id)
+                for meta in snapshot_vm_resource_backing.metadata:
+                    if meta['key'] == 'disk_info':
+                        backing_disk_info = json.loads(meta['value'])
+                        if disk_info['backend'] == 'qcow2':
+                            if backing_disk_info['path'] != (disk_info['backings'][0]['path']):
+                                return None, None
+                        disk_info['prev_disk_info'] = json.loads(meta['value'])
+                        break                    
+                break
+        except Exception as ex:
+            LOG.exception(ex)
+            return None, None
+        return snapshot_vm_resource_backing, vm_disk_resource_snap_backing
+        
     @autolog.log_method(Logger, 'libvirt.driver.get_snapshot_data_size')
     def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
         vm_data_size = 0;
         snapshot_data_ex = self._get_snapshot_disk_info(cntx, db, instance, snapshot, snapshot_data)
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)        
+
         for disk_info in snapshot_data_ex['disks_info']:
             LOG.debug(_("    disk: %(disk)s") %{'disk': disk_info['dev'],})
+            
+            snapshot_vm_resource_backing = None
+            vm_disk_resource_snap_backing = None
+            disk_info['prev_disk_info'] = None
+
+            try:
+                if snapshot_obj.snapshot_type != 'full':
+                    snapshot_vm_resource_backing, vm_disk_resource_snap_backing = \
+                        self._get_backing_snapshot_vm_resource_vm_disk_resource_snap(cntx, db, instance, snapshot, disk_info)
+            except Exception as ex:
+                LOG.info(_("No previous snapshots found"))
+            
+            if snapshot_vm_resource_backing:
+                backings = [disk_info['backings'][0]]
+            else:
+                backings = disk_info['backings'][::-1] # reverse the list
+                                            
             vm_disk_size = 0
-            backings = disk_info['backings'][::-1] # reverse the list
             for i, backing in enumerate(backings):
                 vm_disk_size = vm_disk_size + backing['size']
                 if snapshot['snapshot_type'] == 'full':
@@ -568,37 +627,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
     @autolog.log_method(Logger, 'libvirt.driver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
-
-        def _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info):
-            snapshot_vm_resource_backing = None
-            vm_disk_resource_snap_backing = None
-            try:
-                snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id)
-                for snap in snapshots:
-                    if snap.status != "available":
-                        continue
-                    snapshot_vm_resource_backing = db.snapshot_vm_resource_get_by_resource_name(cntx,
-                                                                                        instance['vm_id'],
-                                                                                        snap.id,
-                                                                                        disk_info['dev'])
-                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource_backing.id)
-                    for meta in snapshot_vm_resource_backing.metadata:
-                        if meta['key'] == 'disk_info':
-                            backing_disk_info = json.loads(meta['value'])
-                            if disk_info['backend'] == 'qcow2':
-                                if backing_disk_info['path'] != (disk_info['backings'][0]['path']):
-                                    return None, None
-                            disk_info['prev_disk_info'] = json.loads(meta['value'])
-                            break                    
-                    break
-            except Exception as ex:
-                LOG.exception(ex)
-                return None, None
-            return snapshot_vm_resource_backing, vm_disk_resource_snap_backing
-
-        def _get_backing_vm_disk_resource_with_volume_id(disk_info):
-            pass
-
         # Always attempt with a new token to avoid timeouts
         user_id = cntx.user
         project_id = cntx.tenant
@@ -613,7 +641,7 @@ class LibvirtDriver(driver.ComputeDriver):
         nova_instance = compute_service.get_server_by_id(cntx, instance['vm_id'])
         cinder_volumes = []
         for volume in getattr(nova_instance, 'os-extended-volumes:volumes_attached'):
-            cinder_volumes.append(volume_service.get(cntx, volume['id']))
+            cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
         
         
         for disk_info in snapshot_data_ex['disks_info']:
@@ -634,16 +662,21 @@ class LibvirtDriver(driver.ComputeDriver):
             else:
                 snapshot_vm_resource_metadata['image_id'] = None
 
-                
             for cinder_volume in cinder_volumes:
-                if disk_info['dev'] in cinder_volume['mountpoint']:
-                    snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
-                    snapshot_vm_resource_metadata['display_name'] = cinder_volume['display_name']
-                    snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
-                    snapshot_vm_resource_metadata['volume_type_id'] = cinder_volume['volume_type_id']
-                    snapshot_vm_resource_metadata['volume_mountpoint'] = cinder_volume['mountpoint']
+                cinder_volume = cinder_volume.__dict__
+                for attachment in cinder_volume['attachments']:
+                    if attachment['server_id'] == instance['vm_id']:
+                        if disk_info['dev'] in attachment['device']:
+                            snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
+                            snapshot_vm_resource_metadata['volume_name'] = cinder_volume['display_name'] or \
+                                snapshot_vm_resource_metadata['volume_id']
+                            snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
+                            snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']
+                            snapshot_vm_resource_metadata['volume_mountpoint'] = attachment['device']
+                            break
+                if 'volume_id' in snapshot_vm_resource_metadata:
                     break
-
+            
             vm_disk_size = 0
             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
@@ -662,14 +695,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
             try:
                 if snapshot_obj.snapshot_type != 'full':
-                    if 'volume_id' in disk_info and disk_info['volume_id']:
-                        #TODO implement _get_backing_vm_disk_resource_with_volume_id
-                        snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_vm_disk_resource_with_volume_id(disk_info)
-                    else:
-                        snapshot_vm_resource_backing, vm_disk_resource_snap_backing = _get_backing_snapshot_vm_resource_vm_disk_resource_snap(disk_info)
+                    snapshot_vm_resource_backing, vm_disk_resource_snap_backing = \
+                        self._get_backing_snapshot_vm_resource_vm_disk_resource_snap(cntx, db, instance, snapshot, disk_info)
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
-            
+
             if snapshot_vm_resource_backing:
                 backings = [disk_info['backings'][0]]
             else:
@@ -725,13 +755,39 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 start_time = timeutils.utcnow()
                 data_transfer_completed = False
+                progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : vm_disk_resource_snap_id}
+                progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
+                uploaded_size = 0
+                uploaded_size_incremental = 0
+                previous_uploaded_size = 0                
                 while True:
                     try:
                         time.sleep(10)
-                        async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                                   instance['vm_id'],
-                                                                                   {'metadata': {'snapshot_id': snapshot['id'],
-                                                                                                 'resource_id' : vm_disk_resource_snap_id}})
+                        async_task_status = {}
+                        if progress_tracking_file_path:
+                            try:
+                                with open(progress_tracking_file_path, 'r') as progress_tracking_file:
+                                    async_task_status['status'] = progress_tracking_file.readlines()
+                                try:
+                                    totalbytes = vault.get_size(vault_url)
+                                    if totalbytes:
+                                        uploaded_size_incremental = totalbytes - previous_uploaded_size
+                                        uploaded_size = totalbytes
+                                        snapshot_obj = db.snapshot_update(cntx, snapshot['id'], {'uploaded_size_incremental': uploaded_size_incremental})
+                                        previous_uploaded_size = uploaded_size                        
+                                except Exception as ex:
+                                    LOG.exception(ex)                                    
+                                    
+                            except Exception as ex:
+                                async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                                           instance['vm_id'],
+                                                                                           {'metadata': progress_tracker_metadata})                                  
+                                                      
+                        else:
+                            async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                                       instance['vm_id'],
+                                                                                       {'metadata': progress_tracker_metadata})
+                            
                         if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
                             for line in async_task_status['status']:
                                 if 'Error' in line:
@@ -739,6 +795,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                 if 'Completed' in line:
                                     data_transfer_completed = True
                                     break;
+                        
 
                         if data_transfer_completed:
                             break;
@@ -792,6 +849,11 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
+
+        #snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
+        #                                    {'progress_msg': 'Finalizing snapshot of VM: '+ instance['vm_id'],
+        #                                     'status': 'finalizing'
+        #                                    })
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
@@ -799,13 +861,26 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
         start_time = timeutils.utcnow()
         async_task_completed = False
+        progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}
+        progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)        
         while True:
             try:
-                time.sleep(15)
-                async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                           instance['vm_id'],
-                                                                           {'metadata': {'snapshot_id': snapshot['id'],
-                                                                                         'resource_id' : instance['vm_id']}})
+                LOG.debug(_('Waiting for the status of VAST finalize for '+ instance['vm_id']))
+                time.sleep(10)
+                async_task_status = {}
+                if progress_tracking_file_path:
+                    try:
+                        with open(progress_tracking_file_path, 'r') as progress_tracking_file:
+                            async_task_status['status'] = progress_tracking_file.readlines()
+                    except Exception as ex:
+                        async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                                   instance['vm_id'],
+                                                                                   {'metadata': progress_tracker_metadata})                                  
+                                              
+                else:
+                    async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                               instance['vm_id'],
+                                                                               {'metadata': progress_tracker_metadata})
                 if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
                     for line in async_task_status['status']:
                         if 'Error' in line:
@@ -827,7 +902,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise ex
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=10*60):
-                raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')        
+                raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')
+        LOG.debug(_('VAST finalize completed for '+ instance['vm_id']))        
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):

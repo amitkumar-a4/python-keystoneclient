@@ -15,10 +15,13 @@ import time
 import cPickle as pickle
 from netaddr import IPNetwork
 import threading
+import time
+import datetime
 
 from neutronclient.common import exceptions as neutron_exceptions
 
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import timeutils
 from workloadmgr import autolog
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
@@ -27,6 +30,8 @@ from workloadmgr.image import glance
 from workloadmgr.vault import vault
 from workloadmgr.virt import driver
 from workloadmgr import utils
+from workloadmgr import exception
+
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -399,10 +404,15 @@ def pause_vm(cntx, db, instance):
     else:
         compute_service.pause(cntx, instance['vm_id'])
         instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+        start_time = timeutils.utcnow()
         while hasattr(instance_ref,'status') and instance_ref.status != 'PAUSED':
+            time.sleep(5)
             instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
             if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
-                raise Exception(_("Error suspending instance " + instance_ref.id))        
+                raise Exception(_("Error suspending instance " + instance_ref.id))
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')                       
 
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
 def unpause_vm(cntx, db, instance):
@@ -421,11 +431,15 @@ def suspend_vm(cntx, db, instance):
     compute_service = nova.API(production=True)
     compute_service.suspend(cntx, instance['vm_id'])
     instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
+    start_time = timeutils.utcnow()
     while hasattr(instance_ref,'status') and instance_ref.status != 'SUSPENDED':
         time.sleep(5)
         instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
         if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
             raise Exception(_("Error suspending instance " + instance_ref.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=4):
+            raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')         
     
 @autolog.log_method(Logger, 'vmtasks_openstack.resume_vm')
 def resume_vm(cntx, db, instance):
@@ -512,11 +526,11 @@ def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
 def delete_restored_vm(cntx, db, instance, restore):
 
     if instance['hypervisor_type'] == 'QEMU':
-       virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-       virtdriver.delete_restored_vm(cntx, db, instance, restore)
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        virtdriver.delete_restored_vm(cntx, db, instance, restore)
     else:
-         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-         virtdriver.delete_restored_vm(cntx, db, instance, restore)
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        virtdriver.delete_restored_vm(cntx, db, instance, restore)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
@@ -599,7 +613,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
             if network_type != 'neutron':
-                #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
                 nic_info.setdefault('net-id', db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'))
             else:
                 if nic_data['mac_address'] in restored_net_resources:
@@ -640,7 +654,6 @@ def get_restore_data_size(cntx, db, restore):
         instance_options = utils.get_instance_restore_options(restore_options, vm.vm_id, restore_options['type'])
         if instance_options and instance_options.get('include', True) == False:
             continue
-        #restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
         restore_size = restore_size + vm.restore_size        
 
     return restore_size
@@ -674,7 +687,6 @@ def restore_vm_networks(cntx, db, restore):
                         return nic_options                    
         return None
                 
-    
     def _get_nic_port_from_restore_options(restore_options,
                                            snapshot_vm_nic_options,
                                            instance_id, mac_address):
@@ -728,7 +740,7 @@ def restore_vm_networks(cntx, db, restore):
             network_id = snapshot_vm_nic_options['network_id']
             subnet_id = snapshot_vm_nic_options['subnet_id']
             if 'ip_address' in snapshot_vm_nic_options:
-                 ip_address = snapshot_vm_nic_options['ip_address']
+                ip_address = snapshot_vm_nic_options['ip_address']
   
             for net in networks_mapping:
                 if net['snapshot_network']['id'] == network_id and \

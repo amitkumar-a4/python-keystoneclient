@@ -6,7 +6,7 @@ import json
 import shutil
 import math
 import time
-from datetime import datetime
+import datetime
 import subprocess
 from subprocess import check_output
 
@@ -43,6 +43,7 @@ from workloadmgr import utils
 from workloadmgr import flags
 from workloadmgr import autolog
 from workloadmgr import exception
+
 
 restore_vm_opts = [
     cfg.StrOpt('ceph_pool_name',
@@ -192,7 +193,7 @@ class UploadImageToGlance(task.Task):
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id)
         image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_name')
-        time_offset = datetime.now() - datetime.utcnow()
+        time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
         image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         if db.get_metadata_value(vm_disk_resource_snap.metadata, 'disk_format') == 'vmdk':
             image_metadata = {'is_public': False,
@@ -307,12 +308,16 @@ class RestoreVolumeFromImage(task.Task):
                    
         #delete the image...it is not needed anymore
         #TODO(gbasava): Cinder takes a while to create the volume from image... so we need to verify the volume creation is complete.
+        start_time = timeutils.utcnow()
         while True:
             time.sleep(10)
             restored_volume = volume_service.get(self.cntx, restored_volume['id'])
             if restored_volume['status'].lower() == 'available' or\
                 restored_volume['status'].lower() == 'error':
                 break
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=10*60):
+                raise exception.ErrorOccurred(reason='Timeout while restoring volume from image')              
 
         self.image_service.delete(self.cntx, imageid)
         if restored_volume['status'].lower() == 'error':
@@ -386,12 +391,16 @@ class RestoreCephVolume(task.Task):
         if not restored_volume:
             raise Exception("Cannot create volume from image")
 
+        start_time = timeutils.utcnow()
         while True:
             time.sleep(10)
             restored_volume = volume_service.get(self.cntx, restored_volume['id'])
             if restored_volume['status'].lower() == 'available' or\
                 restored_volume['status'].lower() == 'error':
                 break
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout restoring CEPH Volume')                
 
         if restored_volume['status'].lower() == 'error':
             LOG.error(_("Volume from image could not successfully create"))
@@ -450,11 +459,15 @@ class RestoreNFSVolume(task.Task):
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)        
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         
-        time_offset = datetime.now() - datetime.utcnow()
+        time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
         desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id')
-        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'display_name')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+
+        progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
+        LOG.debug(progressmsg)
+        db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
         
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
@@ -465,12 +478,16 @@ class RestoreNFSVolume(task.Task):
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
 
+        start_time = timeutils.utcnow()
         while True:
             time.sleep(10)
             self.restored_volume = volume_service.get(self.cntx, self.restored_volume['id'])
             if self.restored_volume['status'].lower() == 'available' or\
                 self.restored_volume['status'].lower() == 'error':
                 break
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout restoring NFS Volume')               
 
         if self.restored_volume['status'].lower() == 'error':
             raise Exception("Failed to create volume type " + volume_type)
@@ -496,12 +513,31 @@ class RestoreNFSVolume(task.Task):
             command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', connection['data']['export'], CONF.cinder_nfs_mount_point_base]
             subprocess.check_call(command, shell=False)
             os.remove(CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name'])
-            qemuimages.convert_image(restored_file_path, 
-                               CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name'], 
-                               'raw', run_as_root=True)
-            qemuimages.resize_image(CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name'],
-                                    '%sG' % volume_size,
-                                    run_as_root=True)
+            
+            destination = CONF.cinder_nfs_mount_point_base + '/' + connection['data']['name']
+            convert_thread = qemuimages.convert_image(restored_file_path, destination, 'raw', run_as_root=True)
+            
+            start_time = timeutils.utcnow()
+            uploaded_size = 0
+            uploaded_size_incremental = 0
+            previous_uploaded_size = 0  
+            while True:
+                time.sleep(10)
+                image_info = qemuimages.qemu_img_info(destination)                
+                totalbytes = image_info.disk_size
+                if totalbytes:
+                    uploaded_size_incremental = totalbytes - previous_uploaded_size
+                    uploaded_size = totalbytes
+                    restore_obj = db.restore_update(self.cntx, restore_obj.id, 
+                                                    {'uploaded_size_incremental': uploaded_size_incremental})
+                    previous_uploaded_size = uploaded_size
+                if not convert_thread.isAlive():
+                    break
+                now = timeutils.utcnow()                        
+                if (now - start_time) > datetime.timedelta(minutes=10*60):
+                    raise exception.ErrorOccurred(reason='Timeout uploading data')               
+            
+            qemuimages.resize_image(destination, '%sG' % volume_size,run_as_root=True)
             try:
                 command = ['sudo', 'umount', CONF.cinder_nfs_mount_point_base]
                 subprocess.call(command, shell=False)
@@ -560,11 +596,16 @@ class RestoreInstanceFromVolume(task.Task):
         restore_obj = db.restore_get(self.cntx, restore_id)
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
 
+
         restored_instance_name = vmname
         if instance_options and 'name' in instance_options:
             restored_instance_name = instance_options['name']
 
-        LOG.debug('Creating Instance ' + restored_instance_name) 
+        LOG.debug('Creating Instance ' + restored_instance_name)
+        snapshot_obj = db.snapshot_update(  self.cntx, snapshot_obj.id,
+                                            {'progress_msg': 'Creating Instance: '+ restored_instance_name,
+                                             'status': 'restoring'
+                                            })        
         
         if instance_options and 'availability_zone' in instance_options:
             availability_zone = instance_options['availability_zone']
@@ -601,6 +642,7 @@ class RestoreInstanceFromVolume(task.Task):
         if not restored_instance:
             raise Exception("Cannot create instance from image")
 
+        start_time = timeutils.utcnow()
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
             time.sleep(10)
@@ -608,6 +650,9 @@ class RestoreInstanceFromVolume(task.Task):
             if hasattr(restored_instance,'status'):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout waiting for the instance to boot from volume')                   
 
         self.restored_instance = restored_instance
         return restored_instance.id
@@ -660,7 +705,11 @@ class RestoreInstanceFromImage(task.Task):
 
         restored_compute_image = compute_service.get_image(self.cntx, imageid)
         LOG.debug('Creating Instance ' + restored_instance_name) 
-        
+        snapshot_obj = db.snapshot_update(  self.cntx, snapshot_obj.id,
+                                            {'progress_msg': 'Creating Instance: '+ restored_instance_name,
+                                             'status': 'restoring'
+                                            })  
+                
         if instance_options and 'availability_zone' in instance_options:
             availability_zone = instance_options['availability_zone']
         else:   
@@ -687,6 +736,7 @@ class RestoreInstanceFromImage(task.Task):
         if not restored_instance:
             raise Exception("Cannot create instance from image")
         
+        start_time = timeutils.utcnow()
         while hasattr(restored_instance,'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance.id + ' to boot' )
             time.sleep(10)
@@ -695,6 +745,9 @@ class RestoreInstanceFromImage(task.Task):
             if hasattr(restored_instance,'status'):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " + restored_instance.id))
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=10*60):
+                raise exception.ErrorOccurred(reason='Timeout waiting for the instance to boot from image')                     
 
         return restored_instance.id
 
@@ -724,15 +777,24 @@ class AttachVolume(task.Task):
                          restore_type, devname):
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
+        # refresh the token
+        user_id = self.cntx.user
+        project_id = self.cntx.tenant
+        self.cntx = nova._get_tenant_context(user_id, project_id)
+        
         self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
         self.volume_service = volume_service = cinder.API()
         if restore_type == 'restore':
             self.restored_volume = restored_volume = volume_service.get(self.cntx, volumeid)
+            start_time = timeutils.utcnow()
             while restored_volume['status'].lower() != 'available' and restored_volume['status'].lower() != 'error':
-                #TODO:(giri) need a timeout to exit
                 LOG.debug('Waiting for volume ' + restored_volume['id'] + ' to be available')
                 time.sleep(10)
                 restored_volume = volume_service.get(self.cntx, volumeid)
+                now = timeutils.utcnow()
+                if (now - start_time) > datetime.timedelta(minutes=4):
+                    raise exception.ErrorOccurred(reason='Timeout waiting for the volume ' + volumeid + ' to be available')                   
+                
             LOG.debug('Attaching volume ' + volumeid)
             compute_service.attach_volume(self.cntx, restored_instance_id, volumeid, ('/dev/' + devname))
             time.sleep(15)
@@ -792,7 +854,7 @@ def RestoreVolumes(context, instance, snapshotobj, restoreid):
             continue
 
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-            if 'ceph' in db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type_id'):
+            if 'ceph' in db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type'):
                 flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
                         rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                         image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id)),
@@ -835,9 +897,10 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
             continue
         if snapshot_vm_resource.resource_name == 'vda':
             continue
-        flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
-                              rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
-                              devname='devname_' + str(snapshot_vm_resource.id),)))
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
+            flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
+                                  rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                                  devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
