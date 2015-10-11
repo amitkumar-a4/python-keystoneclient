@@ -411,7 +411,7 @@ def pause_vm(cntx, db, instance):
             if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
                 raise Exception(_("Error suspending instance " + instance_ref.id))
             now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=4*60):
+            if (now - start_time) > datetime.timedelta(minutes=4):
                 raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')                       
 
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
@@ -438,7 +438,7 @@ def suspend_vm(cntx, db, instance):
         if hasattr(instance_ref,'status') and instance_ref.status == 'ERROR':
             raise Exception(_("Error suspending instance " + instance_ref.id))
         now = timeutils.utcnow()
-        if (now - start_time) > datetime.timedelta(minutes=4*60):
+        if (now - start_time) > datetime.timedelta(minutes=4):
             raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')         
     
 @autolog.log_method(Logger, 'vmtasks_openstack.resume_vm')
@@ -526,11 +526,11 @@ def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
 def delete_restored_vm(cntx, db, instance, restore):
 
     if instance['hypervisor_type'] == 'QEMU':
-       virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-       virtdriver.delete_restored_vm(cntx, db, instance, restore)
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        virtdriver.delete_restored_vm(cntx, db, instance, restore)
     else:
-         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-         virtdriver.delete_restored_vm(cntx, db, instance, restore)
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        virtdriver.delete_restored_vm(cntx, db, instance, restore)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
@@ -654,7 +654,6 @@ def get_restore_data_size(cntx, db, restore):
         instance_options = utils.get_instance_restore_options(restore_options, vm.vm_id, restore_options['type'])
         if instance_options and instance_options.get('include', True) == False:
             continue
-        #restore_size = restore_size + get_vm_restore_data_size(cntx, db, {'vm_id' : vm.vm_id}, restore)
         restore_size = restore_size + vm.restore_size        
 
     return restore_size
@@ -742,7 +741,7 @@ def restore_vm_networks(cntx, db, restore):
             network_id = snapshot_vm_nic_options['network_id']
             subnet_id = snapshot_vm_nic_options['subnet_id']
             if 'ip_address' in snapshot_vm_nic_options:
-                 ip_address = snapshot_vm_nic_options['ip_address']
+                ip_address = snapshot_vm_nic_options['ip_address']
   
             for net in networks_mapping:
                 if net['snapshot_network']['id'] == network_id and \
