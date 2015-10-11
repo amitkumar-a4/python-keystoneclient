@@ -613,7 +613,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
             if network_type != 'neutron':
-                #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
                 nic_info.setdefault('net-id', db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'))
             else:
                 if nic_data['mac_address'] in restored_net_resources:
@@ -687,7 +687,6 @@ def restore_vm_networks(cntx, db, restore):
                         return nic_options                    
         return None
                 
-    
     def _get_nic_port_from_restore_options(restore_options,
                                            snapshot_vm_nic_options,
                                            instance_id, mac_address):

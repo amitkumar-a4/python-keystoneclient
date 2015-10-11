@@ -56,6 +56,7 @@ from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.vault import vault
+from workloadmgr import utils
 
 import  workloadmgr.workflows
 from workloadmgr.workflows import vmtasks_openstack
@@ -695,7 +696,21 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 values['pickle'] = pickle.dumps(options, 0)
 
             restore = self.db.restore_update(context, restore.id, values)
-
+            
+            if options and target_platform == 'openstack':
+                compute_service = nova.API(production=True)                
+                for vm in self.db.snapshot_vms_get(context, restore.snapshot_id):
+                    instance_options = utils.get_instance_restore_options(options, vm.vm_id, target_platform)
+                    if instance_options and instance_options.get('include', True) == False:
+                        continue
+                    else:
+                        instance = compute_service.get_server_by_id(context, vm.vm_id, admin=True)
+                        if instance:
+                            msg = _('Original instance ' +  vm.vm_name + ' is still present. Please delete this instance and try again')
+                            raise wlm_exceptions.InvalidState(reason=msg)
+                                                
+                        
+                        
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':
                 self.db.restore_update( context, restore_id, {'size': restore_size})
