@@ -776,6 +776,7 @@ def snapshot_mark_incomplete_as_error(context, host):
     mark the snapshots that are left hanging from previous run on host as 'error'
     """
     session = get_session()
+    now = timeutils.utcnow()  
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             filter_by(host=host).all()
     for snapshot in snapshots:
@@ -791,14 +792,14 @@ def snapshot_mark_incomplete_as_error(context, host):
         if snapshot.status == 'restoring':
             values =  { 'status': 'available' }
             snapshot.save(session=session)
-            
-    """snapshots =  model_query(context, models.Snapshots, session=session).\
+           
+    snapshots =  model_query(context, models.Snapshots, session=session).\
                             all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error' and\
            snapshot.status != 'restoring' and snapshot.status != 'mounted' and \
            snapshot.status != 'cancelled':
-            if (snapshot.host is not None) and snapshot.host == '':
+            if (snapshot.host is not None) and snapshot.host == '' and now - snapshot.created_at > timedelta(minutes=60):
                 values =  {'progress_percent': 100, 'progress_msg': '',
                            'error_msg': 'Snapshot did not finish successfully',
                            'status': 'error' }
@@ -806,7 +807,7 @@ def snapshot_mark_incomplete_as_error(context, host):
                 snapshot.save(session=session)
         if snapshot.status == 'restoring':
             values =  { 'status': 'available' }
-            snapshot.save(session=session)"""
+            snapshot.save(session=session)
 
 #### Snapshot ################################################################
 """ snapshot functions """
