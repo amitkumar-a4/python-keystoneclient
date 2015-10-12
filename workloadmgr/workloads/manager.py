@@ -706,7 +706,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     else:
                         instance = compute_service.get_server_by_id(context, vm.vm_id, admin=True)
                         if instance:
-                            msg = _('Original instance ' +  vm.vm_name + ' is still present. Please delete this instance and try again')
+                            msg = _('Original instance ' +  vm.vm_name + ' is still present. Please delete this instance and try again.')
                             raise wlm_exceptions.InvalidState(reason=msg)
                                                 
                         
