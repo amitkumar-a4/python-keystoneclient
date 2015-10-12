@@ -1061,7 +1061,7 @@ def to_bytes(text, default=0):
 
     # Take off everything not number 'like' (which should leave
     # only the byte 'identifier' left)
-    mult_key_org = text.lstrip('-1234567890')
+    mult_key_org = text.lstrip('-1234567890.')
     mult_key = mult_key_org.lower()
     mult_key_len = len(mult_key)
     if mult_key.endswith("b"):
@@ -1071,7 +1071,7 @@ def to_bytes(text, default=0):
         if mult_key_len:
             # Empty cases shouldn't cause text[0:-0]
             text = text[0:-mult_key_len]
-        return int(text) * multiplier
+        return int(float(text) * multiplier)
     except KeyError:
         msg = _('Unknown byte multiplier: %s') % mult_key_org
         raise TypeError(msg)
