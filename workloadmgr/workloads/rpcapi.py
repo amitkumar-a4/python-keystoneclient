@@ -132,23 +132,29 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
         
     @autolog.log_method(logger=Logger)     
-    def snapshot_mount(self, ctxt, host, snapshot_id):
-        LOG.debug("snapshot_mount in rpcapi snapshot_id %s", snapshot_id)
+    def snapshot_mount(self, ctxt, host, snapshot_id, mount_vm_id):
+        LOG.debug("snapshot_mount in rpcapi snapshot_id %s, mount_vm_id %s",
+                    snapshot_id, mount_vm_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
         mountpoints = self.call(ctxt,
-                              self.make_msg('snapshot_mount', snapshot_id=snapshot_id),
+                              self.make_msg('snapshot_mount',
+                                      snapshot_id=snapshot_id,
+                                      mount_vm_id=mount_vm_id),
                               topic=topic,
-                              timeout=300)
+                              timeout=600)
         return mountpoints
     
     @autolog.log_method(logger=Logger)     
-    def snapshot_dismount(self, ctxt, host, snapshot_id):
-        LOG.debug("snapshot_dismount in rpcapi snapshot_id %s", snapshot_id)
+    def snapshot_dismount(self, ctxt, host, snapshot_id, mount_vm_id):
+        LOG.debug("snapshot_dismount in rpcapi snapshot_id %s, mount_vm_id %s",
+                    snapshot_id, mount_vm_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
         self.call(ctxt,
-                  self.make_msg('snapshot_dismount', snapshot_id=snapshot_id),
+                  self.make_msg('snapshot_dismount',
+                                snapshot_id=snapshot_id,
+                                mount_vm_id=mount_vm_id),
                   topic=topic,
                   timeout=300)
     

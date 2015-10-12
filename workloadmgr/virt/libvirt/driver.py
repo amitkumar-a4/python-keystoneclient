@@ -380,18 +380,13 @@ class LibvirtDriver(driver.ComputeDriver):
                        for target in doc.findall('devices/disk/target')])
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_mount')
-    def snapshot_mount(self, cntx, snapshot, diskfiles):
+    def snapshot_mount(self, cntx, snapshot, diskfiles, mount_vm_id=None):
         
         def _reboot_fminstance():
             # reboot the file manager server 
             # If the server does not exists, create a server
-            instances = compute_service.get_servers(cntx)
-            fminstance = None
-            for instance in instances:
-                if instance.image['id'] == "6635f177-01b7-4909-a8ca-2260976a295a":
-                    fminstance = instance
-                    break
-
+            fminstance = compute_service.get_server_by_id(cntx, mount_vm_id,
+                                                          admin=True)
             if fminstance == None:
                 raise Exception("TrilioVault File Manager does not exists")
 
@@ -422,17 +417,12 @@ class LibvirtDriver(driver.ComputeDriver):
         return fminstance
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_dismount')
-    def snapshot_dismount(self, cntx, snapshot, devpaths):
+    def snapshot_dismount(self, cntx, snapshot, devpaths, mount_vm_id=None):
         def _reboot_fminstance():
             # reboot the file manager server 
             # If the server does not exists, create a server
-            instances = compute_service.get_servers(cntx)
-            fminstance = None
-            for instance in instances:
-                if instance.image['id'] == "6635f177-01b7-4909-a8ca-2260976a295a":
-                    fminstance = instance
-                    break
-
+            fminstance = compute_service.get_server_by_id(cntx, mount_vm_id,
+                                                            admin=True)
             if fminstance == None:
                 raise Exception("TrilioVault File Manager does not exists")
 
@@ -832,6 +822,8 @@ class LibvirtDriver(driver.ComputeDriver):
                     snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
                     workload_utils.upload_snapshot_db_entry(cntx, snapshot_vm_resource_backing.snapshot_id) 
                     # Update the qcow2 backings
+                    # Give enough time for the backend to settle down
+                    time.sleep(20)
                     qemuimages.rebase_qcow2(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap.vault_path)
                     
                 vm_disk_size = vm_disk_size + backing['size']

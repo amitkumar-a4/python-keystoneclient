@@ -1320,7 +1320,7 @@ class API(base.Base):
 
 
     @autolog.log_method(logger=Logger)
-    def snapshot_mount(self, context, snapshot_id):
+    def snapshot_mount(self, context, snapshot_id, mount_vm_id):
         """
         Make the RPC call to Mount the snapshot.
         """
@@ -1335,21 +1335,23 @@ class API(base.Base):
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
-            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Mount Requested', snapshot)
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' +
+                         'Snapshot \'' + snapshot_display_name + '\' Mount Requested', snapshot)
 
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
-            mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id)
+            mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id, mount_vm_id)
                         
-            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Mount Submitted', snapshot)
+            AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' +
+                         'Snapshot \'' + snapshot_display_name + '\' Mount Submitted', snapshot)
             return mounturl
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
-    def snapshot_dismount(self, context, snapshot_id):
+    def snapshot_dismount(self, context, snapshot_id, mount_vm_id):
         """
         Make the RPC call to Dismount the snapshot.
         """
@@ -1367,7 +1369,7 @@ class API(base.Base):
             if snapshot['status'] != 'mounted':
                 msg = _('Snapshot status must be mounted')
                 raise wlm_exceptions.InvalidState(reason=msg)
-            self.workloads_rpcapi.snapshot_dismount(context, workload['host'], snapshot_id)
+            self.workloads_rpcapi.snapshot_dismount(context, workload['host'], snapshot_id, mount_vm_id)
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Dismount Submitted', snapshot)
         except Exception as ex:
             LOG.exception(ex)

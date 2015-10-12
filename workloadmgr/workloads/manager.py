@@ -878,7 +878,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         self.pool.submit(execute, context, snapshot_id, task_id)
                     
     @autolog.log_method(logger=Logger)
-    def snapshot_mount(self, context, snapshot_id):
+    def snapshot_mount(self, context, snapshot_id, mount_vm_id):
         """
         Mount an existing snapshot
         """
@@ -953,7 +953,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
 
-                fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks)
+                fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks,
+                                            mount_vm_id=mount_vm_id)
                 self.db.snapshot_update(context, snapshot['id'],
                                  {'status': 'mounted', 'metadata': {}})
                 urls = []
@@ -1010,12 +1011,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
 
         except Exception as ex:
-            self.snapshot_dismount(context, snapshot['id'])
+            self.snapshot_dismount(context, snapshot['id'], mount_vm_id)
             LOG.exception(ex)
             raise
 
     @autolog.log_method(logger=Logger)
-    def snapshot_dismount(self, context, snapshot_id):
+    def snapshot_dismount(self, context, snapshot_id, mount_vm_id):
         """
         Dismount an existing snapshot
         """
@@ -1023,7 +1024,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
         if workload.source_platform == 'openstack': 
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-            virtdriver.snapshot_dismount(context, snapshot, None)
+            virtdriver.snapshot_dismount(context, snapshot, None, mount_vm_id)
             self.db.snapshot_update(context, snapshot_id,
                          {'status': 'available', 'metadata': {}})
         elif workload.source_platform == 'vmware': 

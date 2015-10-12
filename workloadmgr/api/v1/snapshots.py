@@ -286,7 +286,10 @@ class SnapshotsController(wsgi.Controller):
     def mount(self, req, id, workload_id=None, body=None):
         try:
             context = req.environ['workloadmgr.context']
-            mounturl = self.workload_api.snapshot_mount(context, id)
+            mount_vm_id = None
+            if 'mount_vm_id' in body['mount']:
+                mount_vm_id = body['mount']['mount_vm_id']
+            mounturl = self.workload_api.snapshot_mount(context, id, mount_vm_id)
             return mounturl
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -322,7 +325,10 @@ class SnapshotsController(wsgi.Controller):
     def dismount(self, req, id, workload_id=None, body=None):
         try:
             context = req.environ['workloadmgr.context']
-            self.workload_api.snapshot_dismount(context, id)
+            mount_vm_id = None
+            if 'mount_vm_id' in body['mount']:
+                mount_vm_id = body['mount']['mount_vm_id']
+            self.workload_api.snapshot_dismount(context, id, mount_vm_id)
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
