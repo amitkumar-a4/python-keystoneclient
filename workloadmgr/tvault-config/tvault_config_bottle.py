@@ -1575,7 +1575,9 @@ def configure_host():
             try:
                 #dhcp
                 replace_line('/etc/dhcp/dhclient.conf', 'prepend domain-name-servers ', 
-                             'prepend domain-name-servers ' + config_data['name_server'] + ';') 
+                             'prepend domain-name-servers ' + config_data['name_server'] + ';')
+                command = ['sudo', 'dhclient']
+                subprocess.call(command, shell=False)                 
             except:
                 pass
         
