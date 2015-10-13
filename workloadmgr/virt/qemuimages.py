@@ -9,6 +9,7 @@ Handling of VM disk images.
 
 import os
 import re
+import time
 
 from oslo.config import cfg
 
@@ -231,7 +232,12 @@ def rebase_qcow2(backing_file_base, backing_file_top, run_as_root=False):
     :param backing_file_base: backing file to rebase to
     :param backing_file_top: top file to rebase
     """
-    utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=run_as_root)
+    try:
+        utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=run_as_root)
+    except Exception as ex:
+        LOG.exception(_("qemu-img Errored. Retrying: %s"), ex)
+        time.sleep(30)
+        utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=run_as_root)
 
 def commit_qcow2(backing_file_top, run_as_root=False):
     """rebase the backing_file_top to backing_file_base
