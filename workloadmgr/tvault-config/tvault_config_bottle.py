@@ -1550,7 +1550,6 @@ def configure_host():
         os.chmod('/etc/hosts', 0644)
         command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
         subprocess.call(command, shell=False)
-
         
         if len(config_data['name_server']):
             fh, abs_path = mkstemp()
@@ -1571,7 +1570,6 @@ def configure_host():
             subprocess.call(command, shell=False)
             command = ['sudo', 'resolvconf',  '-u']
             subprocess.call(command, shell=False)
-            
             try:
                 #dhcp
                 replace_line('/etc/dhcp/dhclient.conf', 'prepend domain-name-servers ', 
@@ -1580,7 +1578,6 @@ def configure_host():
                 subprocess.call(command, shell=False)                 
             except:
                 pass
-        
         try:
             command = ['sudo', 'umount', '/var/triliovault']
             subprocess.call(command, shell=False)
@@ -1598,9 +1595,14 @@ def configure_host():
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass                
-             
+        
 
         if config_data['storage_type'] == 'nfs': 
+            if not os.path.isdir('/var/triliovault'):
+               command = ['sudo', 'mkdir', '/var/triliovault']
+               subprocess.call(command, shell=False)
+               os.chmod('/var/triliovault',0777)
+
             replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
             command = ['sudo', 'service', 'rpcbind', 'restart']
             subprocess.call(command, shell=False)            
