@@ -390,7 +390,7 @@ class LibvirtDriver(driver.ComputeDriver):
             if fminstance == None:
                 raise Exception("TrilioVault File Manager does not exists")
 
-            compute_service.reboot(cntx, fminstance)
+            compute_service.reboot(cntx, fminstance, reboot_type='HARD')
             start_time = timeutils.utcnow()
             while True:
                 time.sleep(1)
