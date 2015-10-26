@@ -627,8 +627,11 @@ class RestoreInstanceFromVolume(task.Task):
         self.volume_service = volume_service = cinder.API()
 
         restored_volume = volume_service.get(self.cntx, volumeid)
-        volume_service.set_bootable(self.cntx, restored_volume)
-
+        try:
+            volume_service.set_bootable(self.cntx, restored_volume)
+        except Exception as ex:
+            LOG.exception(ex)
+            
         block_device_mapping = {u'vda': volumeid+":vol"}
 
         self.restored_instance = restored_instance = \
