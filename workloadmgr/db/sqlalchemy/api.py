@@ -728,6 +728,7 @@ def workload_vms_get(context, workload_id, **kwargs):
                             session=session, read_deleted="no")\
                        .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
                        .filter_by(workload_id=workload_id)\
+                       .filter(models.WorkloadVMs.status != None)\
 
         #TODO(gbasava): filter out deleted workload_vms if context disallows it
         workload_vms = query.all()

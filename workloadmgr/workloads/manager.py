@@ -746,6 +746,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     pass 
                 else:
                     self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
+                    values = {'workload_id': workload.id,
+                              'vm_id': restored_vm.vm_id,
+                              'metadata': instance.metadata,
+                              'vm_name': instance.name,
+                              'status': 'available'}
+                    vm = self.db.workload_vms_create(context, values)
 
                 restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                 restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
