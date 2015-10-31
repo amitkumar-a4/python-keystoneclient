@@ -658,7 +658,13 @@ class LibvirtDriver(driver.ComputeDriver):
                     if attachment['server_id'] == instance['vm_id']:
                         if disk_info['dev'] in attachment['device']:
                             snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
-                            snapshot_vm_resource_metadata['volume_name'] = cinder_volume['display_name'] or \
+                            if 'display_name' in cinder_volume:
+                                namekey = 'display_name'
+                            else:
+                                namekey = 'name'
+                            if namekey in cinder_volume and cinder_volume[namekey]:
+                                snapshot_vm_resource_metadata['volume_name'] = cinder_volume[namekey]
+                            else:
                                 snapshot_vm_resource_metadata['volume_id']
                             snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
                             snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']
