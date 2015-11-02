@@ -434,6 +434,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                 for instance in workflow._store['instances']:
                     values = {'workload_id': workload.id,
+                              'status': 'available',
                               'vm_id': instance['vm_id'],
                               'metadata': instance['vm_metadata'],
                               'vm_name': instance['vm_name']}
