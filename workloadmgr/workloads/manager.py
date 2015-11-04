@@ -741,6 +741,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             compute_service = nova.API(production=True)
             restore_data_transfer_time = 0
             restore_object_store_transfer_time = 0            
+            workload_vms = self.db.workload_vms_get(context, workload.id)
             for restored_vm in self.db.restored_vms_get(context, restore_id):
                 instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
                 if instance == None:
@@ -756,6 +757,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                 restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                 restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
+            # Delete old VMs
+            for vm in workload_vms:
+                self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+
             if restore_type == 'test':
                 self.db.restore_update( context,
                             restore_id,
