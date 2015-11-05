@@ -977,6 +977,25 @@ class API(base.Base):
             raise
 
     @synchronized(novalock)
+    @autolog.log_method(logger=Logger)
+    def vast_reset(self, context, server, params):
+        """
+        Reset the VAST snapshot
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        try:
+            extensions = _discover_extensions('1.1')
+            client =  novaclient(context, self._production, extensions=extensions)
+            return client.contego.vast_reset(server=server, params=params)
+        except nova_exception.Unauthorized as unauth_ex:
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
+            return client.contego.vast_reset(server=server, params=params)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            raise
+
+    @synchronized(novalock)
     def testbubble_attach_volume(self, context, server, params):
         """
         Attach a volume to testbubble instance
