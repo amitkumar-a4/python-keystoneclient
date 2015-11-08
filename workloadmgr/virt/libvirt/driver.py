@@ -540,6 +540,13 @@ class LibvirtDriver(driver.ComputeDriver):
         snapshot_data = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
         return snapshot_data
 
+    @autolog.log_method(Logger, 'libvirt.driver.reset_vm')
+    def reset_vm(self, cntx, workload_id, instance_uuid):
+        compute_service = nova.API(production=True)
+        vast_params = {'workload_id': workload_id}
+        compute_service.vast_reset(cntx, instance_uuid, vast_params)
+        return
+
     @autolog.log_method(Logger, 'libvirt.driver._get_snapshot_disk_info')
     def _get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data):
         compute_service = nova.API(production=True)
@@ -658,13 +665,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     if attachment['server_id'] == instance['vm_id']:
                         if disk_info['dev'] in attachment['device']:
                             snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
-                            if 'display_name' in cinder_volume:
-                                namekey = 'display_name'
-                            else:
-                                namekey = 'name'
-                            if namekey in cinder_volume and cinder_volume[namekey]:
-                                snapshot_vm_resource_metadata['volume_name'] = cinder_volume[namekey]
-                            else:
+                            snapshot_vm_resource_metadata['volume_name'] = cinder_volume['display_name'] or \
                                 snapshot_vm_resource_metadata['volume_id']
                             snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
                             snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']

@@ -143,6 +143,21 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
+
+    def reset(self, req, id):
+        try:
+            context = req.environ['workloadmgr.context']
+            self.workload_api.workload_reset(context, id)
+            return webob.Response(status_int=202)
+        except exception.WorkloadNotFound as error:
+            LOG.exception(error)
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            LOG.exception(error)
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
     
     def snapshot(self, req, id, body=None):
         """snapshot a workload."""
