@@ -106,6 +106,16 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         self.cast(ctxt,
                   self.make_msg('workload_snapshot',snapshot_id=snapshot_id),
                   topic=topic)
+
+    @autolog.log_method(logger=Logger)
+    def workload_reset(self, ctxt, host, workload_id):
+        LOG.debug("workload_reset workload_id:%s", workload_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        self.cast(ctxt,
+                  self.make_msg('workload_reset',workload_id=workload_id),
+                  topic=topic)
+
     @autolog.log_method(logger=Logger)
     def workload_delete(self, ctxt, host, workload_id):
         LOG.debug("delete_workload  rpcapi workload_id %s", workload_id)

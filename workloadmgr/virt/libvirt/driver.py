@@ -390,7 +390,7 @@ class LibvirtDriver(driver.ComputeDriver):
             if fminstance == None:
                 raise Exception("TrilioVault File Manager does not exists")
 
-            compute_service.reboot(cntx, fminstance)
+            compute_service.reboot(cntx, fminstance, reboot_type='HARD')
             start_time = timeutils.utcnow()
             while True:
                 time.sleep(1)
@@ -539,6 +539,13 @@ class LibvirtDriver(driver.ComputeDriver):
                        'workload_id': workload_obj.id}
         snapshot_data = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
         return snapshot_data
+
+    @autolog.log_method(Logger, 'libvirt.driver.reset_vm')
+    def reset_vm(self, cntx, workload_id, instance_uuid):
+        compute_service = nova.API(production=True)
+        vast_params = {'workload_id': workload_id}
+        compute_service.vast_reset(cntx, instance_uuid, vast_params)
+        return
 
     @autolog.log_method(Logger, 'libvirt.driver._get_snapshot_disk_info')
     def _get_snapshot_disk_info(self, cntx, db, instance, snapshot, snapshot_data):

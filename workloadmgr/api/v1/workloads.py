@@ -7,6 +7,7 @@
 
 import os
 import json
+import time
 import webob
 from webob import exc
 from xml.dom import minidom
@@ -45,8 +46,6 @@ def make_workload(elem):
     elem.set('name')
     elem.set('description')
     elem.set('fail_reason')
-
-
 
 class WorkloadTemplate(xmlutil.TemplateBuilder):
     def construct(self):
@@ -134,6 +133,21 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             self.workload_api.workload_unlock(context, id)
+            return webob.Response(status_int=202)
+        except exception.WorkloadNotFound as error:
+            LOG.exception(error)
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            LOG.exception(error)
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def reset(self, req, id):
+        try:
+            context = req.environ['workloadmgr.context']
+            self.workload_api.workload_reset(context, id)
             return webob.Response(status_int=202)
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
@@ -251,9 +265,34 @@ class WorkloadMgrsController(wsgi.Controller):
             description = workload.get('description', None)
             workload_type_id = workload.get('workload_type_id', None)
             source_platform = workload.get('source_platform', "openstack")
-            jobschedule = workload.get('jobschedule', {})
+            jobdefaults = {'fullbackup_interval': '1',
+                           'start_time': '01:12 AM',
+                           'interval': u'24hr',
+                           'enabled': u'false', 'snapshots_to_keep': '30',
+                           'start_date': time.strftime("%x")}
+
+            jobschedule = workload.get('jobschedule', jobdefaults)
             if not jobschedule:
                 jobschedule = {}
+
+            if not 'fullbackup_interval' in jobschedule:
+                jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
+
+            if not 'start_time' in jobschedule:
+                jobschedule['start_time'] = jobdefaults['start_time']
+
+            if not 'interval' in jobschedule:
+                jobschedule['interval'] = jobdefaults['interval']
+
+            if not 'enabled' in jobschedule:
+                jobschedule['enabled'] = jobdefaults['enabled']
+
+            if not 'snapshots_to_keep' in jobschedule:
+                jobschedule['snapshots_to_keep'] = jobdefaults['snapshots_to_keep']
+
+            if not 'start_date' in jobschedule:
+                jobschedule['start_date'] = jobdefaults['start_date']
+
             instances = workload.get('instances', {})
             if not instances:
                 instances = {}        

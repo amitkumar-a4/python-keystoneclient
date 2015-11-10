@@ -240,6 +240,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='unlock',
                        conditions={"method": ['POST']})         
 
+        #reset workload
+        mapper.connect("workloads_reset",
+                       "/{project_id}/workloads/{id}/reset",
+                       controller=self.resources['workloads'],
+                       action='reset',
+                       conditions={"method": ['POST']})         
+
         #discover workload instances
         mapper.connect("workloads_discover_instances",
                        "/{project_id}/workloads/{id}/discover_instances",

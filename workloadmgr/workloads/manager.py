@@ -434,6 +434,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                 for instance in workflow._store['instances']:
                     values = {'workload_id': workload.id,
+                              'status': 'available',
                               'vm_id': instance['vm_id'],
                               'metadata': instance['vm_metadata'],
                               'vm_name': instance['vm_name']}
@@ -564,6 +565,29 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
                             
     @autolog.log_method(logger=Logger)
+    def workload_reset(self, context, workload_id):
+        """
+        Reset an existing workload
+        """
+        try:
+            workload = self.db.workload_get(context, workload_id)
+            vms = self.db.workload_vms_get(context, workload.id)
+ 
+            # get the recent snapshot
+            if workload.source_platform == 'openstack': 
+                virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+                for vm in vms:
+                    virtdriver.reset_vm(context, workload_id, vm.vm_id)
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = _("Failed to  reset: %(exception)s") %{'exception': ex}
+            LOG.error(msg)
+        finally:
+            self.db.workload_update(context, workload_id, {'status': 'available'})
+        return
+
+
+    @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id):
         """
         Delete an existing workload
@@ -574,13 +598,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
             raise wlm_exceptions.InvalidState(reason=msg)
             
-        self.db.workload_delete(context, workload.id)
         LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
         vault.workload_delete(context, {'workload_id': workload.id, 'workload_name': workload.display_name,})
+        self.db.workload_delete(context, workload.id)
 
-        
+
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
         if options['type'] != "vmware":
@@ -740,6 +764,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             compute_service = nova.API(production=True)
             restore_data_transfer_time = 0
             restore_object_store_transfer_time = 0            
+            workload_vms = self.db.workload_vms_get(context, workload.id)
             for restored_vm in self.db.restored_vms_get(context, restore_id):
                 instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
                 if instance == None:
@@ -756,6 +781,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                 restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                 restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
+            # Delete old VMs
+            for vm in workload_vms:
+                self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+
             if restore_type == 'test':
                 self.db.restore_update( context,
                             restore_id,

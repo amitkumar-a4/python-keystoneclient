@@ -341,10 +341,11 @@ class RestoreCephVolume(task.Task):
     """
 
     def create_volume_from_file(self, filename, volume_name):
+        kwargs = {}
         args = [filename]
-        args += [volume_name]
-        kwargs = {'run_as_root':True}
-        out, err = utils.execute('rbd', 'import', *args, **kwargs)
+        args += ['rbd:'+volume_name]
+        out, err = utils.execute('qemu-img', 'convert', '-O',
+                                 'raw', *args, **kwargs)
         return
 
     def rename_volume(self, source, target):
@@ -627,8 +628,11 @@ class RestoreInstanceFromVolume(task.Task):
         self.volume_service = volume_service = cinder.API()
 
         restored_volume = volume_service.get(self.cntx, volumeid)
-        volume_service.set_bootable(self.cntx, restored_volume)
-
+        try:
+            volume_service.set_bootable(self.cntx, restored_volume)
+        except Exception as ex:
+            LOG.exception(ex)
+            
         block_device_mapping = {u'vda': volumeid+":vol"}
 
         self.restored_instance = restored_instance = \

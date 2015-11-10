@@ -531,7 +531,7 @@ class API(base.Base):
     
         try:
             client = novaclient(context, self._production)
-            return client.servers.reboot(server=server) 
+            return client.servers.reboot(server=server, reboot_type=reboot_type)
         except nova_exception.Unauthorized as unauth_ex:
             client = novaclient(context, self._production, admin=True)
             return client.servers.reboot(server=server, reboot_type=reboot_type)
@@ -971,6 +971,25 @@ class API(base.Base):
         except nova_exception.Unauthorized as unauth_ex:
             client =  novaclient(context, self._production, extensions=extensions, admin=True)
             return client.contego.vast_finalize(server=server, params=params)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            raise
+
+    @synchronized(novalock)
+    @autolog.log_method(logger=Logger)
+    def vast_reset(self, context, server, params):
+        """
+        Reset the VAST snapshot
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        try:
+            extensions = _discover_extensions('1.1')
+            client =  novaclient(context, self._production, extensions=extensions)
+            return client.contego.vast_reset(server=server, params=params)
+        except nova_exception.Unauthorized as unauth_ex:
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
+            return client.contego.vast_reset(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception

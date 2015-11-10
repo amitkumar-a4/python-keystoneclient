@@ -568,6 +568,28 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
+
+    @autolog.log_method(logger=Logger)
+    def workload_reset(self, context, workload_id):
+        """
+        Reset a workload. When a workload is reset, any overlay files that were
+        created as part of the snapshot operation are commited back to original
+        files
+        """
+        try:
+            workload = self.workload_get(context, workload_id)
+            display_name = workload['display_name']
+            AUDITLOG.log(context,'Workload \'' + display_name + '\' Reset Requested', workload)
+            if workload['status'] not in ['available', 'resetting']:
+                msg = _("Workload status must be 'available'")
+                raise wlm_exceptions.InvalidState(reason=msg)
+
+            self.db.workload_update(context, workload_id, {'status': 'resetting'})
+            self.workloads_rpcapi.workload_reset(context, workload['host'], workload_id)
+            AUDITLOG.log(context,'Workload \'' + display_name + '\' Reset Submitted', workload)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
    
     @autolog.log_method(logger=Logger)
     def get_import_workloads_list(self, context):
@@ -1047,7 +1069,9 @@ class API(base.Base):
             if snapshot_display_name ==  'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at']) 
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
-            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' ' + snapshot['snapshot_type'] + ' Snapshot \'' + snapshot_display_name + '\' Create Submitted', workload)
+            AUDITLOG.log(context,'Workload \'' + workload['display_name'] +\
+                         '\' ' + snapshot['snapshot_type'] + ' Snapshot \'' +\
+                         snapshot_display_name + '\' Create Submitted', workload)
 
             self.db.snapshot_update(context, 
                                     snapshot.id, 
