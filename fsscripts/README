@@ -1,0 +1,16 @@
+This directory contains all necessary script for file system explorer.
+
+To prepare file system explorer image:
+1. Create instance from openstack ubuntu 14.04 image
+2. install lvm by calling "sudo apt-get install lvm2"
+3. install php by executing "sudo apt-get install php5"
+4. Uninstall apache2 "sudo apt-get remove apache2"
+
+
+1. Copy following python scripts to ubuntu home directory
+   configdrive.py  mount_snapshot.py  nbd.py
+
+2. Copy php.conf to /etc/init directory
+3. copy rc.local to /etc directory
+
+4. copy tvault-filemanager to ubuntu directory
