@@ -1122,6 +1122,11 @@ class API(base.Base):
                                                  'disk': self.db.get_metadata_value(vm_flavor.metadata, 'disk'),
                                                  'ephemeral': self.db.get_metadata_value(vm_flavor.metadata, 'ephemeral')
                                               }
+                    """ security group """
+                    if snapshot_vm_resource.resource_type == 'security_group':
+                        snapshot_vm['security_group'] = {'name' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
+                                                         'security_group_type' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'security_group_type'),
+                                                        }
                     """ nics """
                     if snapshot_vm_resource.resource_type == 'nic':
                         vm_nic_snapshot = self.db.vm_network_resource_snap_get(context, snapshot_vm_resource.id)
@@ -1374,6 +1379,35 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
+
+    @autolog.log_method(logger=Logger)
+    def mounted_list(self, context, workload_id):
+        """
+        Gets list of mounted snapshots
+        """
+        try:
+            mounted_snapshots = []
+            snapshots = self.db.snapshot_get_all(context, workload_id)
+            if len(snapshots) == 0:
+               msg = _("Not found any snapshots")
+               wlm_exceptions.ErrorOccurred(reason=msg)               
+
+            for snapshot in snapshots:
+                if snapshot.status == 'mounted':
+                   fspid = self.db.get_metadata_value(snapshot.metadata, 'fsmanagerpid')
+                   mounturl = fspid = self.db.get_metadata_value(snapshot.metadata, 'mounturl')
+                   #if (fspid and int(fspid) != -1) and (mounturl and len(mounturl) > 1):
+                   mounted = {'snapshot_id': snapshot.id,
+                              'snapshot_name': snapshot.display_name,
+                              'workload_id': snapshot.workload_id,
+                              'mounturl': mounturl,
+                              'status':snapshot.status,
+                             }
+                   mounted_snapshots.append(mounted)
+            return dict(mounted_snapshots=mounted_snapshots)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
     def restore_get(self, context, restore_id):

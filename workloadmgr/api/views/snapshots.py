@@ -31,6 +31,7 @@ class ViewBuilder(common.ViewBuilder):
         """Generic, non-detailed view of a snapshot."""
         d = {}
         d['id'] = snapshot['id']
+        d['created_at'] = snapshot['created_at']
         d['status'] = snapshot['status']
         d['snapshot_type'] = snapshot['snapshot_type']
         d['workload_id'] = snapshot['workload_id']
@@ -60,7 +61,7 @@ class ViewBuilder(common.ViewBuilder):
         d = {}
         d['id'] = snapshot['id']
         d['created_at'] = snapshot['created_at']
-        d['updated_at'] = snapshot['created_at']
+        d['updated_at'] = snapshot['updated_at']
         d['finished_at'] = snapshot['finished_at']
         d['user_id'] = snapshot['user_id']
         d['project_id'] = snapshot['project_id']
@@ -77,6 +78,8 @@ class ViewBuilder(common.ViewBuilder):
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']
+                if 'security_group' in vm:
+                    instance['security_group'] = vm['security_group']
                 if 'nics' in vm:
                     instance['nics'] = vm['nics']
                 instances.append(instance)    

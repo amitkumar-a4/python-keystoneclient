@@ -193,7 +193,6 @@ class SnapshotsController(wsgi.Controller):
             if snapshot['deleted'] == False:
                 snapshots.append(snapshot)        
         
-        
         if is_detail:
             snapshots = self._view_builder.detail_list(req, snapshots)
         else:
@@ -291,6 +290,23 @@ class SnapshotsController(wsgi.Controller):
                 mount_vm_id = body['mount']['mount_vm_id']
             mounturl = self.workload_api.snapshot_mount(context, id, mount_vm_id)
             return mounturl
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def mounted_list(self, req, workload_id=None):
+        try:
+            context = req.environ['workloadmgr.context']
+            return self.workload_api.mounted_list(context, workload_id)
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
