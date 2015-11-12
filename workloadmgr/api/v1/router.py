@@ -338,7 +338,22 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['snapshots'],
                        action='dismount',
                        conditions={"method": ['POST']})                     
-                        
+
+        #list mounted snapshots
+        mapper.connect("mounted_snapshots_list",
+                       "/{project_id}/workloads/{workload_id}/snapshots/mounted/list",
+                       controller=self.resources['snapshots'],
+                       action='mounted_list',
+                       conditions={"method": ['GET']})
+
+        #list mounted snapshots
+        mapper.connect("mounted_snapshots_list",
+                       "/{project_id}/snapshots/mounted/list",
+                       controller=self.resources['snapshots'],
+                       action='mounted_list',
+                       conditions={"method": ['GET']})
+
+
         ###################################################################################################
         self.resources['restores'] = restores.create_resource(ext_mgr)
         #detail list of restores
