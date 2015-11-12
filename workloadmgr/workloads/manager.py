@@ -602,6 +602,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
         vault.workload_delete(context, {'workload_id': workload.id, 'workload_name': workload.display_name,})
+        self.workload_reset(context, workload_id)
         self.db.workload_delete(context, workload.id)
 
 
