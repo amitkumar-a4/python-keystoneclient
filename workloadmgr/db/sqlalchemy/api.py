@@ -968,7 +968,6 @@ def snapshot_get_all(context, workload_id=None, **kwargs):
             return snapshot_get_all_by_workload(context, workload_id, **kwargs)
         else:
             return snapshot_get_all_by_project(context, context.project_id, **kwargs)
- 
     if workload_id == None:
         return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
