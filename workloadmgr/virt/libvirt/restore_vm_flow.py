@@ -193,6 +193,9 @@ class UploadImageToGlance(task.Task):
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id)
         image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_name')
+        if not image_name:
+            image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
         image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         if db.get_metadata_value(vm_disk_resource_snap.metadata, 'disk_format') == 'vmdk':
@@ -829,7 +832,8 @@ def LinearPrepareBackupImages(context, instance, snapshotobj, restoreid):
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
-def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid):
+def LinearUploadImagesToGlance(context, instance, instance_options,
+                               snapshotobj, restoreid):
     flow = lf.Flow("uploadimageslf")
     db = WorkloadMgrDB().db
 
@@ -843,10 +847,28 @@ def LinearUploadImagesToGlance(context, instance, snapshotobj, restoreid):
                                          rebind=dict( vm_resource_id=snapshot_vm_resource.id,
                                          restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
                                          provides='image_id_' + str(snapshot_vm_resource.id)))
+        elif db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
+            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+            volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id').lower()
+
+            if 'vdisks' in instance_options:
+                for voloption in instance_options['vdisks']:
+                    if voloption['id'].lower() == volume_id:
+                        volume_type = voloption['new_volume_type']
+
+            supported_backends = 'ceph' in volume_type.lower() or \
+                                 'nfs' in volume_type.lower()
+
+            if not supported_backends:
+                # Fallback to default mode of glance backed images
+                flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
+                                         rebind=dict( vm_resource_id=snapshot_vm_resource.id,
+                                         restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
+                                         provides='image_id_' + str(snapshot_vm_resource.id)))
 
     return flow
 
-def RestoreVolumes(context, instance, snapshotobj, restoreid):
+def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
     flow = lf.Flow("restorevolumeslf")
 
     db = WorkloadMgrDB().db
@@ -858,16 +880,30 @@ def RestoreVolumes(context, instance, snapshotobj, restoreid):
             continue
 
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-            if 'ceph' in db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type'):
+            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type').lower()
+            volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id').lower()
+            if 'vdisks' in instance_options:
+                for voloption in instance_options['vdisks']:
+                    if voloption['id'].lower() == volume_id:
+                        volume_type = voloption['new_volume_type']
+
+            if 'ceph' in volume_type:
                 flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
                         rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                         image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id)),
                         provides='volume_id_' + str(snapshot_vm_resource.id)))
-            else:
+            elif 'nfs' in volume_type:
                 flow.add(RestoreNFSVolume("RestoreNFSVolume" + snapshot_vm_resource.id,
                         rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                     restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
                         provides='volume_id_' + str(snapshot_vm_resource.id)))                               
+            else:
+                # Default restore path for backends that we don't recognize
+                flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
+                        rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
+                                    imageid='image_id_' + str(snapshot_vm_resource.id),
+                                    image_virtual_size='image_virtual_size_' + str(snapshot_vm_resource.id)),
+                        provides='volume_id_' + str(snapshot_vm_resource.id)))
 
     return flow
 
@@ -955,12 +991,14 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         _restorevmflow.add(childflow)
 
     # This is a linear uploading all vm images to glance
-    childflow = LinearUploadImagesToGlance(cntx, instance, snapshot_obj, restore['id'])
+    childflow = LinearUploadImagesToGlance(cntx, instance, instance_options,
+                                           snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 
     # create nova/cinder objects from image ids
-    childflow = RestoreVolumes(cntx, instance, snapshot_obj, restore['id'])
+    childflow = RestoreVolumes(cntx, instance, instance_options,
+                               snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 

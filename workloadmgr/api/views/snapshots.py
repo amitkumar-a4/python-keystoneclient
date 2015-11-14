@@ -47,6 +47,8 @@ class ViewBuilder(common.ViewBuilder):
                     instance['flavor'] = vm['flavor']
                 if 'nics' in vm:
                     instance['nics'] = vm['nics']
+                if 'vdisks' in vm:
+                    instance['vdisks'] = vm['vdisks']
                 instances.append(instance)   
             d['instances'] = instances
         #d['links'] = self._get_links(request, snapshot['id'])
@@ -82,6 +84,8 @@ class ViewBuilder(common.ViewBuilder):
                     instance['security_group'] = vm['security_group']
                 if 'nics' in vm:
                     instance['nics'] = vm['nics']
+                if 'vdisks' in vm:
+                    instance['vdisks'] = vm['vdisks']
                 instances.append(instance)    
                 
             d['instances'] = instances
