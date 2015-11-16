@@ -632,21 +632,23 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                     # the old IP address may not belong to any of the subnets 
                     pass
 
-                if ipinfo and ipinfo.hostname:
-                    # IP in use. Raise an exception
-                    raise Exception("IP address %s is in use. Cannot restore VM" % \
-                                     nic_info['v4-fixed-ip'])
-
-                # find a free fixed ip that we can use
-                for net in networks:
-                    if net.id == nic_info['net-id']:
-                        for ip in IPNetwork(net.cidr):
-                            if ip >= IPAddress(net.dhcp_start) and \
-                               ip != IPAddress(net.gateway):
-                                ipinfo = compute_service.get_fixed_ip(cntx, str(ip))
-                                if not ipinfo.hostname:
-                                    nic_info['v4-fixed-ip'] = str(ip)
-                                    break
+                if ipinfo:
+                    if ipinfo.hostname:
+                        # IP in use. Raise an exception
+                        raise Exception("IP address %s is in use. Cannot restore VM" % \
+                                         nic_info['v4-fixed-ip'])
+                        # else reuse existing ip address
+                else:
+                    # find a free fixed ip on the subnet that we can use
+                    for net in networks:
+                        if net.id == nic_info['net-id']:
+                            for ip in IPNetwork(net.cidr):
+                                if ip >= IPAddress(net.dhcp_start) and \
+                                   ip != IPAddress(net.gateway):
+                                    ipinfo = compute_service.get_fixed_ip(cntx, str(ip))
+                                    if not ipinfo.hostname:
+                                        nic_info['v4-fixed-ip'] = str(ip)
+                                        break
             else:
                 if nic_data['mac_address'] in restored_net_resources:
                     nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
