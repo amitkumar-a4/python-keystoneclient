@@ -1190,7 +1190,7 @@ class API(base.Base):
                            vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_mountpoint')
 
                         snapshot_vm['vdisks'].append(vdisk)
-                snapshot_vms.append(snapshot_vm)              
+                snapshot_vms.append(snapshot_vm)
 
         except Exception as ex:
             LOG.exception(ex)
