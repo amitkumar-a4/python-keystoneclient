@@ -314,13 +314,20 @@ class RestoreVolumeFromImage(task.Task):
         start_time = timeutils.utcnow()
         while True:
             time.sleep(10)
-            restored_volume = volume_service.get(self.cntx, restored_volume['id'])
-            if restored_volume['status'].lower() == 'available' or\
-                restored_volume['status'].lower() == 'error':
-                break
-            now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=10*60):
-                raise exception.ErrorOccurred(reason='Timeout while restoring volume from image')              
+            try:
+                restored_volume = volume_service.get(self.cntx, restored_volume['id'])
+                if restored_volume['status'].lower() == 'available' or\
+                    restored_volume['status'].lower() == 'error':
+                    break
+                now = timeutils.utcnow()
+                if (now - start_time) > datetime.timedelta(minutes=10*60):
+                    raise exception.ErrorOccurred(reason='Timeout while restoring volume from image')              
+            except nova_unauthorized as ex:
+                LOG.exception(ex)
+                # recreate the token here
+                user_id = self.cntx.user
+                project_id = self.cntx.tenant
+                self.cntx = nova._get_tenant_context(user_id, project_id)
 
         self.image_service.delete(self.cntx, imageid)
         if restored_volume['status'].lower() == 'error':
