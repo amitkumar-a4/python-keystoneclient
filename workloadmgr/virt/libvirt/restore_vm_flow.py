@@ -894,7 +894,6 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
 
             if 'ceph' in volume_type:
                 flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
-                                    volume_type,
                                     rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id)),
