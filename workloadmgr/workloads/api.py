@@ -618,10 +618,15 @@ class API(base.Base):
             import_workload_module = None
             workload_url = vault.get_workloads(context)
             workload_url_iterate = []
+
             if len(workload_ids) > 0:
                for workload in workload_url:
                    if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
                       workload_url_iterate.append(workload)
+            else:
+               for workload in workload_url:
+                   workload_url_iterate.append(workload)
+
             del workload_url[:]
             for workload_url in workload_url_iterate:
                 try:
