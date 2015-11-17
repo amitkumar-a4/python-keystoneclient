@@ -814,6 +814,24 @@ class API(base.Base):
             return
 
     @synchronized(novalock)
+    def get_fixed_ip(self, context, ip):
+        """
+        Get the IP address information
+
+        :param IP4 address: 
+        """
+        try:
+            client = novaclient(context, self._production)
+            return client.fixed_ips.get(ip)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.fixed_ips.get(ip)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def map_snapshot_files(self, context, server, params):
         """
         Map snapshot volume images to file manager instance
