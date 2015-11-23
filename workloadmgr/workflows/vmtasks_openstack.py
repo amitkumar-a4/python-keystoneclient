@@ -735,15 +735,16 @@ def restore_vm_networks(cntx, db, restore):
     def _get_nic_port_from_restore_options(restore_options,
                                            snapshot_vm_nic_options,
                                            instance_id, mac_address):
-        
-        def _is_duplicate_ip(ports, ip_address):
+
+        def _get_port_for_ip(ports, ip_address):
             if ports and ip_address:
                 for port in ports:
+                 
                     if 'fixed_ips' in port:
                         for fixed_ip in port['fixed_ips']:
                             if fixed_ip['ip_address'] == ip_address:
-                                return True
-            return False
+                                return port
+            return None
         
         def _create_port(name, ip_address, network_id,
                          subnet_id):
@@ -784,8 +785,6 @@ def restore_vm_networks(cntx, db, restore):
         else:
             network_id = snapshot_vm_nic_options['network_id']
             subnet_id = snapshot_vm_nic_options['subnet_id']
-            if 'ip_address' in snapshot_vm_nic_options:
-                ip_address = snapshot_vm_nic_options['ip_address']
   
             for net in networks_mapping:
                 if net['snapshot_network']['id'] == network_id and \
@@ -806,22 +805,28 @@ def restore_vm_networks(cntx, db, restore):
             raise Exception("Could not find the subnet that matches the restore options")
 
         ports = network_service.get_ports(cntx, **{'subnet_id':subnet_id})
-        if ports:
-            if ip_address and not _is_duplicate_ip(ports, ip_address):
-                new_ip_address = ip_address
+        if ports and ip_address:
+            port = _get_port_for_ip(ports, ip_address)
+            if port: 
+                if 'device_id' in port and \
+                    port['device_id'] in ('', None):
+                    return port
+                else:
+                    raise Exception(_("Given IP address %s is in use" % ip_address))
+            else:
                 try:
-                    return _create_port(port_name, new_ip_address,
+                    return _create_port(port_name, ip_address,
                                         network_id, subnet_id)
                 except Exception as ex:
                     LOG.exception(ex)
 
-        subnet = network_service.get_subnet(cntx, subnet_id)
-        for ip in IPNetwork(subnet['subnet']['cidr']):
-            if ip < IPAddress(subnet['subnet']['allocation_pools'][0]['start']) or \
-                ip == IPAddress(subnet['subnet']['gateway_ip']):
-                continue
+        else:
+            subnet = network_service.get_subnet(cntx, subnet_id)
+            for ip in IPNetwork(subnet['subnet']['cidr']):
+                if ip < IPAddress(subnet['subnet']['allocation_pools'][0]['start']) or \
+                    ip == IPAddress(subnet['subnet']['gateway_ip']):
+                    continue
 
-            if not _is_duplicate_ip(ports, str(ip)):
                 new_ip_address =  str(ip)
                 try:
                     return _create_port(port_name, new_ip_address,
