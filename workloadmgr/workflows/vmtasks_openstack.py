@@ -612,43 +612,53 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
 
             nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
             nic_info = {}
-            if network_type != 'neutron':
-                nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
-                network_id = db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id')
 
-                # Adjust network id to new network id
-                if nic_data['mac_address'] in restored_net_resources:
-                    network_id = restored_net_resources[nic_data['mac_address']]['network_id']
-                nic_info.setdefault('net-id', network_id)
+            # adjust IP address here
+            compute_service = nova.API(production=True)
+            networks = compute_service.get_networks(cntx)
 
-                # adjust IP address here
-                compute_service = nova.API(production=True)
-                networks = compute_service.get_networks(cntx)
+            nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
+            network_id = db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id')
 
-                ipinfo = None
-                try:
-                    ipinfo = compute_service.get_fixed_ip(cntx, nic_info['v4-fixed-ip'])
-                except:
-                    # the old IP address may not belong to any of the subnets 
-                    pass
+            # Adjust network id to new network id
+            if nic_data['mac_address'] in restored_net_resources:
+                network_id = restored_net_resources[nic_data['mac_address']]['network_id']
+            nic_info.setdefault('net-id', network_id)
 
-                if ipinfo:
-                    if ipinfo.hostname:
-                        # IP in use. Raise an exception
-                        raise Exception("IP address %s is in use. Cannot restore VM" % \
+            ipinfo = None
+            try:
+                ipinfo = compute_service.get_fixed_ip(cntx, nic_info['v4-fixed-ip'])
+            except:
+                # the old IP address may not belong to any of the subnets 
+                pass
+
+            if ipinfo:
+                if ipinfo.hostname:
+                    # IP in use. Raise an exception
+                    raise Exception("IP address %s is in use. Cannot restore VM" % \
                                          nic_info['v4-fixed-ip'])
-                        # else reuse existing ip address
-                else:
-                    # find a free fixed ip on the subnet that we can use
-                    for net in networks:
-                        if net.id == nic_info['net-id']:
-                            for ip in IPNetwork(net.cidr):
-                                if ip >= IPAddress(net.dhcp_start) and \
-                                   ip != IPAddress(net.gateway):
-                                    ipinfo = compute_service.get_fixed_ip(cntx, str(ip))
-                                    if not ipinfo.hostname:
-                                        nic_info['v4-fixed-ip'] = str(ip)
-                                        break
+                    # else reuse existing ip address
+            else:
+                # find a free fixed ip on the subnet that we can use
+                for net in networks:
+                    if net.id == nic_info['net-id']:
+                        if net.cidr is None:
+                            network_type = 'neutron'
+                        else:
+                            network_type = 'nova'
+                        break
+
+                if net.id != nic_info['net-id']:
+                    raise Exception("Network by netid %s not found" % net.id)
+           
+            if network_type != 'neutron':
+                for ip in IPNetwork(net.cidr):
+                    if ip >= IPAddress(net.dhcp_start) and \
+                        ip != IPAddress(net.gateway):
+                        ipinfo = compute_service.get_fixed_ip(cntx, str(ip))
+                        if not ipinfo.hostname:
+                            nic_info['v4-fixed-ip'] = str(ip)
+                            break
             else:
                 if nic_data['mac_address'] in restored_net_resources:
                     nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
@@ -657,6 +667,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
                     new_network = restored_net_resources[pit_id]
                     nic_info.setdefault('net-id', new_network['id']) 
+
                     #TODO(giri): the ip address sometimes may not be available due to one of the router or network
                     #interfaces taking them over
                     #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
@@ -724,15 +735,16 @@ def restore_vm_networks(cntx, db, restore):
     def _get_nic_port_from_restore_options(restore_options,
                                            snapshot_vm_nic_options,
                                            instance_id, mac_address):
-        
-        def _is_duplicate_ip(ports, ip_address):
+
+        def _get_port_for_ip(ports, ip_address):
             if ports and ip_address:
                 for port in ports:
+                 
                     if 'fixed_ips' in port:
                         for fixed_ip in port['fixed_ips']:
                             if fixed_ip['ip_address'] == ip_address:
-                                return True
-            return False
+                                return port
+            return None
         
         def _create_port(name, ip_address, network_id,
                          subnet_id):
@@ -757,8 +769,8 @@ def restore_vm_networks(cntx, db, restore):
 
         networks_mapping = []
         if 'networks_mapping' in restore_options['openstack'] and\
-            'private' in restore_options['openstack']['networks_mapping']:
-            networks_mapping = restore_options['openstack']['networks_mapping']['private']
+            'networks' in restore_options['openstack']['networks_mapping']:
+            networks_mapping = restore_options['openstack']['networks_mapping']['networks']
 
         instance_options = utils.get_instance_restore_options(restore_options,
                                                      instance_id, 'openstack') 
@@ -773,8 +785,6 @@ def restore_vm_networks(cntx, db, restore):
         else:
             network_id = snapshot_vm_nic_options['network_id']
             subnet_id = snapshot_vm_nic_options['subnet_id']
-            if 'ip_address' in snapshot_vm_nic_options:
-                ip_address = snapshot_vm_nic_options['ip_address']
   
             for net in networks_mapping:
                 if net['snapshot_network']['id'] == network_id and \
@@ -795,18 +805,28 @@ def restore_vm_networks(cntx, db, restore):
             raise Exception("Could not find the subnet that matches the restore options")
 
         ports = network_service.get_ports(cntx, **{'subnet_id':subnet_id})
-        if ports:
-            if ip_address and not _is_duplicate_ip(ports, ip_address):
-                new_ip_address = ip_address
+        if ports and ip_address:
+            port = _get_port_for_ip(ports, ip_address)
+            if port: 
+                if 'device_id' in port and \
+                    port['device_id'] in ('', None):
+                    return port
+                else:
+                    raise Exception(_("Given IP address %s is in use" % ip_address))
+            else:
                 try:
-                    return _create_port(port_name, new_ip_address,
+                    return _create_port(port_name, ip_address,
                                         network_id, subnet_id)
                 except Exception as ex:
                     LOG.exception(ex)
 
-        subnet = network_service.get_subnet(cntx, subnet_id)
-        for ip in IPNetwork(subnet['subnet']['cidr']):
-            if not _is_duplicate_ip(ports, str(ip)):
+        else:
+            subnet = network_service.get_subnet(cntx, subnet_id)
+            for ip in IPNetwork(subnet['subnet']['cidr']):
+                if ip < IPAddress(subnet['subnet']['allocation_pools'][0]['start']) or \
+                    ip == IPAddress(subnet['subnet']['gateway_ip']):
+                    continue
+
                 new_ip_address =  str(ip)
                 try:
                     return _create_port(port_name, new_ip_address,
@@ -821,17 +841,23 @@ def restore_vm_networks(cntx, db, restore):
     restored_net_resources = {}
 
     network_service =  neutron.API(production=restore['restore_type'] != 'test')  
+    dst_network_type = 'nova'
+    try:
+        networks = network_service.get_networks(cntx)
+        dst_network_type = 'neutron'
+    except:
+        pass
+
     snapshot_vm_common_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])           
     for snapshot_vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, snapshot_vm.vm_id, restore['snapshot_id'])        
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'nic':
-                network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
-                                                       'network_type')
-
+                src_network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
+                                                         'network_type')
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
-                if network_type != 'neutron':
+                if dst_network_type != 'neutron':
                     instance_id = snapshot_vm.vm_id
                     mac_address = nic_data['mac_address']
                     nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)

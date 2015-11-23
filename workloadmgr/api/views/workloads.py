@@ -35,6 +35,7 @@ class ViewBuilder(common.ViewBuilder):
                 'name': workload['display_name'],
                 'description': workload['display_description'],
                 'workload_type_id': workload['workload_type_id'],
+                'status': workload['status'],
                 #'storage_usage': workload['storage_usage'], 
                 #'instances': workload['instances'],
                 'links': self._get_links(request, workload['id']),
