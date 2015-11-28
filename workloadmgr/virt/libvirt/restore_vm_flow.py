@@ -209,7 +209,11 @@ class UploadImageToGlance(task.Task):
             image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
 
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
-        image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        index = image_name.index('_Snapshot_') if '_Snapshot_' in image_name else -1
+        if index != -1:
+           image_name = image_name[:index] + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        else:
+             image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         if db.get_metadata_value(vm_disk_resource_snap.metadata, 'disk_format') == 'vmdk':
             image_metadata = {'is_public': False,
                               'status': 'active',
