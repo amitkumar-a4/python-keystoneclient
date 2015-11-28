@@ -125,42 +125,37 @@ class PrepareBackupImage(task.Task):
                                                  })
         head, tail = os.path.split(vm_disk_resource_snap_staging_path)
         fileutils.ensure_tree(head)
-        shutil.copyfile(vm_disk_resource_snap.vault_path, vm_disk_resource_snap_staging_path)
 
-        to_commit = []            
-        while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
-            to_commit.append(vm_disk_resource_snap_staging_path)           
-            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(self.cntx, \
-                                                vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-            vm_disk_resource_snap_backing_staging_path = vault.get_restore_vm_disk_resource_staging_path(\
-                                                        {'restore_id' : restore_obj.id,
-                                                         'workload_id': snapshot_obj.workload_id,
-                                                         'snapshot_id': snapshot_obj.id,
-                                                         'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                         'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                         'snapshot_vm_resource_name':  snapshot_vm_resource.resource_name,
-                                                         'vm_disk_resource_snap_id' : vm_disk_resource_snap_backing.id,   
-                                                         })
-            head, tail = os.path.split(vm_disk_resource_snap_backing_staging_path)
-            fileutils.ensure_tree(head)
-            shutil.copyfile(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap_backing_staging_path)
-                
-            #adjust virtual size
-            image_info_vm_disk_resource_snap = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
-            image_info_vm_disk_resource_snap_backing = qemuimages.qemu_img_info(vm_disk_resource_snap_backing_staging_path)
-            if image_info_vm_disk_resource_snap_backing.virtual_size < image_info_vm_disk_resource_snap.virtual_size :
-                qemuimages.resize_image(vm_disk_resource_snap_backing_staging_path, image_info_vm_disk_resource_snap.virtual_size)               
+        convert_thread = qemuimages.convert_image(
+                                      vm_disk_resource_snap.vault_path,
+                                      vm_disk_resource_snap_staging_path,
+                                      'qcow2', run_as_root=True)
+            
+        start_time = timeutils.utcnow()
+        uploaded_size = 0
+        uploaded_size_incremental = 0
+        previous_uploaded_size = 0  
 
-            #rebase and commit
-            qemuimages.rebase_qcow2(vm_disk_resource_snap_backing_staging_path, vm_disk_resource_snap_staging_path)
-
-            vm_disk_resource_snap_staging_path = vm_disk_resource_snap_backing_staging_path
-            vm_disk_resource_snap = vm_disk_resource_snap_backing  
-
-        for qcow2file in to_commit:    
-            qemuimages.commit_qcow2(qcow2file)
-            utils.delete_if_exists(qcow2file)
-
+        while True:
+            time.sleep(10)
+            image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)                
+            totalbytes = image_info.disk_size
+            if totalbytes:
+                progressmsg = _('Rehydrating image of instance %(vmid)s from \
+                                snapshot %(snapshot_id)s %(bytes)s bytes done') % \
+                                {'vmid': snapshot_vm_resource.vm_id,
+                                 'snapshot_id': snapshot_obj.id,
+                                 'bytes': totalbytes}
+                db.restore_update(self.cntx,  restore_obj.id,
+                          {'progress_msg': progressmsg, 'status': 'uploading' })
+                restore_obj = db.restore_update(self.cntx, restore_obj.id, 
+                                                {'uploaded_size_incremental': uploaded_size_incremental})
+            if not convert_thread.isAlive():
+                break
+            now = timeutils.utcnow()                        
+            if (now - start_time) > datetime.timedelta(minutes=10*60):
+                raise exception.ErrorOccurred(reason='Timeout uploading data')
+            
         image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
         self.restored_file_path = vm_disk_resource_snap_staging_path
         return (self.restored_file_path, image_info.virtual_size)
@@ -415,7 +410,7 @@ class RestoreCephVolume(task.Task):
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                       restored_volume_name,
                                                       'from Trilio Vault', None,
-                                                      None, 'ceph', None, None)
+                                                      None, volume_type, None, None)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -965,11 +960,17 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     msg = 'Creating VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id  
     db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg}) 
    
+    # refresh the token so we are attempting each VM restore with a new token
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
+
     context_dict = dict([('%s' % key, value)
                           for (key, value) in cntx.to_dict().iteritems()])            
     context_dict['conf'] =  None # RpcContext object looks for this during init
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], snapshot_obj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'],
+                                                                 snapshot_obj.id)
 
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
