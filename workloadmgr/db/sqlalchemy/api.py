@@ -557,6 +557,7 @@ def workload_get_all(context, **kwargs):
     else:        
         return model_query( context, models.Workloads, **kwargs).\
                             options(sa_orm.joinedload(models.Workloads.metadata)).\
+                            filter_by(project_id=context.project_id).\
                             order_by(models.Workloads.created_at.desc()).all()
 
 @require_admin_context
