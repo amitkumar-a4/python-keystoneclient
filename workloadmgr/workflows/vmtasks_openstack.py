@@ -616,7 +616,6 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             # adjust IP address here
             compute_service = nova.API(production=True)
             networks = compute_service.get_networks(cntx)
-
             nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
             network_id = db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id')
 
@@ -631,7 +630,6 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             except:
                 # the old IP address may not belong to any of the subnets 
                 pass
-
             if ipinfo:
                 if ipinfo.hostname:
                     # IP in use. Raise an exception
@@ -647,11 +645,9 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                         else:
                             network_type = 'nova'
                         break
-
                 if net.id != nic_info['net-id']:
                     raise Exception("Network by netid %s not found" % net.id)
-           
-            if network_type != 'neutron':
+            if network_type != 'neutron' and network_type is not None:
                 for ip in IPNetwork(net.cidr):
                     if ip >= IPAddress(net.dhcp_start) and \
                         ip != IPAddress(net.gateway):
@@ -660,13 +656,16 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                             nic_info['v4-fixed-ip'] = str(ip)
                             break
             else:
-                if nic_data['mac_address'] in restored_net_resources:
+                if nic_data['mac_address'] in restored_net_resources and 'id' in restored_net_resources:
                     nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
                 else:
                     #private network
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
-                    new_network = restored_net_resources[pit_id]
-                    nic_info.setdefault('net-id', new_network['id']) 
+                    try:
+                        new_network = restored_net_resources[pit_id]
+                        nic_info.setdefault('net-id', new_network['id']) 
+                    except:
+                           pass
 
                     #TODO(giri): the ip address sometimes may not be available due to one of the router or network
                     #interfaces taking them over
