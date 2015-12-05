@@ -51,7 +51,7 @@ def get_vms(cntx, workload_id):
                 vm_instance = instance
                 break;
         if vm_instance == None:
-            raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in vCenter inventory") % vm.vm_name)
+            raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in the inventory") % vm.vm_name)
                 
         vm_hypervisor = None
         for hypervisor in hypervisors:
