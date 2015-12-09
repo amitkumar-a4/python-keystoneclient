@@ -51,7 +51,7 @@
                             <br>
 							####### IP Address of Trilio Vault Appliance ################################<br>
 							TVAULT_APPLIANCE_NODE=192.168.1.XXX<br>
-							TVAULT_CONTEGO_VERSION=1.0.160<br>
+							TVAULT_CONTEGO_VERSION=1.0.169<br>
 							<br>
 							####### Nova Configuration Files ########################################<br> 
 							NOVA_CONF_FILE=/etc/nova/nova.conf<br>
