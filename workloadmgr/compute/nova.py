@@ -846,8 +846,9 @@ class API(base.Base):
             return client.contego.map_snapshot_files(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to map snapshot; Please check contego logs for more details' 
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def vast_prepare(self, context, server, params):
@@ -864,8 +865,9 @@ class API(base.Base):
             return client.contego.vast_prepare(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to prepare instance for snapshot operation; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def vast_freeze(self, context, server, params):
@@ -918,8 +920,9 @@ class API(base.Base):
             return client.contego.vast_instance(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to snapshot; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def vast_get_info(self, context, server, params):
@@ -936,8 +939,9 @@ class API(base.Base):
             return client.contego.vast_get_info(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to get instace info; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def vast_data_transfer(self, context, server, params):
@@ -954,8 +958,9 @@ class API(base.Base):
             return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to upload snapshot; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def vast_async_task_status(self, context, server, params):
@@ -972,8 +977,9 @@ class API(base.Base):
             return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to get snapshot upload task status; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     @autolog.log_method(logger=Logger)
@@ -991,8 +997,9 @@ class API(base.Base):
             return client.contego.vast_finalize(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to complete snapshot operation; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     @autolog.log_method(logger=Logger)
@@ -1010,8 +1017,9 @@ class API(base.Base):
             return client.contego.vast_reset(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to reset workload; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def testbubble_attach_volume(self, context, server, params):
@@ -1028,8 +1036,9 @@ class API(base.Base):
             return client.contego.testbubble_attach_volume(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to attach volume to test restore; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
 
     @synchronized(novalock)
     def testbubble_reboot_instance(self, context, server, params):
@@ -1047,5 +1056,6 @@ class API(base.Base):
             return client.contego.testbubble_reboot_instance(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            msg = 'Unable to reboot test restore instance; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
-            raise
