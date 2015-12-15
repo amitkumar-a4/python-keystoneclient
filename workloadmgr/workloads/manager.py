@@ -667,7 +667,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         return options
 
-    @synchronized(workloadlock)
+    #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, restore_id):
         """
@@ -767,25 +767,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             restore_data_transfer_time = 0
             restore_object_store_transfer_time = 0            
             workload_vms = self.db.workload_vms_get(context, workload.id)
-            for restored_vm in self.db.restored_vms_get(context, restore_id):
-                instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
-                if instance == None:
-                    pass 
-                else:
-                    self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
-                    if target_platform == 'openstack':
-                       values = {'workload_id': workload.id,
+            if target_platform == 'openstack':
+               for restored_vm in self.db.restored_vms_get(context, restore_id):
+                   instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
+                   if instance == None:
+                      pass 
+                   else:
+                        self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
+                        values = {'workload_id': workload.id,
                                  'vm_id': restored_vm.vm_id,
                                  'metadata': instance.metadata,
                                  'vm_name': instance.name,
                                  'status': 'available'}
-                       vm = self.db.workload_vms_create(context, values)
+                        vm = self.db.workload_vms_create(context, values)
 
-                restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
-                restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
-            # Delete old VMs
-            for vm in workload_vms:
-                self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+                   restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
+                   restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
+               # Delete old VMs
+               for vm in workload_vms:
+                   self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
 
             if restore_type == 'test':
                 self.db.restore_update( context,
@@ -891,6 +891,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 restore = self.db.restore_get(context, restore_id)
                 self.db.snapshot_update(context, restore.snapshot_id, {'status': 'available'})
+                self.db.workload_update(context, workload.id,{'status': 'available'})
                 if settings.get_settings(context).get('smtp_email_enable') == 'yes':
                     self.send_email(context,restore,'restore')       
             except Exception as ex:

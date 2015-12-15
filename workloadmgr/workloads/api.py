@@ -1289,6 +1289,15 @@ class API(base.Base):
                          snapshot_display_name + '\' Restore \'' + \
                          restore_display_name + '\' Create Requested', snapshot)
 
+            try:
+                workload_lock.acquire()
+                if workload['status'].lower() != 'available':
+                    msg = _("Workload must be in the 'available' state to restore")
+                    raise wlm_exceptions.InvalidState(reason=msg)
+                self.db.workload_update(context, workload.id, {'status': 'locked'})
+            finally:
+                workload_lock.release()
+               
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
