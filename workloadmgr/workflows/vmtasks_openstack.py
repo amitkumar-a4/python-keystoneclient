@@ -778,19 +778,31 @@ def restore_vm_networks(cntx, db, restore):
         nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
         if nic_options:
             network_id = nic_options['network']['id']
-            subnet_id = nic_options['network']['subnet']['id']
+
+            if 'subnet' in nic_options['network']:
+                subnet_id = nic_options['network']['subnet']['id']
+            else:
+                subnet_id = None
+
             if 'ip_address' in nic_options:
                 ip_address = nic_options['ip_address']
         else:
             network_id = snapshot_vm_nic_options['network_id']
-            subnet_id = snapshot_vm_nic_options['subnet_id']
+            subnet_id = None
+            if 'subnet_id' in snapshot_vm_nic_options:
+                subnet_id = snapshot_vm_nic_options['subnet_id']
   
             for net in networks_mapping:
-                if net['snapshot_network']['id'] == network_id and \
-                   net['snapshot_network']['subnet']['id'] == subnet_id:
-                    network_id = net['target_network']['id']
-                    subnet_id = net['target_network']['subnet']['id']
-                    break
+                if net['snapshot_network']['id'] == network_id:
+                    if subnet_id:
+                        if net['snapshot_network']['subnet']['id'] == subnet_id:
+                            subnet_id = net['target_network']['subnet']['id']
+                            network_id = net['target_network']['id']
+                            break
+                    else:
+                        network_id = net['target_network']['id']
+                        subnet_id = net['target_network']['subnet']['id']
+                        break
 
         # Make sure networks and subnets exists
         try:
