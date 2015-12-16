@@ -731,7 +731,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     else:
                         instance = compute_service.get_server_by_id(context, vm.vm_id, admin=True)
                         if instance:
-                            msg = _('Original instance ' +  vm.vm_name + ' is still present. Please delete this instance and try again.')
+                            msg = _('Original instance ' +  vm.vm_name + ' is still present. '
+                                    'Please delete this instance and try again.')
                             raise wlm_exceptions.InvalidState(reason=msg)
                                                 
                         
@@ -992,14 +993,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
                 fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks,
                                             mount_vm_id=mount_vm_id)
-                self.db.snapshot_update(context, snapshot['id'],
-                                 {'status': 'mounted', 'metadata': {}})
                 urls = []
                 for netname, addresses in fminstance.addresses.iteritems():
                     for addr in addresses:
                         if 'addr' in addr:
-                            urls.append("http://" + addr['addr'] + ":8000")
+                            urls.append("http://" + addr['addr'])
  
+                self.db.snapshot_update(context, snapshot['id'],
+                                        {'status': 'mounted',
+                                         'metadata': {
+                                              'mount_vm_id': mount_vm_id,
+                                              'urls': json.dumps(urls)
+                                           }
+                                        })
                 return {"urls": urls}
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            

@@ -4,6 +4,8 @@ import re
 import time
 
 def readconfigdrive():
+    vms = []
+    maps = {}
     try:
         mntpath = "/root/mnt"
         devname = "/dev/sr0"
@@ -20,10 +22,8 @@ def readconfigdrive():
         stdout_value, stderr_value = process.communicate()
 
         if process.returncode:
-            return
+            return vms, maps
         
-        maps = {}
-        vms = []
         time.sleep(10)
         with open("/root/mnt/diskfiles", "r") as f:
             vmdiskmaps = json.loads(f.read())
@@ -51,3 +51,4 @@ def readconfigdrive():
 
         except:
             pass
+    return vms, maps
