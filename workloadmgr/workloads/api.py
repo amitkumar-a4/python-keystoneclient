@@ -1294,7 +1294,7 @@ class API(base.Base):
                 if workload['status'].lower() != 'available':
                     msg = _("Workload must be in the 'available' state to restore")
                     raise wlm_exceptions.InvalidState(reason=msg)
-                self.db.workload_update(context, workload.id, {'status': 'locked'})
+                self.db.workload_update(context, workload['id'], {'status': 'locked'})
             finally:
                 workload_lock.release()
                
