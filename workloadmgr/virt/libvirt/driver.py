@@ -661,6 +661,9 @@ class LibvirtDriver(driver.ComputeDriver):
 
             for cinder_volume in cinder_volumes:
                 cinder_volume = cinder_volume.__dict__
+                if 'name' in cinder_volume:
+                    cinder_volume['display_name'] = cinder_volume['name']
+
                 for attachment in cinder_volume['attachments']:
                     if attachment['server_id'] == instance['vm_id']:
                         if disk_info['dev'] in attachment['device']:
