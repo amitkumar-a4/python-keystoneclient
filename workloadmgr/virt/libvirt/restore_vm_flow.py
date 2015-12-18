@@ -984,7 +984,11 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
             continue
 
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type').lower()
+            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+            if volume_type:
+                volume_type = volume_type.lower()
+            else:
+                volume_type='default'
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id').lower()
   
             volume_type = get_new_volume_type(instance_options, volume_id, volume_type)
