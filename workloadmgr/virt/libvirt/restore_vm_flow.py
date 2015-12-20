@@ -638,7 +638,6 @@ class RestoreSANVolume(task.Task):
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
 
-        import pdb;pdb.set_trace()
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
@@ -662,17 +661,6 @@ class RestoreSANVolume(task.Task):
         if self.restored_volume['status'].lower() == 'error':
             raise Exception("Failed to create volume type " + volume_type)
 
-        # Call into contego to copy the data from backend to volume
-        # comeback
-        compute_service = nova.API(production=True)
-        vast_params = {'volume_id': self.restored_volume['id'],
-                       'backup_image_file_path': restored_file_path}
-        snapshot_data = compute_service.vast_copy_backup_to_volume(cntx, instance['vm_id'], vast_params)
-
-        statinfo = os.stat(restored_file_path)
-        restore_obj = db.restore_update(self.cntx, 
-                                        restore_obj.id,
-                                        {'uploaded_size_incremental': statinfo.st_size})
 
         return self.restored_volume['id']
 
@@ -930,6 +918,53 @@ class AttachVolume(task.Task):
         except:
             pass
 
+class CopyBackupImageToVolume(task.Task):
+    """
+       If the volume is SAN volume, initiate copy of backup data
+       to volume on contego.
+       SAN volumes include iscsi and fc channel volumes
+    """
+
+    def execute(self, context, restored_instance_id,
+                volumeid, restore_id, restore_type,
+                restored_file_path,
+                progress_tracking_file_path):
+        return self.execute_with_log(context, restored_instance_id, volumeid,
+                                     restore_id, restore_type, restored_file_path,
+                                     progress_tracking_file_path)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'CopyBackupImageToVolume.execute')
+    def execute_with_log(self, context, restored_instance_id, volumeid,
+                         restore_id, restore_type, restored_file_path,
+                         progress_tracking_file_path):
+
+        # Call into contego to copy the data from backend to volume
+        compute_service = nova.API(production=True)
+
+        # Get a new token, just to be safe
+        user_id = cntx.user
+        project_id = cntx.tenant
+        cntx = nova._get_tenant_context(user_id, project_id)
+        vast_params = {'volume_id': volumeid,
+                       'backup_image_file_path': restored_file_path,
+                       'progress_tracking_file_path': progress_tracking_file_path}
+        compute_service.copy_backup_image_to_volume(cntx, restored_instance_id, vast_params)
+
+        # wait for the backup image to volume is done. keep monitoring the 
+        # file copy progress here
+        statinfo = os.stat(restored_file_path)
+        restore_obj = db.restore_update(self.cntx, 
+                                        restore_id,
+                                        {'uploaded_size_incremental': statinfo.st_size})
+        pass
+
+    @autolog.log_method(Logger, 'CopyBackupImageToVolume.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
 def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restoreid):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
@@ -1051,6 +1086,25 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
                                   devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
+def CopyBackupImagesToVolumes(cntx, instance, snapshot_obj, restoreid):
+    flow = lf.Flow("copybackupimagestovolumeslf")
+    db = WorkloadMgrDB().db
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
+                                         instance['vm_id'], snapshotobj.id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+        if snapshot_vm_resource.resource_name == 'vda':
+            continue
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
+            flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
+                                  rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                                              volume_type='volume_type_'+str(snapshot_vm_resource.id),
+                                              restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
+                                              progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id)),
+                                              ))
+    return flow
+
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
                restored_nics, instance_options):    
@@ -1085,6 +1139,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'restore_id': restore['id'],
                 'vmid': instance['vm_id'],
                 'vmname': instance['vm_name'],
+                'snapshot_id': snapshot_obj.id,
                 'restore_type': restore['restore_type'],
                 'restored_net_resources': restored_net_resources,    
                 'restored_security_groups': restored_security_groups,
@@ -1097,6 +1152,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
         if snapshot_vm_resource.resource_type == 'disk':
+
+            progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
+                                         'resource_id' : vm_disk_resource_snap_id}
+
+            progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
             if volume_id:
                 volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
@@ -1106,6 +1166,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 store['volume_type_'+snapshot_vm_resource.id] = new_volume_type
             else:
                 store['volume_type_'+snapshot_vm_resource.id] = None
+
+            store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
        
 
     LOG.info(_('Processing disks'))
@@ -1132,10 +1194,27 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     if childflow:
         _restorevmflow.add(childflow)
 
+    # power off the instance until all volumes are attached
+    childflow = PowerOffInstance(cntx, instance)
+    if childflow:
+        _restorevmflow.add(childflow)
+
     # attach restored volumes to restored instances
     childflow = AttachVolumes(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
-        _restorevmflow.add(AttachVolumes(cntx, instance, snapshot_obj, restore['id']))
+        _restorevmflow.add(childflow)
+
+    # copy data if the volumes are iscsi volumes
+    # attach restored volumes to restored instances
+    childflow = CopyBackupImagesToVolumes(cntx, instance,
+                                          snapshot_obj, restore['id'])
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    # power on the instance until all volumes are attached
+    childflow = PowerOnInstance(cntx, instance)
+    if childflow:
+        _restorevmflow.add(childflow)
 
     result = engines.run(_restorevmflow, engine_conf='serial',
                          backend={'connection': store['connection'] }, store=store)
