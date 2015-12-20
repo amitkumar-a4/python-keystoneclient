@@ -5,6 +5,7 @@ import cPickle as pickle
 import json
 import shutil
 import math
+import re
 import time
 import datetime
 import subprocess
@@ -617,7 +618,7 @@ class RestoreSANVolume(task.Task):
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
-    @autolog.log_method(Logger, 'RestoreNFSVolume.execute')
+    @autolog.log_method(Logger, 'RestoreSANVolume.execute')
     def execute_with_log(self, context, restore_id, volume_type,
                          vm_resource_id, restored_file_path):
 
@@ -634,7 +635,7 @@ class RestoreSANVolume(task.Task):
         volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
 
-        progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
+        progressmsg = _('Restoring SAN Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
 
@@ -661,13 +662,13 @@ class RestoreSANVolume(task.Task):
         if self.restored_volume['status'].lower() == 'error':
             raise Exception("Failed to create volume type " + volume_type)
 
-
         return self.restored_volume['id']
 
-    @autolog.log_method(Logger, 'RestoreNFSVolume.revert')
+    @autolog.log_method(Logger, 'RestoreSANVolume.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
-            self.volume_service.delete(self.cntx, self.restored_volume)
+            if self.restored_volume:
+                self.volume_service.delete(self.cntx, self.restored_volume)
         except:
             pass
 
@@ -953,15 +954,152 @@ class CopyBackupImageToVolume(task.Task):
                        'progress_tracking_file_path': progress_tracking_file_path}
         compute_service.copy_backup_image_to_volume(cntx, restored_instance_id, vast_params)
 
-        # wait for the backup image to volume is done. keep monitoring the 
-        # file copy progress here
         statinfo = os.stat(restored_file_path)
+        while True:
+            try:
+                time.sleep(10)
+                async_task_status = {}
+                if progress_tracking_file_path:
+                    try:
+                        with open(progress_tracking_file_path, 'r') as progress_tracking_file:
+                            async_task_status['status'] = progress_tracking_file.readlines()
+                    except Exception as ex:
+                        LOG.exception(ex)
+
+                else:
+                    # For swift based backup media
+                    async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                  instance['vm_id'],
+                                                  {'metadata': progress_tracker_metadata})
+                data_transfer_completed = False
+                if async_task_status and 'status' in async_task_status and \
+                        len(async_task_status['status']):
+                    for line in async_task_status['status']:
+                        if 'percentage complete' in line:
+                            percentage = re.search(r'\d+\.\d+', line).group(0)
+                        if 'Error' in line:
+                            raise Exception("Data transfer failed - " + line)
+                        if 'Completed' in line:
+                            data_transfer_completed = True
+                            break;
+
+                if data_transfer_completed:
+                    break;
+                else:
+                    copied_size_incremental = int(float(percentage) * \
+                                                   statinfo.st_size}))
+                    restore_obj = db.restore_update(cntx, restore_id,
+                                           {'uploaded_size_incremental': copied_size_incremental})
+            except nova_unauthorized as ex:
+                LOG.exception(ex)
+                # recreate the token here
+                user_id = cntx.user
+                project_id = cntx.tenant
+                cntx = nova._get_tenant_context(user_id, project_id)
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=10*60):
+                raise exception.ErrorOccurred(reason='Timeout uploading data')
+
         restore_obj = db.restore_update(self.cntx, 
                                         restore_id,
                                         {'uploaded_size_incremental': statinfo.st_size})
-        pass
 
     @autolog.log_method(Logger, 'CopyBackupImageToVolume.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+class PowerOffInstance(task.Task):
+    """
+       Power Off restored instance
+    """
+
+    def execute(self, context, restored_instance_id, restore_type):
+        return self.execute_with_log(context, restored_instance_id,
+                                     restore_type)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'PowerOffInstance.execute')
+    def execute_with_log(self, context, restored_instance_id, restore_type):
+        self.cntx = amqp.RpcContext.from_dict(context)
+        self.compute_service = compute_service = \
+                       nova.API(production = (restore_type == 'restore'))
+
+        compute_service.stop(self.cntx, restored_instance_id) 
+
+        restored_instance =  compute_service.get_server_by_id(self.cntx,
+                                                        restored_instance_id)
+        start_time = timeutils.utcnow()
+        while hasattr(restored_instance,'status') == False or \
+              restored_instance.status != 'SHUTDOWN':
+            LOG.debug('Waiting for the instance ' + restored_instance_id +\
+                      ' to shutdown' )
+            time.sleep(10)
+            restored_instance =  compute_service.get_server_by_id(self.cntx,
+                                                        restored_instance_id)
+            if hasattr(restored_instance,'status'):
+                if restored_instance.status == 'ERROR':
+                    raise Exception(_("Error creating instance " + \
+                                        restored_instance_id))
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout waiting for '
+                                           'the instance to boot from volume')                   
+
+        self.restored_instance = restored_instance
+        return
+
+    @autolog.log_method(Logger, 'RestoreInstanceFromVolume.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+class PowerOnInstance(task.Task):
+    """
+       Power On restored instance
+    """
+
+    def execute(self, context, restored_instance_id, restore_type):
+        return self.execute_with_log(context, restored_instance_id,
+                                     restore_type)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'PowerOnInstance.execute')
+    def execute_with_log(self, context, restored_instance_id, restore_type):
+        self.cntx = amqp.RpcContext.from_dict(context)
+        self.compute_service = compute_service = \
+                       nova.API(production = (restore_type == 'restore'))
+
+        compute_service.start(self.cntx, restored_instance_id)
+
+        restored_instance =  compute_service.get_server_by_id(self.cntx,
+                                                        restored_instance_id)
+        start_time = timeutils.utcnow()
+        while hasattr(restored_instance,'status') == False or \
+              restored_instance.status != 'SHUTDOWN':
+            LOG.debug('Waiting for the instance ' + restored_instance_id +\
+                      ' to boot' )
+            time.sleep(10)
+            restored_instance =  compute_service.get_server_by_id(self.cntx,
+                                                        restored_instance_id)
+            if hasattr(restored_instance,'status'):
+                if restored_instance.status == 'ERROR':
+                    raise Exception(_("Error creating instance " + \
+                                        restored_instance_id))
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout waiting for '
+                                           'the instance to boot from volume')                   
+
+        self.restored_instance = restored_instance
+        return
+
+    @autolog.log_method(Logger, 'RestoreInstanceFromVolume.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
 
@@ -1039,7 +1177,13 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
-                                    provides='volume_id_' + str(snapshot_vm_resource.id)))                               
+                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
+            elif any(x in volume_type for x in CONF.contego_volume_copy_backend)
+                flow.add(RestoreSANVolume("RestoreSANVolume" + snapshot_vm_resource.id,
+                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
+                                                volume_type='volume_type_'+snapshot_vm_resource.id,
+                                                restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
+                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
             else:
                 # Default restore path for backends that we don't recognize
                 flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
@@ -1103,6 +1247,20 @@ def CopyBackupImagesToVolumes(cntx, instance, snapshot_obj, restoreid):
                                               restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id)),
                                               ))
+    return flow
+
+def PowerOffInstance(context):
+
+    flow = lf.Flow("poweroffinstancelf")
+    flow.add(PowerOffInstance("PowerOffInstance"))
+
+    return flow
+
+def PowerOnInstance(context, instance, snapshotobj, restoreid):
+
+    flow = lf.Flow("poweroninstancelf")
+    flow.add(PowerOffInstance("PowerOnInstance"))
+
     return flow
 
 def restore_vm(cntx, db, instance, restore, restored_net_resources,

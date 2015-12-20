@@ -498,7 +498,9 @@ class LibvirtDriver(driver.ComputeDriver):
         return commit_to.replace(".vmdk", "-flat.vmdk")
         """
         if test:
-            utils.execute('qemu-img', 'convert', '-f', 'vmdk', '-O', 'raw', commit_to, commit_to.replace(".vmdk", ".img"), run_as_root=False)
+            utils.execute('qemu-img', 'convert', '-f', 'vmdk', '-O', 'raw',
+                          commit_to, commit_to.replace(".vmdk",
+                          ".img"), run_as_root=False)
             return commit_to.replace(".vmdk", ".img")
         else:
             return commit_to.replace(".vmdk", "-flat.vmdk")
@@ -759,7 +761,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
                 uploaded_size = 0
                 uploaded_size_incremental = 0
-                previous_uploaded_size = 0                
+                previous_uploaded_size = 0
                 while True:
                     try:
                         time.sleep(10)
