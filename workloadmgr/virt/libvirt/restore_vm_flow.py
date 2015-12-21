@@ -951,6 +951,7 @@ class CopyBackupImageToVolume(task.Task):
 
         # Call into contego to copy the data from backend to volume
         compute_service = nova.API(production=True)
+        db = WorkloadMgrDB().db
 
         # Get a new token, just to be safe
         cntx = amqp.RpcContext.from_dict(context)
@@ -980,7 +981,7 @@ class CopyBackupImageToVolume(task.Task):
 
                     # if we don't see any update to file time for 5 minutes, something is wrong
                     # deal with it.
-                    if time()-progstat.st_mtime > 600:
+                    if time.time() - progstat.st_mtime > 600:
                         raise Exception("No update to %s modified time for last 5 minutes. "
                                         "Contego may have creashed. Bailing out" % 
                                         progress_tracking_file_path)
@@ -990,24 +991,25 @@ class CopyBackupImageToVolume(task.Task):
                                                   instance['vm_id'],
                                                   {'metadata': progress_tracker_metadata})
                 data_transfer_completed = False
+                percentage="0.0"
                 if async_task_status and 'status' in async_task_status and \
                         len(async_task_status['status']):
                     for line in async_task_status['status']:
                         if 'percentage complete' in line:
                             percentage = re.search(r'\d+\.\d+', line).group(0)
                         if 'Error' in line:
-                            raise Exception("Data transfer failed - " + line)
+                            raise Exception("Data transfer failed - Contego Exception:" + line)
                         if 'Completed' in line:
                             data_transfer_completed = True
+                            percentage="100.0"
                             break;
 
+                copied_size_incremental = int(float(percentage) * \
+                                                   statinfo.st_size)
+                restore_obj = db.restore_update(cntx, restore_id,
+                                           {'uploaded_size_incremental': copied_size_incremental})
                 if data_transfer_completed:
                     break;
-                else:
-                    copied_size_incremental = int(float(percentage) * \
-                                                   statinfo.st_size)
-                    restore_obj = db.restore_update(cntx, restore_id,
-                                           {'uploaded_size_incremental': copied_size_incremental})
             except nova_unauthorized as ex:
                 LOG.exception(ex)
                 # recreate the token here
@@ -1017,12 +1019,8 @@ class CopyBackupImageToVolume(task.Task):
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex
-            now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=10*60):
-                raise exception.ErrorOccurred(reason='Timeout uploading data')
 
-        restore_obj = db.restore_update(self.cntx, 
-                                        restore_id,
+        restore_obj = db.restore_update(cntx, restore_id,
                                         {'uploaded_size_incremental': statinfo.st_size})
 
     @autolog.log_method(Logger, 'CopyBackupImageToVolume.revert')

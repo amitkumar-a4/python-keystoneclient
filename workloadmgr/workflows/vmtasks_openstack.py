@@ -764,6 +764,7 @@ def restore_vm_networks(cntx, db, restore):
                                            'metadata': {},
                                            'status': 'available'}
             restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)              
+            network_service.delete_port(cntx, new_port['id'])
             return new_port
 
         networks_mapping = []
