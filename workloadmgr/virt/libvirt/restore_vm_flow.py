@@ -927,11 +927,12 @@ class CopyBackupImageToVolume(task.Task):
     """
 
     def execute(self, context, restored_instance_id,
-                volumeid, restore_id, restore_type,
+                volumeid, volume_type, restore_id, restore_type,
                 restored_file_path,
                 progress_tracking_file_path):
         return self.execute_with_log(context, restored_instance_id, volumeid,
-                                     restore_id, restore_type, restored_file_path,
+                                     volume_type, restore_id, restore_type,
+                                     restored_file_path,
                                      progress_tracking_file_path)
 
     def revert(self, *args, **kwargs):
@@ -939,13 +940,18 @@ class CopyBackupImageToVolume(task.Task):
 
     @autolog.log_method(Logger, 'CopyBackupImageToVolume.execute')
     def execute_with_log(self, context, restored_instance_id, volumeid,
-                         restore_id, restore_type, restored_file_path,
-                         progress_tracking_file_path):
+                         volume_type, restore_id, restore_type,
+                         restored_file_path, progress_tracking_file_path):
+ 
+        # if the volume type is not SAN volume type, return success
+        if not any(x in volume_type for x in CONF.contego_volume_copy_backend):
+            return
 
         # Call into contego to copy the data from backend to volume
         compute_service = nova.API(production=True)
 
         # Get a new token, just to be safe
+        cntx = amqp.RpcContext.from_dict(context)
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
@@ -966,6 +972,16 @@ class CopyBackupImageToVolume(task.Task):
                     except Exception as ex:
                         LOG.exception(ex)
 
+                    # if the modified timestamp of progress file hasn't for a while
+                    # throw an exception
+                    progstat = os.stat(progress_tracking_file_path)
+
+                    # if we don't see any update to file time for 5 minutes, something is wrong
+                    # deal with it.
+                    if time()-progstat.st_mtime > 600:
+                        raise Exception("No update to %s modified time for last 5 minutes. "
+                                        "Contego may have creashed. Bailing out" % 
+                                        progress_tracking_file_path)
                 else:
                     # For swift based backup media
                     async_task_status = compute_service.vast_async_task_status(cntx, 
@@ -987,7 +1003,7 @@ class CopyBackupImageToVolume(task.Task):
                     break;
                 else:
                     copied_size_incremental = int(float(percentage) * \
-                                                   statinfo.st_size}))
+                                                   statinfo.st_size)
                     restore_obj = db.restore_update(cntx, restore_id,
                                            {'uploaded_size_incremental': copied_size_incremental})
             except nova_unauthorized as ex:
@@ -1035,7 +1051,7 @@ class PowerOffInstance(task.Task):
                                                         restored_instance_id)
         start_time = timeutils.utcnow()
         while hasattr(restored_instance,'status') == False or \
-              restored_instance.status != 'SHUTDOWN':
+              restored_instance.status != 'SHUTOFF':
             LOG.debug('Waiting for the instance ' + restored_instance_id +\
                       ' to shutdown' )
             time.sleep(10)
@@ -1081,7 +1097,7 @@ class PowerOnInstance(task.Task):
                                                         restored_instance_id)
         start_time = timeutils.utcnow()
         while hasattr(restored_instance,'status') == False or \
-              restored_instance.status != 'SHUTDOWN':
+              restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance_id +\
                       ' to boot' )
             time.sleep(10)
@@ -1178,7 +1194,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
-            elif any(x in volume_type for x in CONF.contego_volume_copy_backend)
+            elif any(x in volume_type for x in CONF.contego_volume_copy_backend):
                 flow.add(RestoreSANVolume("RestoreSANVolume" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
@@ -1230,11 +1246,11 @@ def AttachVolumes(context, instance, snapshotobj, restoreid):
                                   devname='devname_' + str(snapshot_vm_resource.id),)))
     return flow
 
-def CopyBackupImagesToVolumes(cntx, instance, snapshot_obj, restoreid):
+def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restoreid):
     flow = lf.Flow("copybackupimagestovolumeslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+                                         instance['vm_id'], snapshot_obj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
@@ -1249,17 +1265,17 @@ def CopyBackupImagesToVolumes(cntx, instance, snapshot_obj, restoreid):
                                               ))
     return flow
 
-def PowerOffInstance(context):
+def PowerOffInstanceFlow(context):
 
     flow = lf.Flow("poweroffinstancelf")
     flow.add(PowerOffInstance("PowerOffInstance"))
 
     return flow
 
-def PowerOnInstance(context, instance, snapshotobj, restoreid):
+def PowerOnInstanceFlow(context):
 
     flow = lf.Flow("poweroninstancelf")
-    flow.add(PowerOffInstance("PowerOnInstance"))
+    flow.add(PowerOnInstance("PowerOnInstance"))
 
     return flow
 
@@ -1312,7 +1328,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         if snapshot_vm_resource.resource_type == 'disk':
 
             progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
-                                         'resource_id' : vm_disk_resource_snap_id}
+                                         'resource_id' : snapshot_vm_resource.id}
 
             progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
@@ -1352,8 +1368,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     if childflow:
         _restorevmflow.add(childflow)
 
-    # power off the instance until all volumes are attached
-    childflow = PowerOffInstance(cntx, instance)
+    # power off the restored instance until all volumes are attached
+    childflow = PowerOffInstanceFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 
@@ -1369,8 +1385,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     if childflow:
         _restorevmflow.add(childflow)
 
-    # power on the instance until all volumes are attached
-    childflow = PowerOnInstance(cntx, instance)
+    # power on the restored instance until all volumes are attached
+    childflow = PowerOnInstanceFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 
