@@ -52,6 +52,17 @@ restore_vm_opts = [
     cfg.StrOpt('cinder_nfs_mount_point_base',
                default='/opt/stack/data/mnt',
                help='Dir where the nfs volume is mounted for restore'),                   
+    cfg.StrOpt('workloadmgr_supported_backends',
+               default='ceph,nfs,iscsi,lvm,fc',
+               help='List of backends that workload manages efficiently. '
+                    'The string also maps volume types to specific backend by '
+                    'testing substring of backend in volume_type name. '
+                    'Essentially we assume that all ceph volume types has '
+                    'substring in volume type.'),
+    cfg.StrOpt('contego_volume_copy_backend',
+               default='iscsi,lvm,fc',
+               help='List of backends that contego uses to copy data from '
+                    'backup image to volume')
     ]
 
 LOG = logging.getLogger(__name__)
@@ -71,9 +82,16 @@ def get_new_volume_type(instance_options, volume_id, volume_type):
 
 def is_supported_backend(volume_type):
 
+    supported_backends = CONF.workloadmgr_supported_backends
     if volume_type:
-        return 'ceph' in volume_type.lower() or \
-               'nfs' in volume_type.lower()
+        return volume_type.lower() in (supported_backends.split(","))
+    else:
+        return False
+
+def contego_based_volume_copy(volume_type):
+    contego_volume_copy = CONF.contego_volume_copy_backend
+    if volume_type:
+        return volume_type.lower() in (contego_volume_copy.split(","))
     else:
         return False
 
@@ -585,6 +603,86 @@ class RestoreNFSVolume(task.Task):
         except:
             pass
         
+class RestoreSANVolume(task.Task):
+    """
+       Restore cinder san volume from qcow2
+       SAN volumes including iscsi and fc channel volumes
+    """
+
+    def execute(self, context, restore_id, volume_type,
+                vm_resource_id, restored_file_path):
+        return self.execute_with_log(context, restore_id, volume_type,  
+                                     vm_resource_id, restored_file_path)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'RestoreNFSVolume.execute')
+    def execute_with_log(self, context, restore_id, volume_type,
+                         vm_resource_id, restored_file_path):
+
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = amqp.RpcContext.from_dict(context)
+        self.volume_service = volume_service = cinder.API()
+        restore_obj = db.restore_get(self.cntx, restore_id)
+        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)        
+        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
+        
+        time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
+        desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+
+        progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
+        LOG.debug(progressmsg)
+        db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
+
+        import pdb;pdb.set_trace()
+        self.restored_volume = volume_service.create(self.cntx, 
+                                                     volume_size,
+                                                     volume_name,
+                                                     desciption, 
+                                                     volume_type = volume_type)
+
+        if not self.restored_volume:
+            raise Exception("Failed to create volume type " + volume_type)
+
+        start_time = timeutils.utcnow()
+        while True:
+            time.sleep(10)
+            self.restored_volume = volume_service.get(self.cntx, self.restored_volume['id'])
+            if self.restored_volume['status'].lower() == 'available' or\
+                self.restored_volume['status'].lower() == 'error':
+                break
+            now = timeutils.utcnow()
+            if (now - start_time) > datetime.timedelta(minutes=4):
+                raise exception.ErrorOccurred(reason='Timeout restoring NFS Volume')               
+
+        if self.restored_volume['status'].lower() == 'error':
+            raise Exception("Failed to create volume type " + volume_type)
+
+        # Call into contego to copy the data from backend to volume
+        # comeback
+        compute_service = nova.API(production=True)
+        vast_params = {'volume_id': self.restored_volume['id'],
+                       'backup_image_file_path': restored_file_path}
+        snapshot_data = compute_service.vast_copy_backup_to_volume(cntx, instance['vm_id'], vast_params)
+
+        statinfo = os.stat(restored_file_path)
+        restore_obj = db.restore_update(self.cntx, 
+                                        restore_obj.id,
+                                        {'uploaded_size_incremental': statinfo.st_size})
+
+        return self.restored_volume['id']
+
+    @autolog.log_method(Logger, 'RestoreNFSVolume.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            self.volume_service.delete(self.cntx, self.restored_volume)
+        except:
+            pass
+
 class RestoreInstanceFromVolume(task.Task):
     """
        Restore instance from cinder volume
@@ -886,7 +984,11 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
             continue
 
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type').lower()
+            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+            if volume_type:
+                volume_type = volume_type.lower()
+            else:
+                volume_type='default'
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id').lower()
   
             volume_type = get_new_volume_type(instance_options, volume_id, volume_type)
