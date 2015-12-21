@@ -865,7 +865,7 @@ def restore_vm_networks(cntx, db, restore):
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'nic':
                 src_network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
-                                                         'network_type')
+                                                         'network_type')              
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
                 if dst_network_type != 'neutron':
@@ -921,6 +921,10 @@ def restore_vm_networks(cntx, db, restore):
                             new_router = restored_net_resources[pit_id]
                         else:
                             raise Exception("Could not find the network that matches the restore options")
+
+                restored_net_resources[nic_data['mac_address']]['production'] = False
+                if restored_net_resources[nic_data['mac_address']]['ip_address'] == nic_data['ip_address']:
+                   restored_net_resources[nic_data['mac_address']]['production'] = True
 
     return restored_net_resources
 

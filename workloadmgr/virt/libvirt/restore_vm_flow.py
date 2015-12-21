@@ -1004,7 +1004,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 store['volume_type_'+snapshot_vm_resource.id] = new_volume_type
             else:
                 store['volume_type_'+snapshot_vm_resource.id] = None
-       
+
+        if snapshot_vm_resource.resource_type == 'nic':
+           vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
+           nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
+           mac_address = nic_data['mac_address']
 
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
@@ -1043,10 +1047,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         compute_service = nova.API(production = (not test))
         restored_instance = compute_service.get_server_by_id(cntx,
                                          restored_instance_id, admin=True)
-
+        
         restored_vm_values = {'vm_id': restored_instance_id,
                               'vm_name':  restored_instance.name,    
                               'restore_id': restore['id'],
+                              'metadata' : {'production' : restored_net_resources[mac_address]['production'], 'instance_id': instance['vm_id']},
                               'status': 'available'}
         restored_vm = db.restored_vm_create(cntx, restored_vm_values)    
         

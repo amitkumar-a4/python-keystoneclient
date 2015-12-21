@@ -757,7 +757,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'restore': dict(restore.iteritems()),   # restore dictionary
                 'target_platform': target_platform,                
             }
-
             workflow_class = get_workflow_class(context, workload.workload_type_id, True)
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
@@ -773,19 +772,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                    if instance == None:
                       pass 
                    else:
-                        self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
-                        values = {'workload_id': workload.id,
-                                 'vm_id': restored_vm.vm_id,
-                                 'metadata': instance.metadata,
-                                 'vm_name': instance.name,
-                                 'status': 'available'}
-                        vm = self.db.workload_vms_create(context, values)
+                        production = bool(self.db.get_metadata_value(restored_vm.metadata, 'production', True))
+                        instance_id = self.db.get_metadata_value(restored_vm.metadata, 'instance_id', None)
+                        if production == True:
+                           self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
+                           values = {'workload_id': workload.id,
+                                     'vm_id': restored_vm.vm_id,
+                                     'metadata': instance.metadata,
+                                     'vm_name': instance.name,
+                                     'status': 'available'}
+                           vm = self.db.workload_vms_create(context, values)
+                           if instance_id is not None:
+                              self.db.workload_vms_delete(context, instance_id, workload.id)
 
                    restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                    restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
                # Delete old VMs
-               for vm in workload_vms:
-                   self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+               #for vm in workload_vms:
+                #   self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
 
             if restore_type == 'test':
                 self.db.restore_update( context,
