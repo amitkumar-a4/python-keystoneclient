@@ -20,6 +20,8 @@ from taskflow.patterns import unordered_flow as uf
 from taskflow.patterns import linear_flow as lf
 from taskflow.utils import reflection
 
+from novaclient.exceptions import Unauthorized as nova_unauthorized
+
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.virt import driver
