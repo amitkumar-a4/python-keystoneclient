@@ -963,6 +963,27 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception
 
     @synchronized(novalock)
+    def copy_backup_image_to_volume(self, context, server, params):
+        """
+        Transfer the backup image to volume
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        try:
+            extensions = _discover_extensions('1.1')
+            client =  novaclient(context, self._production, extensions=extensions)
+            return client.contego.copy_backup_image_to_volume(server=server,
+                                            params=params, do_checksum=True)
+        except nova_exception.Unauthorized as unauth_ex:
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
+            return client.contego.copy_backup_image_to_volume(server=server,
+                                            params=params, do_checksum=True)
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = 'Unable to copy backup image to volume; Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
+            #TODO(gbasava): Handle the exception
+
+    @synchronized(novalock)
     def vast_async_task_status(self, context, server, params):
         """
         Get data transfer status of VASTed instance component
