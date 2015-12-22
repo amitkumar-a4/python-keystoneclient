@@ -87,14 +87,16 @@ def is_supported_backend(volume_type):
 
     supported_backends = CONF.workloadmgr_supported_backends
     if volume_type:
-        return volume_type.lower() in (supported_backends.split(","))
+        volume_type = volume_type.lower()
+        return any(x in volume_type for x in supported_backends.split(","))
     else:
         return False
 
 def contego_based_volume_copy(volume_type):
     contego_volume_copy = CONF.contego_volume_copy_backend
     if volume_type:
-        return volume_type.lower() in (contego_volume_copy.split(","))
+        volume_type = volume_type.lower()
+        return any(x in volume_type for x in contego_volume_copy.split(","))
     else:
         return False
 
@@ -946,7 +948,7 @@ class CopyBackupImageToVolume(task.Task):
                          restored_file_path, progress_tracking_file_path):
  
         # if the volume type is not SAN volume type, return success
-        if not any(x in volume_type for x in CONF.contego_volume_copy_backend):
+        if not contego_based_volume_copy(volume_type):
             return
 
         # Call into contego to copy the data from backend to volume
@@ -1254,8 +1256,6 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restoreid):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if snapshot_vm_resource.resource_name == 'vda':
-            continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
                                   rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
@@ -1347,7 +1347,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
 
-    childflow = LinearPrepareBackupImages(cntx, instance, instance_options, snapshot_obj, restore['id'])
+    childflow = LinearPrepareBackupImages(cntx, instance, instance_options,
+                                          snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 
