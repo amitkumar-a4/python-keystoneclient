@@ -966,6 +966,7 @@ class CopyBackupImageToVolume(task.Task):
         compute_service.copy_backup_image_to_volume(cntx, restored_instance_id, vast_params)
 
         statinfo = os.stat(restored_file_path)
+        prev_copied_size_incremental = 0
         while True:
             try:
                 time.sleep(10)
@@ -1009,7 +1010,9 @@ class CopyBackupImageToVolume(task.Task):
                 copied_size_incremental = int(float(percentage) * \
                                                    statinfo.st_size/100)
                 restore_obj = db.restore_update(cntx, restore_id,
-                                           {'uploaded_size_incremental': copied_size_incremental})
+                                           {'uploaded_size_incremental': copied_size_incremental - \
+                                                                   prev_copied_size_incremental})
+                prev_copied_size_incremental = copied_size_incremental
                 if data_transfer_completed:
                     break;
             except nova_unauthorized as ex:
