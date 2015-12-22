@@ -1007,7 +1007,7 @@ class CopyBackupImageToVolume(task.Task):
                             break;
 
                 copied_size_incremental = int(float(percentage) * \
-                                                   statinfo.st_size)
+                                                   statinfo.st_size/100)
                 restore_obj = db.restore_update(cntx, restore_id,
                                            {'uploaded_size_incremental': copied_size_incremental})
                 if data_transfer_completed:
