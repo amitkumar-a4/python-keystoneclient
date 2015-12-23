@@ -865,6 +865,7 @@ def restore_vm_networks(cntx, db, restore):
         snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, snapshot_vm.vm_id, restore['snapshot_id'])        
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'nic':
+
                 src_network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
                                                          'network_type')              
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
@@ -876,12 +877,20 @@ def restore_vm_networks(cntx, db, restore):
                     if nic_options and 'new_network_id' in nic_options:
                         nic_data['network_id'] = nic_options['new_network_id']
                     restored_net_resources.setdefault(nic_data['mac_address'], nic_data)
+                    restored_net_resources[nic_data['mac_address']]['production'] = False
+                    if restored_net_resources[nic_data['mac_address']]['ip_address'] == nic_data['ip_address']:
+                        restored_net_resources[nic_data['mac_address']]['production'] = True
                 else:
                     new_port = _get_nic_port_from_restore_options(restore_options, nic_data,
                                                                snapshot_vm.vm_id,
                                                                nic_data['mac_address'])
                     if new_port:
                         restored_net_resources.setdefault(nic_data['mac_address'], new_port)
+                        restored_net_resources[nic_data['mac_address']]['production'] = False
+                        if restored_net_resources[nic_data['mac_address']]['fixed_ips'][0]['ip_address'] == \
+                           nic_data['ip_address']:
+                            restored_net_resources[nic_data['mac_address']]['production'] = True
+
                         continue
                     #private network
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
@@ -923,9 +932,6 @@ def restore_vm_networks(cntx, db, restore):
                         else:
                             raise Exception("Could not find the network that matches the restore options")
 
-                restored_net_resources[nic_data['mac_address']]['production'] = False
-                if restored_net_resources[nic_data['mac_address']]['ip_address'] == nic_data['ip_address']:
-                   restored_net_resources[nic_data['mac_address']]['production'] = True
 
     return restored_net_resources
 
