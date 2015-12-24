@@ -1434,132 +1434,12 @@ class VMwareVCDriver(VMwareESXDriver):
        
     @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot): 
-        
-        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._snapshot_disks_deleted')    
-        def _snapshot_disks_deleted(snap):
-            try:
-                all_disks_deleted = True
-                some_disks_deleted = False
-                snapshot_vm_resources = db.snapshot_resources_get(cntx, snap.id)
-                for snapshot_vm_resource in snapshot_vm_resources:
-                    if snapshot_vm_resource.resource_type != 'disk':
-                        continue
-                    if snapshot_vm_resource.status != 'deleted':
-                        all_disks_deleted = False
-                    else:
-                        some_disks_deleted = True
-                return all_disks_deleted, some_disks_deleted 
-            except exception.SnapshotVMResourcesNotFound as ex:
-                LOG.exception(ex)
-                return False,True
-        
-        @autolog.log_method(Logger, 'VMwareVCDriver.apply_retention_policy._delete_deleted_snap_chains')    
-        def _delete_deleted_snap_chains(cntx, snapshot):
-            try:
-                snapshot_obj = db.snapshot_type_time_size_update(cntx, snapshot['id'])
-                workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)            
-                snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
-                
-                snap_chains = []
-                snap_chain = []
-                snap_chains.append(snap_chain)
-                for snap in reversed(snapshots_all):
-                    if snap.snapshot_type == 'full':
-                        snap_chain = []
-                        snap_chains.append(snap_chain)
-                    snap_chain.append(snap)
-                        
-                deleted_snap_chains = []        
-                for snap_chain in snap_chains:
-                    deleted_chain = True
-                    for snap in snap_chain:
-                        if snap.status != 'deleted':
-                            deleted_chain = False
-                            break
-                    if deleted_chain == True:
-                        deleted_snap_chains.append(snap_chain)
-                
-                for snap_chain in deleted_snap_chains:
-                    for snap in snap_chain:
-                        if snap.deleted == True and snap.data_deleted == False:
-                            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
-                                                                                                    snap.id,
-                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
-                                                                                                    workload_obj.display_name ))
-                            db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
-            except Exception as ex:
-                LOG.exception(ex)
-                
         try:
-            db.snapshot_update(cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
-            _delete_deleted_snap_chains(cntx, snapshot)
-            affected_snapshots = []             
-            snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
-            workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
-            snapshots_to_keep = pickle.loads(str(workload_obj.jobschedule))['snapshots_to_keep']
-            snapshots_to_keep['number'] = int(snapshots_to_keep['number'])
-            snapshots_to_keep['days'] = int(snapshots_to_keep['days'])            
-            #must retain at least one snapshot
-            if snapshots_to_keep['number'] == 0:
-                snapshots_to_keep['number'] = '1'
-            #must retain at least one day snapshots
-            if snapshots_to_keep['days'] <= 0:
-                snapshots_to_keep['days'] = 1
-            
-            snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
-            snapshots_valid = []
-            snapshots_valid.append(snapshot_obj)
-            for snap in snapshots_all:
-                if snapshots_valid[0].id == snap.id:
-                    continue
-                if snap.status == 'available':
-                    snapshots_valid.append(snap)
-                elif snap.status == 'deleted' and snap.data_deleted == False:
-                    snapshots_valid.append(snap)
- 
-            snapshot_to_commit = None
-            snapshots_to_delete = set()
-            retained_snap_count = 0
-            for idx, snap in enumerate(snapshots_valid):
-                if snapshots_to_keep['number'] == -1:
-                    if (timeutils.utcnow() - snap.created_at).days <  snapshots_to_keep['days']:    
-                        retained_snap_count = retained_snap_count + 1
-                    else:
-                        if snapshot_to_commit == None:
-                            snapshot_to_commit = snapshots_valid[idx-1]
-                        snapshots_to_delete.add(snap)    
-                else:
-                    if retained_snap_count < snapshots_to_keep['number']:
-                        if snap.status == 'deleted':
-                            continue                            
-                        else:
-                            retained_snap_count = retained_snap_count + 1
-                    else:
-                        if snapshot_to_commit == None:
-                            snapshot_to_commit = snapshots_valid[idx-1]
-                        snapshots_to_delete.add(snap)
-            
-            if vault.commit_supported() == False:
-                workload_utils.delete_if_chain(cntx, snapshot, snapshots_to_delete)
-                #nothing more to do.
-                return
-               
+            (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj) = workload_utils.common_apply_retention_policy(cntx, instances, snapshot)              
             #if commited snapshot is full delete all snapshots below it             
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
                 for snap in snapshots_to_delete:
-                    db.snapshot_delete(cntx, snap.id)
-                    if snap.data_deleted == False:
-                        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                        try:
-                            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
-                                                                                                    snap.id,
-                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
-                                                                                                    workload_obj.display_name ))                            
-                            
-                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
-                        except Exception as ex:
-                            LOG.exception(ex)
+                    workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
                                 
             elif snapshot_to_commit:
                 vix_disk_lib_env = os.environ.copy()
@@ -1569,18 +1449,8 @@ class VMwareVCDriver(VMwareESXDriver):
                     affected_snapshots.append(snap.id)
                     snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id, read_deleted='yes')
                     if snapshot_to_commit.snapshot_type == 'full':
-                        db.snapshot_delete(cntx, snap.id)
-                        if snap.data_deleted == False:
-                            db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                            try:
-                                LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
-                                                                                                        snap.id,
-                                                                                                        snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
-                                                                                                        workload_obj.display_name ))                            
-                                vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
-                            except Exception as ex:
-                                LOG.exception(ex)    
-                        continue
+                       workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
+                       continue
                     
                     snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot_to_commit.id)
                     for snapshot_vm_resource in snapshot_vm_resources:
@@ -1639,23 +1509,7 @@ class VMwareVCDriver(VMwareESXDriver):
 
                             self.repair_vm_disk_resource_snap(cntx, db, snapshot_vm_resource, snapshot)    
                            
-                            
-                    db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
-    
-                    all_disks_deleted, some_disks_deleted = _snapshot_disks_deleted(snap)
-                    if some_disks_deleted:
-                        db.snapshot_delete(cntx, snap.id)
-                    if all_disks_deleted: 
-                        db.snapshot_delete(cntx, snap.id)
-                        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                        try:
-                            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
-                                                                                                    snap.id,
-                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
-                                                                                                    workload_obj.display_name ))                            
-                            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
-                        except Exception as ex:
-                            LOG.exception(ex)
+                    workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap)                    
                         
             # Upload snapshot metadata to the vault
             for snapshot_id in affected_snapshots:

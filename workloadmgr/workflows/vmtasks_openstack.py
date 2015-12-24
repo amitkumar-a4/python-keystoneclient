@@ -52,7 +52,12 @@ def _get_pit_resource(snapshot_vm_common_resources, pit_id):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.apply_retention_policy')
 def apply_retention_policy(cntx, db, instances, snapshot):
-    pass
+    if instances[0]['hypervisor_type'] == 'QEMU':
+        virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        virtdriver.apply_retention_policy(cntx, db, instances, snapshot)
+    else:
+        virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
+        virtdriver.apply_retention_policy(cntx, db, instances, snapshot)
              
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
