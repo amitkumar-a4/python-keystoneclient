@@ -962,9 +962,13 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot): 
         try:
-            compute_service = nova.API(production=True)
-            (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj) = workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
+            (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
            
+            if swift == 0:
+               return
+
+            compute_service = nova.API(production=True)
+
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':               
                 for snap in snapshots_to_delete:
                     workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)            
@@ -1041,22 +1045,8 @@ class LibvirtDriver(driver.ComputeDriver):
                            # End of block commit
                            os.remove(vm_disk_resource_snap.vault_path)
                            shutil.move(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap.vault_path)
-                           vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
-                                                            'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
-                                                            }
-                           db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
-                            
-                           snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                           snapshot_vm_resource_values = {'size' : snapshot_vm_resource_backing.size, 
-                                                           'snapshot_type' : snapshot_vm_resource_backing.snapshot_type,
-                                                           'time_taken': snapshot_vm_resource_backing.time_taken}
-                            
-                           db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, snapshot_vm_resource_values)
-                           db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_backing.id)
-                           db.snapshot_vm_resource_delete(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                           snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-                           if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
-                              affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
+
+                           affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing)
 
                     workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap)
 
