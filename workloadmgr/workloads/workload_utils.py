@@ -478,5 +478,4 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk
     if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
        affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
 
-
     return affected_snapshots
