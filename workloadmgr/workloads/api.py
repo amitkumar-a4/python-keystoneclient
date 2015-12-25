@@ -500,21 +500,31 @@ class API(base.Base):
         if 'jobschedule' in workload and workload['jobschedule']:
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
         if  'instances' in workload and workload['instances']:
-            for vm in self.db.workload_vms_get(context, workload_id):
-                self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
             #TODO(giri): optimize this lookup
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context,admin=True)               
             instances = workload['instances']
             for instance in instances:
+                if not isinstance(instance, dict) or\
+                   not 'instance-id' in instance:
+
+                    msg = _("Workload definition key 'instances' must be a dictionary "
+                            "with 'instance-id' key")
+                    raise wlm_exceptions.InvalidState(reason=msg)
+        
                 for instance_with_name in instances_with_name:
                     if instance['instance-id'] == instance_with_name.id:
                         instance['instance-name'] = instance_with_name.name  
                         instance['metadata'] = instance_with_name.metadata
+
+            for vm in self.db.workload_vms_get(context, workload_id):
+                self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
+
             for instance in instances:
                 values = {'workload_id': workload_id,
                           'vm_id': instance['instance-id'],
                           'metadata': instance['metadata'],
+                          'status': 'available',
                           'vm_name': instance['instance-name']}
                 vm = self.db.workload_vms_create(context, values)                                       
 
