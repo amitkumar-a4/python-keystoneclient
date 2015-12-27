@@ -489,36 +489,58 @@ class API(base.Base):
         """
         workloadobj = self.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload \'' + workloadobj['display_name'] + '\' Modify Requested', None)
-        
+   
         purge_metadata = False
         options = {}
+
         if 'name' in workload and workload['name']:
             options['display_name'] = workload['name']
+
         if 'description' in workload and workload['description']:
             options['display_description'] = workload['description']  
-        #if 'workload_type_id' in workload:
-        #    options['workload_type_id'] = workload['workload_type_id']                
+
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']     
+
         if 'jobschedule' in workload and workload['jobschedule']:
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
+
         if  'instances' in workload and workload['instances']:
+
+            compute_service = nova.API(production=True)
+            instances = workload['instances']
+            instances_with_name = compute_service.get_servers(context)
+            for instance in instances:
+                if not isinstance(instance, dict) or\
+                   not 'instance-id' in instance:
+
+                    msg = _("Workload definition key 'instances' must be a dictionary "
+                            "with 'instance-id' key")
+                    raise wlm_exceptions.Invalid(reason=msg)
+        
+                found = False
+                for existing_instance in instances_with_name:
+                    if existing_instance.id == instance['instance-id']:
+                        instance['instance-name'] = existing_instance.name  
+                        instance['metadata'] = existing_instance.metadata
+                        found = True
+                        break
+
+                if not found:
+                    msg = _("Workload definition contains instance id that cannot be "
+                            "found in the cloud")
+                    raise wlm_exceptions.Invalid(reason=msg)
+
+
             for vm in self.db.workload_vms_get(context, workload_id):
                 self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
-            #TODO(giri): optimize this lookup
-            compute_service = nova.API(production=True)
-            instances_with_name = compute_service.get_servers(context,admin=True)               
-            instances = workload['instances']
-            for instance in instances:
-                for instance_with_name in instances_with_name:
-                    if instance['instance-id'] == instance_with_name.id:
-                        instance['instance-name'] = instance_with_name.name  
-                        instance['metadata'] = instance_with_name.metadata
+
             for instance in instances:
                 values = {'workload_id': workload_id,
                           'vm_id': instance['instance-id'],
                           'metadata': instance['metadata'],
+                          'status': 'available',
                           'vm_name': instance['instance-name']}
                 vm = self.db.workload_vms_create(context, values)                                       
 
