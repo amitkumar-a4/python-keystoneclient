@@ -656,14 +656,22 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                             nic_info['v4-fixed-ip'] = str(ip)
                             break
             else:
-                if nic_data['mac_address'] in restored_net_resources and 'id' in restored_net_resources:
-                    nic_info.setdefault('port-id', restored_net_resources[nic_data['mac_address']]['id'])
+                if nic_data['mac_address'] in restored_net_resources and \
+                   'id' in restored_net_resources[nic_data['mac_address']]:
+                    nic_info.setdefault('port-id',
+                           restored_net_resources[nic_data['mac_address']]['id'])
+                    network_id = restored_net_resources[nic_data['mac_address']]['network_id']
+                    'network-id' in nic_info and nic_info.pop('network-id')
+                    'v4-fixed-ip' in nic_info and nic_info.pop('v4-fixed-ip')
+                    nic_info.setdefault('network-id', network_id)
+                    nic_info.setdefault('v4-fixed-ip',
+                           restored_net_resources[nic_data['mac_address']]['fixed_ips'][0]['ip_address'])
                 else:
                     #private network
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
                     try:
                         new_network = restored_net_resources[pit_id]
-                        nic_info.setdefault('net-id', new_network['id']) 
+                        nic_info.setdefault('network-id', new_network['id']) 
                     except:
                            pass
 
@@ -764,7 +772,6 @@ def restore_vm_networks(cntx, db, restore):
                                            'metadata': {},
                                            'status': 'available'}
             restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)              
-            network_service.delete_port(cntx, new_port['id'])
             return new_port
 
         networks_mapping = []
