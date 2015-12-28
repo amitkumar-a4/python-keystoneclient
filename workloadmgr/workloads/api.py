@@ -266,7 +266,7 @@ class API(base.Base):
                                           'full': {'snap_count': 0, 'usage': 0}, 
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                           }
-        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes', project_only='yes'):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
@@ -307,7 +307,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_show(self, context, workload_id):
-        workload = self.db.workload_get(context, workload_id)
+        workload = self.db.workload_get(context, workload_id, project_only='yes')
         workload_dict = dict(workload.iteritems())
 
         workload_dict['storage_usage'] = {'usage': 0, 
@@ -315,7 +315,11 @@ class API(base.Base):
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                          }
        
-        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes', project_only='yes'):
+            if workload_snapshot is None:
+               msg = _("Not found any snapshots or operation not allowed")
+               wlm_exceptions.ErrorOccurred(reason=msg)
+
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
@@ -485,36 +489,58 @@ class API(base.Base):
         """
         workloadobj = self.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload \'' + workloadobj['display_name'] + '\' Modify Requested', None)
-        
+   
         purge_metadata = False
         options = {}
+
         if 'name' in workload and workload['name']:
             options['display_name'] = workload['name']
+
         if 'description' in workload and workload['description']:
             options['display_description'] = workload['description']  
-        #if 'workload_type_id' in workload:
-        #    options['workload_type_id'] = workload['workload_type_id']                
+
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']     
+
         if 'jobschedule' in workload and workload['jobschedule']:
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
+
         if  'instances' in workload and workload['instances']:
+
+            compute_service = nova.API(production=True)
+            instances = workload['instances']
+            instances_with_name = compute_service.get_servers(context)
+            for instance in instances:
+                if not isinstance(instance, dict) or\
+                   not 'instance-id' in instance:
+
+                    msg = _("Workload definition key 'instances' must be a dictionary "
+                            "with 'instance-id' key")
+                    raise wlm_exceptions.Invalid(reason=msg)
+        
+                found = False
+                for existing_instance in instances_with_name:
+                    if existing_instance.id == instance['instance-id']:
+                        instance['instance-name'] = existing_instance.name  
+                        instance['metadata'] = existing_instance.metadata
+                        found = True
+                        break
+
+                if not found:
+                    msg = _("Workload definition contains instance id that cannot be "
+                            "found in the cloud")
+                    raise wlm_exceptions.Invalid(reason=msg)
+
+
             for vm in self.db.workload_vms_get(context, workload_id):
                 self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
-            #TODO(giri): optimize this lookup
-            compute_service = nova.API(production=True)
-            instances_with_name = compute_service.get_servers(context,admin=True)               
-            instances = workload['instances']
-            for instance in instances:
-                for instance_with_name in instances_with_name:
-                    if instance['instance-id'] == instance_with_name.id:
-                        instance['instance-name'] = instance_with_name.name  
-                        instance['metadata'] = instance_with_name.metadata
+
             for instance in instances:
                 values = {'workload_id': workload_id,
                           'vm_id': instance['instance-id'],
                           'metadata': instance['metadata'],
+                          'status': 'available',
                           'vm_name': instance['instance-name']}
                 vm = self.db.workload_vms_create(context, values)                                       
 
@@ -764,8 +790,8 @@ class API(base.Base):
         total_capacity, total_utilization = vault.get_total_capacity(context)
         storage_usage = {'storage_type':vault.CONF.vault_storage_type,'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}        
         try:
-            for workload in self.db.workload_get_all(context, read_deleted='yes'):
-                for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes'):
+            for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
+                for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes', project_only='yes'):
                     if workload_snapshot.data_deleted == False:
                         if workload_snapshot.snapshot_type == 'incremental':
                             storage_usage['incremental'] = storage_usage['incremental'] + workload_snapshot.size
@@ -782,7 +808,7 @@ class API(base.Base):
         now = timeutils.utcnow()
         time_offset = datetime.now() - datetime.utcnow()
         try:
-            for workload in self.db.workload_get_all(context, read_deleted='yes'):
+            for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
                 if workload.deleted:
                     if now - workload.deleted_at < timedelta(minutes=time_in_minutes):
                         activity_description = 'Workload ' + workload.display_name + ' deleted'
@@ -812,7 +838,7 @@ class API(base.Base):
                     recentactivites.append(recentactivity)
                     continue
             
-            for snapshot in self.db.snapshot_get_all(context, read_deleted='yes'):
+            for snapshot in self.db.snapshot_get_all(context, read_deleted='yes', project_only='yes'):
                 if snapshot.deleted:
                     if now - snapshot.deleted_at < timedelta(minutes=time_in_minutes):
                         workload = self.db.workload_get(context, snapshot.workload_id)
@@ -860,7 +886,7 @@ class API(base.Base):
                     recentactivites.append(recentactivity)
                     continue
 
-            for restore in self.db.restore_get_all(context, read_deleted='yes'):
+            for restore in self.db.restore_get_all(context, read_deleted='yes', project_only='yes'):
                 if restore.deleted:
                     if now - restore.deleted_at < timedelta(minutes=time_in_minutes):
                         snapshot = self.db.snapshot_get(context, restore.snapshot_id)
@@ -1092,7 +1118,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def snapshot_get(self, context, snapshot_id):
-        rv = self.db.snapshot_get(context, snapshot_id)
+        rv = self.db.snapshot_get(context, snapshot_id, project_only='yes')
         snapshot_details  = dict(rv.iteritems())
         snapshot_vms = []
         try:
@@ -1123,7 +1149,11 @@ class API(base.Base):
                 if snapshot_vm_resource.resource_pit_id == pit_id:
                     return snapshot_vm_resource
                          
-        rv = self.db.snapshot_show(context, snapshot_id)
+        rv = self.db.snapshot_show(context, snapshot_id, project_only='yes')
+        if rv is None:
+           msg = _("Not found snapshot or operation not allowed")
+           wlm_exceptions.ErrorOccurred(reason=msg)
+
         snapshot_details  = dict(rv.iteritems())
        
         snapshot_vms = []
@@ -1462,7 +1492,7 @@ class API(base.Base):
         rv = self.db.restore_get(context, restore_id)
         restore_details  = dict(rv.iteritems())
         
-        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes")
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes", project_only='yes')
         restore_details.setdefault('workload_id', snapshot.workload_id)
         
         restore_details['snapshot_details'] = dict(snapshot.iteritems())
@@ -1490,7 +1520,7 @@ class API(base.Base):
         rv = self.db.restore_show(context, restore_id)
         restore_details  = dict(rv.iteritems())
         
-        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes")
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes", project_only='yes')
         restore_details.setdefault('workload_id', snapshot.workload_id)
         
         restore_details['snapshot_details'] = dict(snapshot.iteritems())

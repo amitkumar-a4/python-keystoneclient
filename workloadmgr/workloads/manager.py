@@ -721,8 +721,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 values['pickle'] = pickle.dumps(options, 0)
 
             restore = self.db.restore_update(context, restore.id, values)
-            
-            if options and target_platform == 'openstack':
+
+            if options and 'oneclickrestore' in options and \
+               options['oneclickrestore'] and target_platform == 'openstack':
                 compute_service = nova.API(production=True)                
                 for vm in self.db.snapshot_vms_get(context, restore.snapshot_id):
                     instance_options = utils.get_instance_restore_options(options, vm.vm_id, target_platform)
@@ -734,9 +735,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             msg = _('Original instance ' +  vm.vm_name + ' is still present. '
                                     'Please delete this instance and try again.')
                             raise wlm_exceptions.InvalidState(reason=msg)
-                                                
-                        
-                        
+
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':
                 self.db.restore_update( context, restore_id, {'size': restore_size})

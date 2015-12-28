@@ -149,8 +149,8 @@ def model_query(context, *args, **kwargs):
     if context:
         if project_only and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
-    
-    
+        elif project_only:
+             query = query.filter_by(project_id=context.project_id)
     if 'get_hidden' in kwargs:     
         if kwargs.get('get_hidden', False) == False:
             query = query.filter_by(hidden=False)
@@ -1009,9 +1009,9 @@ def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwa
                             order_by(models.Snapshots.created_at.desc()).all()
 
 @require_context
-def snapshot_show(context, snapshot_id):
+def snapshot_show(context, snapshot_id, **kwargs):
     session = get_session()
-    result = model_query(context, models.Snapshots, session=session).\
+    result = model_query(context, models.Snapshots, session=session, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(id=snapshot_id).\
                             first()

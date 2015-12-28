@@ -203,9 +203,9 @@ def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwa
     """Get all snapshots belonging to a project and workload"""
     return IMPL.snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs)
     
-def snapshot_show(context, snapshot_id):
+def snapshot_show(context, snapshot_id, **kwargs):
     """Get more details of the  snapshot or raise if it does not exist."""
-    return IMPL.snapshot_show(context, snapshot_id)
+    return IMPL.snapshot_show(context, snapshot_id, **kwargs)
 
 def snapshot_update(context, snapshot_id, values):
     return IMPL.snapshot_update(context, snapshot_id, values)
