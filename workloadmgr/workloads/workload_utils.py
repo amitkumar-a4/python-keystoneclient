@@ -4,6 +4,8 @@ from workloadmgr import settings
 from workloadmgr.vault import vault
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.openstack.common import jsonutils
+from workloadmgr.openstack.common import timeutils
+from workloadmgr import exception
 import cPickle as pickle
 
 LOG = logging.getLogger(__name__)
@@ -403,7 +405,7 @@ def common_apply_retention_policy(cntx, instances, snapshot):
                       snapshots_to_delete.add(snap)
             
         if vault.commit_supported() == False:
-           self.delete_if_chain(cntx, snapshot, snapshots_to_delete)
+           delete_if_chain(cntx, snapshot, snapshots_to_delete)
            return (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, 0)
 
         return (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, 1)
@@ -412,7 +414,7 @@ def common_apply_retention_policy(cntx, instances, snapshot):
            LOG.exception(ex)
            raise ex       
 
-def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap):
+def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj):
     def _snapshot_disks_deleted(snap):
         try:
             all_disks_deleted = True
@@ -460,7 +462,7 @@ def common_apply_retention_snap_delete(cntx, snap, workload_obj):
        except Exception as ex:
               LOG.exception(ex)   
 
-def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing):
+def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing, affected_snapshots):
     vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
                                     'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                    }

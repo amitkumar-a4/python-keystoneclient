@@ -1485,7 +1485,7 @@ class VMwareVCDriver(VMwareESXDriver):
                             os.remove( vm_disk_resource_snap.vault_path + '-ctk')
                             shutil.move(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap.vault_path)
                             shutil.move(vm_disk_resource_snap_backing.vault_path + '-ctk', vm_disk_resource_snap.vault_path + '-ctk')
-                            affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing)
+                            affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing, affected_snapshots)
  
                             try: 
                                 vm_disk_resource_snap_child = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
@@ -1498,7 +1498,7 @@ class VMwareVCDriver(VMwareESXDriver):
 
                             self.repair_vm_disk_resource_snap(cntx, db, snapshot_vm_resource, snapshot)    
                            
-                    workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap)                    
+                    workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)                    
                         
             # Upload snapshot metadata to the vault
             for snapshot_id in affected_snapshots:
