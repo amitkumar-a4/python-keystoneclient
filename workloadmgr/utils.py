@@ -30,6 +30,7 @@ from xml.sax import expatreader
 from xml.sax import saxutils
 import netifaces as ni
 from netifaces import AF_INET, AF_INET6, AF_LINK, AF_PACKET, AF_BRIDGE
+from netifaces import interfaces, ifaddresses, AF_INET
 
 from eventlet import event
 from eventlet.green import subprocess
@@ -1516,7 +1517,10 @@ def get_ip_addresses():
     # we will configure only br-eth0 and eth1 on the appliance
     ip_addresses = []
     try:
-        ip_addresses.append(ni.ifaddresses('br-eth0')[AF_INET][0]['addr'])
+        for ifaceName in interfaces():
+            addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+            if ifaceName in ('eth0', 'eth1'):
+                ip_addresses += addresses
     except Exception as ex:
         pass
     try:

@@ -608,10 +608,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
-        if options['type'] != "vmware":
-            msg= _("Platforms other than VMware are not supported for oneclick restore")
-            LOG.error(msg)
-            raise wlm_exceptions.InvalidState(reason=msg)
+        if options['type'] == "openstack":
+            return options
 
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)

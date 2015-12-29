@@ -779,38 +779,49 @@ def restore_vm_networks(cntx, db, restore):
             'networks' in restore_options['openstack']['networks_mapping']:
             networks_mapping = restore_options['openstack']['networks_mapping']['networks']
 
-        instance_options = utils.get_instance_restore_options(restore_options,
-                                                     instance_id, 'openstack') 
-        port_name = instance_options.get('name','')
-        ip_address = None
-        nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
-        if nic_options:
-            network_id = nic_options['network']['id']
+        oneclickrestore = 'oneclickrestore' in restore_options and \
+                          restore_options['oneclickrestore']
 
-            if 'subnet' in nic_options['network']:
-                subnet_id = nic_options['network']['subnet']['id']
-            else:
-                subnet_id = None
+        # default to original VM network id, subnet id and ip address
+        network_id = snapshot_vm_nic_options['network_id']
+        subnet_id = None
+        if 'subnet_id' in snapshot_vm_nic_options:
+            subnet_id = snapshot_vm_nic_options['subnet_id']
 
-            if 'ip_address' in nic_options:
-                ip_address = nic_options['ip_address']
-        else:
-            network_id = snapshot_vm_nic_options['network_id']
-            subnet_id = None
-            if 'subnet_id' in snapshot_vm_nic_options:
-                subnet_id = snapshot_vm_nic_options['subnet_id']
+        if 'ip_address' in snapshot_vm_nic_options:
+            ip_address = snapshot_vm_nic_options['ip_address']
   
-            for net in networks_mapping:
-                if net['snapshot_network']['id'] == network_id:
-                    if subnet_id:
-                        if net['snapshot_network']['subnet']['id'] == subnet_id:
-                            subnet_id = net['target_network']['subnet']['id']
+        # if this is not one click restore, then get new network id,
+        # subnet id and ip address
+        if not oneclickrestore:
+            ip_address = None
+            instance_options = utils.get_instance_restore_options(restore_options,
+                                                     instance_id, 'openstack') 
+            port_name = instance_options.get('name','')
+            ip_address = None
+            nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
+            if nic_options:
+                network_id = nic_options['network']['id']
+
+                if 'subnet' in nic_options['network']:
+                    subnet_id = nic_options['network']['subnet']['id']
+                else:
+                    subnet_id = None
+
+                if 'ip_address' in nic_options:
+                    ip_address = nic_options['ip_address']
+            else:
+                for net in networks_mapping:
+                    if net['snapshot_network']['id'] == network_id:
+                        if subnet_id:
+                            if net['snapshot_network']['subnet']['id'] == subnet_id:
+                                subnet_id = net['target_network']['subnet']['id']
+                                network_id = net['target_network']['id']
+                                break
+                        else:
                             network_id = net['target_network']['id']
+                            subnet_id = net['target_network']['subnet']['id']
                             break
-                    else:
-                        network_id = net['target_network']['id']
-                        subnet_id = net['target_network']['subnet']['id']
-                        break
 
         # Make sure networks and subnets exists
         try:
@@ -824,6 +835,8 @@ def restore_vm_networks(cntx, db, restore):
             raise Exception("Could not find the subnet that matches the restore options")
 
         ports = network_service.get_ports(cntx, **{'subnet_id':subnet_id})
+
+        # If IP address is set, then choose the port with that ip address
         if ports and ip_address:
             port = _get_port_for_ip(ports, ip_address)
             if port: 
@@ -840,6 +853,7 @@ def restore_vm_networks(cntx, db, restore):
                     LOG.exception(ex)
 
         else:
+            # Choose free IP address
             subnet = network_service.get_subnet(cntx, subnet_id)
             for ip in IPNetwork(subnet['subnet']['cidr']):
                 if ip < IPAddress(subnet['subnet']['allocation_pools'][0]['start']) or \
