@@ -692,9 +692,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
                 if options and 'type' in options:
                     target_platform = options['type']
-
+            
             restore_type = restore.restore_type
-
             if restore_type == 'test':
                 restore = self.db.restore_update(context,
                                                  restore_id,
@@ -716,12 +715,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             values = {'status': 'executing'}
             if options and 'oneclickrestore' in options and options['oneclickrestore']:
+                # Override traget platfrom for clinets not specified on oneclick
+                if workload.source_platform != target_platform:
+                   target_platform = workload.source_platform
                 # Fill the restore options from the snapshot instances metadata
                 options = self._oneclick_restore_options(context, restore, options)
                 values['pickle'] = pickle.dumps(options, 0)
 
             restore = self.db.restore_update(context, restore.id, values)
-
             if options and 'oneclickrestore' in options and \
                options['oneclickrestore'] and target_platform == 'openstack':
                 compute_service = nova.API(production=True)                
