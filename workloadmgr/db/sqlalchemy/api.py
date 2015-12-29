@@ -739,7 +739,23 @@ def workload_vms_get(context, workload_id, **kwargs):
     
     return workload_vms
 
-    
+@require_context
+def workload_vm_get_by_id(context, vm_id, **kwargs):
+    session = kwargs.get('session') or get_session()
+    try:
+        query = model_query(context, models.WorkloadVMs,
+                            session=session, read_deleted="no")\
+                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                       .filter_by(vm_id=vm_id)\
+                       .filter(models.WorkloadVMs.status != None)\
+
+        vm_found = query.all()
+
+    except sa_orm.exc.NoResultFound:
+           raise exception.WorkloadVMsNotFound(vm_id = vm_id)
+
+    return vm_found
+
 @require_context
 def _workload_vm_get(context, id, session):
     try:
