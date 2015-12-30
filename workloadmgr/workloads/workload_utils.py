@@ -4,6 +4,9 @@ from workloadmgr import settings
 from workloadmgr.vault import vault
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.openstack.common import jsonutils
+from workloadmgr.openstack.common import timeutils
+from workloadmgr import exception
+import cPickle as pickle
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -311,4 +314,170 @@ def purge_restore_vm_resource_from_staging_area(context, restore_id, snapshot_id
             snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap.snapshot_vm_resource_id)
         else:
             snapshot_vm_resource = None
+
+def common_apply_retention_policy(cntx, instances, snapshot): 
+        
+    def _delete_deleted_snap_chains(cntx, snapshot):
+        try:
+            snapshot_obj = db.snapshot_type_time_size_update(cntx, snapshot['id'])
+            workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)            
+            snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
+                
+            snap_chains = []
+            snap_chain = []
+            snap_chains.append(snap_chain)
+            for snap in reversed(snapshots_all):
+                if snap.snapshot_type == 'full':
+                   snap_chain = []
+                   snap_chains.append(snap_chain)
+                   snap_chain.append(snap)
+                        
+            deleted_snap_chains = []        
+            for snap_chain in snap_chains:
+                deleted_chain = True
+                for snap in snap_chain:
+                    if snap.status != 'deleted':
+                       deleted_chain = False
+                       break
+                if deleted_chain == True:
+                   deleted_snap_chains.append(snap_chain)
+                
+            for snap_chain in deleted_snap_chains:
+                for snap in snap_chain:
+                    if snap.deleted == True and snap.data_deleted == False:
+                       LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                    snap.id,
+                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                    workload_obj.display_name ))
+                       db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+                       vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+        except Exception as ex:
+                LOG.exception(ex)
+                
+    try:
+        db.snapshot_update(cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
+        _delete_deleted_snap_chains(cntx, snapshot)
+        affected_snapshots = []             
+        snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+        snapshots_to_keep = pickle.loads(str(workload_obj.jobschedule))['snapshots_to_keep']
+        #snapshots_to_keep['number'] = int(snapshots_to_keep['number'])
+        #snapshots_to_keep['days'] = int(snapshots_to_keep['days'])            
+        snapshots_to_keep = {}
+        snapshots_to_keep['number'] = 2
+        snapshots_to_keep['days'] = 1
+        if snapshots_to_keep['number'] == 0:
+           snapshots_to_keep['number'] = '1'
+
+        if snapshots_to_keep['days'] <= 0:
+           snapshots_to_keep['days'] = 1
+        snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
+        snapshots_valid = []
+        snapshots_valid.append(snapshot_obj)
+        for snap in snapshots_all:
+            if snapshots_valid[0].id == snap.id:
+               continue
+            if snap.status == 'available':
+               snapshots_valid.append(snap)
+            elif snap.status == 'deleted' and snap.data_deleted == False:
+                 snapshots_valid.append(snap)
+ 
+        snapshot_to_commit = None
+        snapshots_to_delete = set()
+        retained_snap_count = 0
+        for idx, snap in enumerate(snapshots_valid):
+            if snapshots_to_keep['number'] == -1:
+               if (timeutils.utcnow() - snap.created_at).days <  snapshots_to_keep['days']:    
+                   retained_snap_count = retained_snap_count + 1
+               else:
+                    if snapshot_to_commit == None:
+                       snapshot_to_commit = snapshots_valid[idx-1]
+                    snapshots_to_delete.add(snap)    
+            else:
+                 if retained_snap_count < snapshots_to_keep['number']:
+                    if snap.status == 'deleted':
+                       continue                            
+                    else:
+                         retained_snap_count = retained_snap_count + 1
+                 else:
+                      if snapshot_to_commit == None:
+                         snapshot_to_commit = snapshots_valid[idx-1]
+                      snapshots_to_delete.add(snap)
             
+        if vault.commit_supported() == False:
+           delete_if_chain(cntx, snapshot, snapshots_to_delete)
+           return (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, 0)
+
+        return (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, 1)
+
+    except Exception as ex:
+           LOG.exception(ex)
+           raise ex       
+
+def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj):
+    def _snapshot_disks_deleted(snap):
+        try:
+            all_disks_deleted = True
+            some_disks_deleted = False
+            snapshot_vm_resources = db.snapshot_resources_get(cntx, snap.id)
+            for snapshot_vm_resource in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type != 'disk':
+                   continue
+                if snapshot_vm_resource.status != 'deleted':
+                   all_disks_deleted = False
+                else:
+                     some_disks_deleted = True
+            return all_disks_deleted, some_disks_deleted 
+        except exception.SnapshotVMResourcesNotFound as ex:
+               LOG.exception(ex)
+               return False,True
+
+    db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
+    
+    all_disks_deleted, some_disks_deleted = _snapshot_disks_deleted(snap)
+    if some_disks_deleted:
+       db.snapshot_delete(cntx, snap.id)
+    if all_disks_deleted: 
+       db.snapshot_delete(cntx, snap.id)
+       db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+       try:
+           LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                    snap.id,
+                                                                                                    snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                    workload_obj.display_name ))                            
+           vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+       except Exception as ex:
+              LOG.exception(ex)
+
+def common_apply_retention_snap_delete(cntx, snap, workload_obj):
+    db.snapshot_delete(cntx, snap.id)
+    if snap.data_deleted == False:
+       db.snapshot_update(cntx, snap.id, {'data_deleted':True})
+       try:
+           LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
+                                                                                                        snap.id,
+                                                                                                        snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                                                                                                        workload_obj.display_name ))                            
+           vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+       except Exception as ex:
+              LOG.exception(ex)   
+
+def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing, affected_snapshots):
+    vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
+                                    'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                                   }
+    db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
+                            
+    snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+    snapshot_vm_resource_values = {'size' : snapshot_vm_resource_backing.size, 
+                                   'snapshot_type' : snapshot_vm_resource_backing.snapshot_type,
+                                   'time_taken': snapshot_vm_resource_backing.time_taken}
+                            
+    db.snapshot_vm_resource_update(cntx, snapshot_vm_resource.id, snapshot_vm_resource_values)
+    db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_backing.id)
+    db.snapshot_vm_resource_delete(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+    snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
+    if snapshot_vm_resource_backing.snapshot_id not in affected_snapshots:
+       affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
+
+    return affected_snapshots
