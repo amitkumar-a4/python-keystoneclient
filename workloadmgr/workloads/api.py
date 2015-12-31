@@ -459,7 +459,8 @@ class API(base.Base):
             #                              'end_date': '07/05/2015',
             #                              'interval': '1 hr',
             #                              'start_time': '2:30 PM',
-            #                              'snapshots_to_keep': '2'}
+            #                              'retention_policy_type': 'Number of Snapshots to Keep',
+            #                              'retention_policy_value': '30'}
             try:
                 self.workload_add_scheduler_job(jobschedule, workload)
             except Exception as ex:

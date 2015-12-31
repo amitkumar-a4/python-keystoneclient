@@ -13,7 +13,8 @@ class WorkloadMgrTrigger(object):
         self.end_date = None
         self.interval = timedelta(seconds=3600)
         self.start_time = convert_to_datetime(parse(jobschedule['start_time']))
-        self.snapshots_to_keep = jobschedule['snapshots_to_keep']
+        self.retention_policy_type = jobschedule['retention_policy_type']
+        self.retention_policy_value = jobschedule['retention_policy_value']        
 
         if 'start_date' in jobschedule and jobschedule['start_date'].strip(" ").lower() != "now":
             self.start_date = convert_to_datetime(parse(jobschedule['start_date'] + " " + jobschedule['start_time']))
@@ -68,14 +69,3 @@ class WorkloadMgrTrigger(object):
             self.__class__.__name__, repr(self.interval),
             repr(self.start_date), repr(self.end_date))
 
-"""
-#Unit Tests
-trigger = WorkloadMgrTrigger(u'{"start_date":"Now","end_date":"No End","start_time":"12:00am","interval":"1 hr","snapshots_to_keep":"10"}')
-print trigger
-print trigger.get_next_fire_time(datetime.now())
-print trigger.get_next_fire_time(datetime.now() + timedelta(days=20))
-
-trigger = WorkloadMgrTrigger(u'{"start_date":"06/15/2014","end_date":"No End","start_time":"12:00am","interval":"1 hr","snapshots_to_keep":"10"}')
-print trigger.get_next_fire_time(datetime.now())
-print trigger.get_next_fire_time(datetime.now() + timedelta(days=20))
-"""
