@@ -268,8 +268,10 @@ class WorkloadMgrsController(wsgi.Controller):
             jobdefaults = {'fullbackup_interval': '1',
                            'start_time': '01:12 AM',
                            'interval': u'24hr',
-                           'enabled': u'false', 'snapshots_to_keep': '30',
-                           'start_date': time.strftime("%x")}
+                           'enabled': u'false',
+                           'start_date': time.strftime("%x"),
+                           'retention_policy_type': 'Number of Snapshots to Keep',
+                           'retention_policy_value': '30'}
 
             jobschedule = workload.get('jobschedule', jobdefaults)
             if not jobschedule:
@@ -287,11 +289,16 @@ class WorkloadMgrsController(wsgi.Controller):
             if not 'enabled' in jobschedule:
                 jobschedule['enabled'] = jobdefaults['enabled']
 
-            if not 'snapshots_to_keep' in jobschedule:
-                jobschedule['snapshots_to_keep'] = jobdefaults['snapshots_to_keep']
-
             if not 'start_date' in jobschedule:
                 jobschedule['start_date'] = jobdefaults['start_date']
+                
+            if not 'retention_policy_type' in jobschedule:
+                jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']                  
+                
+            if not 'retention_policy_value' in jobschedule:
+                jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
+                
+                              
 
             instances = workload.get('instances', {})
             if not instances:

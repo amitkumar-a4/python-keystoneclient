@@ -962,10 +962,11 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot): 
         try:
+
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
            
             if swift == 0:
-               return
+                return
 
             compute_service = nova.API(production=True)
 
@@ -978,8 +979,8 @@ class LibvirtDriver(driver.ComputeDriver):
                     affected_snapshots.append(snap.id)
                     snapshot_to_commit = db.snapshot_get(cntx, snapshot_to_commit.id, read_deleted='yes')
                     if snapshot_to_commit.snapshot_type == 'full':
-                       workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
-                       continue
+                        workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
+                        continue
                     
                     snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot_to_commit.id)
                     for snapshot_vm_resource in snapshot_vm_resources:
@@ -988,65 +989,65 @@ class LibvirtDriver(driver.ComputeDriver):
 
                         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(cntx, snapshot_vm_resource.id)
                         if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
-                           vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-                           user_id = cntx.user
-                           project_id = cntx.tenant
-                           cntx = nova._get_tenant_context(user_id, project_id)
-                           snapshot_data_ex = {}
-                           snapshot_data_ex['metadata'] = {'snapshot_id': snapshot_to_commit.id, 'snapshot_vm_id': snapshot_vm_resource.id}
-
-                           # Start block commit snapshots 
-                           """compute_service.vast_finalize(cntx, snapshot_vm_resource.id, snapshot_data_ex)
-                           start_time = timeutils.utcnow()
-                           async_task_completed = False
-                           progress_tracker_metadata = {'snapshot_id': snapshot_to_commit.id, 'resource_id' : snapshot_vm_resource.id}
-                           progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)        
-                           while True:
-                                 try:
-                                     LOG.debug(_('Waiting for the status of VAST finalize for '+ snapshot_vm_resource.id))
-                                     time.sleep(10)
-                                     async_task_status = {}
-                                     if progress_tracking_file_path:
-                                        try:
-                                            with open(progress_tracking_file_path, 'r') as progress_tracking_file:
-                                                 async_task_status['status'] = progress_tracking_file.readlines()
-                                        except Exception as ex:
-                                               async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                                   snapshot_vm_resource.id,
-                                                                                   {'metadata': progress_tracker_metadata})                                  
-                                              
-                                     else:
-                                          async_task_status = compute_service.vast_async_task_status(cntx, snapshot_vm_resource.id,
-                                                                               {'metadata': progress_tracker_metadata})
-                                     if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
-                                        for line in async_task_status['status']:
-                                            if 'Error' in line:
-                                               pass
-                                               #raise Exception("Finalizing the snapshot failed - " + line)
-                                            if 'Completed' in line:
-                                               async_task_completed = True
-                                               break;
-
-                                     if async_task_completed:
-                                        break;
-                                 except nova_unauthorized as ex:
-                                        LOG.exception(ex)
-                                        user_id = cntx.user
-                                        project_id = cntx.tenant
-                                        cntx = nova._get_tenant_context(user_id, project_id)
-                                 except Exception as ex:
-                                        LOG.exception(ex)
-                                        pass
-                                 now = timeutils.utcnow()
-                                 #if (now - start_time) > datetime.timedelta(minutes=10*60):
-                                    #raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')
-                           LOG.debug(_('VAST finalize completed for '+ snapshot_vm_resource.id))
-                           """
-                           # End of block commit
-                           os.remove(vm_disk_resource_snap.vault_path)
-                           shutil.move(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap.vault_path)
-
-                           affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing, affected_snapshots)
+                            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                            user_id = cntx.user
+                            project_id = cntx.tenant
+                            cntx = nova._get_tenant_context(user_id, project_id)
+                            snapshot_data_ex = {}
+                            snapshot_data_ex['metadata'] = {'snapshot_id': snapshot_to_commit.id, 'snapshot_vm_id': snapshot_vm_resource.id}
+                            
+                            # Start block commit snapshots 
+                            """compute_service.vast_finalize(cntx, snapshot_vm_resource.id, snapshot_data_ex)
+                            start_time = timeutils.utcnow()
+                            async_task_completed = False
+                            progress_tracker_metadata = {'snapshot_id': snapshot_to_commit.id, 'resource_id' : snapshot_vm_resource.id}
+                            progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)        
+                            while True:
+                                  try:
+                                      LOG.debug(_('Waiting for the status of VAST finalize for '+ snapshot_vm_resource.id))
+                                      time.sleep(10)
+                                      async_task_status = {}
+                                      if progress_tracking_file_path:
+                                         try:
+                                             with open(progress_tracking_file_path, 'r') as progress_tracking_file:
+                                                  async_task_status['status'] = progress_tracking_file.readlines()
+                                         except Exception as ex:
+                                                async_task_status = compute_service.vast_async_task_status(cntx, 
+                                                                                    snapshot_vm_resource.id,
+                                                                                    {'metadata': progress_tracker_metadata})                                  
+                                               
+                                      else:
+                                           async_task_status = compute_service.vast_async_task_status(cntx, snapshot_vm_resource.id,
+                                                                                {'metadata': progress_tracker_metadata})
+                                      if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
+                                         for line in async_task_status['status']:
+                                             if 'Error' in line:
+                                                pass
+                                                #raise Exception("Finalizing the snapshot failed - " + line)
+                                             if 'Completed' in line:
+                                                async_task_completed = True
+                                                break;
+                            
+                                      if async_task_completed:
+                                         break;
+                                  except nova_unauthorized as ex:
+                                         LOG.exception(ex)
+                                         user_id = cntx.user
+                                         project_id = cntx.tenant
+                                         cntx = nova._get_tenant_context(user_id, project_id)
+                                  except Exception as ex:
+                                         LOG.exception(ex)
+                                         pass
+                                  now = timeutils.utcnow()
+                                  #if (now - start_time) > datetime.timedelta(minutes=10*60):
+                                     #raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')
+                            LOG.debug(_('VAST finalize completed for '+ snapshot_vm_resource.id))
+                            """
+                            # End of block commit
+                            os.remove(vm_disk_resource_snap.vault_path)
+                            shutil.move(vm_disk_resource_snap_backing.vault_path, vm_disk_resource_snap.vault_path)
+                            
+                            affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing, affected_snapshots)
 
                     workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
 
