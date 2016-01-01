@@ -95,6 +95,9 @@ def _snapshot_create_callback(*args, **kwargs):
     jobscheduler = workload['jobschedule']
 
     snapshot_type = "incremental"
+    jobscheduler['fullbackup_interval'] = \
+                   'fullbackup_interval' in jobscheduler and \
+                   jobscheduler['fullbackup_interval'] or "-1"
     if int(jobscheduler['fullbackup_interval']) > 0:
         # check full backup policy here
         num_of_incr_in_current_chain = 0
