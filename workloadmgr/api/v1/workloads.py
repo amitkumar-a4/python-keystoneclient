@@ -268,8 +268,9 @@ class WorkloadMgrsController(wsgi.Controller):
             jobdefaults = {'fullbackup_interval': '-1',
                            'start_time': '09:00 PM',
                            'interval': u'24hr',
-                           'enabled': u'false',
+                           'enabled': u'true',
                            'start_date': time.strftime("%x"),
+                           'end_date': "No End",
                            'retention_policy_type': 'Number of Snapshots to Keep',
                            'retention_policy_value': '30'}
 
@@ -351,10 +352,11 @@ class WorkloadMgrsController(wsgi.Controller):
                     raise exc.HTTPBadRequest(explanation=msg)
 
                 jobdefaults = {'fullbackup_interval': '-1',
-                               'start_time': '09:00 AM',
+                               'start_time': '09:00 PM',
                                'interval': u'24hr',
-                               'enabled': u'false',
+                               'enabled': u'true',
                                'start_date': time.strftime("%x"),
+                               'end_date': "No End",
                                'retention_policy_type': 'Number of Snapshots to Keep',
                                'retention_policy_value': '30'}
 
