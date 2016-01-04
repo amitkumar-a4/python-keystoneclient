@@ -1511,6 +1511,9 @@ def configure_form_openstack():
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
+    timezone = get_localzone().zone
+    config_data['timezones'] = all_timezones
+    config_data['timezone'] = timezone
     config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_data
 
@@ -1527,7 +1530,8 @@ def task_status_vmware():
 @authorize()
 def task_status():
     bottle.request.environ['beaker.session']['error_message'] = ''
-    return {}
+    config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
+    return config_data
 
 @bottle.route('/configure_host')
 @authorize()
@@ -2086,7 +2090,6 @@ def ntp_setup():
         conf_file = open('/etc/ntp.conf', 'w')
         conf_file.write(new_contents)
         conf_file.close()
-    
         timezone_file = open('/etc/timezone', 'w')
         timezone_file.write(config_data['timezone']+"\n")
         timezone_file.close()
@@ -2298,6 +2301,14 @@ def configure_openstack():
         
         config_data['workloadmgr_user'] = 'triliovault'
         config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD
+
+        if 'ntp-enabled' in config_inputs:
+            config_data['ntp_enabled'] = config_inputs['ntp-enabled']
+        else:
+            config_data['ntp_enabled'] = 'off'
+        
+        config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
+        config_data['timezone'] = config_inputs['timezone']
 
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']

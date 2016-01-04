@@ -140,7 +140,7 @@ def get_progress_tracker_directory(tracker_metadata):
         return None
            
     fileutils.ensure_tree(progress_tracker_directory)
-    utils.chmod(progress_tracker_directory, '0766')
+    utils.chmod(progress_tracker_directory, '0777')
     return progress_tracker_directory
 
 def get_progress_tracker_path(tracker_metadata):
