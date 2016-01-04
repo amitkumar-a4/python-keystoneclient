@@ -95,6 +95,9 @@ def _snapshot_create_callback(*args, **kwargs):
     jobscheduler = workload['jobschedule']
 
     snapshot_type = "incremental"
+    jobscheduler['fullbackup_interval'] = \
+                   'fullbackup_interval' in jobscheduler and \
+                   jobscheduler['fullbackup_interval'] or "-1"
     if int(jobscheduler['fullbackup_interval']) > 0:
         # check full backup policy here
         num_of_incr_in_current_chain = 0
@@ -396,13 +399,25 @@ class API(base.Base):
             #TODO(giri): optimize this lookup
             for instance in instances:
                 for instance_with_name in instances_with_name:
+                    if instance_with_name.tenant_id != context.project_id:
+                        msg = _('Invalid instance as '+instance_with_name.name+' is not associated with your current tenant')
+                        raise wlm_exceptions.Invalid(reason=msg)
                     if instance['instance-id'] == instance_with_name.id:
+                        vm_found = self.db.workload_vm_get_by_id(context, instance_with_name.id)
+                        if isinstance(vm_found, list):
+                            if len(vm_found) > 0:
+                               msg = _('Invalid instance as '+instance_with_name.name+' already attached with other workload')
+                               raise wlm_exceptions.Invalid(reason=msg)
+                        else:
+                              msg = _('Error processing instance'+instance_with_name.name)
+                              raise wlm_exceptions.Invalid(reason=msg)
                         instance['instance-name'] = instance_with_name.name
                         if instance_with_name.metadata:
                             instance['metadata'] = instance_with_name.metadata
                             if 'imported_from_vcenter' in instance_with_name.metadata and \
                                 instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
                                 source_platform = "vmware"
+                        break
         
             workload_type_id_valid = False
             workload_types = self.workload_type_get_all(context)            
@@ -522,7 +537,19 @@ class API(base.Base):
         
                 found = False
                 for existing_instance in instances_with_name:
-                    if existing_instance.id == instance['instance-id']:
+                    if existing_instance.tenant_id != context.project_id:
+                        msg = _('Invalid instance as '+existing_instance.name+' is not associated with your current tenant')
+                        raise wlm_exceptions.Invalid(reason=msg)
+                    if instance['instance-id'] == existing_instance.id:
+                        vm_found = self.db.workload_vm_get_by_id(context, existing_instance.id)
+                        if isinstance(vm_found, list):
+                            if len(vm_found) > 0:
+                               msg = _('Invalid instance as '+existing_instance.name+' already attached with other workload')
+                               raise wlm_exceptions.Invalid(reason=msg)
+                        else:
+                              msg = _('Error processing instance'+existing_instance.name)
+                              raise wlm_exceptions.Invalid(reason=msg)
+
                         instance['instance-name'] = existing_instance.name  
                         instance['metadata'] = existing_instance.metadata
                         found = True
@@ -1018,21 +1045,16 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def workload_resume(self, context, workload_id):
-        workload = self.workload_get(context, workload_id)
+        workload = self.db.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Requested', workload)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 msg = _('Workload job scheduler is not paused')
                 raise wlm_exceptions.InvalidState(reason=msg)
-        jobschedule = workload['jobschedule']
-        if len(jobschedule) >= 5:
-            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                                jobschedule,
-                                                jobstore='jobscheduler_store', 
-                                                kwargs={'workload_id':workload_id,  
-                                                        'user_id': workload['user_id'],
-                                                        'project_id':workload['project_id']})
+        jobschedule = pickle.loads(str(workload['jobschedule']))
+        if len(jobschedule) >= 1:
+            self.workload_add_scheduler_job(jobschedule, workload)
             AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Submitted', workload)
 
     @autolog.log_method(logger=Logger)
