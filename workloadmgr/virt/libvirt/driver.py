@@ -101,6 +101,10 @@ libvirt_opts = [
     cfg.StrOpt('default_production_availability_zone',
                default='None',
                help='TrilioVault availability zone'),
+    cfg.IntOpt('hard_reboot_wait',
+                default=30,
+                help='The amount of time that snapshot mount operation'
+                     'should wait for the recovery manager to reboot'),
     ]
 
 CONF = cfg.CONF
@@ -399,12 +403,13 @@ class LibvirtDriver(driver.ComputeDriver):
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
                 now = timeutils.utcnow()
-                if (now - start_time) > datetime.timedelta(minutes=4):
+                if (now - start_time) > datetime.timedelta(minutes=5):
                     raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                
 
             if fminstance.status.lower() != "active":
                 raise Exception("File Manager VM is not rebooted successfully")
 
+            time.sleep(CONF.hard_reboot_wait)
             return fminstance
 
         def _map_snapshot_images(fminstance):
