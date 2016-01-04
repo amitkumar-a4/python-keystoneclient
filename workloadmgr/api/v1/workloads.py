@@ -265,11 +265,12 @@ class WorkloadMgrsController(wsgi.Controller):
             description = workload.get('description', None)
             workload_type_id = workload.get('workload_type_id', None)
             source_platform = workload.get('source_platform', "openstack")
-            jobdefaults = {'fullbackup_interval': '1',
-                           'start_time': '01:12 AM',
+            jobdefaults = {'fullbackup_interval': '-1',
+                           'start_time': '09:00 PM',
                            'interval': u'24hr',
-                           'enabled': u'false',
+                           'enabled': u'true',
                            'start_date': time.strftime("%x"),
+                           'end_date': "No End",
                            'retention_policy_type': 'Number of Snapshots to Keep',
                            'retention_policy_value': '30'}
 
@@ -297,8 +298,6 @@ class WorkloadMgrsController(wsgi.Controller):
                 
             if not 'retention_policy_value' in jobschedule:
                 jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
-                
-                              
 
             instances = workload.get('instances', {})
             if not instances:
@@ -346,6 +345,47 @@ class WorkloadMgrsController(wsgi.Controller):
     
             context = req.environ['workloadmgr.context']
             try:
+                try:
+                    workload = body['workload']
+                except KeyError:
+                    msg = _("Incorrect request body format")
+                    raise exc.HTTPBadRequest(explanation=msg)
+
+                jobdefaults = {'fullbackup_interval': '-1',
+                               'start_time': '09:00 PM',
+                               'interval': u'24hr',
+                               'enabled': u'true',
+                               'start_date': time.strftime("%x"),
+                               'end_date': "No End",
+                               'retention_policy_type': 'Number of Snapshots to Keep',
+                               'retention_policy_value': '30'}
+
+                jobschedule = workload.get('jobschedule', jobdefaults)
+                # IF user is intended to modify the job schedule
+                # then fill in the default values if user did not specify 
+                # any of them
+                if jobschedule:
+                    if not 'fullbackup_interval' in jobschedule:
+                        jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
+
+                    if not 'start_time' in jobschedule:
+                        jobschedule['start_time'] = jobdefaults['start_time']
+
+                    if not 'interval' in jobschedule:
+                        jobschedule['interval'] = jobdefaults['interval']
+
+                    if not 'enabled' in jobschedule:
+                        jobschedule['enabled'] = jobdefaults['enabled']
+
+                    if not 'start_date' in jobschedule:
+                        jobschedule['start_date'] = jobdefaults['start_date']
+                
+                    if not 'retention_policy_type' in jobschedule:
+                        jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']                  
+                
+                    if not 'retention_policy_value' in jobschedule:
+                        jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
+
                 self.workload_api.workload_modify(context, id, body['workload'])
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))

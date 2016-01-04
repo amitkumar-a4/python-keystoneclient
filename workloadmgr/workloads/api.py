@@ -95,6 +95,9 @@ def _snapshot_create_callback(*args, **kwargs):
     jobscheduler = workload['jobschedule']
 
     snapshot_type = "incremental"
+    jobscheduler['fullbackup_interval'] = \
+                   'fullbackup_interval' in jobscheduler and \
+                   jobscheduler['fullbackup_interval'] or "-1"
     if int(jobscheduler['fullbackup_interval']) > 0:
         # check full backup policy here
         num_of_incr_in_current_chain = 0
@@ -1018,21 +1021,16 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def workload_resume(self, context, workload_id):
-        workload = self.workload_get(context, workload_id)
+        workload = self.db.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Requested', workload)
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
                 msg = _('Workload job scheduler is not paused')
                 raise wlm_exceptions.InvalidState(reason=msg)
-        jobschedule = workload['jobschedule']
-        if len(jobschedule) >= 5:
-            self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
-                                                jobschedule,
-                                                jobstore='jobscheduler_store', 
-                                                kwargs={'workload_id':workload_id,  
-                                                        'user_id': workload['user_id'],
-                                                        'project_id':workload['project_id']})
+        jobschedule = pickle.loads(str(workload['jobschedule']))
+        if len(jobschedule) >= 1:
+            self.workload_add_scheduler_job(jobschedule, workload)
             AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Submitted', workload)
 
     @autolog.log_method(logger=Logger)
