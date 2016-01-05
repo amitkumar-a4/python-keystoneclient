@@ -1061,13 +1061,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             raise
 
     @autolog.log_method(logger=Logger)
-    def snapshot_dismount(self, context, snapshot_id, mount_vm_id):
+    def snapshot_dismount(self, context, snapshot_id):
         """
         Dismount an existing snapshot
         """
         snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
         workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
         if workload.source_platform == 'openstack': 
+            mount_vm_id = self.db.get_metadata_value(snapshot.metadata, 'mount_vm_id')
+
+            if mount_vm_id == None:
+                LOG.error(_("Could not find recovery manager vm id in the snapshot metadata"))
+                raise wlm_exceptions.Invalid(reason=msg)
+
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
             virtdriver.snapshot_dismount(context, snapshot, None, mount_vm_id)
             self.db.snapshot_update(context, snapshot_id,
