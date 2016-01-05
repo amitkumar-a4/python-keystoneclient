@@ -540,6 +540,10 @@ def delete_restored_vm(cntx, db, instance, restore):
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
 
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
+
     restore_obj = db.restore_update( cntx, restore['id'],
                        {'progress_msg': 'Restoring VM Flavor for Instance ' + instance['vm_id']})
 
@@ -874,6 +878,10 @@ def restore_vm_networks(cntx, db, restore):
 
         raise Exception("Could not find the network that matches the restore options")
 
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
+
     restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
     restore_options = pickle.loads(str(restore_obj.pickle))
     restored_net_resources = {}
@@ -1029,6 +1037,11 @@ def restore_vm_security_groups(cntx, db, restore):
                 return False
 
         return True
+
+    # refresh token
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
 
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}

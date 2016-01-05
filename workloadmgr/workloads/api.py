@@ -1464,25 +1464,35 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
-    def snapshot_dismount(self, context, snapshot_id, mount_vm_id):
+    def snapshot_dismount(self, context, snapshot_id):
         """
         Make the RPC call to Dismount the snapshot.
         """
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
+
             if not snapshot:
                 msg = _('Invalid snapshot id')
                 raise wlm_exceptions.Invalid(reason=msg)
+
+            mount_vm_id = self.db.get_metadata_value(snapshot['metadata'], 'mount_vm_id')
+            if mount_vm_id == None:
+                LOG.error(_("Could not find recovery manager vm id in the snapshot metadata"))
+                raise wlm_exceptions.Invalid(reason=msg)
+
             workload = self.workload_get(context, snapshot['workload_id'])
             snapshot_display_name = snapshot['display_name']
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Dismount Requested', snapshot)
+
             if snapshot['status'] != 'mounted':
                 msg = _('Snapshot status must be mounted')
                 raise wlm_exceptions.InvalidState(reason=msg)
-            self.workloads_rpcapi.snapshot_dismount(context, workload['host'], snapshot_id, mount_vm_id)
+
+            self.workloads_rpcapi.snapshot_dismount(context, workload['host'], snapshot_id)
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' + 'Snapshot \'' + snapshot_display_name + '\' Dismount Submitted', snapshot)
         except Exception as ex:
             LOG.exception(ex)
