@@ -543,8 +543,12 @@ class API(base.Base):
                     if instance['instance-id'] == existing_instance.id:
                         vm_found = self.db.workload_vm_get_by_id(context, existing_instance.id)
                         if isinstance(vm_found, list):
-                            if len(vm_found) > 0:
-                               msg = _('Invalid instance as '+existing_instance.name+' already attached with other workload')
+                            if len(vm_found) > 0 and \
+                                vm_found[0].workload_id != workload_id:
+                               msg = _("Invalid instance as " + \
+                                        existing_instance.name+\
+                                       " already part of workload '%s'" % 
+                                       (vm_found[0].workload_id))
                                raise wlm_exceptions.Invalid(reason=msg)
                         else:
                               msg = _('Error processing instance'+existing_instance.name)
@@ -617,6 +621,9 @@ class API(base.Base):
                     self._scheduler.unschedule_job(job)
                     break
     
+            for vm in self.db.workload_vms_get(context, workload_id):
+                self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
+
             self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
             AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
