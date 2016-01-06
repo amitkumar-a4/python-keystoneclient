@@ -59,6 +59,10 @@ def get_vms(cntx, restore_id):
     for snapshot_vm in snapshot_vms:
         vm = {'vm_id' : snapshot_vm.vm_id,
               'vm_name' : snapshot_vm.vm_name,
+              'keyname' : db.get_metadata_value(snapshot_vm.metadata,
+                                                'key_name'),
+              'keydata' : db.get_metadata_value(snapshot_vm.metadata,
+                                                'key_data'),
               'hypervisor_hostname' : 'None',
               'hypervisor_type' :  'QEMU'}
         instance_options = utils.get_instance_restore_options(restore_options, snapshot_vm.vm_id, restore_options['type'])
@@ -77,6 +81,10 @@ def get_vms(cntx, restore_id):
         for snapshot_vm in snapshot_vms: 
             vm = {'vm_id' : snapshot_vm.vm_id,
                   'vm_name' : snapshot_vm.vm_name,
+                  'keyname' : db.get_metadata_value(snapshot_vm.metadata,
+                                                    'key_name'),
+                  'keydata' : db.get_metadata_value(snapshot_vm.metadata,
+                                                'key_data'),
                   'hypervisor_hostname' : 'None',
                   'hypervisor_type' :  'QEMU'}
             
@@ -118,6 +126,9 @@ class RestoreWorkflow(object):
         
         #restore security_groups
         self._flow.add(vmtasks.RestoreSecurityGroups("RestoreSecurityGroups", provides='restored_security_groups'))                           
+
+        #restore keypairs
+        self._flow.add(vmtasks.RestoreKeypairs("RestoreKeypairs"))
         
         #linear restore VMs
         self._flow.add(vmtasks.LinearRestoreVMs(self._store['instances']))

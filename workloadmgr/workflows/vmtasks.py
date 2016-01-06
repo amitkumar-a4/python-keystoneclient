@@ -135,6 +135,31 @@ class RestoreSecurityGroups(task.Task):
         finally:
             pass
 
+class RestoreKeypairs(task.Task):
+    def execute(self, context, target_platform, instances, restore):
+        return self.execute_with_log(context, target_platform, instances, restore)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'RestoreSecurityGroups.execute')
+    def execute_with_log(self, context, target_platform, instances, restore):
+        # Restore the security groups
+        self.db = db = WorkloadMgrDB().db
+        self.cntx = cntx = amqp.RpcContext.from_dict(context)
+        self.target_platform = target_platform
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
+        if target_platform == 'openstack':
+            vmtasks_openstack.restore_keypairs(cntx, db, instances)
+
+        return
+
+    @autolog.log_method(Logger, 'RestoreKeypairs.revert') 
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
 class PreRestore(task.Task):
 
     def execute(self, context, target_platform, instance, restore):
