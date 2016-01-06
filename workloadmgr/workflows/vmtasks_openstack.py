@@ -38,6 +38,19 @@ Logger = autolog.Logger(LOG)
 
 lock = threading.Lock()
 
+def synchronized(lock):
+    '''Synchronization decorator.'''
+    def wrap(f):
+        def new_function(*args, **kw):
+            lock.acquire()
+            try:
+                return f(*args, **kw)
+            finally:
+                lock.release()
+        return new_function
+    return wrap
+
+
 def _get_pit_resource_id(metadata, key):
     for metadata_item in metadata:
         if metadata_item['key'] == key:
@@ -755,13 +768,14 @@ def pre_restore_vm(cntx, db, instance, restore):
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         return virtdriver.pre_restore_vm(cntx, db, instance, restore)  
     
+@synchronized(lock)
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_networks')                    
 def restore_vm_networks(cntx, db, restore):
     """
     Restore the networking configuration of VMs of the snapshot
     nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
     """
-   
+
     def _get_nic_restore_options(restore_options, instance_id, mac_address):
         instance_options = utils.get_instance_restore_options(restore_options, instance_id, 'openstack')
         if instance_options and 'nics' in instance_options:
@@ -773,7 +787,7 @@ def restore_vm_networks(cntx, db, restore):
                     if nic_options['mac_address'] == mac_address:
                         return nic_options                    
         return None
-                
+
     def _get_nic_port_from_restore_options(restore_options,
                                            snapshot_vm_nic_options,
                                            instance_id, mac_address):
