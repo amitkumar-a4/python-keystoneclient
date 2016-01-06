@@ -12,6 +12,7 @@ import time
 import datetime 
 import paramiko
 import uuid
+import cPickle as pickle
 
 from taskflow import engines
 from taskflow.utils import misc
@@ -38,10 +39,12 @@ LOG = logging.getLogger(__name__)
 
 def get_vms(cntx, workload_id):
     db = vmtasks.WorkloadMgrDB().db
-    
+
     compute_service = nova.API(production=True)
     instances = compute_service.get_servers(cntx, admin=True)
     hypervisors = compute_service.get_hypervisors(cntx)
+
+    keypairs = {}
 
     vms = []
     for vm in db.workload_vms_get(cntx, workload_id):
@@ -68,6 +71,21 @@ def get_vms(cntx, workload_id):
               'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
               'hypervisor_hostname' : vm_hypervisor.hypervisor_hostname,
               'hypervisor_type' :  vm_hypervisor.hypervisor_type}
+
+        if vm_instance.key_name and not vm_instance.key_name in keypairs:
+            try:
+                keypair = compute_service.get_keypair_by_name(cntx,
+                                                  vm_instance.key_name)
+                if keypair:
+                    keypairs[vm_instance.key_name] = \
+                               pickle.dumps(keypair._info, 0)
+            except:
+                pass
+
+        if vm_instance.key_name and vm_instance.key_name in keypairs:
+            vm['vm_metadata']['key_name'] = vm_instance.key_name
+            vm['vm_metadata']['key_data'] = keypairs[vm_instance.key_name]
+
         vms.append(vm)
     return vms
 
