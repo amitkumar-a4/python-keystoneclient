@@ -111,6 +111,7 @@ class RestoreSecurityGroups(task.Task):
         self.cntx = cntx = amqp.RpcContext.from_dict(context)
         self.target_platform = target_platform
 
+        self.security_groups = None
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
         if target_platform == 'openstack':
