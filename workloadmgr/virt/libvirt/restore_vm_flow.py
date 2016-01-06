@@ -718,11 +718,11 @@ class RestoreInstanceFromVolume(task.Task):
     def execute(self, context, vmname, restore_id,
                 volumeid, restore_type, instance_options,
                 restored_security_groups, restored_nics,
-                restored_compute_flavor_id):
+                restored_compute_flavor_id, keyname):
         return self.execute_with_log(context, vmname, restore_id,
                                     volumeid, restore_type, instance_options,
                                     restored_security_groups, restored_nics,
-                                    restored_compute_flavor_id)
+                                    restored_compute_flavor_id, keyname)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -731,7 +731,7 @@ class RestoreInstanceFromVolume(task.Task):
     def execute_with_log(self, context, vmname, restore_id,
                          volumeid, restore_type, instance_options,
                          restored_security_groups, restored_nics,
-                         restored_compute_flavor_id):
+                         restored_compute_flavor_id, keyname):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -784,6 +784,7 @@ class RestoreInstanceFromVolume(task.Task):
                                                    nics=restored_nics,
                                                    block_device_mapping=block_device_mapping,
                                                    security_groups=restored_security_group_ids, 
+                                                   key_name=keyname,
                                                    availability_zone=availability_zone)
 
         if not restored_instance:
@@ -819,11 +820,11 @@ class RestoreInstanceFromImage(task.Task):
     def execute(self, context, vmname, restore_id,
                 imageid, restore_type, instance_options,
                 restored_security_groups, restored_nics,
-                restored_compute_flavor_id):
+                restored_compute_flavor_id, keyname):
         return self.execute_with_log(context, vmname, restore_id,
                                     imageid, restore_type, instance_options,
                                     restored_security_groups, restored_nics,
-                                    restored_compute_flavor_id)
+                                    restored_compute_flavor_id, keyname)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -832,7 +833,7 @@ class RestoreInstanceFromImage(task.Task):
     def execute_with_log(self, context, vmname, restore_id,
                          imageid, restore_type, instance_options,
                          restored_security_groups, restored_nics,
-                         restored_compute_flavor_id):
+                         restored_compute_flavor_id, keyname):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -871,13 +872,14 @@ class RestoreInstanceFromImage(task.Task):
         restored_security_group_ids = []
         for pit_id, restored_security_group_id in restored_security_groups.iteritems():
             restored_security_group_ids.append(restored_security_group_id)
-                     
+
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
         self.restored_instance = restored_instance = \
                      compute_service.create_server(self.cntx, restored_instance_name, 
                                                    restored_compute_image, restored_compute_flavor, 
                                                    nics=restored_nics,
                                                    security_groups=restored_security_group_ids, 
+                                                   key_name=keyname,
                                                    availability_zone=availability_zone)
 
         if not restored_instance:
@@ -1108,7 +1110,7 @@ class PowerOffInstance(task.Task):
         self.restored_instance = restored_instance
         return
 
-    @autolog.log_method(Logger, 'RestoreInstanceFromVolume.revert')
+    @autolog.log_method(Logger, 'PowerOffInstance.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
 
@@ -1154,7 +1156,7 @@ class PowerOnInstance(task.Task):
         self.restored_instance = restored_instance
         return
 
-    @autolog.log_method(Logger, 'RestoreInstanceFromVolume.revert')
+    @autolog.log_method(Logger, 'PowerOnInstance.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
 
@@ -1318,7 +1320,7 @@ def PowerOnInstanceFlow(context):
 
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
-               restored_nics, instance_options):    
+               restored_nics, instance_options):
 
     restore_obj = db.restore_get(cntx, restore['id'])
     snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
@@ -1350,6 +1352,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'restore_id': restore['id'],
                 'vmid': instance['vm_id'],
                 'vmname': instance['vm_name'],
+                'keyname': 'keyname' in instance and instance['keyname'] or None,
                 'snapshot_id': snapshot_obj.id,
                 'restore_type': restore['restore_type'],
                 'restored_net_resources': restored_net_resources,    

@@ -38,6 +38,19 @@ Logger = autolog.Logger(LOG)
 
 lock = threading.Lock()
 
+def synchronized(lock):
+    '''Synchronization decorator.'''
+    def wrap(f):
+        def new_function(*args, **kw):
+            lock.acquire()
+            try:
+                return f(*args, **kw)
+            finally:
+                lock.release()
+        return new_function
+    return wrap
+
+
 def _get_pit_resource_id(metadata, key):
     for metadata_item in metadata:
         if metadata_item['key'] == key:
@@ -540,6 +553,10 @@ def delete_restored_vm(cntx, db, instance, restore):
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
 
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
+
     restore_obj = db.restore_update( cntx, restore['id'],
                        {'progress_msg': 'Restoring VM Flavor for Instance ' + instance['vm_id']})
 
@@ -562,8 +579,7 @@ def restore_vm_flavor(cntx, db, instance, restore):
             ephemeral = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral', ram)
             swap =  db.get_metadata_value(snapshot_vm_flavor.metadata, 'swap', swap)           
             break
-    
-    
+
     restore_options = pickle.loads(str(restore_obj.pickle))
     instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'],'openstack')
     if instance_options and 'flavor' in instance_options:
@@ -600,6 +616,33 @@ def restore_vm_flavor(cntx, db, instance, restore):
                                        'status': 'available'}
         restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)         
     return restored_compute_flavor 
+
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_keypairs')
+def restore_keypairs(cntx, db, instances):
+
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
+
+    compute_service = nova.API(production=True)
+    keypairs = [kp.name for kp in compute_service.get_keypairs(cntx)]
+    for inst in instances:
+        if not 'keyname' in inst or not inst['keyname'] or \
+           inst['keyname'] in keypairs:
+            continue
+
+        if not 'keydata' in inst:
+            continue
+
+        keydata = pickle.loads(str(inst['keydata']))
+        if not 'public_key' in keydata:
+            continue
+      
+        public_key = keydata['public_key']
+        newkey = compute_service.create_keypair(cntx, inst['keyname'],
+                                       public_key=public_key)
+        if newkey:
+            keypairs.append(newkey.name)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.get_vm_nics')
 def get_vm_nics(cntx, db, instance, restore, restored_net_resources):     
@@ -725,13 +768,14 @@ def pre_restore_vm(cntx, db, instance, restore):
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         return virtdriver.pre_restore_vm(cntx, db, instance, restore)  
     
+@synchronized(lock)
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_networks')                    
 def restore_vm_networks(cntx, db, restore):
     """
     Restore the networking configuration of VMs of the snapshot
     nic_mappings: Dictionary that holds the nic mappings. { nic_id : { network_id : network_uuid, etc. } }
     """
-   
+
     def _get_nic_restore_options(restore_options, instance_id, mac_address):
         instance_options = utils.get_instance_restore_options(restore_options, instance_id, 'openstack')
         if instance_options and 'nics' in instance_options:
@@ -743,7 +787,7 @@ def restore_vm_networks(cntx, db, restore):
                     if nic_options['mac_address'] == mac_address:
                         return nic_options                    
         return None
-                
+
     def _get_nic_port_from_restore_options(restore_options,
                                            snapshot_vm_nic_options,
                                            instance_id, mac_address):
@@ -795,6 +839,8 @@ def restore_vm_networks(cntx, db, restore):
 
         if 'ip_address' in snapshot_vm_nic_options:
             ip_address = snapshot_vm_nic_options['ip_address']
+
+        port_name = ""
   
         # if this is not one click restore, then get new network id,
         # subnet id and ip address
@@ -873,6 +919,10 @@ def restore_vm_networks(cntx, db, restore):
                     LOG.exception(ex)
 
         raise Exception("Could not find the network that matches the restore options")
+
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
 
     restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
     restore_options = pickle.loads(str(restore_obj.pickle))
@@ -1029,6 +1079,11 @@ def restore_vm_security_groups(cntx, db, restore):
                 return False
 
         return True
+
+    # refresh token
+    user_id = cntx.user
+    project_id = cntx.tenant
+    cntx = nova._get_tenant_context(user_id, project_id)
 
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}

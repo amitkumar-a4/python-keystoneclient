@@ -774,6 +774,61 @@ class API(base.Base):
             return
 
     @synchronized(novalock)
+    def get_keypairs(self, context):
+        """
+        Get the list of keypairs
+
+        :rtype: :class:`keypair`
+        """
+        try:
+            client = novaclient(context, self._production)
+            return client.keypairs.list()
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.keypairs.list()
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
+    def create_keypair(self, context, name, public_key):
+        """
+        Create new keypairs
+
+        """
+        try:
+            client = novaclient(context, self._production)
+            return client.keypairs.create(name, public_key=public_key)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.keypairs.create(name, public_key=public_key)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
+    def get_keypair_by_name(self, context, name):
+        """
+        Get the keypair given the name
+
+        :param name: name of the keypair
+        :rtype: :class:`keypair`
+        """
+
+        try:
+            client = novaclient(context, self._production)
+            return client.keypairs.get(name)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.keypairs.get(name)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
     def get_interfaces(self, context, server):
         """
         List attached network interfaces
