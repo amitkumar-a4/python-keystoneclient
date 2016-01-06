@@ -65,7 +65,16 @@ restore_vm_opts = [
     cfg.StrOpt('contego_volume_copy_backend',
                default='iscsi,lvm,fc',
                help='List of backends that contego uses to copy data from '
-                    'backup image to volume')
+                    'backup image to volume'),
+    cfg.StrOpt('ceph_dir',
+               default='/etc/ceph/',
+               help='by default ceph config dir'
+                    ' It can be override depending on user configuration'),
+    cfg.StrOpt('keyring_ext',
+               default='.keyring,.secret,.key',
+               help='by default ceph config dir'
+                    ' It can be override depending on user configuration'),
+
     ]
 
 LOG = logging.getLogger(__name__)
@@ -74,7 +83,7 @@ Logger = autolog.Logger(LOG)
 FLAGS = flags.FLAGS
 CONF = cfg.CONF
 CONF.register_opts(restore_vm_opts)
-
+ 
 def get_new_volume_type(instance_options, volume_id, volume_type):
     if instance_options and 'vdisks' in instance_options:
         for voloption in instance_options['vdisks']:
@@ -388,11 +397,14 @@ class RestoreCephVolume(task.Task):
     """
        Restore cinder volume from qcow2
     """
-
+    key_user = None
+    key_file = None
     def create_volume_from_file(self, filename, volume_name):
         kwargs = {}
         args = [filename]
-        args += ['rbd:'+volume_name]
+        args_test = [CONF.ceph_pool_name]
+        out, err = self.rbd_keyring_search('ls', *args_test, **kwargs)
+        args += ['rbd:'+volume_name+':id='+self.key_user.split('.')[1]]
         out, err = utils.execute('qemu-img', 'convert', '-O',
                                  'raw', *args, **kwargs)
         return
@@ -401,14 +413,36 @@ class RestoreCephVolume(task.Task):
         args = [source]
         args += [target]
         kwargs = {'run_as_root':True}
-        out, err = utils.execute('rbd', 'mv', *args, **kwargs)
+        out, err = self.rbd_keyring_search('mv', *args, **kwargs)
         return
 
     def delete_volume(self, volume_name):
         args = [volume_name]
         kwargs = {'run_as_root':True}
-        out, err = utils.execute('rbd', 'rm', *args, **kwargs)
+        out, err = self.rbd_keyring_search('rm', *args, **kwargs)
         return
+
+    def rbd_keyring_search(self, command, *args, **kwargs):
+        out = None
+        err = None
+        if self.key_file is not None and self.key_user is not None:
+           out, err = utils.execute('rbd', command, '--name', self.key_user, '-k', self.key_file, *args, **kwargs)
+           return out, err
+        else:
+             for keyring in os.listdir(CONF.ceph_dir):
+                 if keyring.endswith(tuple(CONF.keyring_ext.split(","))):
+                    keyring = CONF.ceph_dir+keyring
+                    try:
+                        out1, err1 = utils.execute('ceph-authtool', '-l', keyring, **kwargs)
+                        name = out1.splitlines()[0][1:-1]
+                        out, err = utils.execute('rbd', command, '--name', name, '-k', keyring, *args, **kwargs)
+                        self.key_file = keyring
+                        self.key_user = name
+                        return out, err
+                    except:
+                           pass
+             return out, err
+
  
     def execute(self, context, restore_id, volume_type, image_virtual_size,
                      restored_file_path):
