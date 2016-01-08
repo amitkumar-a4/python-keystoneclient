@@ -18,7 +18,7 @@
     <div>
         <div class="container">
         <br>
-            <h1 class="center-block text-center">Welcome to TrilioVault landing page. TrilioVault provides tenant driven data protection for the VMware Cloud.</h1>
+            <h1 class="center-block text-center">Welcome to TrilioVault landing page. TrilioVault provides tenant driven data protection for the VMware Cloud.<br /> Version {{ version }}</h1>
         <br>
         </div>
 

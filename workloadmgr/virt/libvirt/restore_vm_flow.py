@@ -403,7 +403,7 @@ class RestoreCephVolume(task.Task):
         kwargs = {}
         args = [filename]
         args_test = [CONF.ceph_pool_name]
-        out, err = self.rbd_keyring_search('ls', *args_test, **kwargs)
+        out, err = self.rbd_keyring_search_and_execute('ls', *args_test, **kwargs)
         args += ['rbd:'+volume_name+':id='+self.key_user.split('.')[1]]
         out, err = utils.execute('qemu-img', 'convert', '-O',
                                  'raw', *args, **kwargs)
@@ -413,16 +413,16 @@ class RestoreCephVolume(task.Task):
         args = [source]
         args += [target]
         kwargs = {'run_as_root':True}
-        out, err = self.rbd_keyring_search('mv', *args, **kwargs)
+        out, err = self.rbd_keyring_search_and_execute('mv', *args, **kwargs)
         return
 
     def delete_volume(self, volume_name):
         args = [volume_name]
         kwargs = {'run_as_root':True}
-        out, err = self.rbd_keyring_search('rm', *args, **kwargs)
+        out, err = self.rbd_keyring_search_and_execute('rm', *args, **kwargs)
         return
 
-    def rbd_keyring_search(self, command, *args, **kwargs):
+    def rbd_keyring_search_and_execute(self, command, *args, **kwargs):
         out = None
         err = None
         if self.key_file is not None and self.key_user is not None:
