@@ -151,12 +151,12 @@ def change_password():
 @bottle.route('/landing_page_openstack')
 @bottle.view('landing_page_openstack')
 def landing_page_openstack():
-    return {}
+    return {'version': models.DB_VERSION}
     
 @bottle.route('/landing_page_vmware')
 @bottle.view('landing_page_vmware')
 def landing_page_vmware():
-    return {}    
+    return {'version': models.DB_VERSION}    
 
 @bottle.route('/')
 def index():
@@ -2302,13 +2302,14 @@ def configure_openstack():
         config_data['workloadmgr_user'] = 'triliovault'
         config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD
 
-        if 'ntp-enabled' in config_inputs:
+        """if 'ntp-enabled' in config_inputs:
             config_data['ntp_enabled'] = config_inputs['ntp-enabled']
         else:
             config_data['ntp_enabled'] = 'off'
         
         config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
-        config_data['timezone'] = config_inputs['timezone']
+        config_data['timezone'] = config_inputs['timezone']"""
+        config_data['ntp_enabled'] = 'off'
 
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device']
