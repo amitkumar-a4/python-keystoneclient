@@ -276,8 +276,14 @@ def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
 def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
     return IMPL.vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id)
 
+def vm_disk_resource_snap_get_bottom(context, snapshot_vm_resource_id):
+    return IMPL.vm_disk_resource_snap_get_bottom(context, snapshot_vm_resource_id)
+
 def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id):
     return IMPL.vm_disk_resource_snap_get(context, vm_disk_resource_snap_id)
+
+def vm_disk_resource_snap_get_snapshot_vm_resource_id(context, vm_disk_resource_snap_id):
+    return IMPL.vm_disk_resource_snap_get_snapshot_vm_resource_id(context, vm_disk_resource_snap_id)
 
 def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
     return IMPL.vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id)
