@@ -2562,7 +2562,13 @@ def main():
                 subprocess.call(command, shell=False)
                 command = ['sudo', 'mv', "/etc/tvault/ssl/"+socket.gethostname()+".key", "/etc/tvault/ssl/localhost.key"];
                 subprocess.call(command, shell=False)
-               
+                
+                #create hostkeys
+                command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"];
+                subprocess.call(command, shell=False)               
+                command = ['sudo', 'ssh-keygen', '-f', "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t', 'rsa', '-q', '-N', ""];
+                subprocess.call(command, shell=False)  
+                
                 with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
                     Config.write(configfile)
                                    
