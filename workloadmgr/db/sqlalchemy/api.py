@@ -1742,6 +1742,17 @@ def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
     return vm_disk_resource_snap
 
 @require_context
+def vm_disk_resource_snap_get_bottom(context, snapshot_vm_resource_id):
+    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id)
+    while vm_disk_resource_snap and vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
+        vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(context,vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+        if vm_disk_resource_snap_backing.snapshot_vm_resource_id == vm_disk_resource_snap.snapshot_vm_resource_id:
+            vm_disk_resource_snap = vm_disk_resource_snap_backing
+        else:
+            break
+    return vm_disk_resource_snap
+
+@require_context
 def _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session):
     try:
         query = session.query(models.VMDiskResourceSnaps)\
@@ -1761,6 +1772,10 @@ def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id):
     session = get_session()
     return _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session)
 
+@require_context
+def vm_disk_resource_snap_get_snapshot_vm_resource_id(context, vm_disk_resource_snap_id):
+    vm_disk_resource_snap = vm_disk_resource_snap_get(context, vm_disk_resource_snap_id)
+    return vm_disk_resource_snap.snapshot_vm_resource_id
 
 @require_context
 def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
