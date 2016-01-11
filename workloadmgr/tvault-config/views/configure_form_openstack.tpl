@@ -109,7 +109,7 @@
                         <br />
 	    		<div class="input-group" >                                        
 					<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-	    			        <input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" required placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
+	    			        <input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
 	    		</div>
                         <br />
                         <div class="input-group">
