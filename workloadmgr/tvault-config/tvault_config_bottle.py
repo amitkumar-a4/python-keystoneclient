@@ -1214,11 +1214,19 @@ def configure_horizon():
         command = ['sudo', 'service', 'apache2', 'restart'];
         subprocess.call(command, shell=False)
     else:
-        command = ['sudo', 'service', 'apache2', 'stop'];
-        subprocess.call(command, shell=False)             
-        command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
-        subprocess.call(command, shell=False)
+         if config_data['configuration_type'] == 'openstack':
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
 
+            command = ['sudo', 'rm', "/etc/init/apache2.override"];
+            subprocess.call(command, shell=False)
+
+            command = ['sudo', 'service', 'apache2', 'restart'];
+            subprocess.call(command, shell=False)
+         else:
+              command = ['sudo', 'service', 'apache2', 'stop'];
+              subprocess.call(command, shell=False)             
+              command = ['sudo', 'sh', '-c', "echo manual > /etc/init/apache2.override"];
+              subprocess.call(command, shell=False)
 
 @bottle.route('/services/<service_display_name>/<action>')
 @authorize()
