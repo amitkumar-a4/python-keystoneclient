@@ -706,6 +706,9 @@ class LibvirtDriver(driver.ComputeDriver):
                         self._get_backing_snapshot_vm_resource_vm_disk_resource_snap(cntx, db, instance, snapshot, disk_info)
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
+                
+            if(disk_info['dev'] == 'vda'):
+                vm_disk_resource_snap_backing = None                
 
             if snapshot_vm_resource_backing:
                 backings = [disk_info['backings'][0]]
