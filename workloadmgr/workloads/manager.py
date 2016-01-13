@@ -773,6 +773,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         production = bool(self.db.get_metadata_value(restored_vm.metadata, 'production', True))
                         instance_id = self.db.get_metadata_value(restored_vm.metadata, 'instance_id', None)
                         if production == True:
+                           workload_metadata = {}
+                           if instance_id is not None:
+                              restored_ids, snap_ins = self.get_metadata_value_by_chain(workload.metadata, instance_id, None)
+                              workload_metadata[instance_id] = restored_vm.vm_id
+                              if restored_ids == None:
+                                 self.db.workload_vms_delete(context, instance_id, workload.id)
+                              else:
+                                   for ins in snap_ins:
+                                       workload_metadata[ins] = restored_vm.vm_id
+ 
+                                   for restored_id in restored_ids:
+                                       self.db.workload_vms_delete(context, restored_id, workload.id)
+
+                              self.db.workload_update(context,
+                                   workload.id,
+                                   {
+                                     'metadata' : workload_metadata,
+                                   })
+
                            self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
                            values = {'workload_id': workload.id,
                                      'vm_id': restored_vm.vm_id,
@@ -780,14 +799,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'vm_name': instance.name,
                                      'status': 'available'}
                            vm = self.db.workload_vms_create(context, values)
-                           if instance_id is not None:
-                              self.db.workload_vms_delete(context, instance_id, workload.id)
 
                    restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                    restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
-               # Delete old VMs
-               #for vm in workload_vms:
-                #   self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
 
             if restore_type == 'test':
                 self.db.restore_update( context,
@@ -1145,6 +1159,35 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Delete an existing restore
         """
         self.db.restore_delete(context, restore_id)		
+
+    @autolog.log_method(logger=Logger)
+    def get_metadata_value_by_chain(self, metadata, key, default=None):
+        list_of_ids = []
+        list_of_snap_ins = []
+        while True:
+              key1 = self.db.get_metadata_value(metadata, key, default=None)
+              if key1 == None:
+                 break
+              list_of_snap_ins.append(key)
+              list_of_ids.append(key1)
+              key = key1
+
+        for reverse_id in list_of_ids:
+            ins_id = self.get_metadata_value(metadata, reverse_id, default=None)
+            if ins_id is not None:
+               if ins_id not in list_of_snap_ins:
+                  list_of_snap_ins.append(ins_id)
+
+        if len(list_of_ids) == 0:
+           return default, list_of_snap_ins
+        return list_of_ids, list_of_snap_ins
+
+    @autolog.log_method(logger=Logger)
+    def get_metadata_value(self, metadata, value, default=None):
+        for kvpair in metadata:
+            if kvpair['value'] == value:
+               return kvpair['key']
+        return default
 
     @autolog.log_method(logger=Logger)
     def send_email(self,context,object,type):
