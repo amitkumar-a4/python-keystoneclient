@@ -178,6 +178,9 @@ class RequestContext(context.RequestContext):
             pass
 
         trustee_user_domain = 'default'
+        if 'domain_name' in cfg.CONF:
+           trustee_user_domain = cfg.CONF.domain_name
+
         if 'user_domain_id' in cfg.CONF.keystone_authtoken:
             trustee_user_domain = cfg.CONF.keystone_authtoken.user_domain_id
 
