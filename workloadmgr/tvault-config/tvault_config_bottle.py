@@ -1547,6 +1547,22 @@ def configure_host():
     # Python code to configure storage
     try:
         #configure host
+
+        hostname = config_data['guest_name']
+        fh, abs_path = mkstemp()
+        new_file = open(abs_path,'w')
+        new_file.write(hostname+'\n')
+        new_file.close()
+        close(fh)
+        command = ['sudo', 'mv', abs_path, "/etc/hostname"];
+        subprocess.call(command, shell=False)
+        os.chmod('/etc/hostname', 0644)
+        command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+        command = ['sudo', 'service', 'hostname', 'restart']
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'networking', 'restart']
+        subprocess.call(command, shell=False)
+
         fh, abs_path = mkstemp()
         new_file = open(abs_path,'w')
         new_file.write('127.0.0.1 localhost\n')
@@ -2297,6 +2313,7 @@ def configure_openstack():
         config_data['admin_password'] = config_inputs['admin-password']
         config_data['admin_tenant_name'] = config_inputs['admin-tenant-name']
         config_data['region_name'] = config_inputs['region-name']
+        config_data['guest_name'] = config_inputs['guest-name']
         
         parse_result = urlparse(config_data['keystone_admin_url'])
         config_data['keystone_host'] = parse_result.hostname
