@@ -34,6 +34,7 @@ from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
 
 from workloadmgr import autolog
+from workloadmgr.decorators import retry
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -980,6 +981,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception
 
     @synchronized(novalock)
+    @retry(Exception, tries=3, delay=1, LOG)
     def vast_get_info(self, context, server, params):
         """
         Get components of a VASTed instance
