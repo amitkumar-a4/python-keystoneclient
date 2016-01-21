@@ -53,7 +53,7 @@ if module_dir:
     os.chdir(os.path.dirname(__file__))
     
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
-TVAULT_CONFIGURATION_TYPE = 'vmware'
+TVAULT_CONFIGURATION_TYPE = 'openstack'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -766,6 +766,7 @@ def configure_rabbitmq():
         subprocess.call(command, shell=False)
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'start']
         subprocess.call(command, shell=False)
+        time.sleep(10)
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
     else:
@@ -2553,6 +2554,7 @@ def main():
         except Exception as ex:
             pass
         
+        time.sleep(10)
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
