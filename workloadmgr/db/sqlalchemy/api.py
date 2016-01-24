@@ -1059,7 +1059,8 @@ def snapshot_type_time_size_update(context, snapshot_id):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if snapshot_vm_resource.snapshot_type == 'full':
+        if snapshot_vm_resource.snapshot_type == 'full' and \
+            snapshot_vm_resource.resource_name != 'vda':
             snapshot_type_full = True
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
