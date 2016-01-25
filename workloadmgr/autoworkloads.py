@@ -97,9 +97,9 @@ def get_token(tenant_name=None):
 def create_workload(inst, tenant_name):
     try:
         workload_payload = {'name': 'New Workload', 'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
-                        'description': 'New Workload', 'source_platform': 'openstack', 'instances': inst, 
-                        'jobschedule': {'end_date': 'No End', 'start_time': scheduler_time, 'interval': 
-                        '24hr', 'enabled': True, 'retain_value': 30, 'retain_type': '0', 'start_date': 
+                            'description': 'New Workload', 'source_platform': 'openstack', 'instances': inst, 
+                            'jobschedule': {'end_date': 'No End', 'start_time': scheduler_time, 'interval': 
+                            '24hr', 'enabled': True, 'retain_value': 30, 'retain_type': '0', 'start_date': 
                         scheduler_date}, 'metadata': {}}  
 
         token, project_id = get_token(tenant_name)   
