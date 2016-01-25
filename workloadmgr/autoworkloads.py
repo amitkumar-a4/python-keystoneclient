@@ -122,7 +122,9 @@ def get_all_tenants():
          
 def main():
     try:
-        engine = create_engine(get_config_value(DEFAULT_SECTION, 'sql_connection'), echo=False)
+        engine = create_engine(
+                      get_config_value(DEFAULT_SECTION, 'sql_connection'),
+                      echo=False)
         auto_wlm_vms = DEFAULT_VMS_PER_WORKLOAD
         config_auto_wlm_vms = get_config_value(DEFAULT_SECTION, 'auto_workload_vm_number')
         if config_auto_wlm_vms is not None:
