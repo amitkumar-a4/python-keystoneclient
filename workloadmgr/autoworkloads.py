@@ -47,7 +47,9 @@ def get_instances(tenant_name):
     project_ids['project_id'] = tenant_name
     
     url = get_config_value(NOVA_SECTION, 'nova_production_endpoint_template', project_ids)
-    cs = nova.novaclient2(get_config_value(NOVA_SECTION, 'nova_admin_auth_url'), get_config_value(NOVA_SECTION, 'nova_admin_username'), get_config_value(NOVA_SECTION, 'nova_admin_password'), tenant_name, url)
+    cs = nova.novaclient2(get_config_value(NOVA_SECTION, 'nova_admin_auth_url'), 
+                          get_config_value(NOVA_SECTION, 'nova_admin_username'), 
+                          get_config_value(NOVA_SECTION, 'nova_admin_password'), tenant_name, url)
     return cs.servers.list()
 
 def execute_post(url, values, headers):
@@ -75,9 +77,12 @@ def get_token(tenant_name=None):
     try:
         url = get_config_value(NOVA_SECTION, 'nova_admin_auth_url') + '/tokens'
         if tenant_name == None:
-           values = {"auth": {"passwordCredentials": {"username": get_config_value(NOVA_SECTION, 'nova_admin_username'), "password": get_config_value(NOVA_SECTION, 'nova_admin_password')}}}
+           values = {"auth": {"passwordCredentials": {"username": get_config_value(NOVA_SECTION, 
+                     'nova_admin_username'), "password": get_config_value(NOVA_SECTION, 'nova_admin_password')}}}
         else:
-             values = {"auth": {"tenantName": tenant_name, "passwordCredentials": {"username": get_config_value(NOVA_SECTION, 'nova_admin_username'), "password": get_config_value(NOVA_SECTION, 'nova_admin_password')}}}
+             values = {"auth": {"tenantName": tenant_name, "passwordCredentials": 
+                      {"username": get_config_value(NOVA_SECTION, 'nova_admin_username'), 
+                       "password": get_config_value(NOVA_SECTION, 'nova_admin_password')}}}
         headers = {'Content-Type': 'application/json'}
         data = json.loads(execute_post(url, values, headers))
 
