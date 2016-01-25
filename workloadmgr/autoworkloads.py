@@ -100,7 +100,7 @@ def create_workload(inst, tenant_name):
                             'description': 'New Workload', 'source_platform': 'openstack', 'instances': inst, 
                             'jobschedule': {'end_date': 'No End', 'start_time': scheduler_time, 'interval': 
                             '24hr', 'enabled': True, 'retain_value': 30, 'retain_type': '0', 'start_date': 
-                        scheduler_date}, 'metadata': {}}  
+                            scheduler_date}, 'metadata': {}}  
 
         token, project_id = get_token(tenant_name)   
         url =  'http://'+get_config_value(DEFAULT_SECTION, 'rabbit_host')+':8780/v1/'+project_id+'/workloads'
