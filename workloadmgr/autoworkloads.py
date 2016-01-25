@@ -122,9 +122,7 @@ def get_all_tenants():
          
 def main():
     try:
-        engine = create_engine(
-                      get_config_value(DEFAULT_SECTION, 'sql_connection'),
-                      echo=False)
+        engine = create_engine(get_config_value(DEFAULT_SECTION, 'sql_connection'),echo=False)
         auto_wlm_vms = DEFAULT_VMS_PER_WORKLOAD
         config_auto_wlm_vms = get_config_value(DEFAULT_SECTION, 'auto_workload_vm_number')
         if config_auto_wlm_vms is not None:
@@ -144,7 +142,8 @@ def main():
                 
                 if instance.status == 'ACTIVE' and auto_workload_found == True:
                    d_inst = {}
-                   for row in engine.execute(select([models.WorkloadVMs.__table__]).where(models.WorkloadVMs.__table__.columns.vm_id==instance.id)):
+                   for row in engine.execute(select([models.WorkloadVMs.__table__]).
+                   where(models.WorkloadVMs.__table__.columns.vm_id==instance.id)):
                        items = dict(row.items())
                        if items['vm_id'] == instance.id and items['status'] == 'available':
                           auto_workload_found = False
