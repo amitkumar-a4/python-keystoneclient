@@ -16,6 +16,8 @@ from Queue import Queue
 import json
 import shutil
 
+from oslo.config import cfg
+
 from taskflow import engines
 from taskflow.listeners import printing
 from taskflow.patterns import unordered_flow as uf
@@ -46,6 +48,17 @@ from workloadmgr import exception
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
+vmtasks_opts = [
+    cfg.BoolOpt('pause_vm_before_snapshot',
+                default=False,
+                help='pause VM before snapshot operation'
+                     ' libvirt calls'),
+    ]
+
+CONF = cfg.CONF
+CONF.register_opts(vmtasks_opts)
+
+
 POWER_STATES = {
     0: "NO STATE",
     1: "RUNNING",
@@ -58,6 +71,13 @@ POWER_STATES = {
     8: "FAILED",
     9: "BUILDING",
 }
+
+class NoneTask(task.Task):
+    def execute(self):
+        pass
+    
+    def revert(self, *args, **kwargs):
+        pass
 
 class RestoreVMNetworks(task.Task):
     def execute(self, context, target_platform, restore):
@@ -409,6 +429,7 @@ class PauseVM(task.Task):
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
+
         if source_platform == 'openstack':
             return vmtasks_openstack.pause_vm(cntx, db, instance)
         else:
@@ -420,8 +441,10 @@ class PauseVM(task.Task):
         try:
             cntx = amqp.RpcContext.from_dict(kwargs['context'])
             db = WorkloadMgrDB().db
+
             if POWER_STATES[kwargs['instance']['vm_power_state']] != 'RUNNING':
                 return        
+
             if kwargs['source_platform'] == 'openstack':
                 return vmtasks_openstack.unpause_vm(cntx, db, kwargs['instance'])
             else:
@@ -448,6 +471,7 @@ class UnPauseVM(task.Task):
 
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return
+
         if source_platform == 'openstack':
             return vmtasks_openstack.unpause_vm(cntx, db, instance)
         else:
@@ -462,7 +486,7 @@ class UnPauseVM(task.Task):
         except Exception as ex:
             LOG.exception(ex)
         finally:
-            pass            
+            pass
         
 class SuspendVM(task.Task):
 
@@ -940,8 +964,12 @@ def LinearFreezeVMs(instances):
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
-    for index,item in enumerate(instances):
-        flow.add(PauseVM("PauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    if CONF.pause_vm_before_snapshot:
+        for index,item in enumerate(instances):
+            flow.add(PauseVM("PauseVM_" + item['vm_id'],
+                     rebind=dict(instance = "instance_" + item['vm_id'])))
+    else:
+        flow.add(NoneTask("UnorderedPauseVMs"))
     return flow
 
 # Assume there is dependency between instances
@@ -949,8 +977,12 @@ def UnorderedPauseVMs(instances):
 
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
-    for index,item in enumerate(instances):
-        flow.add(PauseVM("PauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    if CONF.pause_vm_before_snapshot:
+        for index,item in enumerate(instances):
+            flow.add(PauseVM("PauseVM_" + item['vm_id'],
+                     rebind=dict(instance = "instance_" + item['vm_id'])))
+    else:
+        flow.add(NoneTask("LinearPauseVMs"))
     
     return flow
 
@@ -983,16 +1015,25 @@ def LinearSnapshotVMs(instances):
 
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
-    for index,item in enumerate(instances):
-        flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    if CONF.pause_vm_before_snapshot:
+        for index,item in enumerate(instances):
+            flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
+                     rebind=dict(instance = "instance_" + item['vm_id'])))
+    else:
+        flow.add(NoneTask("UnorderedUnPauseVMs"))
     
     return flow
 
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
-    for index,item in enumerate(instances):
-        flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
-    
+
+    if CONF.pause_vm_before_snapshot:
+        for index,item in enumerate(instances):
+            flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
+                     rebind=dict(instance = "instance_" + item['vm_id'])))
+    else:
+        flow.add(NoneTask("LinearUnPauseVMs"))
+
     return flow
 
 def UnorderedThawVMs(instances):
