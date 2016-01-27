@@ -394,7 +394,7 @@ class API(base.Base):
         try:
             AUDITLOG.log(context,'Workload \'' + name + '\' Create Requested', None)
             compute_service = nova.API(production=True)
-            instances_with_name = compute_service.get_servers(context,admin=True)
+            instances_with_name = compute_service.get_servers(context)
 
             #TODO(giri): optimize this lookup
             for instance in instances:
