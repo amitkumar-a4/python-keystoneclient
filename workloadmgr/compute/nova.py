@@ -981,7 +981,7 @@ class API(base.Base):
             #TODO(gbasava): Handle the exception
 
     @synchronized(novalock)
-    @retry(Exception, tries=3, delay=1, LOG)
+    @retry(Exception, tries=3, delay=1, logger=LOG)
     def vast_get_info(self, context, server, params):
         """
         Get components of a VASTed instance
