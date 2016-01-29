@@ -672,7 +672,7 @@ class API(base.Base):
         return workloads
     
     @autolog.log_method(logger=Logger)    
-    def import_workloads(self, context, workload_ids=[]):
+    def import_workloads(self, context, workload_ids=[], upgrade=True):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         try:
             workloads = []
@@ -708,7 +708,7 @@ class API(base.Base):
                 try:            
                     import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
                     import_workload_method = getattr(import_workload_module, 'import_workload')
-                    workload = import_workload_method(context, workload_url, models.DB_VERSION)
+                    workload = import_workload_method(context, workload_url, models.DB_VERSION, upgrade)
                     workloads.append(workload)
                 except Exception as ex:
                     LOG.exception(ex)
