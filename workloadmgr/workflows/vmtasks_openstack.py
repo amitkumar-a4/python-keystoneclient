@@ -598,11 +598,11 @@ def restore_vm_flavor(cntx, db, instance, restore):
  
     restored_compute_flavor = None
     for flavor in compute_service.get_flavors(cntx):
-        if ((str(flavor.vcpus) ==  vcpus) and
-            (str(flavor.ram) ==  ram) and
-            (str(flavor.disk) ==  disk) and
-            (str(flavor.ephemeral) == ephemeral) and
-            (str(flavor.swap) == swap)):
+        if ((str(flavor.vcpus) == str(vcpus)) and
+            (str(flavor.ram) == str(ram)) and
+            (str(flavor.disk) == str(disk)) and
+            (str(flavor.ephemeral) == str(ephemeral)) and
+            (str(flavor.swap) == str(swap))):
             restored_compute_flavor = flavor
             break            
     if not restored_compute_flavor:
