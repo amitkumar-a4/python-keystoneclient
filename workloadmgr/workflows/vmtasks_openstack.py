@@ -420,7 +420,6 @@ def pause_vm(cntx, db, instance):
     elif instance['hypervisor_type'] == 'VMware vCenter Server':
         suspend_vm(cntx, db, instance)
     else:
-        return
         compute_service.pause(cntx, instance['vm_id'])
         instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
         start_time = timeutils.utcnow()
@@ -442,7 +441,6 @@ def unpause_vm(cntx, db, instance):
     elif instance['hypervisor_type'] == 'VMware vCenter Server':
         resume_vm(cntx, db, instance)
     else:
-        return
         compute_service.unpause(cntx, instance['vm_id'])
 
 @autolog.log_method(Logger, 'vmtasks_openstack.suspend_vm')
