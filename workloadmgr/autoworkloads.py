@@ -27,6 +27,7 @@ cfg.read(utils.find_config('workloadmgr.conf'))
 
 #Script configurables
 DEFAULT_VMS_PER_WORKLOAD = 1
+DEFAULT_SCHEDULER_INTERVAL = 15
 NOVA_SECTION = 'DEFAULT'
 DEFAULT_SECTION = 'DEFAULT'
 
@@ -35,6 +36,7 @@ time_format = '%I:%M%p'
 date_format = '%m/%d/%Y'
 scheduler_date = date_obj.strftime(date_format)
 scheduler_time = "04:00AM" #date_obj.strftime(time_format)
+date_obj = datetime.strptime(scheduler_date+' '+scheduler_time, '%m/%d/%Y %I:%M%p')
 
 def get_config_value(Section, Option, Key=None):                                            
     if cfg.has_option(Section, Option):                                         
@@ -106,6 +108,15 @@ def create_workload(inst, instance_name, tenant_name):
         url =  'http://'+get_config_value(DEFAULT_SECTION, 'rabbit_host')+':8780/v1/'+project_id+'/workloads'
         headers = {'Content-Type': 'application/json', 'X-Auth-Token': token}
         data = execute_post(url, {'workload':workload_payload}, headers)
+
+        interval = DEFAULT_SCHEDULER_INTERVAL
+        config_scheduler_interval = get_config_value(DEFAULT_SECTION, 'automated_workload_scheduler_interval')
+        if config_scheduler_interval is not None:
+           interval = config_scheduler_interval
+
+        date_obj = date_obj + datetime.timedelta(minutes=interval)
+        scheduler_time = date_obj.strftime(time_format)
+        scheduler_date = date_obj.strftime(date_format)
     except Exception as ex:
            pass
 
