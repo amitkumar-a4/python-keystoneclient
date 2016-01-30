@@ -34,7 +34,7 @@ date_obj = datetime.now()
 time_format = '%I:%M%p'
 date_format = '%m/%d/%Y'
 scheduler_date = date_obj.strftime(date_format)
-scheduler_time = date_obj.strftime(time_format)
+scheduler_time = "04:00AM" #date_obj.strftime(time_format)
 
 def get_config_value(Section, Option, Key=None):                                            
     if cfg.has_option(Section, Option):                                         
@@ -94,10 +94,10 @@ def get_token(tenant_name=None):
            print ex
            quit()
 
-def create_workload(inst, tenant_name):
+def create_workload(inst, instance_name, tenant_name):
     try:
-        workload_payload = {'name': 'New Workload', 'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
-                            'description': 'New Workload', 'source_platform': 'openstack', 'instances': inst, 
+        workload_payload = {'name': instance_name, 'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
+                            'description': 'New Workload from automated workload script', 'source_platform': 'openstack', 'instances': inst, 
                             'jobschedule': {'end_date': 'No End', 'start_time': scheduler_time, 'interval': 
                             '24hr', 'enabled': True, 'retain_value': 30, 'retain_type': '0', 'start_date': 
                             scheduler_date}, 'metadata': {}}  
@@ -154,11 +154,11 @@ def main():
                       inst.append(d_inst)
 
                    if len(inst) == auto_wlm_vms:
-                      create_workload(inst, tenant['name'])
+                      create_workload(inst, instance.name+" et.al", tenant['name'])
                       inst = [] 
     
             if len(inst) > 0:
-               create_workload(inst, tenant['name'])
+               create_workload(inst, instance.name+" et.al", tenant['name'])
                    
     except Exception as ex:
            print ex
