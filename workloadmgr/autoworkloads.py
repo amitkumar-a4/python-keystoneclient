@@ -35,10 +35,13 @@ NOVA_SECTION = 'DEFAULT'
 DEFAULT_SECTION = 'DEFAULT'
 
 date_obj = datetime.now()
+interval = DEFAULT_SCHEDULER_INTERVAL
+window = DEFAULT_BACKUP_WINDOW
 time_format = '%I:%M%p'
 date_format = '%m/%d/%Y'
 scheduler_date = date_obj.strftime(date_format)
 scheduler_time = "04:00AM" #date_obj.strftime(time_format)
+date_obj = datetime.strptime(scheduler_date+' '+scheduler_time, '%m/%d/%Y %I:%M%p')
 
 def get_config_value(Section, Option, Key=None):                                            
     if cfg.has_option(Section, Option):                                         
@@ -99,23 +102,13 @@ def get_token(tenant_name=None):
            quit()
 
 def create_workload(inst, instance_name, tenant_name):
-    global scheduler_time
-    global scheduler_date
 
-    interval = DEFAULT_SCHEDULER_INTERVAL
-    window = DEFAULT_BACKUP_WINDOW
-    config_scheduler_interval = get_config_value(DEFAULT_SECTION, 'automated_workload_scheduler_interval')
-    if config_scheduler_interval is not None:
-        interval = config_scheduler_interval
+    global window
+    global interval
 
-    config_window = get_config_value(DEFAULT_SECTION, 'automated_workload_backup_window')
-    if config_window is not None:
-        window = config_window
-
-    date_obj = datetime.strptime(scheduler_date+' '+scheduler_time, '%m/%d/%Y %I:%M%p')
-    date_obj = date_obj + timedelta(minutes = random.randrange(0, window*60, interval))
-    stime = date_obj.strftime(time_format)
-    sdate = date_obj.strftime(date_format)
+    dobj = date_obj + timedelta(minutes = random.randrange(0, window*60, interval))
+    stime = dobj.strftime(time_format)
+    sdate = dobj.strftime(date_format)
     try:
         workload_payload = {'name': instance_name,
                             'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
@@ -158,6 +151,16 @@ def main():
         config_auto_wlm_vms = get_config_value(DEFAULT_SECTION, 'auto_workload_vm_number')
         if config_auto_wlm_vms is not None:
            auto_wlm_vms = config_auto_wlm_vms
+
+        global interval
+        global window
+        config_scheduler_interval = get_config_value(DEFAULT_SECTION, 'automated_workload_scheduler_interval')
+        if config_scheduler_interval is not None:
+            interval = int(config_scheduler_interval)
+
+        config_window = get_config_value(DEFAULT_SECTION, 'automated_workload_backup_window')
+        if config_window is not None:
+            window = int(config_window)
 
         tenants = get_all_tenants()
         for tenant in tenants:
