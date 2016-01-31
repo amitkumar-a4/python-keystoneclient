@@ -11,6 +11,8 @@ from workloadmgr.db.sqlalchemy import models
 from workloadmgr import utils
 import ConfigParser
 from datetime import datetime
+from datetime import timedelta
+import random
 
 from workloadmgr import autolog
 
@@ -28,10 +30,13 @@ cfg.read(utils.find_config('workloadmgr.conf'))
 #Script configurables
 DEFAULT_VMS_PER_WORKLOAD = 1
 DEFAULT_SCHEDULER_INTERVAL = 15
+DEFAULT_BACKUP_WINDOW = 7
 NOVA_SECTION = 'DEFAULT'
 DEFAULT_SECTION = 'DEFAULT'
 
 date_obj = datetime.now()
+interval = DEFAULT_SCHEDULER_INTERVAL
+window = DEFAULT_BACKUP_WINDOW
 time_format = '%I:%M%p'
 date_format = '%m/%d/%Y'
 scheduler_date = date_obj.strftime(date_format)
@@ -97,26 +102,34 @@ def get_token(tenant_name=None):
            quit()
 
 def create_workload(inst, instance_name, tenant_name):
+
+    global window
+    global interval
+
+    dobj = date_obj + timedelta(minutes = random.randrange(0, window*60, interval))
+    stime = dobj.strftime(time_format)
+    sdate = dobj.strftime(date_format)
     try:
-        workload_payload = {'name': instance_name, 'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
-                            'description': 'New Workload from automated workload script', 'source_platform': 'openstack', 'instances': inst, 
-                            'jobschedule': {'end_date': 'No End', 'start_time': scheduler_time, 'interval': 
-                            '24hr', 'enabled': True, 'retain_value': 30, 'retain_type': '0', 'start_date': 
-                            scheduler_date}, 'metadata': {}}  
+        workload_payload = {'name': instance_name,
+                            'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
+                            'description': 'New Workload from automated workload script',
+                            'source_platform': 'openstack',
+                            'instances': inst, 
+                            'jobschedule': {'end_date': 'No End',
+                                            'start_time': stime,
+                                            'interval': '24hr',
+                                            'enabled': True,
+                                            'retain_value': 30,
+                                            'retain_type': '0',
+                                            'fullbackup_interval':0,
+                                            'start_date': sdate},
+                            'metadata': {}}  
 
         token, project_id = get_token(tenant_name)   
         url =  'http://'+get_config_value(DEFAULT_SECTION, 'rabbit_host')+':8780/v1/'+project_id+'/workloads'
         headers = {'Content-Type': 'application/json', 'X-Auth-Token': token}
         data = execute_post(url, {'workload':workload_payload}, headers)
 
-        interval = DEFAULT_SCHEDULER_INTERVAL
-        config_scheduler_interval = get_config_value(DEFAULT_SECTION, 'automated_workload_scheduler_interval')
-        if config_scheduler_interval is not None:
-           interval = config_scheduler_interval
-
-        date_obj = date_obj + datetime.timedelta(minutes=interval)
-        scheduler_time = date_obj.strftime(time_format)
-        scheduler_date = date_obj.strftime(date_format)
     except Exception as ex:
            pass
 
@@ -138,6 +151,16 @@ def main():
         config_auto_wlm_vms = get_config_value(DEFAULT_SECTION, 'auto_workload_vm_number')
         if config_auto_wlm_vms is not None:
            auto_wlm_vms = config_auto_wlm_vms
+
+        global interval
+        global window
+        config_scheduler_interval = get_config_value(DEFAULT_SECTION, 'automated_workload_scheduler_interval')
+        if config_scheduler_interval is not None:
+            interval = int(config_scheduler_interval)
+
+        config_window = get_config_value(DEFAULT_SECTION, 'automated_workload_backup_window')
+        if config_window is not None:
+            window = int(config_window)
 
         tenants = get_all_tenants()
         for tenant in tenants:
