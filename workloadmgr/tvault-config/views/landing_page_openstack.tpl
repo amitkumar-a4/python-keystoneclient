@@ -99,6 +99,14 @@
                     </div>
                     -->
                 </ol>
+                <h2>Cli</h2>
+                <ol>
+                    <div class="well">
+                        <script>document.write("easy_install http://" + window.location.host + ":8081/packages/pip-7.1.2.tar.gz")</script>
+                         <br>
+                        <script>document.write("pip install http://" + window.location.host + ":8081/packages/python-workloadmgrclient-")</script>{{version}}<script>document.write(".tar.gz")</script>
+                    </div>
+                </ol>                
                 <h2>Support</h2>
                 <ol>
                     <div class="well"><a>support@triliodata.com</a>
