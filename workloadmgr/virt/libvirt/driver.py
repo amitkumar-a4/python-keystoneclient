@@ -834,6 +834,8 @@ class LibvirtDriver(driver.ComputeDriver):
                         cntx = nova._get_tenant_context(user_id, project_id)
                     except Exception as ex:
                         LOG.exception(ex)
+                        # vast finalize on error
+                        self.vast_finalize(cntx, compute_service, instance, snapshot, snapshot_data_ex)
                         raise ex
                     now = timeutils.utcnow()
                     if (now - start_time) > datetime.timedelta(minutes=10*60):
@@ -883,56 +885,8 @@ class LibvirtDriver(driver.ComputeDriver):
         #                                    {'progress_msg': 'Finalizing snapshot of VM: '+ instance['vm_id'],
         #                                     'status': 'finalizing'
         #                                    })
-        user_id = cntx.user
-        project_id = cntx.tenant
-        cntx = nova._get_tenant_context(user_id, project_id)
-        snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'], 'snapshot_vm_id': instance['vm_id']}
-        compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
-        start_time = timeutils.utcnow()
-        async_task_completed = False
-        progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}
-        progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)        
-        while True:
-            try:
-                LOG.debug(_('Waiting for the status of VAST finalize for '+ instance['vm_id']))
-                time.sleep(10)
-                async_task_status = {}
-                if progress_tracking_file_path:
-                    try:
-                        with open(progress_tracking_file_path, 'r') as progress_tracking_file:
-                            async_task_status['status'] = progress_tracking_file.readlines()
-                    except Exception as ex:
-                        async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                                   instance['vm_id'],
-                                                                                   {'metadata': progress_tracker_metadata})                                  
-                                              
-                else:
-                    async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                               instance['vm_id'],
-                                                                               {'metadata': progress_tracker_metadata})
-                if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
-                    for line in async_task_status['status']:
-                        if 'Error' in line:
-                            raise Exception("Finalizing the snapshot failed - " + line)
-                        if 'Completed' in line:
-                            async_task_completed = True
-                            break;
 
-                if async_task_completed:
-                    break;
-            except nova_unauthorized as ex:
-                LOG.exception(ex)
-                # recreate the token here
-                user_id = cntx.user
-                project_id = cntx.tenant
-                cntx = nova._get_tenant_context(user_id, project_id)
-            except Exception as ex:
-                LOG.exception(ex)
-                raise ex
-            now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=10*60):
-                raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')
-        LOG.debug(_('VAST finalize completed for '+ instance['vm_id']))        
+        self.vast_finalize(cntx, compute_service, instance, snapshot, snapshot_data_ex)
 
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
@@ -978,7 +932,60 @@ class LibvirtDriver(driver.ComputeDriver):
             try:
                 workload_utils.purge_restore_vm_from_staging_area(cntx, restore_obj.id, restore_obj.snapshot_id, instance['vm_id'])
             except Exception as ex:
-                LOG.exception(ex)                                      
+                LOG.exception(ex)               
+
+    @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
+    def vast_finalize(self, cntx, compute_service, instance, snapshot, snapshot_data_ex):
+        user_id = cntx.user
+        project_id = cntx.tenant
+        cntx = nova._get_tenant_context(user_id, project_id)
+        snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'], 'snapshot_vm_id': instance['vm_id']}
+        compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+        start_time = timeutils.utcnow()
+        async_task_completed = False
+        progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}
+        progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
+        while True:
+              try:
+                  LOG.debug(_('Waiting for the status of VAST finalize for '+ instance['vm_id']))
+                  time.sleep(10)
+                  async_task_status = {}
+                  if progress_tracking_file_path:
+                     try:
+                         with open(progress_tracking_file_path, 'r') as progress_tracking_file:
+                                              async_task_status['status'] = progress_tracking_file.readlines()
+                     except Exception as ex:
+                            async_task_status = compute_service.vast_async_task_status(cntx,
+                                                                                   instance['vm_id'],
+                                                                                   {'metadata': progress_tracker_metadata})
+
+                  else:
+                       async_task_status = compute_service.vast_async_task_status(cntx,
+                                                                               instance['vm_id'],
+                                                                               {'metadata': progress_tracker_metadata})
+                  if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
+                     for line in async_task_status['status']:
+                         if 'Error' in line:
+                            raise Exception("Finalizing the snapshot failed - " + line)
+                         if 'Completed' in line:
+                            async_task_completed = True
+                            break;
+
+                  if async_task_completed:
+                     break;
+              except nova_unauthorized as ex:
+                     LOG.exception(ex)
+                     user_id = cntx.user
+                     project_id = cntx.tenant
+                     cntx = nova._get_tenant_context(user_id, project_id)
+              except Exception as ex:
+                     LOG.exception(ex)
+                     raise ex
+              now = timeutils.utcnow()
+              if (now - start_time) > datetime.timedelta(minutes=10*60):
+                 raise exception.ErrorOccurred(reason='Finalizing the snapshot failed')
+        LOG.debug(_('VAST finalize completed for '+ instance['vm_id']))
+                       
 
     @autolog.log_method(Logger, 'libvirt.driver.post_restore_vm')
     def post_restore_vm(self, cntx, db, instance, restore):
