@@ -339,20 +339,26 @@ class RestoreVolumeFromImage(task.Task):
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
         self.restore_obj = restore_obj = db.restore_get(self.cntx, restore_id)
+        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
+        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
 
         self.image_service = glance.get_default_image_service(production= (restore_obj['restore_type'] != 'test'))
         self.volume_service = volume_service = cinder.API()
 
         restored_image = self.image_service.show(self.cntx, imageid)
 
-        restored_volume_name = uuid.uuid4().hex
         LOG.debug('Restoring volume from image ' + imageid)
 
-        volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
+        #volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
+
+        volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
-                                                restored_volume_name,
-                                                'from Trilio Vault', None,
-                                                imageid, None, None, None)
+                                                 volume_name,
+                                                 'from Trilio Vault',
+                                                imageid, None, None, None, volume_type=volume_type)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -460,12 +466,15 @@ class RestoreCephVolume(task.Task):
         self.cntx = amqp.RpcContext.from_dict(context)
         self.volume_service = volume_service = cinder.API()
         restore_obj = db.restore_get(self.cntx, restore_id)
-     
-        restored_volume_name = uuid.uuid4().hex
+        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
+        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
+        #volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
+        volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
 
-        volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
-                                                      restored_volume_name,
+                                                      volume_name,
                                                       'from Trilio Vault', None,
                                                       None, volume_type, None, None)
 
