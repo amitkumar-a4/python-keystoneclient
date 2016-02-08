@@ -569,7 +569,7 @@ class LibvirtDriver(driver.ComputeDriver):
             workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)            
             snapshots = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id)
             for snap in snapshots:
-                if snap.status != "available":
+                if snap.status != "available" and snap.status != "mounted":
                     continue
                 snapshot_vm_resource_backing = db.snapshot_vm_resource_get_by_resource_name(cntx,
                                                                                     instance['vm_id'],
