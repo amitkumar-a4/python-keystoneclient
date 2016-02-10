@@ -1177,6 +1177,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if ins_id is not None:
                if ins_id not in list_of_snap_ins:
                   list_of_snap_ins.append(ins_id)
+            else:
+                 list_of_snap_ins.append(reverse_id)
 
         if len(list_of_ids) == 0:
            return default, list_of_snap_ins
