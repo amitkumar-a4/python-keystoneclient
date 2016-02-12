@@ -748,12 +748,12 @@ class LibvirtDriver(driver.ComputeDriver):
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
 
                 # Get a new token, just to be safe
-                user_id = cntx.user
-                project_id = cntx.tenant
-                cntx = nova._get_tenant_context(user_id, project_id)
                 status = {'result': 'retry'}
                 while status['result'] == 'retry':
                     try:
+                        user_id = cntx.user
+                        project_id = cntx.tenant
+                        cntx = nova._get_tenant_context(user_id, project_id)
                         status = compute_service.vast_data_transfer(cntx,
                                              instance['vm_id'],
                                              {'path': backing['path'],
@@ -772,6 +772,7 @@ class LibvirtDriver(driver.ComputeDriver):
                         LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
                         time.sleep(60)
 
+                   
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
