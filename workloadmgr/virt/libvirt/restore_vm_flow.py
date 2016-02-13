@@ -451,16 +451,16 @@ class RestoreCephVolume(task.Task):
 
  
     def execute(self, context, restore_id, volume_type, image_virtual_size,
-                     restored_file_path):
+                     restored_file_path, vm_resource_id):
         return self.execute_with_log(context, restore_id, volume_type,
-                     image_virtual_size, restored_file_path)
+                     image_virtual_size, restored_file_path, vm_resource_id)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreCephVolume.execute')
     def execute_with_log(self, context, restore_id, volume_type,
-                         image_virtual_size, restored_file_path):
+                         image_virtual_size, restored_file_path, vm_resource_id):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -1236,7 +1236,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                 flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
                                     rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
-                                                image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id)),
+                                                image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id), vm_resource_id=snapshot_vm_resource.id),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
             elif 'nfs' in volume_type:
                 flow.add(RestoreNFSVolume("RestoreNFSVolume" + snapshot_vm_resource.id,

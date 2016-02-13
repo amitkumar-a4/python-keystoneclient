@@ -770,8 +770,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                    if instance == None:
                       pass 
                    else:
-                        production = bool(self.db.get_metadata_value(restored_vm.metadata, 'production', True))
+                        #production = bool(self.db.get_metadata_value(restored_vm.metadata, 'production', True))
                         instance_id = self.db.get_metadata_value(restored_vm.metadata, 'instance_id', None)
+                        production = compute_service.get_server_by_id(context, instance_id, admin=False)
+                        if production == None:
+                           production = True
+                        else:
+                             production = False
+
                         if production == True:
                            workload_metadata = {}
                            if instance_id is not None:
