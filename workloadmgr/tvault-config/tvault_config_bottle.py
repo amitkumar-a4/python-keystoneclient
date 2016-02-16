@@ -54,6 +54,7 @@ if module_dir:
     
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
+TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -760,14 +761,18 @@ def configure_mysql():
 def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':                    
         #configure rabittmq
+        command = ['sudo', 'apt-get', 'remove', '--purge', "rabbitmq-server", '-y'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'dpkg', '-i', TVAULT_RABBITMQ_DEB_PATH];
+        subprocess.call(command, shell=False)
         command = ['sudo', 'rm', "/etc/init/rabbitmq-server.override"];
-        subprocess.call(command, shell=False)                     
+        subprocess.call(command, shell=False)     
+        time.sleep(10)
+        command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
+        subprocess.call(command, shell=False)
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
         subprocess.call(command, shell=False)
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'start']
-        subprocess.call(command, shell=False)
-        time.sleep(10)
-        command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
     else:
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
@@ -2406,7 +2411,8 @@ def reinitialize():
            tables = engine.table_names() 
            connection.execute("SET FOREIGN_KEY_CHECKS=0")
            for table in tables:
-               connection.execute("TRUNCATE TABLE "+str(table))
+               if table != 'workload_types':
+                  connection.execute("TRUNCATE TABLE "+str(table))
            connection.execute("SET FOREIGN_KEY_CHECKS=1") 
            trans.commit()
            bottle.request.environ['beaker.session']['success_message'] = 'Reinitialized successfully'
