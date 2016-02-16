@@ -761,7 +761,7 @@ def configure_mysql():
 def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':                    
         #configure rabittmq
-        command = ['sudo', 'apt-get', 'remove', '--purge', "rabbitmq-server"];
+        command = ['sudo', 'apt-get', 'remove', '--purge', "rabbitmq-server", '-y'];
         subprocess.call(command, shell=False)
         command = ['sudo', 'dpkg', '-i', TVAULT_RABBITMQ_DEB_PATH];
         subprocess.call(command, shell=False)
