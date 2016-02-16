@@ -1325,8 +1325,8 @@ def services_vmware():
 
 @bottle.route('/troubleshooting')
 @authorize()
-def logs():
-    bottle.redirect("/troubleshooting_vmware")
+def troubleshooting():
+    bottle.redirect("/troubleshooting_" + TVAULT_CONFIGURATION_TYPE)
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
 
@@ -1341,9 +1341,9 @@ def get_default_reset_cbt_output():
     reset_cbt_output = reset_cbt_output + '\n\t' + 'Remove the temporary snapshot'
     reset_cbt_output = reset_cbt_output + '\n\n' + "If the VM was in 'powered on' state before initiating the reset, *-ctk.vmdk needs to be removed manually from the datastores."
     return reset_cbt_output  
-    
-@bottle.route('/troubleshooting_vmware')
-@bottle.view('troubleshooting_page_vmware')
+ 
+@bottle.route('/troubleshooting_' + TVAULT_CONFIGURATION_TYPE)
+@bottle.view('troubleshooting_page_' + TVAULT_CONFIGURATION_TYPE)
 @authorize()
 def troubleshooting_vmware():
     bottle.request.environ['beaker.session']['error_message'] = ''
@@ -1353,8 +1353,8 @@ def troubleshooting_vmware():
     values['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return values
 
-@bottle.post('/troubleshooting_vmware_ping')
-@bottle.view('troubleshooting_page_vmware')
+@bottle.post('/troubleshooting_ping')
+@bottle.view('troubleshooting_page_' + TVAULT_CONFIGURATION_TYPE)
 @authorize()
 def troubleshooting_vmware():
     bottle.request.environ['beaker.session']['error_message'] = ''
@@ -1372,6 +1372,7 @@ def troubleshooting_vmware():
     
     values['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return values
+
 
 @bottle.post('/troubleshooting_vmware_reset_cbt')
 @bottle.view('troubleshooting_page_vmware')
