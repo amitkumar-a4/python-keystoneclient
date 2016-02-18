@@ -1179,12 +1179,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
               key = key1
 
         for reverse_id in list_of_ids:
-            ins_id = self.get_metadata_value(metadata, reverse_id, default=None)
+            ins_id = self.get_metadata_value(metadata, reverse_id, False)
             if ins_id is not None:
                if ins_id not in list_of_snap_ins:
                   list_of_snap_ins.append(ins_id)
-            else:
-                 list_of_snap_ins.append(reverse_id)
+
+            ins_reverse_id = self.db.get_metadata_value(metadata, reverse_id)
+            if ins_reverse_id is None:
+               list_of_snap_ins.append(reverse_id)
 
         if len(list_of_ids) == 0:
            return default, list_of_snap_ins
