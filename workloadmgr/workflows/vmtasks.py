@@ -50,7 +50,7 @@ Logger = autolog.Logger(LOG)
 
 vmtasks_opts = [
     cfg.BoolOpt('pause_vm_before_snapshot',
-                default=True,
+                default=False,
                 help='pause VM before snapshot operation'
                      ' libvirt calls'),
     ]
