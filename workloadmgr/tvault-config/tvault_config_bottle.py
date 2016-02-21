@@ -766,13 +766,11 @@ def configure_rabbitmq():
         command = ['sudo', 'dpkg', '-i', TVAULT_RABBITMQ_DEB_PATH];
         subprocess.call(command, shell=False)
         command = ['sudo', 'rm', "/etc/init/rabbitmq-server.override"];
-        subprocess.call(command, shell=False)     
+        #subprocess.call(command, shell=False)     
         time.sleep(10)
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
-        command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'start']
+        command = ['sudo', '/etc/init.d/rabbitmq-server', 'restart']
         subprocess.call(command, shell=False)
     else:
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
