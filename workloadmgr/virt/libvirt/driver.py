@@ -815,9 +815,11 @@ class LibvirtDriver(driver.ComputeDriver):
                             async_task_status = compute_service.vast_async_task_status(cntx, 
                                                                                        instance['vm_id'],
                                                                                        {'metadata': progress_tracker_metadata})
-                            
                         if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
                             for line in async_task_status['status']:
+                                if 'Down' in line:
+                                   data_transfer_completed = 'Down'
+                                   raise Exception("Contego service Unreachable - " + line)
                                 if 'Error' in line:
                                     raise Exception("Data transfer failed - " + line)
                                 if 'Completed' in line:
