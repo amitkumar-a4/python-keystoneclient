@@ -943,7 +943,6 @@ class LibvirtDriver(driver.ComputeDriver):
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
         snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'], 'snapshot_vm_id': instance['vm_id']}
-        success_in_contego_call = False
         while True:
               try:
                   compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
