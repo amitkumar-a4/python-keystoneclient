@@ -815,9 +815,11 @@ class LibvirtDriver(driver.ComputeDriver):
                             async_task_status = compute_service.vast_async_task_status(cntx, 
                                                                                        instance['vm_id'],
                                                                                        {'metadata': progress_tracker_metadata})
-                            
                         if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
                             for line in async_task_status['status']:
+                                if 'Down' in line:
+                                   data_transfer_completed = 'Down'
+                                   raise Exception("Contego service Unreachable - " + line)
                                 if 'Error' in line:
                                     raise Exception("Data transfer failed - " + line)
                                 if 'Completed' in line:
@@ -941,7 +943,13 @@ class LibvirtDriver(driver.ComputeDriver):
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
         snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'], 'snapshot_vm_id': instance['vm_id']}
-        compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+        while True:
+              try:
+                  compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+                  break
+              except Exception as ex:
+                     pass
+               
         start_time = timeutils.utcnow()
         async_task_completed = False
         progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}

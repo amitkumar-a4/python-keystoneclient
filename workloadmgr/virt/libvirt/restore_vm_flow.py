@@ -358,7 +358,7 @@ class RestoreVolumeFromImage(task.Task):
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                  volume_name,
                                                  'from Trilio Vault',
-                                                imageid, None, None, None, volume_type=volume_type)
+                                                image_id=imageid, volume_type=volume_type)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
