@@ -1444,10 +1444,26 @@ class API(base.Base):
                 raise wlm_exceptions.Invalid(reason=msg)
 
             workload = self.workload_get(context, snapshot['workload_id'])
+            snapshots_all = self.db.snapshot_get_all(context)
+            for snapshot_one in snapshots_all:
+                if snapshot_one.status == 'mounted':
+                   if workload['source_platform'] == 'openstack':
+                      mounted_vm_id = self.db.get_metadata_value(snapshot_one.metadata, 'mount_vm_id')
+                      if mounted_vm_id is not None:
+                         if mount_vm_id == mounted_vm_id:
+                            #msg = _('Invalid as snapshot already mounted with id:%s'%snapshot_one.id)
+                            error_dict = {}
+                            error_info = []
+                            error_info.append('Mounted_found')
+                            error_info.append(snapshot_one.id)
+                            error_dict['urls'] = error_info
+                            return error_dict
+
+
             snapshot_display_name = snapshot['display_name']
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
-                local_time = self.get_local_time(context, snapshot['created_at'])
-                snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
+               local_time = self.get_local_time(context, snapshot['created_at'])
+               snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' +
                          'Snapshot \'' + snapshot_display_name + '\' Mount Requested', snapshot)
 
