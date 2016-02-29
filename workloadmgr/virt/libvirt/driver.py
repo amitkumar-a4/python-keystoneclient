@@ -677,6 +677,8 @@ class LibvirtDriver(driver.ComputeDriver):
                             snapshot_vm_resource_metadata['volume_id'] = cinder_volume['id']
                             snapshot_vm_resource_metadata['volume_name'] = cinder_volume['display_name'] or \
                                 snapshot_vm_resource_metadata['volume_id']
+
+                            snapshot_vm_resource_metadata['volume_description'] = cinder_volume['display_description']
                             snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
                             snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']
                             snapshot_vm_resource_metadata['volume_mountpoint'] = attachment['device']
