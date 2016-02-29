@@ -325,16 +325,18 @@ class RestoreVolumeFromImage(task.Task):
     """
 
     def execute(self, context, vmid, restore_id, vm_resource_id,
-                imageid, image_virtual_size):
+                volume_type, imageid, image_virtual_size):
         return self.execute_with_log(context, vmid, restore_id,
-                                     vm_resource_id, imageid, image_virtual_size)
+                                     vm_resource_id, volume_type,
+                                     imageid, image_virtual_size)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreVolumeFromImage.execute')
     def execute_with_log(self, context, vmid, restore_id,
-                         vm_resource_id, imageid, image_virtual_size):
+                         vm_resource_id, volume_type, 
+                         imageid, image_virtual_size):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -352,7 +354,6 @@ class RestoreVolumeFromImage(task.Task):
         #volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
 
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
@@ -471,7 +472,6 @@ class RestoreCephVolume(task.Task):
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         #volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
@@ -549,7 +549,6 @@ class RestoreNFSVolume(task.Task):
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
         #desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
@@ -682,7 +681,6 @@ class RestoreSANVolume(task.Task):
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
         #desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
@@ -1248,7 +1246,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
-            elif any(x in volume_type for x in CONF.contego_volume_copy_backend):
+            elif any(x in volume_type for x in CONF.contego_volume_copy_backend.split(',')):
                 flow.add(RestoreSANVolume("RestoreSANVolume" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
@@ -1259,6 +1257,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                 flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
                         rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                     imageid='image_id_' + str(snapshot_vm_resource.id),
+                                    volume_type='volume_type_'+snapshot_vm_resource.id,
                                     image_virtual_size='image_virtual_size_' + str(snapshot_vm_resource.id)),
                         provides='volume_id_' + str(snapshot_vm_resource.id)))
 
@@ -1374,7 +1373,6 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'restored_nics': restored_nics,
                 'instance_options': instance_options,
             }
-
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
