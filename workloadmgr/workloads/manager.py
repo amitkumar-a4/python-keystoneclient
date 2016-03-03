@@ -712,7 +712,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                  })
 
             values = {'status': 'executing'}
+            restore_user_selected_value = 'Selective Restore'
             if options and 'oneclickrestore' in options and options['oneclickrestore']:
+                restore_user_selected_value = 'Oneclick Restore'
                 # Override traget platfrom for clinets not specified on oneclick
                 if workload.source_platform != target_platform:
                    target_platform = workload.source_platform
@@ -825,6 +827,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                              'time_taken' : int((timeutils.utcnow() - restore.created_at).total_seconds()),
                              'metadata' : {'data_transfer_time' : restore_data_transfer_time,
                                            'object_store_transfer_time' : restore_object_store_transfer_time,
+                                           'restore_user_selected_value' : restore_user_selected_value,
                                           },                              
                              'status': 'available'
                             })
@@ -858,6 +861,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'time_taken' : time_taken,
                                      'metadata' : {'data_transfer_time' : 0,
                                                    'object_store_transfer_time' : 0,
+                                                   'restore_user_selected_value' : restore_user_selected_value,
                                                   },                                        
                                      'status': status
                                     })       
@@ -890,6 +894,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'time_taken' : time_taken,
                                      'metadata' : {'data_transfer_time' : 0,
                                                    'object_store_transfer_time' : 0,
+                                                   'restore_user_selected_value' : restore_user_selected_value,
                                                   },                                        
                                      'status': status
                                     })
