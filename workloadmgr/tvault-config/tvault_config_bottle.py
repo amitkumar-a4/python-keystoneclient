@@ -715,8 +715,11 @@ def _register_workloadtypes():
             wlm.workload_types.create(metadata={}, is_public = True, 
                                       name= 'Parallel', description = 'Parallel workload that snapshots all VMs in parallel',
                                       id = '2ddd528d-c9b4-4d7e-8722-cc395140255a')
-        
-        if workload_type_names['Composite'] == False:    
+            
+        if config_data['configuration_type'] == 'openstack' and workload_type_names['Composite'] == True:
+            wlm.workload_types.delete('54947065-2a59-494a-ab64-b6501c139a82')
+                    
+        if config_data['configuration_type'] == 'vmware' and workload_type_names['Composite'] == False:    
             #Composite
             time.sleep(2)
             metadata = {'capabilities':'workloads', 'workloadgraph':'string'}

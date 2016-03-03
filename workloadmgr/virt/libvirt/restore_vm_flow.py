@@ -336,8 +336,8 @@ class RestoreVolumeFromImage(task.Task):
 
     @autolog.log_method(Logger, 'RestoreVolumeFromImage.execute')
     def execute_with_log(self, context, vmid, restore_id,
-                         vm_resource_id, volume_type, imageid,
-                         image_virtual_size):
+                         vm_resource_id, volume_type, 
+                         imageid, image_virtual_size):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -356,11 +356,12 @@ class RestoreVolumeFromImage(task.Task):
 
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+        volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
-                                                 volume_name,
-                                                 'from Trilio Vault',
-                                                 image_id=imageid, volume_type=volume_type)
+                                                volume_name,
+                                                volume_description,
+                                                image_id=imageid, volume_type=volume_type)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -473,10 +474,11 @@ class RestoreCephVolume(task.Task):
         #volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+        volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                       volume_name,
-                                                      'from Trilio Vault', None,
+                                                      volume_description, None,
                                                       None, volume_type, None, None)
 
         if not restored_volume:
@@ -546,9 +548,10 @@ class RestoreNFSVolume(task.Task):
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
-        desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        #desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+        volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
         progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
@@ -557,7 +560,7 @@ class RestoreNFSVolume(task.Task):
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
-                                                     desciption, 
+                                                     volume_description, 
                                                      volume_type = volume_type)
 
         if not self.restored_volume:
@@ -677,9 +680,10 @@ class RestoreSANVolume(task.Task):
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
-        desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+        #desciption = 'Restored from Snap_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
+        volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
         progressmsg = _('Restoring SAN Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
@@ -688,7 +692,7 @@ class RestoreSANVolume(task.Task):
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
-                                                     desciption, 
+                                                     volume_description, 
                                                      volume_type = volume_type)
 
         if not self.restored_volume:
