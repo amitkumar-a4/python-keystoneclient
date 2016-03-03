@@ -845,10 +845,12 @@ class LibvirtDriver(driver.ComputeDriver):
                         cntx = nova._get_tenant_context(user_id, project_id)
                     except Exception as ex:
                         LOG.exception(ex)
-                        # vast finalize on error
-                        # DO NOT CALL vast_finalize() IN exception code path. It deletes
-                        # good snapshot and there is not way to perform incrementals again
-                        #self.vast_finalize(cntx, compute_service, instance, snapshot, snapshot_data_ex)
+                        # vast finalize on error. Call vast_finalize only if the boot disk is
+                        # local disk, not cinder volume
+                        if disk_info.get('dev', None) == 'vda' and \
+                            not disk_info.get('volume_id', None):
+                            self.vast_finalize(cntx, compute_service, instance,
+                                               snapshot, snapshot_data_ex)
                         raise ex
                     now = timeutils.utcnow()
                     if (now - start_time) > datetime.timedelta(minutes=10*60):
