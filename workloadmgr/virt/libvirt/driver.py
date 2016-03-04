@@ -941,7 +941,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 LOG.exception(ex)               
 
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
-    def vast_finalize(self, cntx, compute_service, instance, snapshot, snapshot_data_ex):
+    def vast_finalize(self, cntx, compute_service, instance, snapshot,
+                      snapshot_data_ex, failed=False):
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
