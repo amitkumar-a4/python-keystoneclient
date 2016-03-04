@@ -899,7 +899,7 @@ class LibvirtDriver(driver.ComputeDriver):
     def revert_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
         compute_service = nova.API(production=True)
         self.vast_finalize(cntx, compute_service, instance, snapshot,
-                           snapshot_data)
+                           snapshot_data, failed=True)
 
     @autolog.log_method(Logger, 'libvirt.driver.delete_restored_vm')
     def delete_restored_vm(self, cntx, db, instance, restore):
