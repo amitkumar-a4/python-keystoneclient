@@ -951,9 +951,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                         'snapshot_vm_id': instance['vm_id']}
         snapshot_data_ex['workload_failed'] = failed
 
-        compute_service.vast_finalize(cntx, instance['vm_id'],
-                                      snapshot_data_ex)
-
         while True:
               try:
                   compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
