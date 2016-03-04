@@ -548,7 +548,7 @@ class RestoreSANVolume(task.Task):
                 break
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=4):
-                raise exception.ErrorOccurred(reason='Timeout restoring NFS Volume')               
+                raise exception.ErrorOccurred(reason='Timeout restoring SAN Volume')               
 
         if self.restored_volume['status'].lower() == 'error':
             raise Exception("Failed to create volume type " + volume_type)

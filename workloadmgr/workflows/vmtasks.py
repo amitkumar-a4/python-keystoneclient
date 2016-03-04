@@ -689,10 +689,10 @@ class SnapshotVM(task.Task):
             if 'result' in kwargs:
                 result = kwargs['result']
                 if kwargs['source_platform'] == 'openstack':
-                    vmtasks_openstack.post_snapshot(cntx, db, kwargs['instance'],
+                    vmtasks_openstack.revert_snapshot(cntx, db, kwargs['instance'],
                                    kwargs['snapshot'], result)
                 else:
-                    vmtasks_vcloud.post_snapshot(cntx, db, kwargs['instance'],
+                    vmtasks_vcloud.revert_snapshot(cntx, db, kwargs['instance'],
                                    kwargs['snapshot'], result)
         except Exception as ex:
             LOG.exception(ex)
