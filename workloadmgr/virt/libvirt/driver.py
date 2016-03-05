@@ -845,8 +845,6 @@ class LibvirtDriver(driver.ComputeDriver):
                         cntx = nova._get_tenant_context(user_id, project_id)
                     except Exception as ex:
                         LOG.exception(ex)
-                        # vast finalize on error
-                        self.vast_finalize(cntx, compute_service, instance, snapshot, snapshot_data_ex)
                         raise ex
                     now = timeutils.utcnow()
                     if (now - start_time) > datetime.timedelta(minutes=10*60):
@@ -891,20 +889,17 @@ class LibvirtDriver(driver.ComputeDriver):
                                             'status': 'available',
                                             'size': vm_disk_size})
 
-
-        #snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
-        #                                    {'progress_msg': 'Finalizing snapshot of VM: '+ instance['vm_id'],
-        #                                     'status': 'finalizing'
-        #                                    })
-
-        self.vast_finalize(cntx, compute_service, instance, snapshot, snapshot_data_ex)
-
     @autolog.log_method(Logger, 'libvirt.driver.post_snapshot_vm')
     def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
-        #finalize is already called in the upload
-        #compute_service = nova.API(production=True)
-        #return compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data)
-        pass
+        compute_service = nova.API(production=True)
+        self.vast_finalize(cntx, compute_service, instance, snapshot,
+                           snapshot_data)
+
+    @autolog.log_method(Logger, 'libvirt.driver.revert_snapshot_vm')
+    def revert_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
+        compute_service = nova.API(production=True)
+        self.vast_finalize(cntx, compute_service, instance, snapshot,
+                           snapshot_data, failed=True)
 
     @autolog.log_method(Logger, 'libvirt.driver.delete_restored_vm')
     def delete_restored_vm(self, cntx, db, instance, restore):
@@ -946,11 +941,16 @@ class LibvirtDriver(driver.ComputeDriver):
                 LOG.exception(ex)               
 
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
-    def vast_finalize(self, cntx, compute_service, instance, snapshot, snapshot_data_ex):
+    def vast_finalize(self, cntx, compute_service, instance, snapshot,
+                      snapshot_data_ex, failed=False):
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
-        snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'], 'snapshot_vm_id': instance['vm_id']}
+
+        snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'],
+                                        'snapshot_vm_id': instance['vm_id']}
+        snapshot_data_ex['workload_failed'] = failed
+
         while True:
               try:
                   compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)

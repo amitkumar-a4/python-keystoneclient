@@ -49,32 +49,9 @@ from workloadmgr import exception
 
 
 restore_vm_opts = [
-    cfg.StrOpt('ceph_pool_name',
-               default='volumes',
-               help='Ceph pool name configured for Cinder'),
     cfg.StrOpt('cinder_nfs_mount_point_base',
                default='/opt/stack/data/mnt',
                help='Dir where the nfs volume is mounted for restore'),                   
-    cfg.StrOpt('workloadmgr_supported_backends',
-               default='ceph,nfs,iscsi,lvm,fc',
-               help='List of backends that workload manages efficiently. '
-                    'The string also maps volume types to specific backend by '
-                    'testing substring of backend in volume_type name. '
-                    'Essentially we assume that all ceph volume types has '
-                    'substring in volume type.'),
-    cfg.StrOpt('contego_volume_copy_backend',
-               default='iscsi,lvm,fc',
-               help='List of backends that contego uses to copy data from '
-                    'backup image to volume'),
-    cfg.StrOpt('ceph_dir',
-               default='/etc/ceph/',
-               help='by default ceph config dir'
-                    ' It can be override depending on user configuration'),
-    cfg.StrOpt('keyring_ext',
-               default='.keyring,.secret,.key',
-               help='by default ceph config dir'
-                    ' It can be override depending on user configuration'),
-
     ]
 
 LOG = logging.getLogger(__name__)
@@ -95,20 +72,7 @@ def get_new_volume_type(instance_options, volume_id, volume_type):
 
 def is_supported_backend(volume_type):
 
-    supported_backends = CONF.workloadmgr_supported_backends
-    if volume_type:
-        volume_type = volume_type.lower()
-        return any(x in volume_type for x in supported_backends.split(","))
-    else:
-        return False
-
-def contego_based_volume_copy(volume_type):
-    contego_volume_copy = CONF.contego_volume_copy_backend
-    if volume_type:
-        volume_type = volume_type.lower()
-        return any(x in volume_type for x in contego_volume_copy.split(","))
-    else:
-        return False
+        return True
 
 class PrepareBackupImage(task.Task):
     """
@@ -402,128 +366,6 @@ class RestoreVolumeFromImage(task.Task):
         except:
             pass
 
-class RestoreCephVolume(task.Task):
-    """
-       Restore cinder volume from qcow2
-    """
-    key_user = None
-    key_file = None
-    def create_volume_from_file(self, filename, volume_name):
-        kwargs = {}
-        args = [filename]
-        args_test = [CONF.ceph_pool_name]
-        out, err = self.rbd_keyring_search_and_execute('ls', *args_test, **kwargs)
-        args += ['rbd:'+volume_name+':id='+self.key_user.split('.')[1]]
-        out, err = utils.execute('qemu-img', 'convert', '-O',
-                                 'raw', *args, **kwargs)
-        return
-
-    def rename_volume(self, source, target):
-        args = [source]
-        args += [target]
-        kwargs = {'run_as_root':True}
-        out, err = self.rbd_keyring_search_and_execute('mv', *args, **kwargs)
-        return
-
-    def delete_volume(self, volume_name):
-        args = [volume_name]
-        kwargs = {'run_as_root':True}
-        out, err = self.rbd_keyring_search_and_execute('rm', *args, **kwargs)
-        return
-
-    def rbd_keyring_search_and_execute(self, command, *args, **kwargs):
-        out = None
-        err = None
-        if self.key_file is not None and self.key_user is not None:
-           out, err = utils.execute('rbd', command, '--name', self.key_user, '-k', self.key_file, *args, **kwargs)
-           return out, err
-        else:
-             for keyring in os.listdir(CONF.ceph_dir):
-                 if keyring.endswith(tuple(CONF.keyring_ext.split(","))):
-                    keyring = CONF.ceph_dir+keyring
-                    try:
-                        out1, err1 = utils.execute('ceph-authtool', '-l', keyring, **kwargs)
-                        name = out1.splitlines()[0][1:-1]
-                        out, err = utils.execute('rbd', command, '--name', name, '-k', keyring, *args, **kwargs)
-                        self.key_file = keyring
-                        self.key_user = name
-                        return out, err
-                    except:
-                           pass
-             return out, err
-
- 
-    def execute(self, context, restore_id, volume_type, image_virtual_size,
-                     restored_file_path, vm_resource_id):
-        return self.execute_with_log(context, restore_id, volume_type,
-                     image_virtual_size, restored_file_path, vm_resource_id)
-
-    def revert(self, *args, **kwargs):
-        return self.revert_with_log(*args, **kwargs)
-
-    @autolog.log_method(Logger, 'RestoreCephVolume.execute')
-    def execute_with_log(self, context, restore_id, volume_type,
-                         image_virtual_size, restored_file_path, vm_resource_id):
-
-        self.db = db = WorkloadMgrDB().db
-        self.cntx = amqp.RpcContext.from_dict(context)
-        self.volume_service = volume_service = cinder.API()
-        restore_obj = db.restore_get(self.cntx, restore_id)
-        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
-        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
-        #volume_size = int(math.ceil(image_virtual_size/(float)(1024*1024*1024)))
-        volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
-        volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
-        volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
-
-        self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
-                                                      volume_name,
-                                                      volume_description, None,
-                                                      None, volume_type, None, None)
-
-        if not restored_volume:
-            raise Exception("Cannot create volume from image")
-
-        start_time = timeutils.utcnow()
-        while True:
-            time.sleep(10)
-            restored_volume = volume_service.get(self.cntx, restored_volume['id'])
-            if restored_volume['status'].lower() == 'available' or\
-                restored_volume['status'].lower() == 'error':
-                break
-            now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=4):
-                raise exception.ErrorOccurred(reason='Timeout restoring CEPH Volume')                
-
-        if restored_volume['status'].lower() == 'error':
-            LOG.error(_("Volume from image could not successfully create"))
-            raise Exception("Restoring volume failed")
-
-        # import image to rbd volume
-        volume_name = CONF.ceph_pool_name + '/' + "volume-" + str(uuid.uuid4().hex)
-        self.create_volume_from_file(restored_file_path, volume_name)
-        
-        # delete volume created by cinder
-        cinder_volume_name = CONF.ceph_pool_name + '/' + "volume-" \
-                                + restored_volume['id']
-        self.delete_volume(cinder_volume_name)
-
-        # rename the other volume to cinder created volume name
-        self.rename_volume(volume_name, cinder_volume_name)
-        statinfo = os.stat(restored_file_path)
-
-        restore_obj = db.restore_update(self.cntx, restore_obj.id,
-                               {'uploaded_size_incremental': statinfo.st_size})
-
-        return restored_volume['id']
-
-    @autolog.log_method(Logger, 'RestoreCephVolume.revert')
-    def revert_with_log(self, *args, **kwargs):
-        try:
-            self.volume_service.delete(self.cntx, self.restored_volume)
-        except:
-            pass
-
 class RestoreNFSVolume(task.Task):
     """
        Restore cinder nfs volume from qcow2
@@ -707,7 +549,7 @@ class RestoreSANVolume(task.Task):
                 break
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=4):
-                raise exception.ErrorOccurred(reason='Timeout restoring NFS Volume')               
+                raise exception.ErrorOccurred(reason='Timeout restoring SAN Volume')               
 
         if self.restored_volume['status'].lower() == 'error':
             raise Exception("Failed to create volume type " + volume_type)
@@ -995,10 +837,6 @@ class CopyBackupImageToVolume(task.Task):
                          volume_type, restore_id, restore_type,
                          restored_file_path, progress_tracking_file_path):
  
-        # if the volume type is not SAN volume type, return success
-        if not contego_based_volume_copy(volume_type):
-            return
-
         # Call into contego to copy the data from backend to volume
         compute_service = nova.API(production=True)
         db = WorkloadMgrDB().db
@@ -1235,24 +1073,19 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
   
             volume_type = get_new_volume_type(instance_options, volume_id, volume_type)
 
-            if 'ceph' in volume_type:
-                flow.add(RestoreCephVolume("RestoreCephVolume" + snapshot_vm_resource.id,
-                                    rebind=dict(restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
-                                                volume_type='volume_type_'+snapshot_vm_resource.id,
-                                                image_virtual_size='image_virtual_size_'+ str(snapshot_vm_resource.id), vm_resource_id=snapshot_vm_resource.id),
-                                    provides='volume_id_' + str(snapshot_vm_resource.id)))
-            elif 'nfs' in volume_type:
+            if 'nfs' in volume_type:
                 flow.add(RestoreNFSVolume("RestoreNFSVolume" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
-            elif any(x in volume_type for x in CONF.contego_volume_copy_backend.split(',')):
+            else:
                 flow.add(RestoreSANVolume("RestoreSANVolume" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
+"""
             else:
                 # Default restore path for backends that we don't recognize
                 flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
@@ -1261,6 +1094,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                                     volume_type='volume_type_'+snapshot_vm_resource.id,
                                     image_virtual_size='image_virtual_size_' + str(snapshot_vm_resource.id)),
                         provides='volume_id_' + str(snapshot_vm_resource.id)))
+"""
 
     return flow
 

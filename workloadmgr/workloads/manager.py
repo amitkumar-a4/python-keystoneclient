@@ -1081,7 +1081,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
 
         except Exception as ex:
-            self.snapshot_dismount(context, snapshot['id'], mount_vm_id)
+            self.snapshot_dismount(context, snapshot['id'])
             LOG.exception(ex)
             raise
 
