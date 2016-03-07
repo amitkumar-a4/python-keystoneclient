@@ -1084,7 +1084,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,
                                                 restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id)),
                                     provides='volume_id_' + str(snapshot_vm_resource.id)))
-"""
+            """
             else:
                 # Default restore path for backends that we don't recognize
                 flow.add(RestoreVolumeFromImage("RestoreVolumeFromImage" + snapshot_vm_resource.id,
@@ -1093,7 +1093,7 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                                     volume_type='volume_type_'+snapshot_vm_resource.id,
                                     image_virtual_size='image_virtual_size_' + str(snapshot_vm_resource.id)),
                         provides='volume_id_' + str(snapshot_vm_resource.id)))
-"""
+            """
 
     return flow
 
