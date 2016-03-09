@@ -17,7 +17,7 @@ import pkg_resources
 import six
 from six.moves.urllib import parse
 from threading import Lock
-
+from collections import namedtuple
 
 from workloadmgr.openstack.common.gettextutils import _
 from novaclient import exceptions as nova_exception
@@ -629,6 +629,48 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
+    def set_meta_item(self, context, server_id, key, value):
+        """
+        Adds a metadata item to the server given key value
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+
+        try:
+            server = namedtuple('server', 'id')
+            s = server(id=server_id)
+
+            client = novaclient(context, self._production)
+            return client.servers.set_meta_item(server=s, key=key, value=value)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.servers.set_meta_item(server=s, key=key, value=value)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
+    def delete_meta(self, context, server_id, keys):
+        """
+        Delete metadata of the server given the server id and keys
+        :param server: The :class:`Server` (or its ID) to query.
+        :param keys: meta data keys
+        """
+
+        try:
+            server = namedtuple('server', 'id')
+            s = server(id=server_id)
+
+            client = novaclient(context, self._production)
+            return client.servers.delete_meta(server=s, keys=keys)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.servers.delete_meta(server=s, keys=keys)
+        except Exception as ex:
+            LOG.exception(ex)
             return
 
     @synchronized(novalock)

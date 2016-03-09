@@ -279,9 +279,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         workflow = workflow_class("discover_instances", store)
         instances = workflow.discover()
 
-
+        compute_service = nova.API(production=True)
         for vm in self.db.workload_vms_get(context, workload.id):
             self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+            compute_service.delete_meta(context, vm.vm_id,
+                                   ["workload_id", "workload_name"])
         
         if instances and 'instances' in instances:
             for instance in instances['instances']:
@@ -290,6 +292,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                           'metadata': instance['vm_metadata'],
                           'vm_name': instance['vm_name']}
                 vm = self.db.workload_vms_create(context, values)                                       
+                compute_service.set_meta_item(context, vm.vm_id,
+                                    "workload_id", workload.id)
+                compute_service.set_meta_item(context, vm.vm_id,
+                                    "workload_name", workload.display_name)
         
         if instances and 'topology' in instances:
             workload_metadata = {'topology': json.dumps(instances['topology'])}
@@ -370,12 +376,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'available',
                                      'availability_zone': self.az,
                                     })
+
+            compute_service = nova.API(production=True)
+            for vm in vms:
+                compute_service.set_meta_item(context, vm.vm_id,
+                                    "workload_id", workload_id)
+                compute_service.set_meta_item(context, vm.vm_id,
+                                    "workload_name", workload['display_name'])
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
                                       {'status': 'error',
                                        'fail_reason': unicode(err)})
-        
+
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
@@ -429,8 +442,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.snapshot_type_time_size_update(context, snapshot_id)               
             # Update vms of the workload
             if  'instances' in workflow._store and workflow._store['instances']:
+                compute_service = nova.API(production=True)                
                 for vm in self.db.workload_vms_get(context, workload.id):
                     self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
+                    compute_service.delete_meta(context, vm.vm_id,
+                                            ["workload_id", 'workload_name'])
+
 
                 for instance in workflow._store['instances']:
                     values = {'workload_id': workload.id,
@@ -439,6 +456,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                               'metadata': instance['vm_metadata'],
                               'vm_name': instance['vm_name']}
                     vm = self.db.workload_vms_create(context, values)                                       
+                    compute_service.set_meta_item(context, vm.vm_id,
+                                                  "workload_id", workload.id)
+                    compute_service.set_meta_item(context, vm.vm_id,
+                                                  "workload_name", workload.display_name)
             
             hostnames = []
             for inst in workflow._store['instances']:
@@ -601,8 +622,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
                                                                 workload.id,
                                                                 workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete(context, {'workload_id': workload.id, 'workload_name': workload.display_name,})
+        vault.workload_delete(context, {'workload_id': workload.id,
+                                        'workload_name': workload.display_name,})
         self.workload_reset(context, workload_id)
+
+        compute_service = nova.API(production=True)                
+        workload_vms = self.db.workload_vms_get(context, workload.id)
+        for vm in workload_vms:
+            compute_service.delete_meta(context, vm.vm_id,
+                                   ["workload_id", 'workload_name'])
+            self.db.workload_vms_delete(context, vm.vm_id, workload.id)
         self.db.workload_delete(context, workload.id)
 
 
@@ -785,12 +814,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                               workload_metadata[instance_id] = restored_vm.vm_id
                               if restored_ids == None:
                                  self.db.workload_vms_delete(context, instance_id, workload.id)
+                                 compute_service.delete_meta(context, instance_id,
+                                                         ["workload_id", "workload_name"])
                               else:
                                    for ins in snap_ins:
                                        workload_metadata[ins] = restored_vm.vm_id
  
                                    for restored_id in restored_ids:
                                        self.db.workload_vms_delete(context, restored_id, workload.id)
+                                       compute_service.delete_meta(context, restore__id,
+                                                            ["workload_id", ["workload_name"]])
 
                               self.db.workload_update(context,
                                    workload.id,
@@ -798,13 +831,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'metadata' : workload_metadata,
                                    })
 
-                           self.db.restored_vm_update( context, restored_vm.vm_id, restore_id, {'metadata': instance.metadata})
+                           self.db.restored_vm_update( context, restored_vm.vm_id,
+                                               restore_id, {'metadata': instance.metadata})
                            values = {'workload_id': workload.id,
                                      'vm_id': restored_vm.vm_id,
                                      'metadata': instance.metadata,
                                      'vm_name': instance.name,
                                      'status': 'available'}
                            vm = self.db.workload_vms_create(context, values)
+                           compute_service.set_meta_item(context, vm.vm_id,
+                                     "workload_id", workload.id)
+                           compute_service.set_meta_item(context, vm.vm_id,
+                                     "workload_name", workload.display_name)
 
                    restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                    restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
