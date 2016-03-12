@@ -564,8 +564,9 @@ class API(base.Base):
                             "found in the cloud")
                     raise wlm_exceptions.Invalid(reason=msg)
 
-
             for vm in self.db.workload_vms_get(context, workload_id):
+                compute_service.delete_meta(context, vm.vm_id,
+                                      ['workload_id', 'workload_name'])
                 self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
 
             for instance in instances:
@@ -574,7 +575,10 @@ class API(base.Base):
                           'metadata': instance['metadata'],
                           'status': 'available',
                           'vm_name': instance['instance-name']}
-                vm = self.db.workload_vms_create(context, values)                                       
+                vm = self.db.workload_vms_create(context, values)
+                compute_service.set_meta_item(context, vm.vm_id, 'workload_id', workload_id)
+                compute_service.set_meta_item(context, vm.vm_id,
+                                        'workload_name', workload['name'])
 
         workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
             
@@ -621,9 +625,6 @@ class API(base.Base):
                     self._scheduler.unschedule_job(job)
                     break
     
-            for vm in self.db.workload_vms_get(context, workload_id):
-                self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
-
             self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
             AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
