@@ -1096,7 +1096,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             mount_vm_id = self.db.get_metadata_value(snapshot.metadata, 'mount_vm_id')
 
             if mount_vm_id == None:
-                LOG.error(_("Could not find recovery manager vm id in the snapshot metadata"))
+                msg = _("Could not find recovery manager vm id in the snapshot metadata")
+                LOG.error(msg)
                 raise wlm_exceptions.Invalid(reason=msg)
 
             virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
