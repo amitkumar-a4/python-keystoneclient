@@ -765,7 +765,7 @@ def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':                    
         #configure rabittmq
         command = ['sudo', 'apt-get', 'remove', '--purge', "rabbitmq-server", '-y'];
-        subprocess.call(command, shell=False)
+        #subprocess.call(command, shell=False)
         command = ['sudo', 'dpkg', '-i', TVAULT_RABBITMQ_DEB_PATH];
         subprocess.call(command, shell=False)
         command = ['sudo', 'rm', "/etc/init/rabbitmq-server.override"];
@@ -1562,6 +1562,8 @@ def configure_host():
         new_file.write(hostname+'\n')
         new_file.close()
         close(fh)
+        command = ['sudo', 'apt-get', 'remove', '--purge', "rabbitmq-server", '-y'];
+        subprocess.call(command, shell=False)
         command = ['sudo', 'mv', abs_path, "/etc/hostname"];
         subprocess.call(command, shell=False)
         os.chmod('/etc/hostname', 0644)
