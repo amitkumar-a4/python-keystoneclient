@@ -945,7 +945,6 @@ def purge_restore_vm_resource_from_staging_area(context, restore_vm_resource_met
     except Exception as ex:
         LOG.exception(ex)                   
 
-@autolog.log_method(logger=Logger)         
 def get_size(vault_path):
     size = 0
     try:
