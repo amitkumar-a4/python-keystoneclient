@@ -66,6 +66,7 @@ def get_new_volume_type(instance_options, volume_id, volume_type):
         for voloption in instance_options['vdisks']:
             if voloption['id'].lower() == volume_id:
                 volume_type = voloption['new_volume_type']
+                break
 
     return volume_type
 
