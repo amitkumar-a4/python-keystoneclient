@@ -715,11 +715,6 @@ class LibvirtDriver(driver.ComputeDriver):
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
                 
-            if(disk_info['dev'] == 'vda' and snapshot_vm_resource_metadata['image_id'] != None):
-                snapshot_vm_resource_backing = None
-                vm_disk_resource_snap_backing = None
-                disk_info['prev_disk_info'] = None
-
             # Make sure the previous snapshot exists in cinder.
             # if not, fall back to full snapshot
             if snapshot_vm_resource_backing:
@@ -728,6 +723,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                         {'disk_info': disk_info,})
 
                 if status['result'] != 'success':
+                    LOG.info(_("No previous snapshots found. Performing full snapshot"))
                     snapshot_vm_resource_backing = None
                     vm_disk_resource_snap_backing = None
                     disk_info['prev_disk_info'] = None
