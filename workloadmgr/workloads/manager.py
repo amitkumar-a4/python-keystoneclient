@@ -824,7 +824,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
  
                                    for restored_id in restored_ids:
                                        self.db.workload_vms_delete(context, restored_id, workload.id)
-                                       compute_service.delete_meta(context, restore__id,
+                                       compute_service.delete_meta(context, restore_id,
                                                             ["workload_id", ["workload_name"]])
 
                               self.db.workload_update(context,
