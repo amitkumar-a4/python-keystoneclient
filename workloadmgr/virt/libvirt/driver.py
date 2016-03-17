@@ -543,8 +543,67 @@ class LibvirtDriver(driver.ComputeDriver):
 
         compute_service = nova.API(production=True)
         vast_params = {'snapshot_id': snapshot_obj.id,
-                       'workload_id': workload_obj.id}
-        snapshot_data = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
+                       'workload_id': workload_obj.id,
+                       'instance_vm_id': instance['vm_id']}
+
+        try:
+            status = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
+        except nova_unauthorized as ex:
+               LOG.exception(ex)
+               user_id = cntx.user
+               project_id = cntx.tenant
+               cntx = nova._get_tenant_context(user_id, project_id)
+        start_time = timeutils.utcnow()
+        snapshot_completed = False
+        progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}
+        progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
+        while True:
+              try:
+                  time.sleep(10)
+                  async_task_status = {}
+                  if progress_tracking_file_path:
+                     try:
+                         with open(progress_tracking_file_path, 'r') as progress_tracking_file:
+                              async_task_status['status'] = progress_tracking_file.readlines()
+                     except Exception as ex:
+                            async_task_status = compute_service.vast_async_task_status(cntx,
+                                                                     instance['vm_id'],
+                                                                     {'metadata': progress_tracker_metadata})                          
+
+                  else:
+                       async_task_status = compute_service.vast_async_task_status(cntx,
+                                                                 instance['vm_id'],
+                                                                 {'metadata': progress_tracker_metadata})
+                  if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
+                     for line in async_task_status['status']:
+                         if 'Down' in line:
+                            data_transfer_completed = 'Down'
+                            raise Exception("Contego service Unreachable - " + line)
+                         if 'Error' in line:
+                            raise Exception("Data transfer failed - " + line)
+                         if 'Completed' in line:
+                            snapshot_completed = True
+                            snapshot_data = compute_service.vast_async_task_status(cntx,
+                                                                 instance['vm_id'],
+                                                                 {'metadata': progress_tracker_metadata})
+
+                            break;
+
+                  if snapshot_completed:
+                     break;
+              except nova_unauthorized as ex:
+                     LOG.exception(ex)
+                     user_id = cntx.user
+                     project_id = cntx.tenant
+                     cntx = nova._get_tenant_context(user_id, project_id)
+              except Exception as ex:
+                     LOG.exception(ex)
+                     raise ex
+              now = timeutils.utcnow()
+              if (now - start_time) > datetime.timedelta(minutes=10*60):
+                 raise exception.ErrorOccurred(reason='Timeout uploading data')
+
+        
         return snapshot_data
 
     @autolog.log_method(Logger, 'libvirt.driver.reset_vm')
