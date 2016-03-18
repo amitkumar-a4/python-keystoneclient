@@ -537,22 +537,18 @@ class WorkloadMgrsController(wsgi.Controller):
     def import_workloads(self, req, body={}):
         try:
             context = req.environ['workloadmgr.context']
+            workload_ids = []
             try:
                 workload_ids = body['workload_ids']
             except KeyError:
-                workload_ids = []
+                   pass
 
-            upgrade = False
+            upgrade = True
             try:
                 upgrade = body.get('upgrade')
-                if upgrade == 'true':
-                    upgrade = True 
-                else:
-                    upgrade = False                                        
-            except Exception as ex:
-                upgrade = False
+            except KeyError:
+                   pass
 
-            
             try:
                 workloads = self.workload_api.import_workloads(context, workload_ids, upgrade)
                 return self._view_builder.detail_list(req, workloads)
