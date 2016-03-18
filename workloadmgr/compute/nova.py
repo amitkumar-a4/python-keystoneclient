@@ -17,7 +17,7 @@ import pkg_resources
 import six
 from six.moves.urllib import parse
 from threading import Lock
-
+from collections import namedtuple
 
 from workloadmgr.openstack.common.gettextutils import _
 from novaclient import exceptions as nova_exception
@@ -632,6 +632,48 @@ class API(base.Base):
             return
 
     @synchronized(novalock)
+    def set_meta_item(self, context, server_id, key, value):
+        """
+        Adds a metadata item to the server given key value
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+
+        try:
+            server = namedtuple('server', 'id')
+            s = server(id=server_id)
+
+            client = novaclient(context, self._production)
+            return client.servers.set_meta_item(server=s, key=key, value=value)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.servers.set_meta_item(server=s, key=key, value=value)
+        except Exception as ex:
+            LOG.exception(ex)
+            #TODO(gbasava): Handle the exception
+            return
+
+    @synchronized(novalock)
+    def delete_meta(self, context, server_id, keys):
+        """
+        Delete metadata of the server given the server id and keys
+        :param server: The :class:`Server` (or its ID) to query.
+        :param keys: meta data keys
+        """
+
+        try:
+            server = namedtuple('server', 'id')
+            s = server(id=server_id)
+
+            client = novaclient(context, self._production)
+            return client.servers.delete_meta(server=s, keys=keys)
+        except nova_exception.Unauthorized as unauth_ex:
+            client = novaclient(context, self._production, admin=True)
+            return client.servers.delete_meta(server=s, keys=keys)
+        except Exception as ex:
+            LOG.exception(ex)
+            return
+
+    @synchronized(novalock)
     def attach_volume(self, context, server_id, volume_id, device):
         """
         Attach a volume identified by the volume ID to the given server ID
@@ -1018,6 +1060,29 @@ class API(base.Base):
             msg = 'Unable to upload snapshot; Please check contego logs for more details'
             raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
+
+    @synchronized(novalock)
+    def vast_check_prev_snapshot(self, context, server, params):
+        """
+        Check if the previous snapshot is valid
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        try:
+            extensions = _discover_extensions('1.1')
+            client =  novaclient(context, self._production,
+                                 extensions=extensions)
+            return client.contego.vast_check_prev_snapshot(server=server,
+                                         params=params, do_checksum=True)
+        except nova_exception.Unauthorized as unauth_ex:
+            client =  novaclient(context, self._production,
+                                 extensions=extensions, admin=True)
+            return client.contego.vast_check_prev_snapshot(server=server,
+                                         params=params, do_checksum=True)
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = 'Unable to verify validity of previous snapshot; \
+                   Please check contego logs for more details'
+            raise exception.ErrorOccurred(msg)
 
     @synchronized(novalock)
     def copy_backup_image_to_volume(self, context, server, params):

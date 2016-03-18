@@ -52,6 +52,11 @@ restore_vm_opts = [
     cfg.StrOpt('cinder_nfs_mount_point_base',
                default='/opt/stack/data/mnt',
                help='Dir where the nfs volume is mounted for restore'),                   
+
+    cfg.StrOpt('nfs_volume_type_substr',
+               default='nfs,netapp',
+               help='Dir where the nfs volume is mounted for restore'),                   
+
     ]
 
 LOG = logging.getLogger(__name__)
@@ -1000,7 +1005,7 @@ class PowerOnInstance(task.Task):
                                         restored_instance_id))
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=4):
-                raise exception.ErrorOccurred(reason='Timeout waiting for '
+                raise exception.ErrorOccurred(reason='Timeout waiting for '\
                                            'the instance to boot from volume')                   
 
         self.restored_instance = restored_instance
@@ -1071,9 +1076,10 @@ def RestoreVolumes(context, instance, instance_options, snapshotobj, restoreid):
                 volume_type='default'
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id').lower()
   
-            volume_type = get_new_volume_type(instance_options, volume_id, volume_type)
+            new_volume_type = get_new_volume_type(instance_options, volume_id, volume_type)
 
-            if 'nfs' in volume_type:
+            #if [vtype for vtype in CONF.nfs_volume_type_substr.split(',') if vtype in new_volume_type]:
+            if False:
                 flow.add(RestoreNFSVolume("RestoreNFSVolume" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id, 
                                                 volume_type='volume_type_'+snapshot_vm_resource.id,

@@ -774,13 +774,24 @@ class LibvirtDriver(driver.ComputeDriver):
             except Exception as ex:
                 LOG.info(_("No previous snapshots found. Performing full snapshot"))
                 
-            if(disk_info['dev'] == 'vda' and snapshot_vm_resource_metadata['image_id'] != None):
-                vm_disk_resource_snap_backing = None                
+            # Make sure the previous snapshot exists in cinder.
+            # if not, fall back to full snapshot
+            if snapshot_vm_resource_backing:
+                status = compute_service.vast_check_prev_snapshot(cntx,
+                                        instance['vm_id'],
+                                        {'disk_info': disk_info,})
+
+                if status['result'] != 'success':
+                    LOG.info(_("No previous snapshots found. Performing full snapshot"))
+                    snapshot_vm_resource_backing = None
+                    vm_disk_resource_snap_backing = None
+                    disk_info['prev_disk_info'] = None
 
             if snapshot_vm_resource_backing:
                 backings = [disk_info['backings'][0]]
             else:
                 backings = disk_info['backings'][::-1] # reverse the list
+
             for i, backing in enumerate(backings):
                 vm_disk_resource_snap_id = str(uuid.uuid4())
                 vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
