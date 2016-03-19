@@ -564,7 +564,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                 LOG.exception(ex)                                    
                                     
                      except Exception as ex:
-                            import pdb;pdb.set_trace()
                             async_task_status = compute_service.vast_async_task_status(cntx, 
                                                                                            instance_id,
                                                                                            {'metadata': progress_tracker_metadata})                                  
