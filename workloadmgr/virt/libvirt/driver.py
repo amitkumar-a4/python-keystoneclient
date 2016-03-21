@@ -536,6 +536,20 @@ class LibvirtDriver(driver.ComputeDriver):
     def enable_cbt(self, cntx, db, instance):
         pass
 
+    def _vast_methods_call_by_function(self, func, *args):
+        status = {'result': 'retry'}
+        try:
+            status = func(*args)
+        except nova_unauthorized as ex:
+               LOG.exception(ex)
+               user_id = cntx.user
+               project_id = cntx.tenant
+               cntx = nova._get_tenant_context(user_id, project_id)
+        except Exception as ex:
+               LOG.exception(ex)
+               raise ex
+        return status
+
     def _wait_for_remote_nova_process(self, cntx, compute_service, progress_tracker_metadata,
                                       instance_id, db=None, vault_url=None, calc_size=False):
         start_time = timeutils.utcnow()
@@ -605,7 +619,9 @@ class LibvirtDriver(driver.ComputeDriver):
                        'workload_id': workload_obj.id,
                        'instance_vm_id': instance['vm_id']}
 
-        try:
+        status = self._vast_methods_call_by_function(compute_service.vast_instance, cntx, instance['vm_id'], vast_params)
+
+        """try:
             status = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
         except nova_unauthorized as ex:
                LOG.exception(ex)
@@ -614,7 +630,7 @@ class LibvirtDriver(driver.ComputeDriver):
                cntx = nova._get_tenant_context(user_id, project_id)
         except Exception as ex:
                LOG.exception(ex)
-               raise ex
+               raise ex"""
 
         progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}
         self._wait_for_remote_nova_process(cntx, compute_service, progress_tracker_metadata, instance['vm_id'])
@@ -854,29 +870,19 @@ class LibvirtDriver(driver.ComputeDriver):
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
 
                 # Get a new token, just to be safe
+
                 status = {'result': 'retry'}
                 while status['result'] == 'retry':
-                    try:
-                        user_id = cntx.user
-                        project_id = cntx.tenant
-                        cntx = nova._get_tenant_context(user_id, project_id)
-                        status = compute_service.vast_data_transfer(cntx,
-                                             instance['vm_id'],
-                                             {'path': backing['path'],
-                                              'metadata': snapshot_vm_disk_resource_metadata,
-                                              'disk_info': disk_info
-                                             })
-                    except nova_unauthorized as ex:
-                        LOG.exception(ex)
-                        # recreate the token here
-                        user_id = cntx.user
-                        project_id = cntx.tenant
-                        cntx = nova._get_tenant_context(user_id, project_id)
-                        status = {'result': 'retry'}
+                      status = self._vast_methods_call_by_function(compute_service.vast_data_transfer, cntx,
+                                                      instance['vm_id'],
+                                                      {'path': backing['path'],
+                                                       'metadata': snapshot_vm_disk_resource_metadata,
+                                                       'disk_info': disk_info
+                                                      })
      
-                    if status['result'] == 'retry':
-                        LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
-                        time.sleep(60)
+                      if status['result'] == 'retry':
+                         LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
+                         time.sleep(60)
 
                    
                 snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
@@ -995,7 +1001,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         while True:
               try:
-                  compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+                  status = self._vast_methods_call_by_function(compute_service.vast_finalize, cntx, instance['vm_id'], snapshot_data_ex)
                   break
               except Exception as ex:
                      pass
