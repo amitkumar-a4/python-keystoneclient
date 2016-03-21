@@ -621,17 +621,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
         status = self._vast_methods_call_by_function(compute_service.vast_instance, cntx, instance['vm_id'], vast_params)
 
-        """try:
-            status = compute_service.vast_instance(cntx, instance['vm_id'], vast_params)
-        except nova_unauthorized as ex:
-               LOG.exception(ex)
-               user_id = cntx.user
-               project_id = cntx.tenant
-               cntx = nova._get_tenant_context(user_id, project_id)
-        except Exception as ex:
-               LOG.exception(ex)
-               raise ex"""
-
         progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']}
         self._wait_for_remote_nova_process(cntx, compute_service, progress_tracker_metadata, instance['vm_id'])
 
