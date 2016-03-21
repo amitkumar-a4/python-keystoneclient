@@ -536,7 +536,8 @@ class LibvirtDriver(driver.ComputeDriver):
     def enable_cbt(self, cntx, db, instance):
         pass
 
-    def _wait_for_remote_nova_process(self, cntx, compute_service, progress_tracker_metadata, instance_id, db=None, vault_url=None, calc_size=False):
+    def _wait_for_remote_nova_process(self, cntx, compute_service, progress_tracker_metadata,
+                                      instance_id, db=None, vault_url=None, calc_size=False):
         start_time = timeutils.utcnow()
         operation_completed = False
         progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
@@ -558,7 +559,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                 if totalbytes:
                                    uploaded_size_incremental = totalbytes - previous_uploaded_size
                                    uploaded_size = totalbytes
-                                   snapshot_obj = db.snapshot_update(cntx, progress_tracker_metadata['snapshot_id'], {'uploaded_size_incremental': uploaded_size_incremental})
+                                   snapshot_obj = db.snapshot_update(cntx, progress_tracker_metadata['snapshot_id'], 
+                                                                    {'uploaded_size_incremental': uploaded_size_incremental})
                                    previous_uploaded_size = uploaded_size                        
                          except Exception as ex:
                                 LOG.exception(ex)                                    
@@ -887,7 +889,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
   
                 progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : vm_disk_resource_snap_id}
-                self._wait_for_remote_nova_process(cntx, compute_service, progress_tracker_metadata, instance['vm_id'], db, vault_url, True)
+                self._wait_for_remote_nova_process(cntx, compute_service, progress_tracker_metadata, 
+                                                   instance['vm_id'], db, vault_url, True)
 
                 snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id,
                                                   {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
