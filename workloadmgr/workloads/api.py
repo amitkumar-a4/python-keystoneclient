@@ -730,6 +730,9 @@ class API(base.Base):
         try:
             for node_record in self.db.service_get_all_by_topic(context, topic='workloadmgr-workloads'):
                 try:
+                    status = 'Up'
+                    if not utils.service_is_up(node_record) or node_record['disabled']:
+                       status = 'Down'
                     ipaddress = ''
                     ip_addresses = node_record.ip_addresses.split(';')
                     if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
@@ -738,9 +741,11 @@ class API(base.Base):
                     if socket.gethostname() == node_record.host:
                        is_controller = True
                     nodes.append({'node':node_record.host, 
+                                  'id': node_record.id,
                                   'version':node_record.version, 
                                   'ipaddress': ipaddress,
-                                  'is_controller': is_controller})
+                                  'is_controller': is_controller,
+                                  'status': status})
                 except Exception as ex:
                     LOG.exception(ex)                      
         except Exception as ex:
