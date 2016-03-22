@@ -662,6 +662,7 @@ class API(base.Base):
                 try:
                     workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
                     workloads.append(workload_values)
+
                 except Exception as ex:
                     LOG.exception(ex)
                     continue
@@ -680,6 +681,7 @@ class API(base.Base):
             if upgrade:
                 raise wlm_exceptions.AdminRequired()
         
+        try:
             workloads = []
             import_workload_module = None
             workload_url = vault.get_workloads(context)
