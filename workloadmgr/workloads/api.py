@@ -675,7 +675,11 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
         AUDITLOG.log(context,'Import Workloads Requested', None)
-        try:
+
+        if not context.is_admin:
+            if upgrade:
+                raise wlm_exceptions.AdminRequired()
+        
             workloads = []
             import_workload_module = None
             workload_url = vault.get_workloads(context)
