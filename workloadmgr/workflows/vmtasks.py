@@ -959,7 +959,7 @@ def LinearFreezeVMs(instances):
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
-    if bool(int(instances[0]['pause_at_snapshot'])) == True:
+    if instances[0]['pause_at_snapshot'] == True:
        for index,item in enumerate(instances):
             flow.add(PauseVM("PauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
@@ -972,7 +972,7 @@ def UnorderedPauseVMs(instances):
 
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
-    if bool(int(instances[0]['pause_at_snapshot'])) == True:
+    if instances[0]['pause_at_snapshot'] == True:
         for index,item in enumerate(instances):
             flow.add(PauseVM("PauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
@@ -1011,7 +1011,7 @@ def LinearSnapshotVMs(instances):
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
     for index,item in enumerate(instances):
-        if bool(int(item['pause_at_snapshot'])) == True:
+        if item['pause_at_snapshot'] == True:
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
         else:
@@ -1022,7 +1022,7 @@ def UnorderedUnPauseVMs(instances):
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
     for index,item in enumerate(instances):
-        if bool(int(item['pause_at_snapshot'])) == True:
+        if item['pause_at_snapshot'] == True:
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
         else:
