@@ -673,7 +673,7 @@ class API(base.Base):
         return workloads
     
     @autolog.log_method(logger=Logger)    
-    def import_workloads(self, context, workload_ids=[], upgrade=True):
+    def import_workloads(self, context, workload_ids, upgrade):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         try:
             workloads = []
