@@ -305,7 +305,6 @@ class API(base.Base):
                 workload_dict['jobschedule']['enabled'] = True
                 break
 
-
         return workload_dict
     
     @autolog.log_method(logger=Logger)

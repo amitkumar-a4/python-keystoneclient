@@ -117,6 +117,7 @@ class SerialWorkflow(workflow.Workflow):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
         self._store['instances'] =  get_vms(cntx, self._store['workload_id'])
         for index,item in enumerate(self._store['instances']):
+            item['pause_at_snapshot'] = self._store['pause_at_snapshot']
             self._store['instance_'+item['vm_id']] = item
       
         _snapshotvms = lf.Flow(self.name + "#SnapshotVMs")

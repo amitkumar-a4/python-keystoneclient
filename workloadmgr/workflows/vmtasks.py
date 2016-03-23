@@ -48,12 +48,7 @@ from workloadmgr import exception
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
-vmtasks_opts = [
-    cfg.BoolOpt('pause_vm_before_snapshot',
-                default=False,
-                help='pause VM before snapshot operation'
-                     ' libvirt calls'),
-    ]
+vmtasks_opts = []
 
 CONF = cfg.CONF
 CONF.register_opts(vmtasks_opts)
@@ -964,8 +959,8 @@ def LinearFreezeVMs(instances):
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
-    if CONF.pause_vm_before_snapshot:
-        for index,item in enumerate(instances):
+    if instances[0]['pause_at_snapshot'] == True:
+       for index,item in enumerate(instances):
             flow.add(PauseVM("PauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
     else:
@@ -977,7 +972,7 @@ def UnorderedPauseVMs(instances):
 
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
-    if CONF.pause_vm_before_snapshot:
+    if instances[0]['pause_at_snapshot'] == True:
         for index,item in enumerate(instances):
             flow.add(PauseVM("PauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
@@ -1015,24 +1010,23 @@ def LinearSnapshotVMs(instances):
 
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
-    if CONF.pause_vm_before_snapshot:
-        for index,item in enumerate(instances):
+    for index,item in enumerate(instances):
+        if item['pause_at_snapshot'] == True:
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
-    else:
-        flow.add(NoneTask("UnorderedUnPauseVMs"))
+        else:
+             flow.add(NoneTask("UnorderedUnPauseVMs"))
     
     return flow
 
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
-
-    if CONF.pause_vm_before_snapshot:
-        for index,item in enumerate(instances):
+    for index,item in enumerate(instances):
+        if item['pause_at_snapshot'] == True:
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
-    else:
-        flow.add(NoneTask("LinearUnPauseVMs"))
+        else:
+             flow.add(NoneTask("LinearUnPauseVMs"))
 
     return flow
 

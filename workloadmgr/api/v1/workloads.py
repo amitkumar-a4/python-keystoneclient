@@ -274,6 +274,7 @@ class WorkloadMgrsController(wsgi.Controller):
                            'retention_policy_type': 'Number of Snapshots to Keep',
                            'retention_policy_value': '30'}
 
+
             jobschedule = workload.get('jobschedule', jobdefaults)
             if not jobschedule:
                 jobschedule = {}
