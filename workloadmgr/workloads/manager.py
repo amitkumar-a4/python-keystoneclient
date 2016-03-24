@@ -80,9 +80,9 @@ workloads_manager_opts = [
                default='/var/triliovault/tvault-mounts',
                help='Root directory where all snapshots are mounted.'),
     cfg.BoolOpt('pause_vm_before_snapshot',
-               default=False,
-               help='pause VM before snapshot operation'
-                    ' libvirt calls'),               
+                default=False,
+                help='pause VM before snapshot operation'
+                     ' libvirt calls'),
 ]
 
 scheduler_config = {'standalone': 'True'}
@@ -418,7 +418,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             for metadata in workload.metadata:
                 for key in metadata:
                     if key == 'pause_at_snapshot':
-                        pause_at_snapshot = bool(int(metadata[key]))
+                       pause_at_snapshot = bool(int(metadata[key]))
 
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])            
