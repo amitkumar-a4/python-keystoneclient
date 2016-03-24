@@ -592,6 +592,15 @@ def workload_get_all_by_project(context, project_id):
         raise exception.WorkloadsNotFound() 
     
     return workloads
+
+@require_context
+def workload_get_all_by_admin(context, **kwargs):
+    if not is_admin_context(context):
+        raise exception.AdminRequired()
+    else:        
+        return model_query( context, models.Workloads, **kwargs).\
+                            options(sa_orm.joinedload(models.Workloads.metadata)).\
+                            order_by(models.Workloads.created_at.desc()).all()
     
 @require_context
 def _workload_get(context, id, session, **kwargs):

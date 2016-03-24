@@ -128,6 +128,10 @@ def workload_get_all(context, **kwargs):
     """Get all workloads."""
     return IMPL.workload_get_all(context, **kwargs)
 
+def workload_get_all_by_admin(context, **kwargs):
+    """Get all workloads of all the projects."""
+    return IMPL.workload_get_all_by_admin(context, **kwargs)    
+
 def workload_get_all_by_host(context, host):
     """Get all workloads belonging to a host."""
     return IMPL.workload_get_all_by_host(context, host)

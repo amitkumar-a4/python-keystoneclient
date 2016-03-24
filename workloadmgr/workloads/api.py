@@ -305,6 +305,7 @@ class API(base.Base):
                 workload_dict['jobschedule']['enabled'] = True
                 break
 
+
         return workload_dict
     
     @autolog.log_method(logger=Logger)
@@ -382,6 +383,12 @@ class API(base.Base):
     def workload_get_all(self, context, search_opts={}):
         workloads = self.db.workload_get_all(context)
         return workloads
+        
+
+    @autolog.log_method(logger=Logger)
+    def workload_get_all_by_admin(self, context, search_opts={}):
+        workloads = self.db.workload_get_all_by_admin(context)
+        return workloads        
     
     @autolog.log_method(logger=Logger)
     def workload_create(self, context, name, description, workload_type_id,
@@ -675,7 +682,14 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
         AUDITLOG.log(context,'Import Workloads Requested', None)
-        
+        print "**************************************************"
+        print "**************************************************"
+        print "user_id TYPE : ", str(context.user_id)
+        print "**************************************************"
+        print "upgrade TYPE", type(upgrade) 
+        print "**************************************************"
+        if not context.is_admin == 1:
+            print "Admin 1 Worked"
         if not context.is_admin and upgrade:
             raise wlm_exceptions.AdminRequired()
         

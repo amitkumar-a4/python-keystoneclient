@@ -225,6 +225,20 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+    @wsgi.serializers(xml=WorkloadsTemplate)
+    def get_all_workloads(self, req):
+        """Returns a list of all workloads."""
+        try:
+            return self._get_workloads_all(req)
+        except exception.WorkloadNotFound as error:
+            LOG.exception(error)
+            raise exc.HTTPNotFound(explanation=unicode(error))
+        except exception.InvalidState as error:
+            LOG.exception(error)
+            raise exc.HTTPBadRequest(explanation=unicode(error))
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
         
     def _get_workloads(self, req, is_detail):
         """Returns a list of workloadmgr, transformed through view builder."""
@@ -244,6 +258,18 @@ class WorkloadMgrsController(wsgi.Controller):
             workloads = self._view_builder.summary_list(req, workloads)
         return workloads
 
+    def _get_workloads_all(self, req):
+        """Returns a list of all workloads."""
+        context = req.environ['workloadmgr.context']
+        workloads_all = self.workload_api.workload_get_all_by_admin(context)
+        limited_list = common.limited(workloads_all, req)
+
+        workloads = []
+        for workload in limited_list:
+            if workload['deleted'] == False:
+                workloads.append(workload)
+        workloads = self._view_builder.summary_list(req, workloads)
+        return workloads
         
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)
