@@ -959,8 +959,8 @@ def restore_vm_networks(cntx, db, restore):
                     instance_id = snapshot_vm.vm_id
                     mac_address = nic_data['mac_address']
                     nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
-                    if nic_options and 'new_network_id' in nic_options:
-                        nic_data['network_id'] = nic_options['new_network_id']
+                    if nic_options and 'network' in nic_options:
+                        nic_data['network_id'] = nic_options['network'].get('id', nic_data['network_id'])
                     restored_net_resources.setdefault(nic_data['mac_address'], nic_data)
                     restored_net_resources[nic_data['mac_address']]['production'] = False
                     if restored_net_resources[nic_data['mac_address']]['ip_address'] == nic_data['ip_address']:
