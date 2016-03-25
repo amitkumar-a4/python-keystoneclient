@@ -36,7 +36,7 @@ cinder_opts = [
                default=3,
                help='Number of cinderclient retries on failed http calls'),
     cfg.BoolOpt('cinder_api_insecure',
-               default=False,
+               default=True,
                help='Allow to perform insecure SSL requests to cinder'),
     cfg.BoolOpt('cinder_cross_az_attach',
                default=True,
