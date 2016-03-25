@@ -66,7 +66,7 @@ nova_opts = [
                default=None,
                help='region name for connecting to nova in admin context'),
     cfg.BoolOpt('nova_api_insecure',
-                default=False,
+                default=True,
                 help='if set, ignore any SSL validation issues'),
     cfg.StrOpt('nova_auth_system',
                default='keystone',
