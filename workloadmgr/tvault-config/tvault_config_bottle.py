@@ -1231,9 +1231,16 @@ def configure_horizon():
     if config_data['nodetype'] == 'controller': 
         #configure horizon
         if config_data['configuration_type'] == 'vmware':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
         elif config_data['configuration_type'] == 'openstack':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            if 'https' in config_data['keystone_public_url']: 
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_KEYSTONE_URL = ', 'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_SSL_NO_VERIFY = ', 'OPENSTACK_SSL_NO_VERIFY = True')
             
         command = ['sudo', 'rm', "/etc/init/apache2.override"];
         subprocess.call(command, shell=False)
@@ -1244,6 +1251,11 @@ def configure_horizon():
          if config_data['configuration_type'] == 'openstack':
             replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
                          'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            if 'https' in config_data['keystone_public_url']: 
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_KEYSTONE_URL = ', 'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_SSL_NO_VERIFY = ', 'OPENSTACK_SSL_NO_VERIFY = True')
 
             command = ['sudo', 'rm', "/etc/init/apache2.override"];
             subprocess.call(command, shell=False)
