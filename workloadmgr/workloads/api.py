@@ -681,8 +681,9 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
-        AUDITLOG.log(context,'Import Workloads Requested', None)        
-        if not context.is_admin and upgrade:
+        AUDITLOG.log(context,'Import Workloads Requested', None)     
+        
+        if not context.is_admin == True and upgrade == True:
             raise wlm_exceptions.AdminRequired()
             
         try:
