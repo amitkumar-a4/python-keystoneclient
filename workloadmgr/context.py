@@ -3,7 +3,10 @@
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
-"""RequestContext: context for requests that persist through all of workloadmgr."""
+"""
+    RequestContext: context for requests that persist
+    through all of workloadmgr.
+"""
 
 import copy
 import uuid
@@ -11,6 +14,7 @@ import uuid
 from workloadmgr.openstack.common import local
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import policy
 
 

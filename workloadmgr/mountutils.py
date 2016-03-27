@@ -2,17 +2,8 @@ import subprocess
 import os
 import re
 import time
-from subprocess import call
-from subprocess import check_call
-from subprocess import check_output
 import shutil
 import socket
-from os import remove, close
-
-from Queue import Queue
-from Queue import Queue, Empty
-from threading  import Thread
-from tempfile import mkstemp
 
 from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
@@ -45,27 +36,29 @@ class log():
 LOG = log()
 """
 
+
 ##
 # getfdisk_output():
-# if the underlying disk is fdisk, read the partition table from the mounted disk
+# if the underlying disk is fdisk, read the partition table from
+# the mounted disk
 #
 ##
 def getfdisk_output(mountpath=None):
     partitions = []
-    cmdspec = ["sudo", "fdisk", "-l",]
+    cmdspec = ["sudo", "fdisk", "-l", ]
     if mountpath:
         cmdspec.append(str(mountpath))
 
-    LOG.info(_( " ".join(cmdspec) ))
-    #stdout_value = check_output(cmdspec, stderr=subprocess.STDOUT)
+    LOG.info(_(" ".join(cmdspec)))
+    # stdout_value = check_output(cmdspec, stderr=subprocess.STDOUT)
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
-                
+
     stdout_value, stderr_value = process.communicate()
     parse = False
     for line in stdout_value.split("\n"):
@@ -74,7 +67,7 @@ def getfdisk_output(mountpath=None):
             fields = line.split()
             if (len(fields) == 0):
                 continue
-            index = 0;
+            index = 0
             partition["Device Name"] = fields[index]
             index += 1
             if fields[index] == "*":
@@ -101,31 +94,33 @@ def getfdisk_output(mountpath=None):
             parse = True
     return partitions
 
+
 ##
 # getgptdisk_output():
 #    if the underlying disk is gptdisk, read the partition table from
 # the mounted disk
 #
 # Fdisk shows gpt partition as follows:
-# stack@openstack01:~/gptsupport$ fdisk -l 1t.img 
-# 
-# WARNING: GPT (GUID Partition Table) detected on '1t.img'! The util fdisk doesn't support GPT. Use GNU Parted.
-# 
-# 
+# stack@openstack01:~/gptsupport$ fdisk -l 1t.img
+#
+# WARNING: GPT (GUID Partition Table) detected on '1t.img'!
+# The util fdisk doesn't support GPT. Use GNU Parted.
+#
+#
 # Disk 1t.img: 1099.5 GB, 1099511627776 bytes
 # 256 heads, 63 sectors/track, 133152 cylinders, total 2147483648 sectors
 # Units = sectors of 1 * 512 = 512 bytes
 # Sector size (logical/physical): 512 bytes / 512 bytes
 # I/O size (minimum/optimal): 512 bytes / 512 bytes
 # Disk identifier: 0x00000000
-# 
+#
 # Device Boot      Start         End      Blocks   Id  System
 # 1t.img1               1  2147483647  1073741823+  ee  GPT
 #
 #
 # A typical partition to support would be:
 #
-# stack@openstack01:~/gptsupport$ sgdisk -p 1t.img 
+# stack@openstack01:~/gptsupport$ sgdisk -p 1t.img
 # Disk 1t.img: 2147483648 sectors, 1024.0 GiB
 # Logical sector size: 512 bytes
 # Disk identifier (GUID): 006BE6CD-B6F1-4DBE-9CD5-8207D66A7BEE
@@ -133,10 +128,10 @@ def getfdisk_output(mountpath=None):
 # First usable sector is 34, last usable sector is 2147483614
 # Partitions will be aligned on 2048-sector boundaries
 # Total free space is 900013290 sectors (429.2 GiB)
-# 
+#
 # Number  Start (sector)    End (sector)  Size       Code  Name
 #   1            2048       147483614   70.3 GiB    8300  First
-#   2       147484672       157483614   4.8 GiB     8300  
+#   2       147484672       157483614   4.8 GiB     8300
 #   3       157485056       247483614   42.9 GiB    8300  Second
 #   4       247484416       347483614   47.7 GiB    8300  Third
 #   5       347484160       447483614   47.7 GiB    8300  Forth
@@ -144,27 +139,27 @@ def getfdisk_output(mountpath=None):
 #   7       547483648       647483614   47.7 GiB    8300  Sixth
 #   8       647485440       747483614   47.7 GiB    8300  Seventh
 #   9       747485184       847483614   47.7 GiB    8300  Eighth
-#  10       847484928       947483614   47.7 GiB    8300  
+#  10       847484928       947483614   47.7 GiB    8300
 #  11       947484672      1047483614   47.7 GiB    8300  Ninth
 #  12      1047484416      1147483614   47.7 GiB    8300  Tenth
 #  13      1147484160      1247483614   47.7 GiB    8300  Eleventh
-# 
+#
 ##
 def getgptdisk_output(mountpath=None):
     partitions = []
-    cmdspec = ["sudo", "sgdisk", "-p",]
+    cmdspec = ["sudo", "sgdisk", "-p", ]
     if mountpath:
         cmdspec.append(str(mountpath))
 
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
-                
+
     stdout_value, stderr_value = process.communicate()
     parse = False
     for line in stdout_value.split("\n"):
@@ -173,15 +168,15 @@ def getgptdisk_output(mountpath=None):
             fields = line.split()
             if (len(fields) == 0):
                 continue
-            index = 0;
+            index = 0
             partition["Number"] = fields[index]
             index += 1
             partition["start"] = fields[index]
             index += 1
             partition["end"] = fields[index]
             index += 1
-            partition["blocks"] = str((int(partition['end']) - \
-                                   int(partition['start']) + 1)/2)
+            partition["blocks"] = str((int(partition['end']) -
+                                       int(partition['start']) + 1)/2)
             index += 2
             partition["id"] = fields[index].lower()
             index += 1
@@ -190,9 +185,10 @@ def getgptdisk_output(mountpath=None):
             partitions.append(partition)
 
         if "Number" in line and "Start" in line and "End" in line and \
-            "Size" in line and "Code" in line and "Name" in line:
+           "Size" in line and "Code" in line and "Name" in line:
             parse = True
     return partitions
+
 
 def getlvs(vgs):
     subprocess.check_output(["lvscan"], stderr=subprocess.STDOUT)
@@ -214,7 +210,8 @@ def getlvs(vgs):
 
             if not len(lvinfo):
                 continue
-            lvinfo['LVM2_LV_PATH'] = "/dev/" + vgname + "/" + lvinfo['LVM2_LV_NAME']
+            lvinfo['LVM2_LV_PATH'] = "/dev/" + vgname + "/" + \
+                                     lvinfo['LVM2_LV_NAME']
             cmd = ["lvs", "--segments", "--noheadings", "--units", "b", "-o",
                    "seg_all", "--nameprefixes",
                    "/dev/" + vgname + "/" + lvinfo['LVM2_LV_NAME']]
@@ -235,13 +232,14 @@ def getlvs(vgs):
 
     return lvlist
 
-def getvgs(pvinfos = None):
+
+def getvgs(pvinfos=None):
     subprocess.check_output(["vgscan"], stderr=subprocess.STDOUT)
 
     # Activate volume groups on the pv
     subprocess.check_output(["vgchange", "-ay"], stderr=subprocess.STDOUT)
 
-    vgcmd = ["vgs", "--noheadings", "--nameprefixes",]
+    vgcmd = ["vgs", "--noheadings", "--nameprefixes", ]
     vgoutput = subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
 
     vglist = []
@@ -253,33 +251,41 @@ def getvgs(pvinfos = None):
                 vginfo[attr.split("=")[0]] =\
                      attr.split("=")[1].strip("\'").strip("B")
 
-        if len(vginfo) and 'LVM2_VG_NAME' in vginfo and vginfo['LVM2_VG_NAME'] != "tvault-appliance-vg":
+        if len(vginfo) and 'LVM2_VG_NAME' in vginfo and \
+           vginfo['LVM2_VG_NAME'] != "tvault-appliance-vg":
             vglist.append(vginfo)
 
     return vglist
 
+
 def getloop_part_start_size(loopdev):
     loopdev = loopdev.strip().rstrip()
     if re.search("loop[0-9]+p[0-9]+", loopdev):
-        with open('/sys/block/' + re.search("loop[0-9]+", loopdev).group(0) + '/' + re.search("loop[0-9]+p[0-9]+", loopdev).group(0) + '/size', 'r') as f:
+        with open('/sys/block/' + re.search("loop[0-9]+", loopdev).group(0) +
+                  '/' + re.search("loop[0-9]+p[0-9]+", loopdev).group(0) +
+                  '/size', 'r') as f:
             size = int(f.read()) * 512
 
-        with open('/sys/block/' + re.search("loop[0-9]+", loopdev).group(0) + '/' + re.search("loop[0-9]+p[0-9]+", loopdev).group(0) + '/start', 'r') as f:
+        with open('/sys/block/' + re.search("loop[0-9]+", loopdev).group(0) +
+                  '/' + re.search("loop[0-9]+p[0-9]+", loopdev).group(0) +
+                  '/start', 'r') as f:
             start = int(f.read()) * 512
     else:
         start = 0
-        with open('/sys/block/' + re.search("loop[0-9]+", loopdev).group(0) + '/size', 'r') as f:
+        with open('/sys/block/' + re.search("loop[0-9]+", loopdev).group(0) +
+                  '/size', 'r') as f:
             size = int(f.read()) * 512
 
     return start, size
 
-def _getpvinfo(mountpath, startoffset = '0', length = None):
+
+def _getpvinfo(mountpath, startoffset='0', length=None):
 
     subprocess.check_output(["pvscan"], stderr=subprocess.STDOUT)
     subprocess.check_output(["pvdisplay", mountpath], stderr=subprocess.STDOUT)
     LOG.info(_(mountpath + ":" + str(startoffset) + " is part of LVM"))
 
-    cmd = ["pvs", "--noheadings", "--nameprefixes",]
+    cmd = ["pvs", "--noheadings", "--nameprefixes", ]
     pvstr = subprocess.check_output(cmd + [mountpath],
                                     stderr=subprocess.STDOUT)
 
@@ -288,19 +294,21 @@ def _getpvinfo(mountpath, startoffset = '0', length = None):
         for attr in line.strip().split(" "):
             if 'LVM2_PV_NAME' in attr.split("=")[0] or\
                'LVM2_VG_NAME' in attr.split("=")[0]:
-                pvinfo[attr.split("=")[0]] = attr.split("=")[1].strip("\'").strip().strip("B")
+                pvinfo[attr.split("=")[0]] = \
+                    attr.split("=")[1].strip("\'").strip().strip("B")
 
     cmd = ["pvs", "--noheadings", "--units", "b", "-o",
-           "pv_all", "--nameprefixes",]
+           "pv_all", "--nameprefixes", ]
     pvstr = subprocess.check_output(cmd + [mountpath],
                                     stderr=subprocess.STDOUT)
     for line in pvstr.strip().split("\n"):
         for attr in line.strip().split(" "):
             if attr.split("=")[0].startswith('LVM2'):
-                pvinfo[attr.split("=")[0]] = attr.split("=")[1].strip("\'").strip("B")
+                pvinfo[attr.split("=")[0]] = \
+                    attr.split("=")[1].strip("\'").strip("B")
 
     cmd = ["pvs", "--noheadings", "--units", "b", "-o",
-           "pvseg_all", "--nameprefixes",]
+           "pvseg_all", "--nameprefixes", ]
     pvstr = subprocess.check_output(cmd + [mountpath],
                                     stderr=subprocess.STDOUT)
 
@@ -310,11 +318,13 @@ def _getpvinfo(mountpath, startoffset = '0', length = None):
         segs = {}
         for attr in seg.strip().split(" "):
             if attr.split("=")[0].startswith('LVM2'):
-                segs[attr.split("=")[0]] = attr.split("=")[1].strip("\'").strip("B")
+                segs[attr.split("=")[0]] = \
+                    attr.split("=")[1].strip("\'").strip("B")
         if len(segs):
             pvinfo['PV_SEGMENTS'].append(segs)
 
     return pvinfo
+
 
 def getpvs(vgs):
     subprocess.check_output(["pvscan"], stderr=subprocess.STDOUT)
@@ -326,7 +336,7 @@ def getpvs(vgs):
         vgname = vg['LVM2_VG_NAME']
 
         vgdisplay = subprocess.check_output(["vgdisplay", "-v", vgname],
-                                      stderr=subprocess.STDOUT)
+                                            stderr=subprocess.STDOUT)
         for line in vgdisplay.split("\n"):
             if "PV Name" in line:
                 pvpath = line.strip().rstrip().split("  ")[-1].strip().rstrip()
@@ -342,13 +352,15 @@ def getpvs(vgs):
     for pv in pvlist:
         if not pv['LVM2_VG_NAME'] in incompletevgs:
             purgedpvlist.append(pv)
-      
+
     return purgedpvlist
+
 
 def deactivatevgs(vgname):
     if vgname != "tvault-appliance-vg":
         vgcmd = ["vgchange", "-an", vgname]
         subprocess.check_output(vgcmd, stderr=subprocess.STDOUT)
+
 
 def read_partition_table(mountpath=None):
     partitions = getfdisk_output(mountpath)
@@ -357,6 +369,7 @@ def read_partition_table(mountpath=None):
         partitions = getgptdisk_output(mountpath)
 
     return partitions
+
 
 def mountlvmvgs(mountinfo):
     vgs = []
@@ -367,7 +380,7 @@ def mountlvmvgs(mountinfo):
     try:
         # explore VGs and volumes on the disk
         vgs = getvgs()
-               
+
         if len(vgs):
             lvs = getlvs(vgs)
             if len(lvs):
@@ -376,7 +389,7 @@ def mountlvmvgs(mountinfo):
                     for key, mount in mountinfo.iteritems():
                         if mount in pv['LVM2_PV_NAME']:
                             pvs[index]['filename'] = key
-            
+
         # purge vms based on pvlist
         # if pv list does not have any reference to vg, purge the vg
         for vg in vgs:
@@ -384,13 +397,13 @@ def mountlvmvgs(mountinfo):
                 if vg['LVM2_VG_NAME'] == pv['LVM2_VG_NAME']:
                     purgedvgs.append(vg)
                     break
- 
+
         for lv in lvs:
             found = False
             for vg in purgedvgs:
                 if lv['LVM2_VG_NAME'] == vg['LVM2_VG_NAME']:
                     found = True
-                    break               
+                    break
             if found:
                 purgedlvs.append(lv)
 
@@ -409,13 +422,13 @@ def mountlvmvgs(mountinfo):
                 pass
         return pvs, purgedvgs, purgedlvs, mountinfo
 
+
 def discover_lvs_and_partitions(devicepaths, partitions):
 
-    totalblocks = 0
     lvmresources = {}
     # create separate list of disks and partitions used by LVM
     # and non lvm
-    # 
+    #
     lvmdisks = []
     lvmpartitions = []
     regularpartitions = []
@@ -437,7 +450,8 @@ def discover_lvs_and_partitions(devicepaths, partitions):
                 lvmpartitions.append(resinfo)
             else:
                 lvmdisks.append(resinfo)
-            claimed.add(resinfo['filename'] + ':' + str(resinfo['startoffset']))
+            claimed.add(resinfo['filename'] + ':' +
+                        str(resinfo['startoffset']))
 
         # identify raw disks here
         for filename, parttable in partitions.iteritems():
@@ -460,6 +474,7 @@ def discover_lvs_and_partitions(devicepaths, partitions):
 
     except Exception as ex:
         LOG.exception(ex)
+
 
 def mount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
 
@@ -499,6 +514,7 @@ def mount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
         except Exception as ex:
             LOG.exception(ex)
 
+
 def umount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
     # umount
     snapshotdir = os.path.join(mountdir, snapshot_id)
@@ -536,21 +552,23 @@ def umount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects):
     if os.path.exists(snapshotdir):
         shutil.rmtree(snapshotdir, True)
 
+
 def start_filemanager_server(mountdir):
-    hostspec = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
+    hostspec = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2]
+                if not ip.startswith("127.")][:1][0] + ":8888"
     cmdspec = ["php", "-S", hostspec,
                "-t", "/home/stack/tvault-mounts"]
 
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     cmd = " ".join(cmdspec)
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
-                
+
     if not process.poll() is None:
         _returncode = process.returncode  # pylint: disable=E1101
         if _returncode:
@@ -560,6 +578,7 @@ def start_filemanager_server(mountdir):
                                       stderr=process.stderr.read(),
                                       cmd=cmd)
     return process.pid
+
 
 def stop_filemanager_server(mountdir, pid):
     try:

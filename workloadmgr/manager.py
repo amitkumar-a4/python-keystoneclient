@@ -21,6 +21,8 @@ from workloadmgr.db import base
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common.rpc import dispatcher as rpc_dispatcher
+from workloadmgr.openstack.common.gettextutils import _
+
 from workloadmgr.scheduler import rpcapi as scheduler_rpcapi
 from workloadmgr import version
 
@@ -46,6 +48,7 @@ def periodic_task(*args, **kwargs):
         f._periodic_task = True
         f._ticks_between_runs = kwargs.pop('ticks_between_runs', 0)
         return f
+
 
 class ManagerMeta(type):
     def __init__(cls, names, bases, dict_):
