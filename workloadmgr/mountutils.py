@@ -587,7 +587,18 @@ def stop_filemanager_server(mountdir, pid):
         pass
 
 """
-vmdkfiles=[u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_550479e5-eafa-46b9-8a0f-55d7455f3de8_Harddisk2/3271e40f-f7a2-4889-84b5-21538180c9f2\n', u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_64ffbc78-3ac6-473d-b6d6-83016ed05ca0_Harddisk3/36a68e15-c910-4085-85d6-6e1db51e70c2\n', u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_dea95503-0851-41af-878c-6456241f3bae_Harddisk1/404ed8a8-3628-4fec-b031-13433a5bee47\n']
+vmdkfiles=[u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc386\
+           /snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-\
+           4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_550479e5-eafa-46b9-8a0f-\
+           55d7455f3de8_Harddisk2/3271e40f-f7a2-4889-84b5-21538180c9f2\n',
+           u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7c\
+           c386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223\
+           b17-4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_64ffbc78-3ac6-473d-\
+           b6d6-83016ed05ca0_Harddisk3/36a68e15-c910-4085-85d6-6e1db51e70c2\n',
+           u'/home/stack/wlmsda1/workload_2a524094-6358-475f-b37b-6cac4b7cc\
+           386/snapshot_d4d0be85-f12a-44e3-b7d1-ea665598a70b/vm_id_50223b17-\
+           4fee-1f2d-dea4-c1ccbdf5efd6/vm_res_id_dea95503-0851-41af-878c-\
+           6456241f3bae_Harddisk1/404ed8a8-3628-4fec-b031-13433a5bee47\n']
 
 # We mount vmdk file first?
 # Identify the root folder for mounting all snapshot volumes/partitions
