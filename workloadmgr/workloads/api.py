@@ -1284,8 +1284,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def snapshot_get_all(self, context, workload_id=None):
-        #snapshots = self.db.snapshot_get_all(context, workload_id)
-        snapshots = self.db.snapshot_get_running_snapshots_by_host(context)
+        snapshots = self.db.snapshot_get_all(context, workload_id)
         return snapshots
     
     @autolog.log_method(logger=Logger)
