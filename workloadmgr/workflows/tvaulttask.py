@@ -9,19 +9,17 @@ All tvault tasks and flow should derive from these base classes
 """
 
 import abc
-import collections
-import contextlib
 import logging
 
 import six
 
-from taskflow import atom
 from taskflow import task
-from taskflow.utils import reflection
+from taskflow import flow
 
 LOG = logging.getLogger(__name__)
 
-class tVaultTask(Task):
+
+class tVaultTask(task.Task):
     """Base class for tvault-defined tasks.
 
     Adds following features to Task:
@@ -36,8 +34,9 @@ class tVaultTask(Task):
             provides = self.default_provides
         super(tVaultTask, self).__init__(name, provides=provides)
 
+
 @six.add_metaclass(abc.ABCMeta)
-class tValutFlow(Flow):
+class tVaultFlow(flow.Flow):
     """The base abstract class of all tvault flow implementations
     """
 

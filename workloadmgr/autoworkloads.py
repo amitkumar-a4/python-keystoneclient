@@ -5,7 +5,7 @@
 # All Rights Reserved.
 
 import logging
-from sqlalchemy import *
+from sqlalchemy import *  # nopep8
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr import utils
 import ConfigParser

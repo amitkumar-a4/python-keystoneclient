@@ -56,12 +56,12 @@ def _get_pit_resource_id(metadata, key):
         if metadata_item['key'] == key:
             pit_id = metadata_item['value']
             return pit_id
-        
+
 def _get_pit_resource(snapshot_vm_common_resources, pit_id):
     for snapshot_vm_resource in snapshot_vm_common_resources:
         if snapshot_vm_resource.resource_pit_id == pit_id:
-            return snapshot_vm_resource 
-            
+            return snapshot_vm_resource
+
 
 @autolog.log_method(Logger, 'vmtasks_openstack.apply_retention_policy')
 def apply_retention_policy(cntx, db, instances, snapshot):
@@ -71,13 +71,13 @@ def apply_retention_policy(cntx, db, instances, snapshot):
     else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         virtdriver.apply_retention_policy(cntx, db, instances, snapshot)
-             
+
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_networks')
 def snapshot_vm_networks(cntx, db, instances, snapshot):
     try:
         lock.acquire()
         compute_service = nova.API(production=True)
-        network_service =  neutron.API(production=True)  
+        network_service =  neutron.API(production=True)
         subnets = []
         networks = []
         routers = []
@@ -87,35 +87,35 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         user_id = cntx.user
         project_id = cntx.tenant
         cntx = nova._get_tenant_context(user_id, project_id)
-        
+
         def _snapshot_neutron_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             nics = []
             for interface in interfaces:
                 nic = {} #nic is dictionary to hold the following data
                 #ip_address, mac_address, subnet_id, network_id, router_id, ext_subnet_id, ext_network_id
-                
+
                 nic.setdefault('ip_address', interface.fixed_ips[0]['ip_address'])
                 nic.setdefault('mac_address', interface.mac_addr)
-        
+
                 port_data = network_service.get_port(cntx, interface.port_id)
                 #TODO(giri): We may not need ports
-                #utils.append_unique(ports, port_data['port']) 
+                #utils.append_unique(ports, port_data['port'])
                 #nic.setdefault('port_id', interface.port_id)
-                
+
                 subnets_data = network_service.get_subnets_from_port(cntx,port_data['port'])
                 #TODO(giri): we will support only one fixedip per interface for now
                 if subnets_data['subnets'][0]:
                     utils.append_unique(subnets, subnets_data['subnets'][0])
                     nic.setdefault('subnet_id', subnets_data['subnets'][0]['id'])
                     nic.setdefault('subnet_name', subnets_data['subnets'][0]['name'])
-        
+
                 network = network_service.get_network(cntx,port_data['port']['network_id'])
-                if network : 
+                if network :
                     utils.append_unique(networks, network)
                     nic.setdefault('network_id', network['id'])
                     nic.setdefault('network_name', network['name'])
-                
+
                 #Let's find our router
                 routers_data = network_service.get_routers(cntx)
                 router_found = None
@@ -133,7 +133,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                                     if router_port_ip['subnet_id'] == subnet['id']:
                                         router_found = router
                                         break;
-                                
+
                 if router_found:
                     utils.append_unique(routers, router_found)
                     nic.setdefault('router_id', router_found['id'])
@@ -143,7 +143,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                         router_ext_ports = network_service.get_ports(cntx,**search_opts)
                         if router_ext_ports and len(router_ext_ports) and router_ext_ports[0]:
                             ext_port = router_ext_ports[0]
-                            #utils.append_unique(ports, ext_port) TODO(giri): We may not need ports 
+                            #utils.append_unique(ports, ext_port) TODO(giri): We may not need ports
                             ext_subnets_data = network_service.get_subnets_from_port(cntx,ext_port)
                             #TODO(giri): we will capture only one subnet for now
                             if ext_subnets_data['subnets'][0]:
@@ -158,7 +158,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 nics.append(nic)
 
             return nics
-        
+
         def _snapshot_nova_networks(instance):
             interfaces = compute_service.get_interfaces(cntx, instance['vm_id'])
             networks = compute_service.get_networks(cntx)
@@ -167,9 +167,9 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             uniquemacs = set()
             for networkname, interfaceinfo in interfaces.iteritems():
                 for interface in interfaceinfo:
-                    if not interface['OS-EXT-IPS-MAC:mac_addr'] in uniquemacs: 
+                    if not interface['OS-EXT-IPS-MAC:mac_addr'] in uniquemacs:
                         nic = {} #nic is dictionary to hold the following data
-                
+
                         nic.setdefault('ip_address', interface['addr'])
                         nic.setdefault('mac_address', interface['OS-EXT-IPS-MAC:mac_addr'])
                         nic.setdefault('network_name', networkname)
@@ -184,7 +184,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         #Store the nics in the DB
 
         network_type = ""
-        for instance in instances: 
+        for instance in instances:
             try:
                 network_service.get_networks(cntx)
                 nics = _snapshot_neutron_networks(instance)
@@ -197,13 +197,13 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
             for nic in nics:
                 snapshot_vm_resource_values = { 'id': str(uuid.uuid4()),
                                                 'vm_id': instance['vm_id'],
-                                                'snapshot_id': snapshot['id'],       
+                                                'snapshot_id': snapshot['id'],
                                                 'resource_type': 'nic',
                                                 'resource_name':  nic['mac_address'],
                                                 'resource_pit_id': '',
                                                 'metadata': {'network_type': network_type},
                                                 'status': 'available'}
-                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
+                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,
                                                     snapshot_vm_resource_values)
                 # create an entry in the vm_network_resource_snaps table
                 vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
@@ -212,73 +212,73 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 vm_network_resource_snap_values = {'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                      'pickle': pickle.dumps(nic, 0),
-                                                     'metadata': vm_network_resource_snap_metadata,       
-                                                     'status': 'available'}     
-                                                             
-                vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
-                                
+                                                     'metadata': vm_network_resource_snap_metadata,
+                                                     'status': 'available'}
+
+                vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)
+
         #store the subnets, networks and routers in the DB
         for subnet in subnets:
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': snapshot['id'], 
-                                           'snapshot_id': snapshot['id'],       
+                                           'vm_id': snapshot['id'],
+                                           'snapshot_id': snapshot['id'],
                                            'resource_type': 'subnet',
                                            'resource_name':  subnet['name'],
                                            'resource_pit_id': subnet['id'],
                                            'metadata': {},
                                            'status': 'available'}
-            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,
                                                 snapshot_vm_resource_values)
             # create an entry in the vm_network_resource_snaps table
             vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
             vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                  'pickle': pickle.dumps(subnet, 0),
-                                                 'metadata': vm_network_resource_snap_metadata,       
-                                                 'status': 'available'}     
-                                                         
-            vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
-            
+                                                 'metadata': vm_network_resource_snap_metadata,
+                                                 'status': 'available'}
+
+            vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)
+
         for network in networks:
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': snapshot['id'],
-                                           'snapshot_id': snapshot['id'],       
+                                           'snapshot_id': snapshot['id'],
                                            'resource_type': 'network',
                                            'resource_name':  network['name'],
                                            'resource_pit_id': network['id'],
                                            'metadata': {},
                                            'status': 'available'}
-            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                                snapshot_vm_resource_values)                                                
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,
+                                                snapshot_vm_resource_values)
             # create an entry in the vm_network_resource_snaps table
             vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
             vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                  'pickle': pickle.dumps(network, 0),
-                                                 'metadata': vm_network_resource_snap_metadata,       
-                                                 'status': 'available'}     
-                                                         
-            vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)                
-        
+                                                 'metadata': vm_network_resource_snap_metadata,
+                                                 'status': 'available'}
+
+            vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)
+
         for router in routers:
             snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                            'vm_id': snapshot['id'],
-                                           'snapshot_id': snapshot['id'],       
+                                           'snapshot_id': snapshot['id'],
                                            'resource_type': 'router',
                                            'resource_name':  router['name'],
                                            'resource_pit_id': router['id'],
                                            'metadata': {},
                                            'status': 'available'}
-            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx, 
-                                                snapshot_vm_resource_values)                                                
+            snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,
+                                                snapshot_vm_resource_values)
             # create an entry in the vm_network_resource_snaps table
             vm_network_resource_snap_metadata = {} # Dictionary to hold the metadata
             vm_network_resource_snap_values = {  'vm_network_resource_snap_id': snapshot_vm_resource.id,
                                                  'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                  'pickle': pickle.dumps(router, 0),
-                                                 'metadata': vm_network_resource_snap_metadata,       
-                                                 'status': 'available'}     
-                                                         
+                                                 'metadata': vm_network_resource_snap_metadata,
+                                                 'status': 'available'}
+
             vm_network_resource_snap = db.vm_network_resource_snap_create(cntx, vm_network_resource_snap_values)
     finally:
         lock.release()
@@ -290,22 +290,22 @@ def snapshot_vm_flavors(cntx, db, instances, snapshot):
     for instance in instances:
         # Create  a flavor resource
         flavor = compute_service.get_flavor_by_id(cntx, instance['vm_flavor_id'])
-        metadata = {'name':flavor.name, 'vcpus':flavor.vcpus, 'ram':flavor.ram, 
+        metadata = {'name':flavor.name, 'vcpus':flavor.vcpus, 'ram':flavor.ram,
                     'disk':flavor.disk, 'ephemeral':flavor.ephemeral, 'swap': flavor.swap}
         snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                        'vm_id': instance['vm_id'],
-                                       'snapshot_id': snapshot['id'],       
+                                       'snapshot_id': snapshot['id'],
                                        'resource_type': 'flavor',
                                        'resource_name':  flavor.name,
                                        'metadata': metadata,
                                        'status': 'available'}
-        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values) 
-        
-@autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_security_groups')        
+        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)
+
+@autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm_security_groups')
 def snapshot_vm_security_groups(cntx, db, instances, snapshot):
     compute_service = nova.API(production=True)
-    network_service =  neutron.API(production=True)  
-    
+    network_service =  neutron.API(production=True)
+
     def _snapshot_neutron_security_groups():
         security_group_ids = []
         for instance in instances:
@@ -315,7 +315,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                 security_group = network_service.security_group_get(cntx, security_group_id)
                 snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                                'vm_id': instance['vm_id'],
-                                               'snapshot_id': snapshot['id'],       
+                                               'snapshot_id': snapshot['id'],
                                                'resource_type': 'security_group',
                                                'resource_name':  security_group['id'],
                                                'resource_pit_id': security_group['id'],
@@ -323,15 +323,15 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                                                             'security_group_type': 'neutron',
                                                             'description' : security_group['description']},
                                                'status': 'available'}
-                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)        
-        
+                snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)
+
         unique_security_group_ids = list(set(security_group_ids))
         for security_group_id in unique_security_group_ids:
             security_group = network_service.security_group_get(cntx, security_group_id)
             security_group_rules = security_group['security_group_rules']
             vm_security_group_snap_values = {'id': str(uuid.uuid4()),
                                            'vm_id': snapshot['id'],
-                                           'snapshot_id': snapshot['id'],       
+                                           'snapshot_id': snapshot['id'],
                                            'resource_type': 'security_group',
                                            'resource_name':  security_group['id'],
                                            'resource_pit_id': security_group['id'],
@@ -340,15 +340,15 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                                                         'description' : security_group['description']},
                                            'status': 'available'}
             vm_security_group_snap = db.snapshot_vm_resource_create(cntx,  vm_security_group_snap_values)
-        
+
             for security_group_rule in security_group_rules:
                 vm_security_group_rule_snap_metadata = {'security_group_type': 'neutron',}
                 vm_security_group_rule_snap_values = {  'id': str(uuid.uuid4()),
                                                         'vm_security_group_snap_id': vm_security_group_snap.id,
                                                         'pickle': pickle.dumps(security_group_rule, 0),
-                                                        'metadata': vm_security_group_rule_snap_metadata,       
-                                                        'status': 'available'}     
-                                                         
+                                                        'metadata': vm_security_group_rule_snap_metadata,
+                                                        'status': 'available'}
+
                 vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)
                 if security_group_rule['remote_group_id']:
                     if (security_group_rule['remote_group_id'] in unique_security_group_ids) == False:
@@ -366,7 +366,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                         security_group_ids.append(secgrp['name'])
                         snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
                                                'vm_id': instance['vm_id'],
-                                               'snapshot_id': snapshot['id'],       
+                                               'snapshot_id': snapshot['id'],
                                                'resource_type': 'security_group',
                                                'resource_name':  group.id,
                                                'resource_pit_id': group.id,
@@ -374,9 +374,9 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                                                             'security_group_type': 'nova',
                                                             'description' : group.description},
                                                'status': 'available'}
-                        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)        
+                        snapshot_vm_resource = db.snapshot_vm_resource_create(cntx,  snapshot_vm_resource_values)
                         break
-        
+
         unique_security_group_ids = list(set(security_group_ids))
         for security_group_id in unique_security_group_ids:
             for group in security_groups:
@@ -384,7 +384,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     security_group_rules = group.rules
                     vm_security_group_snap_values = {'id': str(uuid.uuid4()),
                                                   'vm_id': snapshot['id'],
-                                                  'snapshot_id': snapshot['id'],       
+                                                  'snapshot_id': snapshot['id'],
                                                   'resource_type': 'security_group',
                                                   'resource_name':  group.id,
                                                   'resource_pit_id': group.id,
@@ -393,15 +393,15 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                                                                'description' : group.description},
                                                   'status': 'available'}
                     vm_security_group_snap = db.snapshot_vm_resource_create(cntx,  vm_security_group_snap_values)
-        
+
                     for security_group_rule in security_group_rules:
                         vm_security_group_rule_snap_metadata = {'security_group_type': 'nova',}
                         vm_security_group_rule_snap_values = {  'id': str(uuid.uuid4()),
                                                                 'vm_security_group_snap_id': vm_security_group_snap.id,
                                                                 'pickle': pickle.dumps(security_group_rule, 0),
-                                                                'metadata': vm_security_group_rule_snap_metadata,       
-                                                                'status': 'available'}     
-                                                         
+                                                                'metadata': vm_security_group_rule_snap_metadata,
+                                                                'status': 'available'}
+
                         vm_security_group_rule_snap = db.vm_security_group_rule_snap_create(cntx, vm_security_group_rule_snap_values)
 
     try:
@@ -430,7 +430,7 @@ def pause_vm(cntx, db, instance):
                 raise Exception(_("Error suspending instance " + instance_ref.id))
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=4):
-                raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')                       
+                raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')
 
 @autolog.log_method(Logger, 'vmtasks_openstack.unpause_vm')
 def unpause_vm(cntx, db, instance):
@@ -445,7 +445,7 @@ def unpause_vm(cntx, db, instance):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.suspend_vm')
 def suspend_vm(cntx, db, instance):
-    
+
     compute_service = nova.API(production=True)
     compute_service.suspend(cntx, instance['vm_id'])
     instance_ref =  compute_service.get_server_by_id(cntx, instance['vm_id'])
@@ -457,76 +457,76 @@ def suspend_vm(cntx, db, instance):
             raise Exception(_("Error suspending instance " + instance_ref.id))
         now = timeutils.utcnow()
         if (now - start_time) > datetime.timedelta(minutes=4):
-            raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')         
-    
+            raise exception.ErrorOccurred(reason='Timeout waiting for the instance to pause')
+
 @autolog.log_method(Logger, 'vmtasks_openstack.resume_vm')
 def resume_vm(cntx, db, instance):
-    
+
     compute_service = nova.API(production=True)
-    compute_service.resume(cntx, instance['vm_id'])  
-    
+    compute_service.resume(cntx, instance['vm_id'])
+
 @autolog.log_method(Logger, 'vmtasks_openstack.pre_snapshot_vm')
 def pre_snapshot_vm(cntx, db, instance, snapshot):
     # pre processing of snapshot
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.pre_snapshot_vm(cntx, db, instance, snapshot)    
-    else: 
+        return virtdriver.pre_snapshot_vm(cntx, db, instance, snapshot)
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.pre_snapshot_vm(cntx, db, instance, snapshot)   
-    
+        return virtdriver.pre_snapshot_vm(cntx, db, instance, snapshot)
+
 @autolog.log_method(Logger, 'vmtasks_openstack.freeze_vm')
 def freeze_vm(cntx, db, instance, snapshot):
     # freeze instance
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)    
-    else: 
+        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)  
-    
+        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+
 @autolog.log_method(Logger, 'vmtasks_openstack.thaw_vm')
 def thaw_vm(cntx, db, instance, snapshot):
     # thaw instance
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)    
-    else: 
+        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)          
+        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm')
 def snapshot_vm(cntx, db, instance, snapshot):
 
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
         return virtdriver.snapshot_vm(cntx, db, instance, snapshot)
-    else: 
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.snapshot_vm(cntx, db, instance, snapshot) 
+        return virtdriver.snapshot_vm(cntx, db, instance, snapshot)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.get_snapshot_data_size')
-def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):  
-        
+def get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data):
+
     LOG.debug(_("instance: %(instance_id)s") %{'instance_id': instance['vm_id'],})
     vm_data_size = 0;
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
         vm_data_size = virtdriver.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
-    else: 
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         vm_data_size = virtdriver.get_snapshot_data_size(cntx, db, instance, snapshot, snapshot_data)
-         
+
     LOG.debug(_("vm_data_size: %(vm_data_size)s") %{'vm_data_size': vm_data_size,})
     return vm_data_size
-        
+
 @autolog.log_method(Logger, 'vmtasks_openstack.upload_snapshot')
 def upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex):
 
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
         return virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
-    else: 
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         return virtdriver.upload_snapshot(cntx, db, instance, snapshot, snapshot_data_ex)
 
@@ -541,11 +541,11 @@ def revert_snapshot(cntx, db, instance, snapshot, snapshot_data):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.post_snapshot')
 def post_snapshot(cntx, db, instance, snapshot, snapshot_data):
-        
-    if instance['hypervisor_type'] == 'QEMU': 
+
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
         virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
-    else: 
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
         virtdriver.post_snapshot_vm(cntx, db, instance, snapshot, snapshot_data)
 
@@ -577,7 +577,7 @@ def restore_vm_flavor(cntx, db, instance, restore):
     disk = '1'
     ephemeral = '0'
     swap = '0'
-    
+
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'flavor':
@@ -586,7 +586,7 @@ def restore_vm_flavor(cntx, db, instance, restore):
             ram = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ram', ram)
             disk = db.get_metadata_value(snapshot_vm_flavor.metadata, 'disk', ram)
             ephemeral = db.get_metadata_value(snapshot_vm_flavor.metadata, 'ephemeral', ram)
-            swap =  db.get_metadata_value(snapshot_vm_flavor.metadata, 'swap', swap)           
+            swap =  db.get_metadata_value(snapshot_vm_flavor.metadata, 'swap', swap)
             break
 
     restore_options = pickle.loads(str(restore_obj.pickle))
@@ -602,7 +602,7 @@ def restore_vm_flavor(cntx, db, instance, restore):
             ephemeral = instance_options['flavor'].get('ephemeral', ephemeral)
         if instance_options['flavor'].get('swap', "") != "":
             swap = instance_options['flavor'].get('swap', swap)
- 
+
     restored_compute_flavor = None
     for flavor in compute_service.get_flavors(cntx):
         if ((str(flavor.vcpus) == str(vcpus)) and
@@ -611,20 +611,20 @@ def restore_vm_flavor(cntx, db, instance, restore):
             (str(flavor.ephemeral) == str(ephemeral)) and
             (str(flavor.swap) == str(swap))):
             restored_compute_flavor = flavor
-            break            
+            break
     if not restored_compute_flavor:
         #TODO(giri):create a new flavor
         name = str(uuid.uuid4())
         restored_compute_flavor = compute_service.create_flavor(cntx, name, ram, vcpus, disk, ephemeral)
         restored_vm_resource_values = {'id': restored_compute_flavor.id,
                                        'vm_id': restore['id'],
-                                       'restore_id': restore['id'],       
+                                       'restore_id': restore['id'],
                                        'resource_type': 'flavor',
                                        'resource_name':  name,
                                        'metadata': {},
                                        'status': 'available'}
-        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)         
-    return restored_compute_flavor 
+        restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)
+    return restored_compute_flavor
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_keypairs')
 def restore_keypairs(cntx, db, instances):
@@ -646,7 +646,7 @@ def restore_keypairs(cntx, db, instances):
         keydata = pickle.loads(str(inst['keydata']))
         if not 'public_key' in keydata:
             continue
-      
+
         public_key = keydata['public_key']
         newkey = compute_service.create_keypair(cntx, inst['keyname'],
                                        public_key=public_key)
@@ -654,7 +654,7 @@ def restore_keypairs(cntx, db, instances):
             keypairs.append(newkey.name)
 
 @autolog.log_method(Logger, 'vmtasks_openstack.get_vm_nics')
-def get_vm_nics(cntx, db, instance, restore, restored_net_resources):     
+def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
 
     db.restore_update( cntx, restore['id'],
                        {'progress_msg': 'Restoring network interfaces for Instance ' + instance['vm_id']})
@@ -663,7 +663,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'nic':
             vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
-            
+
             network_type = db.get_metadata_value(vm_nic_snapshot.metadata,
                                                   'network_type')
 
@@ -685,7 +685,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
             try:
                 ipinfo = compute_service.get_fixed_ip(cntx, nic_info['v4-fixed-ip'])
             except:
-                # the old IP address may not belong to any of the subnets 
+                # the old IP address may not belong to any of the subnets
                 pass
             if ipinfo:
                 if ipinfo.hostname:
@@ -728,20 +728,20 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')
                     try:
                         new_network = restored_net_resources[pit_id]
-                        nic_info.setdefault('network-id', new_network['id']) 
+                        nic_info.setdefault('network-id', new_network['id'])
                     except:
                            pass
 
                     #TODO(giri): the ip address sometimes may not be available due to one of the router or network
                     #interfaces taking them over
                     #nic_info.setdefault('v4-fixed-ip', db.get_metadata_value(vm_nic_snapshot.metadata, 'ip_address'))
-            restored_nics.append(nic_info) 
-    return restored_nics 
+            restored_nics.append(nic_info)
+    return restored_nics
 
 @autolog.log_method(Logger, 'vmtasks_openstack.get_vm_restore_data_size')
 def get_vm_restore_data_size(cntx, db, instance, restore):
 
-    instance_size = 0          
+    instance_size = 0
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
@@ -751,7 +751,7 @@ def get_vm_restore_data_size(cntx, db, instance, restore):
         while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
             vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
             instance_size = instance_size + vm_disk_resource_snap_backing.size
-            vm_disk_resource_snap  = vm_disk_resource_snap_backing                           
+            vm_disk_resource_snap  = vm_disk_resource_snap_backing
 
     return instance_size
 
@@ -763,22 +763,22 @@ def get_restore_data_size(cntx, db, restore):
         instance_options = utils.get_instance_restore_options(restore_options, vm.vm_id, restore_options['type'])
         if instance_options and instance_options.get('include', True) == False:
             continue
-        restore_size = restore_size + vm.restore_size        
+        restore_size = restore_size + vm.restore_size
 
     return restore_size
 
 @autolog.log_method(Logger, 'vmtasks_openstack.pre_restore_vm')
 def pre_restore_vm(cntx, db, instance, restore):
     # pre processing of restore
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.pre_restore_vm(cntx, db, instance, restore)    
-    else: 
+        return virtdriver.pre_restore_vm(cntx, db, instance, restore)
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.pre_restore_vm(cntx, db, instance, restore)  
-    
+        return virtdriver.pre_restore_vm(cntx, db, instance, restore)
+
 @synchronized(lock)
-@autolog.log_method(Logger, 'vmtasks_openstack.restore_networks')                    
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_networks')
 def restore_vm_networks(cntx, db, restore):
     """
     Restore the networking configuration of VMs of the snapshot
@@ -794,7 +794,7 @@ def restore_vm_networks(cntx, db, restore):
                         return nic_options
                 if 'mac_address' in nic_options:
                     if nic_options['mac_address'] == mac_address:
-                        return nic_options                    
+                        return nic_options
         return None
 
     def _get_nic_port_from_restore_options(restore_options,
@@ -804,16 +804,16 @@ def restore_vm_networks(cntx, db, restore):
         def _get_port_for_ip(ports, ip_address):
             if ports and ip_address:
                 for port in ports:
-                 
+
                     if 'fixed_ips' in port:
                         for fixed_ip in port['fixed_ips']:
                             if fixed_ip['ip_address'] == ip_address:
                                 return port
             return None
-        
+
         def _create_port(name, ip_address, network_id,
                          subnet_id):
-            
+
             params = {'name': name,
                       'fixed_ips': [{'ip_address': ip_address,
                                      'subnet_id': subnet_id} ],
@@ -821,15 +821,15 @@ def restore_vm_networks(cntx, db, restore):
                       'tenant_id': cntx.tenant}
 
             new_port = network_service.create_port(cntx, **params)
-               
+
             restored_vm_resource_values = {'id': new_port['id'],
                                            'vm_id': restore['id'],
-                                           'restore_id': restore['id'],       
+                                           'restore_id': restore['id'],
                                            'resource_type': 'port',
                                            'resource_name':  new_port['name'],
                                            'metadata': {},
                                            'status': 'available'}
-            restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)              
+            restored_vm_resource = db.restored_vm_resource_create(cntx,restored_vm_resource_values)
             return new_port
 
         networks_mapping = []
@@ -850,13 +850,13 @@ def restore_vm_networks(cntx, db, restore):
             ip_address = snapshot_vm_nic_options['ip_address']
 
         port_name = ""
-  
+
         # if this is not one click restore, then get new network id,
         # subnet id and ip address
         if not oneclickrestore:
             ip_address = None
             instance_options = utils.get_instance_restore_options(restore_options,
-                                                     instance_id, 'openstack') 
+                                                     instance_id, 'openstack')
             port_name = instance_options.get('name','')
             ip_address = None
             nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
@@ -899,7 +899,7 @@ def restore_vm_networks(cntx, db, restore):
         # If IP address is set, then choose the port with that ip address
         if ports and ip_address:
             port = _get_port_for_ip(ports, ip_address)
-            if port: 
+            if port:
                 if 'device_id' in port and \
                     port['device_id'] in ('', None):
                     return port
@@ -933,11 +933,11 @@ def restore_vm_networks(cntx, db, restore):
     project_id = cntx.tenant
     cntx = nova._get_tenant_context(user_id, project_id)
 
-    restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
+    restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})
     restore_options = pickle.loads(str(restore_obj.pickle))
     restored_net_resources = {}
 
-    network_service =  neutron.API(production=restore['restore_type'] != 'test')  
+    network_service =  neutron.API(production=restore['restore_type'] != 'test')
     dst_network_type = 'nova'
     try:
         networks = network_service.get_networks(cntx)
@@ -945,14 +945,14 @@ def restore_vm_networks(cntx, db, restore):
     except:
         pass
 
-    snapshot_vm_common_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])           
+    snapshot_vm_common_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])
     for snapshot_vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
-        snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, snapshot_vm.vm_id, restore['snapshot_id'])        
+        snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, snapshot_vm.vm_id, restore['snapshot_id'])
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type == 'nic':
 
                 src_network_type = db.get_metadata_value(snapshot_vm_resource.metadata,
-                                                         'network_type')              
+                                                         'network_type')
                 vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
                 if dst_network_type != 'neutron':
@@ -1000,7 +1000,7 @@ def restore_vm_networks(cntx, db, restore):
                             new_ext_network = restored_net_resources[pit_id]
                         else:
                             raise Exception("Could not find the network that matches the restore options")
-                        
+
                         #external subnet
                         pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'ext_subnet_id')
                         if pit_id:
@@ -1020,7 +1020,7 @@ def restore_vm_networks(cntx, db, restore):
 
     return restored_net_resources
 
-@autolog.log_method(Logger, 'vmtasks_openstack.delete_networks')                    
+@autolog.log_method(Logger, 'vmtasks_openstack.delete_networks')
 def delete_vm_networks(cntx, restored_net_resources):
     network_service =  neutron.API(production=True)
     # Delete routers first
@@ -1097,7 +1097,7 @@ def restore_vm_security_groups(cntx, db, restore):
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])        
+    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, restore['snapshot_id'], restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'security_group':
 
@@ -1132,41 +1132,41 @@ def restore_vm_security_groups(cntx, db, restore):
                 else:
                     remote_group_id = None
 
-                network_service.security_group_rule_create( cntx, 
+                network_service.security_group_rule_create( cntx,
                                             restored_security_groups[snapshot_vm_resource.resource_pit_id],
                                             vm_security_group_rule_values['direction'],
                                             vm_security_group_rule_values['ethertype'],
-                                            vm_security_group_rule_values['protocol'], 
-                                            vm_security_group_rule_values['port_range_min'], 
+                                            vm_security_group_rule_values['protocol'],
+                                            vm_security_group_rule_values['port_range_min'],
                                             vm_security_group_rule_values['port_range_max'],
                                             vm_security_group_rule_values['remote_ip_prefix'],
-                                            remote_group_id) 
-    return restored_security_groups      
+                                            remote_group_id)
+    return restored_security_groups
 
-@autolog.log_method(Logger, 'vmtasks_openstack.delete_vm_security_groups')        
+@autolog.log_method(Logger, 'vmtasks_openstack.delete_vm_security_groups')
 def delete_vm_security_groups(cntx, security_groups):
     network_service =  neutron.API(production=True)
     for resid, secid in security_groups.iteritems():
         network_service.security_group_delete(cntx, secid)
 
-@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm')                    
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm')
 def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_security_groups):
 
-    restored_compute_flavor = restore_vm_flavor(cntx, db, instance,restore)                      
+    restored_compute_flavor = restore_vm_flavor(cntx, db, instance,restore)
 
     restored_nics = get_vm_nics( cntx, db, instance, restore, restored_net_resources)
-    
-    restore_obj = db.restore_get(cntx, restore['id']) 
+
+    restore_obj = db.restore_get(cntx, restore['id'])
     restore_options = pickle.loads(str(restore_obj.pickle))
     instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'],'openstack')
-         
+
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-  
+
     # call with new context
     user_id = cntx.user
     project_id = cntx.tenant
     cntx = nova._get_tenant_context(user_id, project_id)
-    return virtdriver.restore_vm( cntx, db, instance, restore, 
+    return virtdriver.restore_vm( cntx, db, instance, restore,
                                   restored_net_resources,
                                   restored_security_groups,
                                   restored_compute_flavor,
@@ -1180,9 +1180,9 @@ def poweron_vm(cntx, instance, restore, restored_instance):
 @autolog.log_method(Logger, 'vmtasks_openstack.post_restore_vm')
 def post_restore_vm(cntx, db, instance, restore):
     # post processing of restore
-    if instance['hypervisor_type'] == 'QEMU': 
+    if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.post_restore_vm(cntx, db, instance, restore)    
-    else: 
+        return virtdriver.post_restore_vm(cntx, db, instance, restore)
+    else:
         virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.post_restore_vm(cntx, db, instance, restore)      
+        return virtdriver.post_restore_vm(cntx, db, instance, restore)
