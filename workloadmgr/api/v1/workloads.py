@@ -199,7 +199,7 @@ class WorkloadMgrsController(wsgi.Controller):
     def index(self, req):
         """Returns a summary list of workloads."""
         try:
-            return self._get_workloads(req, is_detail=False)        
+            return self._get_workloads(req, is_detail=False)
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
