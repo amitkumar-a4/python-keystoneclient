@@ -685,7 +685,7 @@ class API(base.Base):
     def import_workloads(self, context, workload_ids, upgrade):
         AUDITLOG.log(context,'Import Workloads Requested', None)     
         
-        if not context.is_admin == True and upgrade == True:
+        if not context.is_admin is True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
             
         try:
@@ -1284,7 +1284,8 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def snapshot_get_all(self, context, workload_id=None):
-        snapshots = self.db.snapshot_get_all(context, workload_id)
+        #snapshots = self.db.snapshot_get_all(context, workload_id)
+        snapshots = self.db.snapshot_get_running_snapshots_by_host(context)
         return snapshots
     
     @autolog.log_method(logger=Logger)

@@ -595,7 +595,7 @@ def workload_get_all_by_project(context, project_id):
 
 @require_context
 def workload_get_all_by_admin(context, **kwargs):
-    if not is_admin_context(context):
+    if is_admin_context(context) is not True:
         raise exception.AdminRequired()
     else:        
         return model_query( context, models.Workloads, **kwargs).\
