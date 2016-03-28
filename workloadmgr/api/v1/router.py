@@ -111,11 +111,11 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})  
   
         #get the list of all workloads
-        mapper.connect("workloads_4",
-                       "/{project_id}/workloads_all",
-                       controller=self.resources['workloads'],
-                       action='get_all_workloads',
-                       conditions={"method": ['GET']}) 
+        #mapper.connect("workloads_4",
+        #               "/{project_id}/workloads_all",
+        #               controller=self.resources['workloads'],
+        #               action='get_all_workloads',
+        #               conditions={"method": ['GET']}) 
 
         #import workloads
         mapper.connect("workloads_import_list",

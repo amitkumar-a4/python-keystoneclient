@@ -199,7 +199,7 @@ class WorkloadMgrsController(wsgi.Controller):
     def index(self, req):
         """Returns a summary list of workloads."""
         try:
-            return self._get_workloads(req, is_detail=False)
+            return self._get_workloads(req, is_detail=False)        
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
@@ -224,12 +224,34 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-
-    @wsgi.serializers(xml=WorkloadsTemplate)
-    def get_all_workloads(self, req):
-        """Returns a list of all workloads."""
+        
+    def _get_workloads(self, req, is_detail):
+        """Returns a list of workloadmgr, transformed through view builder."""
         try:
-            return self._get_workloads_all(req)
+            context = req.environ['workloadmgr.context']
+            param_all_workloads = False
+            workloads_all = None
+            if ('QUERY_STRING' in req.environ):            
+                qs=parse_qs(req.environ['QUERY_STRING'])
+                var = parse_qs(req.environ['QUERY_STRING'])
+                param_all_workloads = var.get('all_workloads',[''])[0]
+                param_all_workloads = bool(escape(param_all_workloads))
+                if param_all_workloads is True:
+                    workloads_all = self.workload_api.workload_get_all_by_admin(context)
+            else:
+                workloads_all = self.workload_api.workload_get_all(context)
+            limited_list = common.limited(workloads_all, req)
+            #TODO(giri): implement the search_opts to specify the filters
+            workloads = []
+            for workload in limited_list:
+                if workload['deleted'] == False:
+                    workloads.append(workload)
+
+            if is_detail:
+                workloads = self._view_builder.detail_list(req, workloads)
+            else:
+                workloads = self._view_builder.summary_list(req, workloads)
+            return workloads
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
@@ -239,37 +261,6 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-        
-    def _get_workloads(self, req, is_detail):
-        """Returns a list of workloadmgr, transformed through view builder."""
-        context = req.environ['workloadmgr.context']
-        workloads_all = self.workload_api.workload_get_all(context)
-        limited_list = common.limited(workloads_all, req)
-        
-        #TODO(giri): implement the search_opts to specify the filters
-        workloads = []
-        for workload in limited_list:
-            if workload['deleted'] == False:
-                workloads.append(workload)
-        
-        if is_detail:
-            workloads = self._view_builder.detail_list(req, workloads)
-        else:
-            workloads = self._view_builder.summary_list(req, workloads)
-        return workloads
-
-    def _get_workloads_all(self, req):
-        """Returns a list of all workloads."""
-        context = req.environ['workloadmgr.context']
-        workloads_all = self.workload_api.workload_get_all_by_admin(context)
-        limited_list = common.limited(workloads_all, req)
-
-        workloads = []
-        for workload in limited_list:
-            if workload['deleted'] == False:
-                workloads.append(workload)
-        workloads = self._view_builder.summary_list(req, workloads)
-        return workloads
         
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)

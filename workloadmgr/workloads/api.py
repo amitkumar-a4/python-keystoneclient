@@ -387,6 +387,8 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def workload_get_all_by_admin(self, context, search_opts={}):
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
         workloads = self.db.workload_get_all_by_admin(context)
         return workloads        
     
