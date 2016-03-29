@@ -766,7 +766,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
 
-                # Get a new token, just to be safe
+                snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id,
+                                                    {'progress_msg': 'Waiting for Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
+                                                     'status': 'wait_to_be_uploading'
+                                                    })
+
                 status = {'result': 'retry'}
                 while status['result'] == 'retry':
                     try:
@@ -792,7 +796,7 @@ class LibvirtDriver(driver.ComputeDriver):
                         time.sleep(60)
 
                    
-                snapshot_obj = db.snapshot_update(  cntx, snapshot_obj.id,
+                snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id,
                                                     {'progress_msg': 'Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                      'status': 'uploading'
                                                     })
