@@ -661,6 +661,7 @@ class API(base.Base):
                 try:
                     workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
                     workloads.append(workload_values)
+
                 except Exception as ex:
                     LOG.exception(ex)
                     continue
@@ -674,6 +675,10 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
         AUDITLOG.log(context,'Import Workloads Requested', None)
+        
+        if not context.is_admin and upgrade:
+            raise wlm_exceptions.AdminRequired()
+        
         try:
             workloads = []
             import_workload_module = None
