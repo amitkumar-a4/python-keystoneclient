@@ -1286,7 +1286,12 @@ class API(base.Base):
     def snapshot_get_all(self, context, workload_id=None):
         snapshots = self.db.snapshot_get_all(context, workload_id)
         return snapshots
-    
+
+    @autolog.log_method(logger=Logger)
+    def snapshot_get_all_by_host(self, context, host=None):
+        snapshots = self.db.snapshot_get_all_by_host(context, host)
+        return snapshots
+
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """

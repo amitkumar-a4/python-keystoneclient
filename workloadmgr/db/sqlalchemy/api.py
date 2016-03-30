@@ -984,7 +984,7 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     result = model_query(   context, models.Snapshots.host, func.count(models.Snapshots.host), **kwargs).\
                             filter(and_(~models.Snapshots.status.in_(['available','error','deleted','cancelled'])),models.Snapshots.host != '').\
                             group_by(models.Snapshots.host).\
-                            all() 
+                            all()
     return result
 
 @require_context
@@ -1002,8 +1002,24 @@ def snapshot_get_all(context, workload_id=None, **kwargs):
         return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(workload_id=workload_id).\
-                            order_by(models.Snapshots.created_at.desc()).all()
+                            order_by(models.Snapshots.created_at.desc()).all()   
+    return result
 
+@require_context
+def snapshot_get_all_by_host(context, host, **kwargs):
+    if is_admin_context(context) is not True:
+        raise exception.AdminRequired()
+
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(context, models.Snapshots, **kwargs).\
+                        options(sa_orm.joinedload(models.Snapshots.metadata)).\
+                        filter(models.Snapshots.host == host).\
+                        order_by(models.Snapshots.created_at.desc()).all()
+    if not result:
+        raise exception.SnapshotNotFound(host=host)
+    return result
+    
 @require_context                            
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
     if kwargs.get('session') == None:

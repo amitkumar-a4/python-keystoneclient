@@ -197,7 +197,10 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     
 def snapshot_get_all(context, workload_id=None, **kwargs):
     return IMPL.snapshot_get_all(context, workload_id, **kwargs)   
-
+    
+def snapshot_get_all_by_host(context, host=None, **kwargs):
+    return IMPL.snapshot_get_all_by_host(context, host, **kwargs)
+    
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
     """Get all snapshots belonging to a workload."""
     return IMPL.snapshot_get_all_by_workload(context, workload_id, **kwargs) 
