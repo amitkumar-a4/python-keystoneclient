@@ -458,7 +458,8 @@ def _authenticate_with_keystone():
     keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
-                               tenant_name=config_data['admin_tenant_name'])
+                               tenant_name=config_data['admin_tenant_name'],
+                               insecure=True)
     tenants = keystone.tenants.list()
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
@@ -476,18 +477,21 @@ def _authenticate_with_keystone():
     #test public url
     keystone = ksclient.Client(auth_url=config_data['keystone_public_url'], 
                                username=config_data['admin_username'], 
-                               password=config_data['admin_password'])
+                               password=config_data['admin_password'],
+                               insecure=True)
     tenants = keystone.tenants.list()
     
     keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
-                               tenant_name=config_data['admin_tenant_name']) 
+                               tenant_name=config_data['admin_tenant_name'],
+                               insecure=True)
     
      
     
     #image
-    kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+    kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL',
+              'region_name': config_data['region_name'],}
     image_public_url = keystone.service_catalog.url_for(**kwargs)
     parse_result = urlparse(image_public_url)
     config_data['glance_production_host'] = parse_result.hostname
@@ -496,7 +500,8 @@ def _authenticate_with_keystone():
     
     #network
     try:
-        kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL',
+                  'region_name': config_data['region_name'],}
         network_public_url = keystone.service_catalog.url_for(**kwargs)
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
@@ -507,7 +512,8 @@ def _authenticate_with_keystone():
     config_data['neutron_admin_password'] = config_data['admin_password']
     
     #compute       
-    kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+    kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL',
+              'region_name': config_data['region_name'],}
     compute_public_url = keystone.service_catalog.url_for(**kwargs)
     config_data['nova_production_endpoint_template']  =  compute_public_url.replace(
                                                             compute_public_url.split("/")[-1], 
@@ -519,7 +525,8 @@ def _authenticate_with_keystone():
     
     try:
         #volume
-        kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL',
+                  'region_name': config_data['region_name'],}
         volume_public_url = keystone.service_catalog.url_for(**kwargs)
         config_data['cinder_production_endpoint_template']  =  volume_public_url.replace(
                                                                 volume_public_url.split("/")[-1], 
@@ -530,7 +537,8 @@ def _authenticate_with_keystone():
          
     try:        
         #object
-        kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL',
+                  'region_name': config_data['region_name'],}
         object_public_url = keystone.service_catalog.url_for(**kwargs)
         config_data['vault_swift_url']  =  object_public_url.replace(
                                                                 object_public_url.split("/")[-1], 
@@ -567,7 +575,8 @@ def _register_service():
     keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
-                               tenant_name=config_data['admin_tenant_name'])
+                               tenant_name=config_data['admin_tenant_name'],
+                               insecure=True)
     
     if config_data['configuration_type'] == 'openstack':
         #create user
@@ -593,7 +602,9 @@ def _register_service():
                    raise exception
             
             
-            wlm_user = keystone.users.create(config_data['workloadmgr_user'], config_data['workloadmgr_user_password'], 'workloadmgr@triliodata.com',
+            wlm_user = keystone.users.create(config_data['workloadmgr_user'],
+                                             config_data['workloadmgr_user_password'],
+                                             'workloadmgr@triliodata.com',
                                              tenant_id=config_data['service_tenant_id'],
                                              enabled=True)
             
@@ -619,9 +630,11 @@ def _register_service():
                 if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                     keystone.services.delete(service.id)
     #create service and endpoint
-    wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
+    wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads',
+                                           'Trilio Vault Workload Manager Service')
     wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
-    keystone.endpoints.create(config_data['region_name'], wlm_service.id, wlm_url, wlm_url, wlm_url)
+    keystone.endpoints.create(config_data['region_name'],
+                              wlm_service.id, wlm_url, wlm_url, wlm_url)
         
     return {'status':'Success'}
 
@@ -633,7 +646,9 @@ def _register_workloadtypes():
         wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
-                               tenant_id=config_data['admin_tenant_id'])
+                               tenant_id=config_data['admin_tenant_id'],
+                               insecure=True,
+                               )
         workload_types = wlm.workload_types.list()
         
         workload_type_names = {'Hadoop':False,
@@ -830,7 +845,9 @@ def configure_keystone():
         subprocess.call(command, shell=False)
         time.sleep(8) 
         try:
-            keystone = ksclient.Client(endpoint=config_data['keystone_admin_url'], token='52T8FVYZJse')
+            keystone = ksclient.Client(endpoint=config_data['keystone_admin_url'],
+                                       insecure=True,
+                                       token='52T8FVYZJse')
                                        #username=config_data['admin_username'], 
                                        #password=config_data['admin_password'], 
                                        #tenant_name=config_data['admin_tenant_name'])
@@ -963,6 +980,7 @@ def configure_nova():
         
         try:
             keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       insecure=True,
                                        username=config_data['admin_username'], 
                                        password=config_data['admin_password'], 
                                        tenant_name=config_data['admin_tenant_name'])                
@@ -1082,6 +1100,7 @@ def configure_neutron():
               
         try:
             keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       insecure=True,
                                        username=config_data['admin_username'], 
                                        password=config_data['admin_password'], 
                                        tenant_name=config_data['admin_tenant_name'])               
@@ -1175,6 +1194,7 @@ def configure_glance():
         
         try:
             keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
+                                       insecure=True,
                                        username=config_data['admin_username'], 
                                        password=config_data['admin_password'], 
                                        tenant_name=config_data['admin_tenant_name'])               
@@ -1211,18 +1231,31 @@ def configure_horizon():
     if config_data['nodetype'] == 'controller': 
         #configure horizon
         if config_data['configuration_type'] == 'vmware':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
         elif config_data['configuration_type'] == 'openstack':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            if 'https' in config_data['keystone_public_url']: 
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_KEYSTONE_URL = ', 'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_SSL_NO_VERIFY = ', 'OPENSTACK_SSL_NO_VERIFY = True')
             
         command = ['sudo', 'rm', "/etc/init/apache2.override"];
-        subprocess.call(command, shell=False)    
+        subprocess.call(command, shell=False)
         
         command = ['sudo', 'service', 'apache2', 'restart'];
         subprocess.call(command, shell=False)
     else:
          if config_data['configuration_type'] == 'openstack':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py', 'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            if 'https' in config_data['keystone_public_url']: 
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_KEYSTONE_URL = ', 'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
+                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                             'OPENSTACK_SSL_NO_VERIFY = ', 'OPENSTACK_SSL_NO_VERIFY = True')
 
             command = ['sudo', 'rm', "/etc/init/apache2.override"];
             subprocess.call(command, shell=False)
@@ -1915,6 +1948,10 @@ def configure_service():
         if 'vcenter_username' in config_data:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'auditlog_admin_user = ', 'auditlog_admin_user = ' + config_data['vcenter_username'])
                
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_api_insecure = ', 'nova_api_insecure = True')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_api_insecure = ', 'cinder_api_insecure = True')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_insecure = ', 'glance_api_insecure = True')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_api_insecure = ', 'neutron_api_insecure = True')
         
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
@@ -1922,6 +1959,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_protocol = ', 'auth_protocol = ' + config_data['keystone_admin_protocol'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])        
+        replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}

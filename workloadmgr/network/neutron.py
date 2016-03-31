@@ -47,7 +47,7 @@ neutron_opts = [
                default=None,
                help='region name for connecting to neutron in admin context'),
     cfg.BoolOpt('neutron_api_insecure',
-                default=False,
+                default=True,
                 help='if set, ignore any SSL validation issues'),
     cfg.StrOpt('neutron_auth_strategy',
                default='keystone',

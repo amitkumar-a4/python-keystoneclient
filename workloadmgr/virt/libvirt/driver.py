@@ -536,6 +536,7 @@ class LibvirtDriver(driver.ComputeDriver):
     def enable_cbt(self, cntx, db, instance):
         pass
 
+<<<<<<< HEAD
     def _vast_methods_call_by_function(self, func, *args):
         status = {'result': 'retry'}
         try:
@@ -1079,3 +1080,4 @@ class LibvirtDriver(driver.ComputeDriver):
         except Exception as ex:
             LOG.exception(ex)
             db.snapshot_update( cntx, snapshot['id'], {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
+
