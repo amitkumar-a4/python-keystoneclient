@@ -964,31 +964,30 @@ class PrepareBackupImage(task.Task):
             workload_utils.download_snapshot_vm_resource_from_object_store(
                 cntx, mount_id, snapshot_id, snapshot_vm_resource.id)
 
-        snapshot_vm_object_store_transfer_time = \
-            snapshot_vm_resource_object_store_transfer_time
-        snapshot_vm_data_transfer_time = \
-            snapshot_vm_resource_object_store_transfer_time
+        LOG.debug(_('Time took to download backup image %d secs' %
+                  snapshot_vm_resource_object_store_transfer_time))
+
         temp_directory = os.path.join(
             "/var/triliovault", mount_id, vm_resource_id)
         try:
-            shutil.rmtree( temp_directory )
-        except OSError as exc:
+            shutil.rmtree(temp_directory)
+        except OSError:
             pass
         fileutils.ensure_tree(temp_directory)
 
-        commit_queue = Queue() # queue to hold the files to be committed
+        commit_queue = Queue()  # queue to hold the files to be committed
 
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
             cntx, snapshot_vm_resource.id)
         disk_format = db.get_metadata_value(
             vm_disk_resource_snap.metadata, 'disk_format')
         disk_filename_extention = db.get_metadata_value(
-            vm_disk_resource_snap.metadata,'disk_format')
+            vm_disk_resource_snap.metadata, 'disk_format')
 
         restored_file_path = temp_directory + '/' + \
-                             vm_disk_resource_snap.id + \
-                             '_' + snapshot_vm_resource.resource_name + '.' \
-                             + disk_filename_extention
+            vm_disk_resource_snap.id + \
+            '_' + snapshot_vm_resource.resource_name + '.' \
+            + disk_filename_extention
         restored_file_path = restored_file_path.replace(" ", "")
 
         image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
@@ -996,19 +995,22 @@ class PrepareBackupImage(task.Task):
             qemuimages.convert_image(vm_disk_resource_snap.vault_path,
                                      restored_file_path, 'qcow2')
         else:
-            shutil.copyfile(vm_disk_resource_snap.vault_path, restored_file_path)
+            shutil.copyfile(vm_disk_resource_snap.vault_path,
+                            restored_file_path)
 
-        while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
+        while vm_disk_resource_snap.vm_disk_resource_snap_backing_id \
+             is not None:  # nopep8
             vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(
                 cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-            disk_format = db.get_metadata_value(vm_disk_resource_snap_backing.metadata,
-                                                'disk_format')
+            disk_format = db.get_metadata_value(
+                vm_disk_resource_snap_backing.metadata,
+                'disk_format')
             snapshot_vm_resource_backing = db.snapshot_vm_resource_get(
                 cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
             restored_file_path_backing = temp_directory + '/' + \
-                                         vm_disk_resource_snap_backing.id + \
-                                         '_' + snapshot_vm_resource_backing.resource_name + '.' \
-                                         + disk_filename_extention
+                vm_disk_resource_snap_backing.id + \
+                '_' + snapshot_vm_resource_backing.resource_name + '.' \
+                + disk_filename_extention
             restored_file_path_backing = \
                 restored_file_path_backing.replace(" ", "")
             image_attr = qemuimages.qemu_img_info(
@@ -1028,7 +1030,7 @@ class PrepareBackupImage(task.Task):
                 restored_file_path_backing)
 
             # increase the size of the base image
-            if image_backing_info.virtual_size < image_info.virtual_size :
+            if image_backing_info.virtual_size < image_info.virtual_size:
                 qemuimages.resize_image(restored_file_path_backing,
                                         image_info.virtual_size)
 
@@ -1068,36 +1070,37 @@ class PrepareBackupImage(task.Task):
 
 def UnorderedPreSnapshot(instances):
     flow = uf.Flow("presnapshotuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'])
-        flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'])
+        flow.add(PreSnapshot("PreSnapshot_" + item['vm_id'],
+                             rebind=rebind_dict))
 
     return flow
 
 
 def UnorderedFreezeVMs(instances):
     flow = uf.Flow("freezevmsuf")
-    for index,item in enumerate(instances):
+    for index, item in enumerate(instances):
         flow.add(FreezeVM("FreezeVM_" + item['vm_id'],
-                          rebind=dict(instance = "instance_" + item['vm_id'])))
+                          rebind=dict(instance="instance_" + item['vm_id'])))
     return flow
 
 
 def LinearFreezeVMs(instances):
     flow = lf.Flow("freezevmslf")
-    for index,item in enumerate(instances):
+    for index, item in enumerate(instances):
         flow.add(FreezeVM("FreezeVM_" + item['vm_id'],
-                          rebind=dict(instance = "instance_" + item['vm_id'])))
+                          rebind=dict(instance="instance_" + item['vm_id'])))
 
     return flow
 
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
-    if instances[0]['pause_at_snapshot'] == True:
-       for index,item in enumerate(instances):
+    if instances[0]['pause_at_snapshot'] is True:
+        for index, item in enumerate(instances):
             flow.add(PauseVM("PauseVM_" + item['vm_id'],
-                     rebind=dict(instance = "instance_" + item['vm_id'])))
+                     rebind=dict(instance="instance_" + item['vm_id'])))
     else:
         flow.add(NoneTask("UnorderedPauseVMs"))
     return flow
@@ -1108,10 +1111,10 @@ def UnorderedPauseVMs(instances):
 
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
-    if instances[0]['pause_at_snapshot'] == True:
-        for index,item in enumerate(instances):
+    if instances[0]['pause_at_snapshot'] is True:
+        for index, item in enumerate(instances):
             flow.add(PauseVM("PauseVM_" + item['vm_id'],
-                     rebind=dict(instance = "instance_" + item['vm_id'])))
+                     rebind=dict(instance="instance_" + item['vm_id'])))
     else:
         flow.add(NoneTask("LinearPauseVMs"))
 
@@ -1120,10 +1123,12 @@ def LinearPauseVMs(instances):
 # Assume there is no ordering dependency between instances
 # snapshot each VM in parallel.
 
+
 def UnorderedSnapshotVMs(instances):
     flow = uf.Flow("snapshotvmuf")
-    for index,item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id']),
+    for index, item in enumerate(instances):
+        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'],
+                            rebind=dict(instance="instance_" + item['vm_id']),
                             provides='snapshot_data_' + str(item['vm_id'])))
 
     return flow
@@ -1132,10 +1137,12 @@ def UnorderedSnapshotVMs(instances):
 # Assume there is dependency between instances
 # snapshot each VM in the order that appears in the array.
 
+
 def LinearSnapshotVMs(instances):
     flow = lf.Flow("snapshotvmlf")
-    for index,item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id']),
+    for index, item in enumerate(instances):
+        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'],
+                            rebind=dict(instance="instance_" + item['vm_id']),
                             provides='snapshot_data_' + str(item['vm_id'])))
 
     return flow
@@ -1144,96 +1151,123 @@ def LinearSnapshotVMs(instances):
 # resume each VM in parallel. Usually there should not be any
 # order in which vms should be resumed.
 
+
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
-    for index,item in enumerate(instances):
-        if item['pause_at_snapshot'] == True:
+    for index, item in enumerate(instances):
+        if item['pause_at_snapshot'] is True:
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
-                     rebind=dict(instance = "instance_" + item['vm_id'])))
+                     rebind=dict(instance="instance_" + item['vm_id'])))
         else:
-             flow.add(NoneTask("UnorderedUnPauseVMs"))
+            flow.add(NoneTask("UnorderedUnPauseVMs"))
 
     return flow
+
 
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
-    for index,item in enumerate(instances):
-        if item['pause_at_snapshot'] == True:
+    for index, item in enumerate(instances):
+        if item['pause_at_snapshot'] is True:
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
-                     rebind=dict(instance = "instance_" + item['vm_id'])))
+                     rebind=dict(instance="instance_" + item['vm_id'])))
         else:
-             flow.add(NoneTask("LinearUnPauseVMs"))
+            flow.add(NoneTask("LinearUnPauseVMs"))
 
     return flow
+
 
 def UnorderedThawVMs(instances):
     flow = uf.Flow("thawvmsuf")
-    for index,item in enumerate(instances):
-        flow.add(ThawVM("ThawVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    for index, item in enumerate(instances):
+        flow.add(ThawVM("ThawVM_" + item['vm_id'],
+                        rebind=dict(instance="instance_" + item['vm_id'])))
     return flow
+
 
 def LinearThawVMs(instances):
     flow = lf.Flow("thawvmslf")
-    for index,item in enumerate(instances):
-        flow.add(ThawVM("ThawVM_" + item['vm_id'], rebind=dict(instance = "instance_" + item['vm_id'])))
+    for index, item in enumerate(instances):
+        flow.add(ThawVM("ThawVM_" + item['vm_id'],
+                 rebind=dict(instance="instance_" + item['vm_id'])))
 
     return flow
+
 
 def UnorderedSnapshotDataSize(instances):
     flow = uf.Flow("snapshotdatasizeuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
-        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict,
-                                  provides='snapshot_data_ex_' + str(item['vm_id'])))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'],
+                           snapshot_data="snapshot_data_" + str(item['vm_id']))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'],
+                                  rebind=rebind_dict,
+                                  provides='snapshot_data_ex_' +
+                                  str(item['vm_id'])))
 
     return flow
+
 
 def LinearSnapshotDataSize(instances):
     flow = lf.Flow("snapshotdatasizelf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data = "snapshot_data_" + str(item['vm_id']))
-        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict,
-                                  provides='snapshot_data_ex_' + str(item['vm_id'])))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'],
+                           snapshot_data="snapshot_data_" + str(item['vm_id']))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'],
+                                  rebind=rebind_dict,
+                                  provides='snapshot_data_ex_' +
+                                  str(item['vm_id'])))
 
     return flow
+
 
 def UnorderedUploadSnapshot(instances):
     flow = uf.Flow("uploadsnapshotuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'], snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'],
+                           snapshot_data_ex="snapshot_data_ex_" +
+                           str(item['vm_id']))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'],
+                                rebind=rebind_dict))
 
     return flow
+
 
 def LinearUploadSnapshot(instances):
     flow = lf.Flow("uploadsnapshotlf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                           snapshot_data_ex = "snapshot_data_ex_" + str(item['vm_id']))
-        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'],
+                           snapshot_data_ex="snapshot_data_ex_" +
+                           str(item['vm_id']))
+        flow.add(UploadSnapshot("UploadSnapshot_" + item['vm_id'],
+                                rebind=rebind_dict))
 
     return flow
+
 
 def UnorderedPostSnapshot(instances):
     flow = uf.Flow("postsnapshotuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                           snapshot_data = "snapshot_data_" + str(item['vm_id']))
-        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'],
+                           snapshot_data="snapshot_data_" + str(item['vm_id']))
+        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'],
+                              rebind=rebind_dict))
 
     return flow
+
 
 def LinearPostSnapshot(instances):
     flow = lf.Flow("postsnapshotlf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + item['vm_id'],
-                            snapshot_data = "snapshot_data_" + str(item['vm_id']))
-        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + item['vm_id'],
+                           snapshot_data="snapshot_data_" +
+                           str(item['vm_id']))
+        flow.add(PostSnapshot("PostSnapshot_" + item['vm_id'],
+                              rebind=rebind_dict))
 
     return flow
 
+
 def CreateVMSnapshotDBEntries(context, instances, snapshot):
-    #create an entry for the VM in the workloadmgr database
+    # create an entry for the VM in the workloadmgr database
     cntx = amqp.RpcContext.from_dict(context)
     db = WorkloadMgrDB().db
     for instance in instances:
@@ -1242,26 +1276,28 @@ def CreateVMSnapshotDBEntries(context, instances, snapshot):
                    'metadata': instance['vm_metadata'],
                    'snapshot_id': snapshot['id'],
                    'snapshot_type': snapshot['snapshot_type'],
-                   'status': 'creating',}
-        snapshot_vm = db.snapshot_vm_create(cntx, options)
+                   'status': 'creating', }
+        db.snapshot_vm_create(cntx, options)
 
 
 def UnorderedPreRestore(instances):
     flow = uf.Flow("prerestoreuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index))
-        flow.add(PreRestore("PreRestore_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + str(index))
+        flow.add(PreRestore("PreRestore_" + item['vm_id'],
+                            rebind=rebind_dict))
 
     return flow
 
 # Assume there is no ordering dependency between instances
 # restore each VM in parallel.
 
+
 def UnorderedRestoreVMs(instances):
     flow = uf.Flow("restorevmuf")
-    for index,item in enumerate(instances):
+    for index, item in enumerate(instances):
         flow.add(RestoreVM("RestoreVM_" + item['vm_id'],
-                           rebind=dict(instance = "instance_" + str(index)),
+                           rebind=dict(instance="instance_" + str(index)),
                            provides='restored_instance_' + str(index)))
 
     return flow
@@ -1269,41 +1305,49 @@ def UnorderedRestoreVMs(instances):
 # Assume there is dependency between instances
 # snapshot each VM in the order that appears in the array.
 
+
 def LinearRestoreVMs(instances):
     flow = lf.Flow("restorevmlf")
-    for index,item in enumerate(instances):
+    for index, item in enumerate(instances):
         flow.add(RestoreVM("RestoreVM_" + item['vm_id'],
-                           rebind=dict(instance = "instance_" + str(index)),
+                           rebind=dict(instance="instance_" + str(index)),
                            provides='restored_instance_' + str(index)))
 
     return flow
 
+
 def LinearPowerOnVMs(instances):
     flow = lf.Flow("poweronvmlf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(restored_instance = "restored_instance_" + str(index), instance = "instance_" + str(index))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(restored_instance="restored_instance_" + str(index),
+                           instance="instance_" + str(index))
         flow.add(PowerOnVM("PowerOnVM_" + item['vm_id'], rebind=rebind_dict))
     return flow
 
+
 def UnorderedPostRestore(instances):
     flow = uf.Flow("postrestoreuf")
-    for index,item in enumerate(instances):
-        rebind_dict = dict(instance = "instance_" + str(index))
-        flow.add(PostRestore("PostRestore_" + item['vm_id'], rebind=rebind_dict))
+    for index, item in enumerate(instances):
+        rebind_dict = dict(instance="instance_" + str(index))
+        flow.add(PostRestore("PostRestore_" + item['vm_id'],
+                 rebind=rebind_dict))
 
     return flow
+
 
 def LinearPrepareBackupImages(context, instance, snapshotobj):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+                                                         instance['vm_id'],
+                                                         snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
-                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id),
-                                    provides=('restore_file_path_' + str(snapshot_vm_resource.id),
-                                              'image_virtual_size_' + str(snapshot_vm_resource.id))))
+        flow.add(PrepareBackupImage(
+            "PrepareBackupImage" + snapshot_vm_resource.id,
+            rebind=dict(vm_resource_id=snapshot_vm_resource.id),
+            provides=('restore_file_path_' + str(snapshot_vm_resource.id),
+                      'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
