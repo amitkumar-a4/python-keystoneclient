@@ -305,7 +305,6 @@ class API(base.Base):
                 workload_dict['jobschedule']['enabled'] = True
                 break
 
-
         return workload_dict
     
     @autolog.log_method(logger=Logger)
@@ -363,7 +362,6 @@ class API(base.Base):
                 pass
 
         workload_dict['metadata'] = metadata
-        
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False 
 
@@ -375,7 +373,6 @@ class API(base.Base):
                 timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
                 workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
                 break
-
                 
         return workload_dict
     
@@ -383,7 +380,6 @@ class API(base.Base):
     def workload_get_all(self, context, search_opts={}):
         workloads = self.db.workload_get_all(context)
         return workloads
-        
 
     @autolog.log_method(logger=Logger)
     def workload_get_all_by_admin(self, context, search_opts={}):
@@ -683,11 +679,10 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
-        AUDITLOG.log(context,'Import Workloads Requested', None)     
-        
+        AUDITLOG.log(context,'Import Workloads Requested', None)        
         if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
-            
+
         try:
             workloads = []
             import_workload_module = None
