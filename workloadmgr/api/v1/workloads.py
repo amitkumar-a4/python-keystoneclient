@@ -230,13 +230,14 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             all_workloads = None
+            #Get value of query parameter 'all_workloads'
             if ('QUERY_STRING' in req.environ):                
                 var = parse_qs(req.environ['QUERY_STRING'])
                 all_workloads = var.get('all_workloads',[''])[0]
                 all_workloads = bool(escape(all_workloads))
             
             workloads_all = None
-            if all_workloads is True:
+            if all_workloads is True:                            
                 workloads_all = self.workload_api.workload_get_all_by_admin(context)
             else:
                 workloads_all = self.workload_api.workload_get_all(context)

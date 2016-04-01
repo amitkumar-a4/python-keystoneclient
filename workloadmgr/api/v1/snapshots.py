@@ -158,7 +158,7 @@ class SnapshotsController(wsgi.Controller):
             raise exc.HTTPServerError(explanation=unicode(error))   
         
     @wsgi.serializers(xml=SnapshotsTemplate)
-    def detail(self, req, workload_id=None):
+    def detail(self, req, workload_id=None, host=None):
         """Returns a detailed list of snapshots."""
         try:
             return self._get_snapshots(req, workload_id, host, is_detail=True)
@@ -183,7 +183,9 @@ class SnapshotsController(wsgi.Controller):
         if not host:
             host = req.GET.get('host', None)
          
-        if host is not None:
+        if host is not None:            
+            if context.is_admin is not True:
+                raise exception.AdminRequired()
             snapshots_all = self.workload_api.snapshot_get_all_by_host(context, host)
         elif workload_id:
             snapshots_all = self.workload_api.snapshot_get_all(context, workload_id)
