@@ -229,15 +229,15 @@ class WorkloadMgrsController(wsgi.Controller):
         """Returns a list of workloadmgr, transformed through view builder."""
         try:
             context = req.environ['workloadmgr.context']
-            param_all_workloads = False
-            workloads_all = None
-            if ('QUERY_STRING' in req.environ):            
-                qs=parse_qs(req.environ['QUERY_STRING'])
+            all_workloads = None
+            if ('QUERY_STRING' in req.environ):                
                 var = parse_qs(req.environ['QUERY_STRING'])
-                param_all_workloads = var.get('all_workloads',[''])[0]
-                param_all_workloads = bool(escape(param_all_workloads))
-                if param_all_workloads is True:
-                    workloads_all = self.workload_api.workload_get_all_by_admin(context)
+                all_workloads = var.get('all_workloads',[''])[0]
+                all_workloads = bool(escape(all_workloads))
+            
+            workloads_all = None
+            if all_workloads is True:
+                workloads_all = self.workload_api.workload_get_all_by_admin(context)
             else:
                 workloads_all = self.workload_api.workload_get_all(context)
             limited_list = common.limited(workloads_all, req)
