@@ -270,6 +270,19 @@ def send_keystone_logs(filename):
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.sh', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)    
 
+@bottle.route('/tvault-horizon-plugin-install.sh')
+def send_tvault_horizon_panel():
+    return static_file('tvault-horizon-plugin-install.sh', root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)    
+    
+@bottle.route('/tvault_panel.py')
+def send_tvault_horizon_panel():
+    return static_file('tvault_panel.py', root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)    
+
+@bottle.route('/tvault_panel_group.py')
+def send_tvault_horizon_panel():
+    return static_file('tvault_panel_group.py', root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)    
+    
+
 @authorize()
 def send_tvault_logs():
     try:
