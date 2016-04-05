@@ -36,8 +36,8 @@ class ViewBuilder(common.ViewBuilder):
                 'description': workload['display_description'],
                 'workload_type_id': workload['workload_type_id'],
                 'status': workload['status'],
-                #'storage_usage': workload['storage_usage'], 
-                #'instances': workload['instances'],
+                # 'storage_usage': workload['storage_usage'],
+                # 'instances': workload['instances'],
                 'links': self._get_links(request, workload['id']),
             },
         }
@@ -65,10 +65,10 @@ class ViewBuilder(common.ViewBuilder):
                 'name': workload.get('display_name'),
                 'description': workload.get('display_description'),
                 'interval': workload.get('hours'),
-                'storage_usage': workload.get('storage_usage'), 
+                'storage_usage': workload.get('storage_usage'),
                 'instances': workload.get('instances'),
-                'metadata' : workload.get('metadata'),                
-                'jobschedule' : workload.get('jobschedule'),                
+                'metadata': workload.get('metadata'),
+                'jobschedule': workload.get('jobschedule'),
                 'status': workload.get('status'),
                 'links': self._get_links(request, workload['id'])
             }
@@ -76,10 +76,12 @@ class ViewBuilder(common.ViewBuilder):
 
     def _list_view(self, func, request, workloads):
         """Provide a view for a list of workloads."""
-        workloads_list = [func(request, workload)['workload'] for workload in workloads]
-        workloads_links = self._get_collection_links(request,
-                                                   workloads,
-                                                   self._collection_name)
+        workloads_list = [func(request, workload)['workload']
+                          for workload in workloads]
+        workloads_links = self._get_collection_links(
+            request,
+            workloads,
+            self._collection_name)
         workloads_dict = dict(workloads=workloads_list)
 
         if workloads_links:

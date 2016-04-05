@@ -13,9 +13,10 @@ import webob.exc
 
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import wsgi
 
-#default request size is 112k
+# default request size is 112k
 max_request_body_size_opt = cfg.IntOpt('osapi_max_request_body_size',
                                        default=114688,
                                        help='Max size for body of a request')

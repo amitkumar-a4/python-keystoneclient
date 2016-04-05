@@ -9,11 +9,14 @@ from workloadmgr.db.imports import import_workload_1_0_180
 
 LOG = logging.getLogger(__name__)
 
+
 def import_settings(cntx, new_version):
     return import_workload_1_0_180.import_settings(cntx, new_version)
 
+
 def import_workload(cntx, workload_url, new_version, upgrade=True):
-    """ Import workload and snapshot records from vault 
+    """ Import workload and snapshot records from vault
     Versions Supported: 1.0.181
     """
-    return import_workload_1_0_180.import_workload(cntx, workload_url, new_version, upgrade)
+    return import_workload_1_0_180.import_workload(cntx, workload_url,
+                                                   new_version, upgrade)

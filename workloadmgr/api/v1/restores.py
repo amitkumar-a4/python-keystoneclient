@@ -5,10 +5,8 @@
 
 """The restores api."""
 
-import webob
-from webob import exc
 from xml.dom import minidom
-from cgi import parse_qs, escape
+from webob.exc import exc
 
 from workloadmgr.api import common
 from workloadmgr.api import wsgi
@@ -16,8 +14,6 @@ from workloadmgr.api import xmlutil
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.openstack.common import strutils
-from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import restores as restore_views
 
@@ -34,12 +30,14 @@ def make_restore(elem):
     elem.set('created_at')
     elem.set('name')
     elem.set('description')
-  
+
+
 class RestoreTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('restore', selector='restore')
         make_restore(root)
         return xmlutil.MasterTemplate(root, 1)
+
 
 class RestoresTemplate(xmlutil.TemplateBuilder):
     def construct(self):
@@ -48,6 +46,7 @@ class RestoresTemplate(xmlutil.TemplateBuilder):
                                           selector='restores')
         make_restore(elem)
         return xmlutil.MasterTemplate(root, 1)
+
 
 class RestoreDeserializer(wsgi.MetadataXMLDeserializer):
     def default(self, string):
@@ -67,7 +66,7 @@ class RestoresController(wsgi.Controller):
     """The restores API controller for the OpenStack API."""
 
     _view_builder_class = restore_views.ViewBuilder
-    
+
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
         self.ext_mgr = ext_mgr
@@ -94,7 +93,7 @@ class RestoresController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))       
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a restore."""
@@ -105,7 +104,7 @@ class RestoresController(wsgi.Controller):
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
             except wlm_exceptions.InvalidState as error:
-                raise exc.HTTPBadRequest(explanation= unicode(error))
+                raise exc.HTTPBadRequest(explanation=unicode(error))
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -117,18 +116,18 @@ class RestoresController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error)) 
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def restore_cancel(self, req, id):
         """Cancel a restore."""
         try:
             context = req.environ['workloadmgr.context']
             try:
-                self.workload_api.restore_cancel(context, id)              
+                self.workload_api.restore_cancel(context, id)
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
             except wlm_exceptions.InvalidState as error:
-                raise exc.HTTPBadRequest(explanation= unicode(error))
+                raise exc.HTTPBadRequest(explanation=unicode(error))
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -158,8 +157,8 @@ class RestoresController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     @wsgi.serializers(xml=RestoresTemplate)
     def detail(self, req, workload_id=None, snapshot_id=None):
         """Returns a detailed list of restores."""
@@ -176,31 +175,34 @@ class RestoresController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def _get_restores(self, req, snapshot_id, is_detail):
         """Returns a list of restores, transformed through view builder."""
         context = req.environ['workloadmgr.context']
         if not snapshot_id:
             snapshot_id = req.GET.get('snapshot_id', None)
         if snapshot_id:
-            restores_all = self.workload_api.restore_get_all(context, snapshot_id)
+            restores_all = self.workload_api.restore_get_all(context,
+                                                             snapshot_id)
         else:
             restores_all = self.workload_api.restore_get_all(context)
-   
+
         limited_list = common.limited(restores_all, req)
-        
-        #TODO(giri): implement the search_opts to specify the filters
+
+        # TODO(giri): implement the search_opts to specify the filters
         restores = []
         for restore in limited_list:
-            if (restore['deleted'] == False) and (restore['restore_type'] != 'test'):
-                restores.append(restore)        
+            if (restore['deleted'] is False) and \
+               (restore['restore_type'] != 'test'):
+                restores.append(restore)
 
         if is_detail:
             restores = self._view_builder.detail_list(req, restores)
         else:
             restores = self._view_builder.summary_list(req, restores)
         return restores
-    
+
+
 def create_resource(ext_mgr):
     return wsgi.Resource(RestoresController(ext_mgr))

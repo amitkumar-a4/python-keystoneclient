@@ -14,6 +14,7 @@ from workloadmgr.api import xmlutil
 from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import exception as common_exception
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
 import workloadmgr.policy
@@ -262,7 +263,8 @@ class ExtensionManager(object):
                             'standard_extensions')
         new_contrib_path = 'workloadmgr.api.contrib.standard_extensions'
         if old_contrib_path in extensions:
-            LOG.warn(_('osapi_workloadmgr_extension is set to deprecated path: %s'),
+            LOG.warn(_('osapi_workloadmgr_extension is set to '
+                       'deprecated path: %s'),
                      old_contrib_path)
             LOG.warn(_('Please set your flag or workloadmgr.conf settings for '
                        'osapi_workloadmgr_extension to: %s'), new_contrib_path)
