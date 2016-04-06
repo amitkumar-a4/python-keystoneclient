@@ -371,7 +371,6 @@ class API(base.Base):
                 pass
 
         workload_dict['metadata'] = metadata
-        
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False 
 
@@ -383,7 +382,6 @@ class API(base.Base):
                 timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
                 workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
                 break
-
                 
         return workload_dict
     
@@ -391,6 +389,13 @@ class API(base.Base):
     def workload_get_all(self, context, search_opts={}):
         workloads = self.db.workload_get_all(context)
         return workloads
+
+    @autolog.log_method(logger=Logger)
+    def workload_get_all_by_admin(self, context, search_opts={}):
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+        workloads = self.db.workload_get_all_by_admin(context)
+        return workloads        
     
     @autolog.log_method(logger=Logger)
     def workload_create(self, context, name, description, workload_type_id,
@@ -683,11 +688,10 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
-        AUDITLOG.log(context,'Import Workloads Requested', None)
-        
-        if not context.is_admin and upgrade:
+        AUDITLOG.log(context,'Import Workloads Requested', None)        
+        if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
-        
+
         try:
             workloads = []
             import_workload_module = None
@@ -1286,7 +1290,12 @@ class API(base.Base):
     def snapshot_get_all(self, context, workload_id=None):
         snapshots = self.db.snapshot_get_all(context, workload_id)
         return snapshots
-    
+
+    @autolog.log_method(logger=Logger)
+    def snapshot_get_all_by_host(self, context, host=None):
+        snapshots = self.db.snapshot_get_all_by_host(context, host)
+        return snapshots
+
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_id):
         """
