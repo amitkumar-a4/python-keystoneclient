@@ -759,14 +759,13 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']        
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'
-
             try:
                  settings = settings_module.get_settings() 
                  import re
                  for setting in settings:
                      if setting.strip().find('smtp_') >= 0:
                         value = settings_module.get_settings().get(setting)
-                        if value == "" or len(value) <= 1:
+                        if (value == "" or len(value) <= 1) and setting != 'smtp_email_enable':
                            if settings_module.get_settings().get('smtp_server_name') == 'localhost' and (setting == 'smtp_server_password' or setting == 'smtp_server_username'):
                               continue
                            else:

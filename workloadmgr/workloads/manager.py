@@ -583,7 +583,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             try:                
                 snapshot = self.db.snapshot_get(context, snapshot_id)
-                if settings.get_settings(context).get('smtp_email_enable') == 'yes':
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes' or settings.get_settings(context).get('smtp_email_enable') == '1':
                     self.send_email(context,snapshot,'snapshot')
             except Exception as ex:
                 LOG.exception(ex)
@@ -967,7 +967,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 restore = self.db.restore_get(context, restore_id)
                 self.db.snapshot_update(context, restore.snapshot_id, {'status': 'available'})
                 self.db.workload_update(context, workload.id,{'status': 'available'})
-                if settings.get_settings(context).get('smtp_email_enable') == 'yes':
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes' or settings.get_settings(context).get('smtp_email_enable') == '1':
                     self.send_email(context,restore,'restore')       
             except Exception as ex:
                 LOG.exception(ex)                     
@@ -1260,16 +1260,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         else error email
         """  
         try:
-            try:
-                keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url) 
-                user = keystone.users.get(context.user_id)
-                if user.email == '':
-                    user.email = settings.get_settings(context).get('smtp_default_recipient')
-            except:
-                o = {'name':'admin','email':settings.get_settings(context).get('smtp_default_recipient')}
-                user = objectview(o)
-                pass
-
             if type == 'snapshot':
                 workload = self.db.workload_get(context, object.workload_id)
                 workload_type = self.db.workload_type_get(context, workload.workload_type_id)
@@ -1280,6 +1270,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 workload_type = self.db.workload_type_get(context, workload.workload_type_id)
                 snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
 
+            try:
+                keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
+                user = keystone.users.get(context.user_id)
+                if user.email is None or user.email == '':
+                    user.email = settings.get_settings(context).get('smtp_default_recipient')
+            except:
+                o = {'name':'admin','email':settings.get_settings(context).get('smtp_default_recipient')}
+                user = objectview(o)
+                pass
             with open('/opt/stack/workloadmgr/workloadmgr/templates/vms.html', 'r') as content_file:
                 vms_html = content_file.read()
             
