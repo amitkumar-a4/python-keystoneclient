@@ -78,7 +78,15 @@
                 </ol>
                 <h2>Dashboard</h2>
                 <ol>
-                    <li>Horizon Dashboard
+                    <li>Configure Horizon Plugin
+                        <br>
+                        <br>
+                        <div class="well">
+                            <b>Download <a href="/tvault-horizon-plugin-install.sh">tvault-horizon-plugin-install.sh</a> and run as sudo...</b><br>
+                        </div>                    
+                    </li>
+               
+                    <li>Horizon Dashboard on Appliance
                         <br>
                         <br>
                         <div class="well">
