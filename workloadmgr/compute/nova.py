@@ -671,7 +671,7 @@ class API(base.Base):
             return client.servers.delete_meta(server=s, keys=keys)
         except Exception as ex:
             LOG.exception(ex)
-            return
+            return ex
 
     @synchronized(novalock)
     def attach_volume(self, context, server_id, volume_id, device):
@@ -1140,6 +1140,8 @@ class API(base.Base):
             return client.contego.vast_finalize(server=server, params=params)
         except Exception as ex:
             LOG.exception(ex)
+            if ex.code == 400 or ex.code == 404:
+               return ex
             msg = 'Unable to complete snapshot operation; Please check contego logs for more details'
             raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
