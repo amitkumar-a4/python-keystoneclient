@@ -50,7 +50,7 @@ neutron_opts = [
                default='http://localhost:5000/v2.0',
                help='auth url for connecting to neutron in admin context'),
     cfg.BoolOpt('neutron_api_insecure',
-                default=False,
+                default=True,
                 deprecated_name='quantum_api_insecure',
                 help='if set, ignore any SSL validation issues'),
     cfg.StrOpt('neutron_auth_strategy',

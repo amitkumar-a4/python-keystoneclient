@@ -50,7 +50,7 @@ glance_opts = [
                 help='Default protocol to use when connecting to glance. '
                      'Set to https for SSL.'),
     cfg.BoolOpt('glance_api_insecure',
-                default=False,
+                default=True,
                 help='Allow to perform insecure SSL (https) requests to '
                      'glance'),
     cfg.IntOpt('glance_num_retries',
