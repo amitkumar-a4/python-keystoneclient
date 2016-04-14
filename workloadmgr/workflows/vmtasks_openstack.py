@@ -97,6 +97,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 
                 nic.setdefault('ip_address', interface.fixed_ips[0]['ip_address'])
                 nic.setdefault('mac_address', interface.mac_addr)
+                nic.setdefault('network_type', 'neutron')
         
                 port_data = network_service.get_port(cntx, interface.port_id)
                 #TODO(giri): We may not need ports
@@ -173,9 +174,11 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                         nic.setdefault('ip_address', interface['addr'])
                         nic.setdefault('mac_address', interface['OS-EXT-IPS-MAC:mac_addr'])
                         nic.setdefault('network_name', networkname)
+                        nic.setdefault('network_type', 'nova')
                         for net in networks:
                             if net.label == networkname:
                                 nic.setdefault('network_id', net.id)
+                                nic.setdefault('cidr', net.cidr)
                                 break
                         nics.append(nic)
                         uniquemacs.add(interface['OS-EXT-IPS-MAC:mac_addr'])
