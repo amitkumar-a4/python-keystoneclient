@@ -552,13 +552,21 @@ def workload_update(context, id, values, purge_metadata=False):
 
 @require_context
 def workload_get_all(context, **kwargs):
-    if not is_admin_context(context):
-        return workload_get_all_by_project(context, context.project_id)
-    else:        
-        return model_query( context, models.Workloads, **kwargs).\
-                            options(sa_orm.joinedload(models.Workloads.metadata)).\
-                            filter_by(project_id=context.project_id).\
-                            order_by(models.Workloads.created_at.desc()).all()
+        if 'page_number' in kwargs:
+            page_size = setting_get(context,'page_size')
+            return model_query( context, models.Workloads, **kwargs).\
+                                    options(sa_orm.joinedload(models.Workloads.metadata)).\
+                                    filter_by(project_id=context.project_id).\
+                                    order_by(models.Workloads.created_at.desc()).limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
+        else:
+            if not is_admin_context(context):
+                return workload_get_all_by_project(context, context.project_id)
+            else:
+                return model_query( context, models.Workloads, **kwargs).\
+                                    options(sa_orm.joinedload(models.Workloads.metadata)).\
+                                    filter_by(project_id=context.project_id).\
+                                    order_by(models.Workloads.created_at.desc()).all()
+
 
 @require_admin_context
 def workload_get_all_by_host(context, host):
@@ -2904,7 +2912,11 @@ def _setting_get(context, setting_name, **kwargs):
                             first()
 
     if not result:
-        raise exception.SettingNotFound(setting_name=setting_name)
+        if setting_name == 'page_size':
+            return 10
+        else:
+            raise exception.SettingNotFound(setting_name=setting_name)
+
 
     return result
 
