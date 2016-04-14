@@ -816,16 +816,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                               workload_metadata[instance_id] = restored_vm.vm_id
                               if restored_ids == None:
                                  self.db.workload_vms_delete(context, instance_id, workload.id)
-                                 compute_service.delete_meta(context, instance_id,
-                                                         ["workload_id", "workload_name"])
                               else:
                                    for ins in snap_ins:
                                        workload_metadata[ins] = restored_vm.vm_id
  
                                    for restored_id in restored_ids:
                                        self.db.workload_vms_delete(context, restored_id, workload.id)
-                                       compute_service.delete_meta(context, restore_id,
+                                       try:
+                                           result = compute_service.delete_meta(context, restore_id,
                                                             ["workload_id", ["workload_name"]])
+                                       except Exception as ex:
+                                              LOG.exception(ex)
+                                              pass
 
                               self.db.workload_update(context,
                                    workload.id,
