@@ -369,7 +369,10 @@ class WorkloadVMsNotFound(NotFound):
     message = _("WorkloadVMs of %(workload_id)s could not be found.")
         
 class WorkloadVMNotFound(NotFound):
-    message = _("WorkloadVM %(workload_vm_id)s could not be found.")            
+    message = _("WorkloadVM %(workload_vm_id)s could not be found.")
+    
+class SnapshotsOfHostNotFound(NotFound):
+    message = _("Snapshots for host: %(host) could not be found.")
 
 
 class SnapshotsNotFound(NotFound):
