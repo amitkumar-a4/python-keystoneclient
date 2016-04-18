@@ -1679,7 +1679,6 @@ def configure_host():
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass                
-        
 
         if config_data['storage_type'] == 'nfs':
             if not os.path.isdir('/var/triliovault'):
@@ -1696,8 +1695,11 @@ def configure_host():
             #create a temp file to check read write permissions for root user. In future, we need it check with nova user
             try:
                 temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
+                test_pattern = 'Testing read write permissions\n'
                 with open(temp_file_name, 'w') as temp_file:
-                    temp_file.write('Testing read write permissions\n')
+                    temp_file.write(test_pattern)
+                with open(temp_file_name, 'r') as temp_file:
+                    assert temp_file.readline() == test_pattern                    
                 remove(temp_file_name)
             except Exception as exception:
                 raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
