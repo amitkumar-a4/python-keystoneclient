@@ -24,6 +24,7 @@ import tarfile
 import shutil
 import datetime
 from threading  import Thread
+import uuid
     
 import bottle
 from bottle import static_file, ServerAdapter
@@ -1601,7 +1602,6 @@ def configure_host():
     # Python code to configure storage
     try:
         #configure host
-
         hostname = config_data['guest_name']
         fh, abs_path = mkstemp()
         new_file = open(abs_path,'w')
@@ -1679,9 +1679,8 @@ def configure_host():
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass                
-        
 
-        if config_data['storage_type'] == 'nfs': 
+        if config_data['storage_type'] == 'nfs':
             if not os.path.isdir('/var/triliovault'):
                command = ['sudo', 'mkdir', '/var/triliovault']
                subprocess.call(command, shell=False)
@@ -1692,6 +1691,19 @@ def configure_host():
             subprocess.call(command, shell=False)            
             command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
             subprocess.check_call(command, shell=False) 
+
+            #create a temp file to check read write permissions for root user. In future, we need it check with nova user
+            try:
+                temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
+                test_pattern = 'Testing read write permissions\n'
+                with open(temp_file_name, 'w') as temp_file:
+                    temp_file.write(test_pattern)
+                with open(temp_file_name, 'r') as temp_file:
+                    assert temp_file.readline() == test_pattern                    
+                remove(temp_file_name)
+            except Exception as exception:
+                raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
+            
         else:       
             command = ['sudo', 'rescan-scsi-bus']
             subprocess.call(command, shell=False)
@@ -2358,23 +2370,23 @@ def configure_openstack():
     
     try:    
         config_inputs = bottle.request.POST
-        
+
         config_data['configuration_type'] = 'openstack'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_ipaddress'] = get_lan_ip()
-        config_data['floating_ipaddress'] = config_inputs['floating-ipaddress']
+        config_data['floating_ipaddress'] = config_inputs['floating-ipaddress'].strip()
         if config_data['nodetype'] == 'controller':
-            config_data['tvault_primary_node'] = config_data['floating_ipaddress']
-        config_data['name_server'] = config_inputs['name-server']
-        config_data['domain_search_order'] = config_inputs['domain-search-order']        
+            config_data['tvault_primary_node'] = config_data['floating_ipaddress'].strip()
+        config_data['name_server'] = config_inputs['name-server'].strip()
+        config_data['domain_search_order'] = config_inputs['domain-search-order'].strip()        
         
-        config_data['keystone_admin_url'] = config_inputs['keystone-admin-url']
-        config_data['keystone_public_url'] = config_inputs['keystone-public-url']
-        config_data['admin_username'] = config_inputs['admin-username']
+        config_data['keystone_admin_url'] = config_inputs['keystone-admin-url'].strip()
+        config_data['keystone_public_url'] = config_inputs['keystone-public-url'].strip()
+        config_data['admin_username'] = config_inputs['admin-username'].strip()
         config_data['admin_password'] = config_inputs['admin-password']
-        config_data['admin_tenant_name'] = config_inputs['admin-tenant-name']
-        config_data['region_name'] = config_inputs['region-name']
-        config_data['guest_name'] = config_inputs['guest-name']
+        config_data['admin_tenant_name'] = config_inputs['admin-tenant-name'].strip()
+        config_data['region_name'] = config_inputs['region-name'].strip()
+        config_data['guest_name'] = config_inputs['guest-name'].strip()
         
         parse_result = urlparse(config_data['keystone_admin_url'])
         config_data['keystone_host'] = parse_result.hostname
@@ -2398,21 +2410,21 @@ def configure_openstack():
         config_data['ntp_enabled'] = 'off'
 
         config_data['storage_type'] = config_inputs['storage-type']
-        config_data['storage_local_device'] = config_inputs['storage-local-device']
+        config_data['storage_local_device'] = config_inputs['storage-local-device'].strip()
         if 'create-file-system' in config_inputs:
             config_data['create_file_system'] = config_inputs['create-file-system']
         else:
             config_data['create_file_system'] = 'off'
         
-        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
+        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
         
         config_data['swift_auth_version'] = ''
         config_data['swift_auth_url'] = ''
         config_data['swift_username'] = ''
         config_data['swift_password'] = ''
         config_data['swift_tenantname'] = ''
-        config_data['swift_container_prefix'] = config_inputs['swift-container-prefix']        
-        config_data['swift_url_template'] = config_inputs['swift-url-template']
+        config_data['swift_container_prefix'] = config_inputs['swift-container-prefix'].strip()        
+        config_data['swift_url_template'] = config_inputs['swift-url-template'].strip()
         
         bottle.redirect("/task_status_openstack")
     except Exception as exception:
