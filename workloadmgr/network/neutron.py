@@ -101,6 +101,9 @@ def _get_client(token=None, production= True):
         'endpoint_url': neutron_url,
         'timeout': CONF.neutron_url_timeout,
         'insecure': CONF.neutron_api_insecure,
+        'auth_url': CONF.neutron_admin_auth_url,
+        'username': CONF.neutron_admin_username,
+        'password': CONF.neutron_admin_password,
     }
     if token:
         params['token'] = token
