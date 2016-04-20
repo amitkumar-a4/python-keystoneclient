@@ -1008,9 +1008,6 @@ class API(base.Base):
                 return contego_service_info
             except Exception as ex:
                 LOG.exception(ex)                
-        except nova_exception.Unauthorized as unauth_ex:
-            client =  novaclient(context, self._production, extensions=extensions, admin=True)
-            return client.contego.service_status(context)
         except Exception as ex:
             LOG.exception(ex)
             msg = 'Unable to get the status of contego service'
