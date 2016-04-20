@@ -967,6 +967,55 @@ class API(base.Base):
             raise exception.ErrorOccurred(msg)
             #TODO(gbasava): Handle the exception
 
+    def contego_service_status(self, context, host=None, ip=None):
+        """
+        Get contego service status running on a compute node
+        """
+        contego_service_info = {}
+        all_services = []
+        try:                
+            try:
+                client = novaclient(context, self._production)
+                
+                if host == 'all' and ip == 'all':
+                    all_services = client.services.list()               
+                elif host != 'all':
+                    all_services = client.services.list(host=host)
+                elif ip != 'all':
+                    for hypervisor in client.hypervisors.list():                    
+                        if hypervisor.host_ip == ip:
+                            all_services = client.services.list(host=hypervisor.hypervisor_hostname)
+                            
+                for service in all_services:                    
+                    if service.binary in 'contego':
+                        contego_service_info[service.host] = ({"id":service.id,
+                                                                "name":service.binary,
+                                                                "status":service.status,
+                                                                "running_state":service.state
+                                                                })                                                    
+                return contego_service_info
+            except nova_exception.Unauthorized as unauth_ex:
+                client = novaclient(context, self._production, admin=True)
+                all_services = client.services.list()
+                
+                for service in all_services:                    
+                    if service.binary in 'contego':
+                        contego_service_info[service.host] = ({"id":service.id,
+                                                                "name":service.binary,
+                                                                "status":service.status,
+                                                                "running_state":service.state
+                                                                })
+                return contego_service_info
+            except Exception as ex:
+                LOG.exception(ex)                
+        except nova_exception.Unauthorized as unauth_ex:
+            client =  novaclient(context, self._production, extensions=extensions, admin=True)
+            return client.contego.service_status(context)
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = 'Unable to get the status of contego service'
+            raise exception.ErrorOccurred(msg)            
+            
     @synchronized(novalock)
     def vast_freeze(self, context, server, params):
         """
