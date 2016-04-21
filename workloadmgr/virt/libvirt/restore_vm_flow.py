@@ -73,6 +73,8 @@ def get_new_volume_type(instance_options, volume_id, volume_type):
                 volume_type = voloption['new_volume_type']
                 break
 
+    if volume_type.lower() == 'none':
+        volume_type = None
     return volume_type
 
 def is_supported_backend(volume_type):
