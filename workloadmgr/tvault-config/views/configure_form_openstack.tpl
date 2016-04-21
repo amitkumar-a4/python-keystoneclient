@@ -92,7 +92,7 @@
 		<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
 	</div><br>   	      
 
-        <div class="panel-group" id="accordion" style='display:none'>
+        <div class="panel-group" id="accordion" >
 		  <div class="panel panel-default" id="panel9">
 		    <div class="panel-heading">
 		      <h4 class="panel-title">
@@ -208,5 +208,20 @@
   </form>
   </div>
 </div>
+
+<script>
+$(document).ready(function(){
+$('#ntp-enabled').click(function(){
+if($(this).is(':checked'))
+{
+$('#ntp-servers').attr('required','required')
+}
+else
+{
+$('#ntp-servers').removeAttr('required');
+}
+});
+});
+</script>
 </body>
 </html>

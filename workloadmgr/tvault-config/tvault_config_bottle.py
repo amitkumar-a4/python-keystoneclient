@@ -459,22 +459,18 @@ def _authenticate_with_swift():
 
 def _authenticate_with_keystone():
     # Authenticate with Keystone
-
-    configure_mysql()
-    configure_rabbitmq()
-    configure_keystone()
-    configure_nova()
-    configure_neutron()
-    configure_glance()
-    configure_horizon()
-    
     #test admin url
-    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                               username=config_data['admin_username'], 
-                               password=config_data['admin_password'], 
-                               tenant_name=config_data['admin_tenant_name'],
-                               insecure=True)
-    tenants = keystone.tenants.list()
+    try:
+            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
+                                       username=config_data['admin_username'],
+                                       password=config_data['admin_password'],
+                                       tenant_name=config_data['admin_tenant_name'],
+                                       insecure=True)
+            tenants = keystone.tenants.list()
+    except Exception as e:
+           raise Exception( "KeystoneError:Unable to connect to keystone Admin URL "+e.message  )
+                     
+
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
@@ -489,20 +485,30 @@ def _authenticate_with_keystone():
     
 
     #test public url
-    keystone = ksclient.Client(auth_url=config_data['keystone_public_url'], 
-                               username=config_data['admin_username'], 
+    try:
+        keystone = ksclient.Client(auth_url=config_data['keystone_public_url'],
+                                   username=config_data['admin_username'],
+                                   password=config_data['admin_password'],
+                                   insecure=True)
+        tenants = keystone.tenants.list()
+    except Exception as e:      
+            raise Exception("KeystoneError:Unable to connect to keystone Public URL "+e.message  )
+         
+
+    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
+                               username=config_data['admin_username'],
                                password=config_data['admin_password'],
-                               insecure=True)
-    tenants = keystone.tenants.list()
-    
-    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                               username=config_data['admin_username'], 
-                               password=config_data['admin_password'], 
                                tenant_name=config_data['admin_tenant_name'],
                                insecure=True)
-    
-     
-    
+
+    configure_mysql()
+    configure_rabbitmq()
+    configure_keystone()
+    configure_nova()
+    configure_neutron()
+    configure_glance()
+    configure_horizon()
+
     #image
     kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL',
               'region_name': config_data['region_name'],}
@@ -1542,7 +1548,8 @@ def configure_form():
 @bottle.view('configure_form_vmware')
 @authorize()
 def configure_form_vmware():
-    bottle.request.environ['beaker.session']['error_message'] = ''   
+    if not 'error_message' in bottle.request.environ['beaker.session']:
+       bottle.request.environ['beaker.session']['error_message'] = ''
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
@@ -1570,7 +1577,8 @@ def configure_form_vmware():
 @bottle.view('configure_form_openstack')
 @authorize()
 def configure_form_openstack():
-    bottle.request.environ['beaker.session']['error_message'] = '' 
+    if not 'error_message' in bottle.request.environ['beaker.session']:
+       bottle.request.environ['beaker.session']['error_message'] = ''
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
     config_data = dict(Config._defaults)
@@ -1716,14 +1724,17 @@ def configure_host():
             subprocess.call(command, shell=False)
             
             command = ['sudo', 'mount', config_data['storage_local_device'], '/var/triliovault']
-            subprocess.check_call(command, shell=False) 
-
+            subprocess.check_call(command, shell=False)
+    
+        
+        if config_data['ntp_enabled'] != 'off':
+            ntp_setup()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           raise exception        
+            return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
 
@@ -1746,7 +1757,7 @@ def authenticate_with_vcenter():
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           raise exception        
+           return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
 
@@ -1768,7 +1779,7 @@ def authenticate_with_swift():
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           raise exception        
+           return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
         
@@ -1782,15 +1793,19 @@ def authenticate_with_keystone():
             time.sleep(1)
             return {'status':'Success'}            
         except Exception as exception:
-            pass    
-    try:
+            if "KeystoneError:" in exception.message:
+                bottle.request.environ['beaker.session']['error_message'] = " %(exception)s" %{'exception': exception,}
+                return bottle.HTTPResponse(status=500,body="Error")
+            else:
+                pass
+    try:        
         _authenticate_with_keystone()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
-        else:
-           raise exception        
+        else:    
+           return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}    
 
@@ -1813,7 +1828,7 @@ def register_service():
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           raise exception        
+           return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}        
 
@@ -1880,7 +1895,7 @@ def configure_api():
             
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception       
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
 
@@ -1903,7 +1918,7 @@ def configure_scheduler():
             subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception         
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
 
@@ -1988,7 +2003,7 @@ def configure_service():
         
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception      
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
 
@@ -2015,7 +2030,7 @@ def start_api():
             
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception         
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(2)
     return {'status':'Success'}
 
@@ -2030,7 +2045,7 @@ def start_scheduler():
             subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception    
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(2)
     return {'status':'Success'}
 
@@ -2044,7 +2059,7 @@ def start_service():
         subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-        raise exception      
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(2)
     return {'status':'Success'}
 
@@ -2066,7 +2081,7 @@ def register_workloadtypes():
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           raise exception        
+           return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}  
 
@@ -2088,7 +2103,7 @@ def workloads_import():
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           raise exception        
+           return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}        
 
@@ -2113,8 +2128,8 @@ def discover_vcenter():
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         config_data['config_status'] = 'failed'
-        persist_config()        
-        raise exception                    
+        persist_config()
+        return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
 
@@ -2155,46 +2170,17 @@ def persist_config():
     time.sleep(1)
     return {'status':'Success'}    
 
-@bottle.route('/ntp_setup')
-@authorize()
-def ntp_setup():
-    try:
-        contents = open('/etc/ntp.conf', 'r').read()
-        new_contents = ""
-        detect = 0
+def ntp_setup():    
+    try: 
         ntps = config_data['ntp_servers']
         ntp_str = ""
         count = 0
         for ntp in ntps.split(','):
             if count > 5:
                break
-            ntp_str += "server "+ntp.strip()+" \n" 
+            ntp_str += "server "+ntp.strip()+" \n"        
 
-        for line in contents.splitlines():
-            line = line.strip()
-            if (line.find('#server ') != -1 or line.find('server ') != -1) and (detect == 0 or detect == 1):
-               detect = 1
-            else:
-                 if line.find('fallback') != -1 and detect == 1:
-                    detect = 2
-                    new_contents += ntp_str
-                 elif detect == 1:
-                      detect = 3
-                      new_contents += ntp_str
-
-                 new_contents += line+"\n"
-
-        conf_file = open('/etc/ntp.conf', 'w')
-        conf_file.write(new_contents)
-        conf_file.close()
-        timezone_file = open('/etc/timezone', 'w')
-        timezone_file.write(config_data['timezone']+"\n")
-        timezone_file.close()
-        command = ['sudo', 'dpkg-reconfigure', '-f', 'noninteractive', 'tzdata']
-        subprocess.call(command, shell=False)
-     
-        command = ['sudo', 'service', 'ntp', 'stop']
-        subprocess.call(command, shell=False)
+        
         current_time = time.time()
         delay = current_time + 300
         status = 0
@@ -2214,17 +2200,47 @@ def ntp_setup():
                    error_msg = "Network connection unavailabe to update time instantly"
         
         if status == 0:
-           error_msg = "NTP servers unavailable to update time instantly <b> Enter valid servers </b>"
-        
+           error_msg = "NTP servers unavailable to update time instantly  Enter valid servers "
+
         if count > 5:
-           errro_msg = "Maximum 5 servers allowed <b> Suppressed rest </b>"
- 
-        command = ['sudo', 'service', 'ntp', 'restart']
-        subprocess.call(command, shell=False) 
+           errro_msg = "Maximum 5 servers allowed  Suppressed rest "
+
+        
 
         if 'error_msg' in vars():
-           return {'status':error_msg} 
-             
+           raise Exception(error_msg)
+        else:
+           contents = open('/etc/ntp.conf', 'r').read()
+           new_contents = ""
+           detect = 0
+           for line in contents.splitlines():
+               line = line.strip()
+               if (line.find('#server ') != -1 or line.find('server ') != -1) and (detect == 0 or detect == 1):
+                    detect = 1
+               else:
+                    if line.find('fallback') != -1 and detect == 1:
+                        detect = 2
+                        new_contents += ntp_str
+                    elif detect == 1:
+                        detect = 3
+                        new_contents += ntp_str
+
+                    new_contents += line+"\n"
+
+           conf_file = open('/etc/ntp.conf', 'w')
+           conf_file.write(new_contents)
+           conf_file.close()
+            #timezone_file = open('/etc/timezone', 'w')
+            #timezone_file.write(config_data['timezone']+"\n")
+            #timezone_file.close()
+            #command = ['sudo', 'dpkg-reconfigure', '-f', 'noninteractive', 'tzdata']
+           command = ['sudo', 'timedatectl', 'set-timezone', config_data['timezone']]
+           subprocess.call(command, shell=False)
+
+           command = ['sudo', 'service', 'ntp', 'stop']
+           subprocess.call(command, shell=False)
+           command = ['sudo', 'service', 'ntp', 'restart']
+           subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         config_data['config_status'] = 'failed'
@@ -2392,22 +2408,20 @@ def configure_openstack():
         config_data['keystone_host'] = parse_result.hostname
         config_data['keystone_admin_port'] = parse_result.port
         config_data['keystone_admin_protocol'] = parse_result.scheme
-        
+        #getting ntp and timezones        
+        if 'ntp-enabled' in config_inputs:
+            config_data['ntp_enabled'] = config_inputs['ntp-enabled']
+        else:
+            config_data['ntp_enabled'] = 'off'
+        config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
+        config_data['timezone'] = config_inputs['timezone']
+
         parse_result = urlparse(config_data['keystone_public_url'])
         config_data['keystone_public_port'] = parse_result.port
         config_data['keystone_public_protocol'] = parse_result.scheme
         
         config_data['workloadmgr_user'] = 'triliovault'
-        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD
-
-        """if 'ntp-enabled' in config_inputs:
-            config_data['ntp_enabled'] = config_inputs['ntp-enabled']
-        else:
-            config_data['ntp_enabled'] = 'off'
-        
-        config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
-        config_data['timezone'] = config_inputs['timezone']"""
-        config_data['ntp_enabled'] = 'off'
+        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
 
         config_data['storage_type'] = config_inputs['storage-type']
         config_data['storage_local_device'] = config_inputs['storage-local-device'].strip()
