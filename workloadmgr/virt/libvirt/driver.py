@@ -536,7 +536,6 @@ class LibvirtDriver(driver.ComputeDriver):
     def enable_cbt(self, cntx, db, instance):
         pass
 
-<<<<<<< HEAD
     def _vast_methods_call_by_function(self, func, *args):
         status = {'result': 'retry'}
         try:
@@ -994,9 +993,13 @@ class LibvirtDriver(driver.ComputeDriver):
 
         while True:
               try:
-                  status = self._vast_methods_call_by_function(compute_service.vast_finalize, cntx, instance['vm_id'], snapshot_data_ex)
+                  result = self._vast_methods_call_by_function(compute_service.vast_finalize, cntx, instance['vm_id'], snapshot_data_ex)
+                  if type(result).__name__ == 'BadRequest':
+                     if compute_service.get_server_by_id(cntx, instance['vm_id'], admin=False) is not None:
+                        continue
                   break
               except Exception as ex:
+                     time.sleep(10)
                      pass
              
         progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : instance['vm_id']} 
