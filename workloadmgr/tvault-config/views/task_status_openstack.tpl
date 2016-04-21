@@ -259,7 +259,7 @@ $( document ).ready(function() {
                 Starting tVault scheduler service</li>
     <li id="start_service" class="list-group-item"><span class="glyphicon"></span>
                 Starting tVault service</li>
-  <!--  <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
+    <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
     %#if 'ntp_enabled' in locals() and ntp_enabled == 'on':
         <li id="ntp_setup" class="list-group-item"><span class="glyphicon"></span>
@@ -267,7 +267,7 @@ $( document ).ready(function() {
     %#else:
         <li id="ntp_setup" class="list-group-item" style="display:None"><span class="glyphicon"></span>
         NTP setup</li>
-    %#end  -->
+    %#end 
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>

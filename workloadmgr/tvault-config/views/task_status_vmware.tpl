@@ -322,13 +322,13 @@ $( document ).ready(function() {
     %end
     <li id="discover_vcenter" class="list-group-item"><span class="glyphicon"></span>
                 Discover vCenter inventory</li>
-     %if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+     %#if 'ntp_enabled' in locals() and ntp_enabled == 'on':
         <li id="ntp_setup" class="list-group-item"><span class="glyphicon"></span>
         NTP setup</li>
-     %else:
+    %#else:
         <li id="ntp_setup" class="list-group-item" style="display:None"><span class="glyphicon"></span>
         NTP setup</li>
-     %end
+    %#end
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>
