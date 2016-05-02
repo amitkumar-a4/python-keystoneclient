@@ -20,17 +20,20 @@ from threading import Lock
 from collections import namedtuple
 from functools import wraps
 
-from workloadmgr.openstack.common.gettextutils import _
+from oslo.config import cfg
+
 from novaclient import exceptions as nova_exception
 from novaclient import service_catalog
 from novaclient import client
 from novaclient import extension as nova_extension
 from novaclient.v1_1 import client as nova_client
-from oslo.config import cfg
+
+from neutronclient.common import exceptions as nc_exc
 
 from workloadmgr.db import base
 from workloadmgr import context
 from workloadmgr import exception
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
 
@@ -285,7 +288,7 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                                         extensions=extensions)
                     argv.update({'client': client})
                     return func(*args, **argv)
-                except nova_exception.Unauthorized as unauth_ex:
+                except (nc_exc.NeutronClientException, nova_exception.Unauthorized) as unauth_ex:
                     if refresh_token is True:
                         argv.pop('client')
                         client = novaclient(args[1], args[0]._production,
@@ -789,7 +792,7 @@ class API(base.Base):
         return client.contego.vast_prepare(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False, contego=True)
+    @exception_handler(ignore_exception=True, contego=True)
     def vast_freeze(self, context, server, params, **kwargs):
         """
         FREEZE an instance
@@ -799,7 +802,7 @@ class API(base.Base):
         return client.contego.vast_freeze(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False, contego=True)
+    @exception_handler(ignore_exception=True, contego=True)
     def vast_thaw(self, context, server, params, **kwargs):
         """
         Thaw an instance
