@@ -579,7 +579,7 @@ class API(base.Base):
             return
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False)
+    @exception_handler(ignore_exception=True)
     def set_meta_item(self, context, server_id, key, value, **kwargs):
         """
         Adds a metadata item to the server given key value
@@ -593,7 +593,7 @@ class API(base.Base):
         return client.servers.set_meta_item(server=s, key=key, value=value)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False)
+    @exception_handler(ignore_exception=True)
     def delete_meta(self, context, server_id, keys, **kwargs):
         """
         Delete metadata of the server given the server id and keys
