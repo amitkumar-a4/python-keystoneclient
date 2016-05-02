@@ -144,7 +144,14 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='get_nodes',
                        conditions={"method": ['GET']})             
-
+        
+        #get contego service status
+        mapper.connect("contego_status",
+                       "/{project_id}/workloads/metrics/contego_status",
+                       controller=self.resources['workloads'],
+                       action='get_contego_status',
+                       conditions={"method": ['GET']})
+                       
         #remove workloadmanager node
         mapper.connect("workload_remove_node",
                        "/{project_id}/workloads/remove_node/{ip}",

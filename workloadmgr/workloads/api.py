@@ -788,6 +788,16 @@ class API(base.Base):
             raise ex
 
     @autolog.log_method(logger=Logger)
+    def get_contego_status(self, context, host=None, ip=None):
+        try:   
+            compute_service = nova.API(production=True)           
+            compute_contego_records = compute_service.contego_service_status(context, host, ip)            
+            return compute_contego_records
+        except Exception as ex:
+            LOG.exception(ex)
+            raise ex      
+            
+    @autolog.log_method(logger=Logger)
     def add_node(self, context, ip):
         try:
             for node_record in self.db.service_get_all_by_topic(context, topic='workloadmgr-workloads'):

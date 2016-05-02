@@ -677,7 +677,45 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))        
-    
+
+                
+    def get_contego_status(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            host, ip = None, None
+                        
+            if context.is_admin is False:
+                raise wlm_exceptions.AdminRequired()
+                
+            if ('QUERY_STRING' in req.environ) :
+                qs=parse_qs(req.environ['QUERY_STRING'])                
+                host = qs.get('host',[''])[0]
+                host = str(escape(host))
+                              
+            if ('QUERY_STRING' in req.environ) :
+                qs=parse_qs(req.environ['QUERY_STRING'])                
+                ip = qs.get('ip',[''])[0]
+                ip = str(escape(ip))
+            
+            compute_contego_records = {}
+            try:                
+                compute_contego_records = self.workload_api.get_contego_status(context, host, ip)
+            except Exception as ex:
+                LOG.exception(ex)
+            return compute_contego_records
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))       
+            
     def get_recentactivities(self, req):
         try:
             context = req.environ['workloadmgr.context']
