@@ -46,6 +46,9 @@ if __name__ == '__main__':
     logging.setup("workloadmgr")
     utils.monkey_patch()
     launcher = service.ProcessLauncher()
-    server = service.Service.create(binary='workloadmgr-workloads')
-    launcher.launch_server(server)
+    i = flags.FLAGS.get('workloads_workers')
+    while i > 0:
+          server = service.Service.create(binary='workloadmgr-workloads')
+          launcher.launch_server(server)
+          i = i - 1
     launcher.wait()

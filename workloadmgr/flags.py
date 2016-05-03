@@ -15,6 +15,7 @@ stepping stone.
 import os
 import socket
 import sys
+import multiprocessing
 
 from oslo.config import cfg
 
@@ -182,6 +183,10 @@ global_opts = [
                default='noauth',
                help='The strategy to use for auth. Supports noauth, keystone, '
                     'and deprecated.'),
+    cfg.IntOpt('workloads_workers',
+               default=multiprocessing.cpu_count(),
+               help='Parallel processing of workloads '
+                    'depending on cpus'),
 ]
 
 FLAGS.register_opts(global_opts)
