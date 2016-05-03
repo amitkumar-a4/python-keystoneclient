@@ -964,9 +964,13 @@ class LibvirtDriver(driver.ComputeDriver):
 
         while True:
               try:
-                  compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+                  result = compute_service.vast_finalize(cntx, instance['vm_id'], snapshot_data_ex)
+                  if type(result).__name__ == 'BadRequest':
+                     if compute_service.get_server_by_id(cntx, instance['vm_id'], admin=False) is not None:
+                        continue
                   break
               except Exception as ex:
+                     time.sleep(10)
                      pass
                
         start_time = timeutils.utcnow()

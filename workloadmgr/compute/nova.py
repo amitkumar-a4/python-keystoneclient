@@ -299,6 +299,8 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
             except Exception as ex:
                 if ignore_exception is False:
                     LOG.exception(ex)
+                    if ex.code == 400 or ex.code == 404:
+                        return
                     if contego is True:
                         msg = 'Unable to call %s; Please check contego \
                                logs for more details' % func.func_name
