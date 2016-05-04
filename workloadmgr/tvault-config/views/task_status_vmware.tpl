@@ -15,6 +15,14 @@
 <script>
 var xmlhttp;
 var ntp_note = "";
+function redirectToConf(xmlhttp)
+{
+  if(xmlhttp.status==500 &&  xmlhttp.responseText =="Error"  )
+ {
+ window.location.href="/configure_form_vmware"
+ return;
+ }
+}
 function loadXMLDoc(url, callback)
 {
         flag = $('#'+url).css('display')
@@ -43,11 +51,11 @@ function taskfunction()
 	var r = confirm("Continuing will configure the appliance.\nWould you like to proceed?");
 	if (r == false) {
 		window.history.back()
-		return	
+		return
 	}
 
 	$("#alert").hide();
-	document.getElementById("final_status").innerHTML = "Final Status";	
+	document.getElementById("final_status").innerHTML = "Final Status";
    	loadXMLDoc("configure_host", function() {
    	   document.getElementById("configure_host").children[0].classList.add("glyphicon-refresh");
 	   if (xmlhttp.readyState != 4) return;
@@ -59,13 +67,7 @@ function taskfunction()
 	   }
 	   else
 	   {
-		  $("#error_message").html(xmlhttp.responseText);
-		  $("#alert").show();
-		  document.getElementById("configure_host").classList.add("list-group-item-danger");
-		  document.getElementById("configure_host").children[0].classList.add("glyphicon-remove");
-		  document.getElementById("final_status").classList.add("list-group-item-danger");
-		  //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		  return;
+		  return redirectToConf(xmlhttp);
 	   }
 	   // Call authenticate with keystone
 	   loadXMLDoc("authenticate_with_vcenter", function() {
@@ -80,14 +82,7 @@ function taskfunction()
 	      }
 	      else
 	      {
-			 //$("#error_message").html(xmlhttp.responseText);
-			 $("#error_message").html(xmlhttp.responseText);
-			 $("#alert").show();	      
-	         document.getElementById("authenticate_with_vcenter").classList.add("list-group-item-danger");
-	         document.getElementById("authenticate_with_vcenter").children[0].classList.add("glyphicon-remove");
-	         document.getElementById("final_status").classList.add("list-group-item-danger");
-	         //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-	         return;
+			 return redirectToConf(xmlhttp);
 	      }
 		  // Call authenticate with swift
 		  loadXMLDoc("authenticate_with_swift", function() {
@@ -102,14 +97,7 @@ function taskfunction()
 		      }
 		      else
 		      {
-				 //$("#error_message").html(xmlhttp.responseText);
-				 $("#error_message").html(xmlhttp.responseText);
-				 $("#alert").show();	      
-		         document.getElementById("authenticate_with_swift").classList.add("list-group-item-danger");
-		         document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-remove");
-		         document.getElementById("final_status").classList.add("list-group-item-danger");
-		         //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		         return;
+				 return redirectToConf(xmlhttp);
 		      }
 			  // Call register_service api
 			  loadXMLDoc("register_service", function() {
@@ -123,13 +111,7 @@ function taskfunction()
 			     }
 			     else
 			     {
-				 	$("#error_message").html(xmlhttp.responseText);
-				 	$("#alert").show();		     
-			        document.getElementById("register_service").classList.add("list-group-item-danger");
-			        document.getElementById("register_service").children[0].classList.add("glyphicon-remove");
-			        document.getElementById("final_status").classList.add("list-group-item-danger");
-			        //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-			        return;
+				 	return redirectToConf(xmlhttp);
 			     }
 			     // Call configure_api
 			     loadXMLDoc("configure_api",function() {
@@ -143,13 +125,7 @@ function taskfunction()
 			        }
 			        else
 			        {
-				 	   $("#error_message").html(xmlhttp.responseText);
-				 	   $("#alert").show();		        
-			           document.getElementById("configure_api").classList.add("list-group-item-danger");
-			           document.getElementById("configure_api").children[0].classList.add("glyphicon-remove");
-			           document.getElementById("final_status").classList.add("list-group-item-danger");
-			           //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-			           return;
+				 	   return redirectToConf(xmlhttp);
 			        }
 			        // Call configure_scheduler
 			        loadXMLDoc("configure_scheduler",function() {
@@ -163,13 +139,7 @@ function taskfunction()
 			           }
 			           else
 			           {
-				 		  $("#error_message").html(xmlhttp.responseText);
-				 		  $("#alert").show();		           
-			              document.getElementById("configure_scheduler").classList.add("list-group-item-danger");
-			              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-remove");
-			              document.getElementById("final_status").classList.add("list-group-item-danger");
-			              //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-			              return;
+				 		  return redirectToConf(xmlhttp);
 			           }
 			           // Call configure_service
 			           loadXMLDoc("configure_service",function() {
@@ -183,13 +153,7 @@ function taskfunction()
 			              }
 			              else
 			              {
-							 $("#error_message").html(xmlhttp.responseText);
-							 $("#alert").show();		              
-			                 document.getElementById("configure_service").classList.add("list-group-item-danger");
-			                 document.getElementById("configure_service").children[0].classList.add("glyphicon-remove");
-			                 document.getElementById("final_status").classList.add("list-group-item-danger");
-			                 //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-			                 return;
+							 return redirectToConf(xmlhttp);
 			              }
 			              // Call start_api
 			              loadXMLDoc("start_api",function() {
@@ -203,13 +167,7 @@ function taskfunction()
 			                 }
 			                 else
 			                 {
-				 				$("#error_message").html(xmlhttp.responseText);
-				 				$("#alert").show();		                 
-			                    document.getElementById("start_api").classList.add("list-group-item-danger");
-			                    document.getElementById("start_api").children[0].classList.add("glyphicon-remove");
-			                    document.getElementById("final_status").classList.add("list-group-item-danger");
-			                    //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-			                    return;
+				 				return redirectToConf(xmlhttp);
 			                 }
 			                 // Call start_scheduler
 			                 loadXMLDoc("start_scheduler",function() {
@@ -223,13 +181,7 @@ function taskfunction()
 			                    }
 			                    else
 			                    {
-				 				   $("#error_message").html(xmlhttp.responseText);
-				 				   $("#alert").show();		                    
-			                       document.getElementById("start_scheduler").classList.add("list-group-item-danger");
-			                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-remove");
-			                       document.getElementById("final_status").classList.add("list-group-item-danger");
-			                       //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-			                       return;
+				 				  return redirectToConf(xmlhttp);
 			                    }
 			                    // Call start_service
 			                    loadXMLDoc("start_service",function() {
@@ -243,13 +195,7 @@ function taskfunction()
 									}
 									else
 									{
-										$("#error_message").html(xmlhttp.responseText);
-										$("#alert").show();		                       
-										document.getElementById("start_service").classList.add("list-group-item-danger");
-										document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
-										document.getElementById("final_status").classList.add("list-group-item-danger");
-										//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-										return;
+										return redirectToConf(xmlhttp);
 									}
 			                       	loadXMLDoc("register_workloadtypes",function() {
 										document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
@@ -262,13 +208,7 @@ function taskfunction()
 										}
 										else
 										{
-											$("#error_message").html(xmlhttp.responseText);
-											$("#alert").show();		                          
-											document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
-											document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
-											document.getElementById("final_status").classList.add("list-group-item-danger");
-											//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-											return;
+											return redirectToConf(xmlhttp);
 										}
 				                       	loadXMLDoc("workloads_import",function() {
 											document.getElementById("workloads_import").children[0].classList.add("glyphicon-refresh");
@@ -281,13 +221,7 @@ function taskfunction()
 											}
 											else
 											{
-												$("#error_message").html(xmlhttp.responseText);
-												$("#alert").show();		                          
-												document.getElementById("workloads_import").classList.add("list-group-item-danger");
-												document.getElementById("workloads_import").children[0].classList.add("glyphicon-remove");
-												document.getElementById("final_status").classList.add("list-group-item-danger");
-												//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-												return;
+												return redirectToConf(xmlhttp);
 											}
 					                       	loadXMLDoc("discover_vcenter",function() {
 												document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-refresh");
@@ -300,48 +234,11 @@ function taskfunction()
 												}
 												else
 												{
-													$("#error_message").html(xmlhttp.responseText);
-													$("#alert").show();		                          
-													document.getElementById("discover_vcenter").classList.add("list-group-item-danger");
-													document.getElementById("discover_vcenter").children[0].classList.add("glyphicon-remove");
-													document.getElementById("final_status").classList.add("list-group-item-danger");
-													//document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-													return;
+													return redirectToConf(xmlhttp);
 												}
 
-                                                                 loadXMLDoc("ntp_setup",function() {
-                                                                                        document.getElementById("ntp_setup").children[0].classList.add("glyphicon-refresh");
-                                                                                        if (xmlhttp.readyState != 4) return;
-                                                                                        document.getElementById("ntp_setup").children[0].classList.remove("glyphicon-refresh");
-                                                                                        if (xmlhttp.readyState==4 && xmlhttp.status==200)
-                                                                                        {
-                                                                                                obj = jQuery.parseJSON(xmlhttp.responseText)
-                                                                                                if(obj.status != 'Success') {
-                                                                                                  ntp_note = obj.status
-                                                                                                } 
-                                                                                                document.getElementById("ntp_setup").classList.add("list-group-item-success");
-                                                                                                document.getElementById("ntp_setup").children[0].classList.add("glyphicon-ok");
-                                                                                        }
-                                                                                        else
-                                                                                        {
-                                                                                                $("#error_message").html(xmlhttp.responseText);
-                                                                                                $("#alert").show();
-                                                                                                document.getElementById("ntp_setup").classList.add("list-group-item-danger");
-                                                                                                document.getElementById("ntp_setup").children[0].classList.add("glyphicon-remove");
-                                                                                                document.getElementById("final_status").classList.add("list-group-item-danger");
-                                                                                                //document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-                                                                                                return;
-                                                                                        }
-  
-						                        document.getElementById("final_status").classList.add("list-group-item-success");
-						                        //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-                                                                        if(ntp_note != "") {
-                                                                           ntp_note = "Note: "+ntp_note+" <br />"
-                                                                        }
-						                        document.getElementById("final_status").innerHTML = ntp_note+"<b>Configuration Completed. Click here to access <a href='/' onclick='javascript:event.target.port=3000'> TrilioVault Dashboard</a> </b>";
+                                  //ntp code
 
-                                                                      });
-	
 						                   });
 						               });
 					           	   });
@@ -354,7 +251,7 @@ function taskfunction()
 		     });
 		  });
 	   });
-	});	     
+	});
 }
 
 $( document ).ready(function() {
@@ -390,16 +287,16 @@ $( document ).ready(function() {
   <!-- List group -->
   <ul class="list-group">
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>
-                Configuring TrilioVault host</li>  
+                Configuring TrilioVault host</li>
     <li id="authenticate_with_vcenter" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with vCenter</li> 
+                Authenticating with vCenter</li>
 	%if 'swift_auth_url' in locals() and len(swift_auth_url) > 0:
     	<li id="authenticate_with_swift" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with Swift Object Store</li>     
+                Authenticating with Swift Object Store</li>
 	%else:
     	<li id="authenticate_with_swift" class="list-group-item" style="display:None"><span class="glyphicon"></span>
-                Authenticating with Swift Object Store</li>     
-    %end      			
+                Authenticating with Swift Object Store</li>
+    %end
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
                 Registering TrilioVault service</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>
@@ -418,26 +315,26 @@ $( document ).ready(function() {
                 Registering workload types</li>
 	%if 'import_workloads' in locals() and import_workloads == 'on':
     	<li id="workloads_import" class="list-group-item"><span class="glyphicon"></span>
-                Importing workloads</li>     
+                Importing workloads</li>
 	%else:
     	<li id="workloads_import" class="list-group-item" style="display:None"><span class="glyphicon"></span>
-                Importing workloads</li>     
-    %end      			
+                Importing workloads</li>
+    %end
     <li id="discover_vcenter" class="list-group-item"><span class="glyphicon"></span>
-                Discover vCenter inventory</li>                
-     %if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+                Discover vCenter inventory</li>
+     %#if 'ntp_enabled' in locals() and ntp_enabled == 'on':
         <li id="ntp_setup" class="list-group-item"><span class="glyphicon"></span>
         NTP setup</li>
-     %else:
+    %#else:
         <li id="ntp_setup" class="list-group-item" style="display:None"><span class="glyphicon"></span>
         NTP setup</li>
-     %end
+    %#end
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>
   <div id="alert" class="alert alert-danger" role="alert" style="display:none">
 	  <p id="error_message"> Error Message </p>
-  </div>    
+  </div>
 </div>
 
 </body>

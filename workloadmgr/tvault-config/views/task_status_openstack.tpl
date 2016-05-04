@@ -15,6 +15,14 @@
 <script>
 var xmlhttp;
 var ntp_note = "";
+function redirectToConf(xmlhttp)
+{
+  if(xmlhttp.status==500 &&  xmlhttp.responseText =="Error"  )
+ {
+ window.location.href="/configure_openstack"
+ return;
+ }
+}
 function loadXMLDoc(url, callback)
 {
         flag = $('#'+url).css('display')
@@ -43,9 +51,9 @@ function taskfunction()
 	var r = confirm("Continuing will configure the appliance.\nWould you like to proceed?");
 	if (r == false) {
 		window.history.back()
-		return	
+		return
 	}
-    
+
 	$("#alert").hide();
    	loadXMLDoc("configure_host", function() {
    	   document.getElementById("configure_host").children[0].classList.add("glyphicon-refresh");
@@ -57,14 +65,8 @@ function taskfunction()
 		  document.getElementById("configure_host").children[0].classList.add("glyphicon-ok");
 	   }
 	   else
-	   {
-		  $("#error_message").html(xmlhttp.responseText);
-		  $("#alert").show();
-		  document.getElementById("configure_host").classList.add("list-group-item-danger");
-		  document.getElementById("configure_host").children[0].classList.add("glyphicon-remove");
-		  document.getElementById("final_status").classList.add("list-group-item-danger");
-		  document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		  return;
+	   {		
+	   return redirectToConf(xmlhttp);				  
 	   }
 	   // Call authenticate with keystone
 	   loadXMLDoc("authenticate_with_keystone", function() {
@@ -79,17 +81,12 @@ function taskfunction()
 	      }
 	      else
 	      {
-			 //$("#error_message").html(xmlhttp.responseText);
-			 $("#error_message").html(xmlhttp.responseText);
-			 $("#alert").show();	      
-	         document.getElementById("authenticate_with_keystone").classList.add("list-group-item-danger");
-	         document.getElementById("authenticate_with_keystone").children[0].classList.add("glyphicon-remove");
-	         document.getElementById("final_status").classList.add("list-group-item-danger");
-	         document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-	         return;
+		    return redirectToConf(xmlhttp);	
+			
 	      }
 		  // Call register_service api
 		  loadXMLDoc("register_service", function() {
+			
 	   	   	 document.getElementById("register_service").children[0].classList.add("glyphicon-refresh");
 	      	 if (xmlhttp.readyState != 4) return;
 	      	 document.getElementById("register_service").children[0].classList.remove("glyphicon-refresh");
@@ -100,16 +97,10 @@ function taskfunction()
 		     }
 		     else
 		     {
-			 	$("#error_message").html(xmlhttp.responseText);
-			 	$("#alert").show();		     
-		        document.getElementById("register_service").classList.add("list-group-item-danger");
-		        document.getElementById("register_service").children[0].classList.add("glyphicon-remove");
-		        document.getElementById("final_status").classList.add("list-group-item-danger");
-		        document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		        return;
+			 	return redirectToConf(xmlhttp);	
 		     }
 		     // Call configure_api
-		     loadXMLDoc("configure_api",function() {
+		     loadXMLDoc("configure_api",function() {				
 		   	   	document.getElementById("configure_api").children[0].classList.add("glyphicon-refresh");
 		      	if (xmlhttp.readyState != 4) return;
 		      	document.getElementById("configure_api").children[0].classList.remove("glyphicon-refresh");
@@ -120,13 +111,7 @@ function taskfunction()
 		        }
 		        else
 		        {
-			 	   $("#error_message").html(xmlhttp.responseText);
-			 	   $("#alert").show();		        
-		           document.getElementById("configure_api").classList.add("list-group-item-danger");
-		           document.getElementById("configure_api").children[0].classList.add("glyphicon-remove");
-		           document.getElementById("final_status").classList.add("list-group-item-danger");
-		           document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		           return;
+			 	   return redirectToConf(xmlhttp);	
 		        }
 		        // Call configure_scheduler
 		        loadXMLDoc("configure_scheduler",function() {
@@ -140,16 +125,10 @@ function taskfunction()
 		           }
 		           else
 		           {
-			 		  $("#error_message").html(xmlhttp.responseText);
-			 		  $("#alert").show();		           
-		              document.getElementById("configure_scheduler").classList.add("list-group-item-danger");
-		              document.getElementById("configure_scheduler").children[0].classList.add("glyphicon-remove");
-		              document.getElementById("final_status").classList.add("list-group-item-danger");
-		              document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		              return;
+			 		  return redirectToConf(xmlhttp);	
 		           }
 		           // Call configure_service
-		           loadXMLDoc("configure_service",function() {
+		           loadXMLDoc("configure_service",function() {	
 		   	   	      document.getElementById("configure_service").children[0].classList.add("glyphicon-refresh");
 		      	      if (xmlhttp.readyState != 4) return;
 		      	      document.getElementById("configure_service").children[0].classList.remove("glyphicon-refresh");
@@ -160,13 +139,7 @@ function taskfunction()
 		              }
 		              else
 		              {
-						 $("#error_message").html(xmlhttp.responseText);
-						 $("#alert").show();		              
-		                 document.getElementById("configure_service").classList.add("list-group-item-danger");
-		                 document.getElementById("configure_service").children[0].classList.add("glyphicon-remove");
-		                 document.getElementById("final_status").classList.add("list-group-item-danger");
-		                 document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                 return;
+						 return redirectToConf(xmlhttp);	
 		              }
 		              // Call start_api
 		              loadXMLDoc("start_api",function() {
@@ -180,13 +153,7 @@ function taskfunction()
 		                 }
 		                 else
 		                 {
-			 				$("#error_message").html(xmlhttp.responseText);
-			 				$("#alert").show();		                 
-		                    document.getElementById("start_api").classList.add("list-group-item-danger");
-		                    document.getElementById("start_api").children[0].classList.add("glyphicon-remove");
-		                    document.getElementById("final_status").classList.add("list-group-item-danger");
-		                    document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                    return;
+			 				return redirectToConf(xmlhttp);	
 		                 }
 		                 // Call start_scheduler
 		                 loadXMLDoc("start_scheduler",function() {
@@ -200,13 +167,7 @@ function taskfunction()
 		                    }
 		                    else
 		                    {
-			 				   $("#error_message").html(xmlhttp.responseText);
-			 				   $("#alert").show();		                    
-		                       document.getElementById("start_scheduler").classList.add("list-group-item-danger");
-		                       document.getElementById("start_scheduler").children[0].classList.add("glyphicon-remove");
-		                       document.getElementById("final_status").classList.add("list-group-item-danger");
-		                       document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                       return;
+			 				   return redirectToConf(xmlhttp);	
 		                    }
 		                    // Call start_service
 		                    loadXMLDoc("start_service",function() {
@@ -220,13 +181,7 @@ function taskfunction()
 		                       }
 		                       else
 		                       {
-								  $("#error_message").html(xmlhttp.responseText);
-								  $("#alert").show();		                       
-		                          document.getElementById("start_service").classList.add("list-group-item-danger");
-		                          document.getElementById("start_service").children[0].classList.add("glyphicon-remove");
-		                          document.getElementById("final_status").classList.add("list-group-item-danger");
-		                          document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                          return;
+								  return redirectToConf(xmlhttp);	
 		                       }
 		                       loadXMLDoc("register_workloadtypes",function() {
 		   	   	                  document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
@@ -239,43 +194,9 @@ function taskfunction()
 		                          }
 		                          else
 		                          {
-			 						 $("#error_message").html(xmlhttp.responseText);
-			 						 $("#alert").show();		                          
-		                             document.getElementById("register_workloadtypes").classList.add("list-group-item-danger");
-		                             document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-remove");
-		                             document.getElementById("final_status").classList.add("list-group-item-danger");
-		                             document.getElementById("final_status").children[0].classList.add("glyphicon-remove");
-		                             return;
+			 						return redirectToConf(xmlhttp);	
 		                          }
-                                          loadXMLDoc("ntp_setup",function() {
-                                             document.getElementById("ntp_setup").children[0].classList.add("glyphicon-refresh");
-                                             if (xmlhttp.readyState != 4) return;
-                                             document.getElementById("ntp_setup").children[0].classList.remove("glyphicon-refresh");
-                                             if (xmlhttp.readyState==4 && xmlhttp.status==200)
-                                             {                                                                                                obj = jQuery.parseJSON(xmlhttp.responseText)
-                                                                                                                                              if(obj.status != 'Success') {
-                                                                                                                                                  ntp_note = obj.status
-                                                                                                                                              } 
-                                                                                                                                              document.getElementById("ntp_setup").classList.add("list-group-item-success");
-                                                                                                                                              document.getElementById("ntp_setup").children[0].classList.add("glyphicon-ok");
-                                             }
-                                             else
-                                             {
-                                                                                                                                              $("#error_message").html(xmlhttp.responseText);
-                                                                                                                                              $("#alert").show();
-                                                                                                                                              document.getElementById("ntp_setup").classList.add("list-group-item-danger");
-                                                                                                                                              document.getElementById("ntp_setup").children[0].classList.add("glyphicon-remove");
-                                                                                                                                              document.getElementById("final_status").classList.add("list-group-item-danger");
-                                                                                                                                              return;
-                                            }                                            
-  
-		                          document.getElementById("final_status").classList.add("list-group-item-success");
-		                          //document.getElementById("final_status").children[0].classList.add("glyphicon-ok");
-                                          if(ntp_note != "") {
-                                             ntp_note = "Note: "+ntp_note+" <br />"
-                                          }
-                                  document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';          
-		                       });
+                                         //ntp configure code
 		                    });
 		                 });
 		              });
@@ -285,7 +206,7 @@ function taskfunction()
 		  });
 	     });
 	 });
-    });	     
+    });
 }
 
 $( document ).ready(function() {
@@ -321,9 +242,9 @@ $( document ).ready(function() {
   <!-- List group -->
   <ul class="list-group">
     <li id="configure_host" class="list-group-item"><span class="glyphicon"></span>
-                Configuring tVault host</li>  
+                Configuring tVault host</li>
     <li id="authenticate_with_keystone" class="list-group-item"><span class="glyphicon"></span>
-                Authenticating with keystone</li>                 
+                Authenticating with keystone</li>
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
                 Registering tVault service with keystone</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>
@@ -340,19 +261,19 @@ $( document ).ready(function() {
                 Starting tVault service</li>
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
-    %if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+    %#if 'ntp_enabled' in locals() and ntp_enabled == 'on':
         <li id="ntp_setup" class="list-group-item"><span class="glyphicon"></span>
         NTP setup</li>
-    %else:
+    %#else:
         <li id="ntp_setup" class="list-group-item" style="display:None"><span class="glyphicon"></span>
         NTP setup</li>
-    %end
+    %#end 
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>
   <div id="alert" class="alert alert-danger" role="alert" style="display:none">
 	  <p id="error_message"> Error Message </p>
-  </div>    
+  </div>
 </div>
 
 </body>
