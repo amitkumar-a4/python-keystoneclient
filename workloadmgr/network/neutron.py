@@ -9,6 +9,7 @@ Handles all requests relating to network + neutron.
 """
 
 from threading import Lock
+from functools import wraps
 
 from oslo.config import cfg
 from neutronclient import client
@@ -90,6 +91,7 @@ def _get_auth_token():
             LOG.exception(_("_get_auth_token() failed"))
     return httpclient.auth_token
 
+
 def _get_client(token=None, production= True):
     if not token and CONF.neutron_auth_strategy:
         token = _get_auth_token()
@@ -101,6 +103,7 @@ def _get_client(token=None, production= True):
         'endpoint_url': neutron_url,
         'timeout': CONF.neutron_url_timeout,
         'insecure': CONF.neutron_api_insecure,
+        'auth_url': CONF.neutron_admin_auth_url,
     }
     if token:
         params['token'] = token
@@ -108,13 +111,40 @@ def _get_client(token=None, production= True):
         params['auth_strategy'] = None
     return clientv20.Client(**params)
 
-def get_client(context, admin=False, production = True):
-    if admin:
+
+def get_client(context, refresh_token=False, production=True):
+    if refresh_token:
         token = None
     else:
         token = context.auth_token
     return _get_client(token=token, production=production)
     
+
+def exception_handler(ignore_exception=False, refresh_token=True):
+    def exception_handler_decorator(func):
+        @wraps(func)
+        def func_wrapper(*args, **argv):
+            try:
+                try:
+                    client = get_client(args[1], production=args[0]._production)
+                    argv.update({'client': client})
+                    return func(*args, **argv)
+                except qexceptions.NeutronClientException as unauth_ex:
+                    if refresh_token is True:
+                        argv.pop('client')
+                        client = get_client(args[1], refresh_token=True,
+                                            production=args[0]._production)
+                        argv.update({'client': client})
+                        return func(*args, **argv)
+            except Exception as ex:
+                if ignore_exception is False:
+                    LOG.exception(ex)
+                    raise
+
+        return func_wrapper
+    return exception_handler_decorator
+
+
 class API(base.Base):
     """API for interacting with the network manager."""
     
@@ -122,26 +152,33 @@ class API(base.Base):
         self._production = production        
     
     def _get_ports(self, context, **search_opts):
-        return get_client(context, admin=True, production=self._production).list_ports(**search_opts).get('ports')
+        client = search_opts['client']
+        return client.list_ports(**search_opts).get('ports')
         
     @synchronized(neutronlock) 
+    @exception_handler(ignore_exception=False)
     def get_ports(self, context, **search_opts):
         return self._get_ports(context, **search_opts)
 
     @synchronized(neutronlock)
-    def get_port(self, context, port_id):
-        return get_client(context, admin=True, production=self._production).show_port(port_id)
+    @exception_handler(ignore_exception=False)
+    def get_port(self, context, port_id, **kwargs):
+        client = kwargs['client']
+        return client.show_port(port_id)
    
     def _modify_port(self, context, port_id, **kwargs):
         LOG.debug("port_modify(): portid=%s, kwargs=%s" % (port_id, kwargs))
         body = {'port': kwargs}
-        return get_client(context, admin=True, production=self. _production).update_port(port_id, body=body).get('port')
+        client = kwargs['client']
+        return client.update_port(port_id, body=body).get('port')
     
     @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
     def modify_port(self, context, port_id, **kwargs):
         return self._modify_port(context, port_id, **kwargs)
     
     @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
     def create_port(self, context, **kwargs):
         """
         Create a port on a specified network.
@@ -152,37 +189,45 @@ class API(base.Base):
         :param name: (optional) name of the port created
         :returns: Port object
         """
-        client = get_client(context, admin=True, production=self._production)
+        client = kwargs['client']
+        kwargs.pop('client')
         body = {'port': kwargs}
         port = client.create_port(body=body).get('port')
         return port    
 
-    def _delete_port(self, context, port_id):
-        return get_client(context, admin=True, production=self._production).delete_port(port_id)
+    def _delete_port(self, context, port_id, **kwargs):
+        client = kwargs['client']
+        return client.delete_port(port_id)
         
     @synchronized(neutronlock)
-    def delete_port(self, context, port_id):
+    @exception_handler(ignore_exception=False)
+    def delete_port(self, context, port_id, **kwargs):
         return self._delete_port(context, port_id)    
     
     @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
     def create_subnet(self, context, **kwargs):
-        client = get_client(context, admin=True, production=self._production)
+        client = kwargs['client']
+        kwargs.pop('client')
         body = {'subnet': kwargs}
         subnet = client.create_subnet(body=body).get('subnet')        
         subnet['label'] = subnet['name']
         return subnet  
 
-    def _get_subnet(self, context, subnet_id):
-        return get_client(context, admin=True, production=self._production).show_subnet(subnet_id)
+    def _get_subnet(self, context, subnet_id, **kwargs):
+        client = kwargs['client']
+        return client.show_subnet(subnet_id)
     
     @synchronized(neutronlock)
-    def get_subnet(self, context, subnet_id):
-        return self._get_subnet(context, subnet_id)
+    @exception_handler(ignore_exception=False)
+    def get_subnet(self, context, subnet_id, **kwargs):
+        return self._get_subnet(context, subnet_id, **kwargs)
     
     @synchronized(neutronlock)
-    def delete_subnet(self, context, subnet_id):
-        client = get_client(context, admin=True, production=self._production)
-        rv_subnets = self._get_subnet(context, subnet_id)
+    @exception_handler(ignore_exception=False)
+    def delete_subnet(self, context, subnet_id, **kwargs):
+        client = kwargs['client']
+        rv_subnets = self._get_subnet(context, subnet_id, **kwargs)
         search_opts = {'network_id': rv_subnets['subnet']['network_id']}        
         rv_ports = self._get_ports(context, **search_opts)
         for port in rv_ports:
@@ -190,9 +235,11 @@ class API(base.Base):
         client.delete_subnet(subnet_id) 
     
     @synchronized(neutronlock)
-    def get_subnets_from_port(self, context, port):
+    @exception_handler(ignore_exception=False)
+    def get_subnets_from_port(self, context, port, **kwargs):
         """Return the subnets for a given port."""
 
+        client = kwargs['client']
         fixed_ips = port['fixed_ips']
         # No fixed_ips for the port means there is no subnet associated
         # with the network the port is created on.
@@ -202,7 +249,7 @@ class API(base.Base):
         if not fixed_ips:
             return []
         search_opts = {'id': [ip['subnet_id'] for ip in fixed_ips]}
-        data = get_client(context, admin=True, production=self._production).list_subnets(**search_opts)
+        data = client.list_subnets(**search_opts)
         return data
         """
         ipam_subnets = data.get('subnets', [])
@@ -237,41 +284,47 @@ class API(base.Base):
         """   
 
     @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
     def create_network(self, context, **kwargs):
-        client = get_client(context, admin=True, production=self._production)
+        client = kwargs['client']
+        kwargs.pop('client')
         body = {'network': kwargs}
         network = client.create_network(body=body).get('network')        
         network['label'] = network['name']
         return network
     
     @synchronized(neutronlock)
-    def delete_network(self, context, network_id):
-        client = get_client(context, admin=True, production=self._production)
-        client.delete_network(network_id)          
+    @exception_handler(ignore_exception=False)
+    def delete_network(self, context, network_id, **kwargs):
+        client = kwargs['client']
+        client.delete_network(network_id, **kwargs)
 
     @synchronized(neutronlock)
-    def get_network(self, context, network_uuid):
-        client = get_client(context, admin=True, production=self._production)
+    @exception_handler(ignore_exception=False)
+    def get_network(self, context, network_uuid, **kwargs):
+        client = kwargs['client']
         network = client.show_network(network_uuid).get('network') or {}
         network['label'] = network['name']
         return network
     
     @synchronized(neutronlock)
-    def get_networks(self, context):
-        client = get_client(context, admin=True, production=self._production)
+    @exception_handler(ignore_exception=False)
+    def get_networks(self, context, **kwargs):
+        client = kwargs['client']
         networks = client.list_networks().get('networks')
         for network in networks:
             network['label'] = network['name']
         return networks
     
     @synchronized(neutronlock)    
-    def get_available_networks(self, context, project_id, net_ids=None):
+    @exception_handler(ignore_exception=False)
+    def get_available_networks(self, context, project_id, net_ids=None, **kwargs):
         """
         Return a network list available for the tenant.
         The list contains networks owned by the tenant and public networks.
         If net_ids specified, it searches networks with requested IDs only.
         """
-        client = get_client(context, admin=True, production=self._production)
+        client = kwargs['client']
 
         # If user has specified networks,
         # add them to **search_opts
@@ -294,16 +347,20 @@ class API(base.Base):
         return nets
     
     @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
     def create_router(self, context, **kwargs):
         client = get_client(context, admin=True, production=self._production)
+        client = kwargs['client']
+        kwargs.pop('client')
         body = {'router': kwargs}
         router = client.create_router(body=body).get('router')        
         router['label'] = router['name']
         return router
     
     @synchronized(neutronlock)
-    def delete_router(self, context, router_id):
-        client = get_client(context, admin=True, production=self._production)
+    @exception_handler(ignore_exception=False)
+    def delete_router(self, context, router_id, **kwargs):
+        client = kwargs['client']
         search_opts = {'device_owner': 'network:router_interface','device_id': router_id}
         ports = client.list_ports(**search_opts).get('ports')
         for port in ports:
@@ -311,73 +368,88 @@ class API(base.Base):
         client.delete_router(router_id)        
         
     @synchronized(neutronlock)
-    def get_routers(self, context):
+    @exception_handler(ignore_exception=False)
+    def get_routers(self, context, **kwargs):
         """Fetches a list of all routers for a tenant."""
-        client = get_client(context, admin=True, production=self._production)
+        client = kwargs['client']
         search_opts = {}
         routers = client.list_routers(**search_opts).get('routers', [])
         return routers
 
     @synchronized(neutronlock)
-    def router_add_interface(self, context, router_id, subnet_id=None, port_id=None):
+    def router_add_interface(self, context, router_id, subnet_id=None, port_id=None, **kwargs):
         body = {}
+        client = kwargs['client']
         if subnet_id:
             body['subnet_id'] = subnet_id
         if port_id:
             body['port_id'] = port_id
-        get_client(context, admin=True, production=self._production).add_interface_router(router_id, body)
+        client.add_interface_router(router_id, body)
     
-    def _router_remove_interface(self, context, router_id, subnet_id=None, port_id=None):
+    def _router_remove_interface(self, context, router_id, subnet_id=None, port_id=None, **kwargs):
         body = {}
+        client = kwargs['client']
         if subnet_id:
             body['subnet_id'] = subnet_id
         if port_id:
             body['port_id'] = port_id
-        get_client(context, admin=True, production=self._production).remove_interface_router(router_id, body)
+        client.remove_interface_router(router_id, body)
             
     @synchronized(neutronlock)
-    def router_remove_interface(self, context, router_id, subnet_id=None, port_id=None):
-        return self._router_remove_interface(context, router_id, subnet_id, port_id)
+    @exception_handler(ignore_exception=False)
+    def router_remove_interface(self, context, router_id, subnet_id=None, port_id=None, **kwargs):
+        return self._router_remove_interface(context, router_id, subnet_id, port_id, **kwargs)
     
     @synchronized(neutronlock)
-    def router_add_gateway(self, context, router_id, network_id):
+    @exception_handler(ignore_exception=False)
+    def router_add_gateway(self, context, router_id, network_id, **kwargs):
         body = {'network_id': network_id}
-        get_client(context, admin=True, production=self._production).add_gateway_router(router_id, body)
+        client = kwargs['client']
+        client.add_gateway_router(router_id, body)
     
         
     @synchronized(neutronlock)
-    def security_group_list(self, context):
-        return get_client(context, admin=False, production=self._production).list_security_groups(tenant_id = context.project_id)
+    @exception_handler(ignore_exception=False)
+    def security_group_list(self, context, **kwargs):
+        client = kwargs['client']
+        return client.list_security_groups(tenant_id = context.project_id)
+
+    @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
+    def security_group_get(self, context, sg_id, **kwargs):
+        client = kwargs['client']
+        return client.show_security_group(sg_id).get('security_group')
     
     
     @synchronized(neutronlock)
-    def security_group_get(self, context, sg_id):
-        return get_client(context, admin=False, production=self._production).show_security_group(sg_id).get('security_group')
-    
-    
-    @synchronized(neutronlock)
-    def security_group_create(self, context, name, desc):
+    @exception_handler(ignore_exception=False)
+    def security_group_create(self, context, name, desc, **kwargs):
         body = {'security_group': {'name': name,
                                    'description': desc}}
-        return get_client(context, admin=False, production=self._production).create_security_group(body)
+        client = kwargs['client']
+        return client.create_security_group(body)
     
     @synchronized(neutronlock)
-    def security_group_delete(self, context, sg_id):
-        return get_client(context, admin=False, production=self._production).delete_security_group(sg_id)
-    
-    
+    @exception_handler(ignore_exception=False)
+    def security_group_delete(self, context, sg_id, **kwargs):
+        client = kwargs['client']
+        return client.delete_security_group(sg_id)
+
     @synchronized(neutronlock)
-    def security_group_update(self, context, sg_id, name, desc):
+    @exception_handler(ignore_exception=False)
+    def security_group_update(self, context, sg_id, name, desc, **kwargs):
         body = {'security_group': {'name': name,
                                    'description': desc}}
-        return get_client(context, admin=False, production=self._production).update_security_group(sg_id, body)        
+        client = kwargs['client']
+        return client.update_security_group(sg_id, body)        
     
     
     @synchronized(neutronlock)
+    @exception_handler(ignore_exception=False)
     def security_group_rule_create(self, context, parent_group_id,
                                    direction, ethertype,
                                    ip_protocol, from_port, to_port,
-                                   cidr, group_id):
+                                   cidr, group_id, **kwargs):
         if not cidr:
             cidr = None
         if from_port < 0:
@@ -396,31 +468,32 @@ class API(base.Base):
                      'port_range_max': to_port,
                      'remote_ip_prefix': cidr,
                      'remote_group_id': group_id}}
-        rule = get_client(context, admin=False, production=self._production).create_security_group_rule(body)
+        client = kwargs['client']
+        rule = client.create_security_group_rule(body)
         return rule.get('security_group_rule')        
-        
+
     @synchronized(neutronlock)
-    def security_group_rule_delete(self, context, sgr_id):
-        return get_client(context, admin=False, production=self._production).delete_security_group_rule(sgr_id)
-    
+    @exception_handler(ignore_exception=False)
+    def security_group_rule_delete(self, context, sgr_id, **kwargs):
+        client = kwargs['client']
+        return client.delete_security_group_rule(sgr_id)
+
     @synchronized(neutronlock)
-    def server_security_groups(self, context, instance_id):
+    @exception_handler(ignore_exception=False)
+    def server_security_groups(self, context, instance_id, **kwargs):
         """Gets security groups of an instance."""
-        ports = self._get_ports(context, device_id=instance_id)
+        ports = self._get_ports(context, device_id=instance_id, **kwargs)
         sg_ids = []
         for p in ports:
             sg_ids += p['security_groups']
         
         return list(set(sg_ids))  
-    
-    
+
+
     @synchronized(neutronlock)
-    def server_update_security_groups(self, context, instance_id, new_security_group_ids):
-        ports = self._get_ports(context, device_id=instance_id)
+    @exception_handler(ignore_exception=False)
+    def server_update_security_groups(self, context, instance_id, new_security_group_ids, **kwargs):
+        ports = self._get_ports(context, device_id=instance_id, **kwargs)
         for p in ports:
             params = {'security_groups': new_security_group_ids}
             self._modify_port(context, p.id, **params)
-
-       
-    
-            
