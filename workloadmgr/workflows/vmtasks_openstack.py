@@ -1106,6 +1106,8 @@ def restore_vm_security_groups(cntx, db, restore):
             if security_group_type != 'neutron':
                 continue
             if  security_group_exists(snapshot_vm_resource):
+                restored_security_groups[snapshot_vm_resource.resource_pit_id] = \
+                    snapshot_vm_resource.resource_name
                 continue
 
             name = 'snap_of_' + db.get_metadata_value(snapshot_vm_resource.metadata, 'name')
