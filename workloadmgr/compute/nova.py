@@ -606,7 +606,7 @@ class API(base.Base):
         return client.servers.delete_meta(server=s, keys=keys)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=True)
+    @exception_handler(ignore_exception=False)
     def list_security_group(self, context, server_id, **kwargs):
         """
         List security groups on the server
@@ -620,7 +620,7 @@ class API(base.Base):
         return client.servers.list_security_group(server=s)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=True)
+    @exception_handler(ignore_exception=False)
     def add_security_group(self, context, server_id, security_group_id, **kwargs):
         """
         Add security group identified by security group id
@@ -635,7 +635,7 @@ class API(base.Base):
         return client.servers.add_security_group(server=s, security_group=security_group_id)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=True)
+    @exception_handler(ignore_exception=False)
     def remove_security_group(self, context, server_id, security_group_id, **kwargs):
         """
         Removes a security group identified by the security group_id
