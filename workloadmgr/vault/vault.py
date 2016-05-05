@@ -203,12 +203,8 @@ def mount_backup_media():
     elif CONF.vault_storage_type == 'vault':
         pass  
     elif CONF.vault_storage_type == 'nfs':        
-        try:
-            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_data_directory]
-            subprocess.check_call(command, shell=False) 
-        except Exception as ex:
-               LOG.exception(ex)
-               pass
+         command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_data_directory]
+         subprocess.check_call(command, shell=False) 
          
     else: # das, swift-i, swift-s, s3
         if CONF.vault_storage_das_device != 'none':      

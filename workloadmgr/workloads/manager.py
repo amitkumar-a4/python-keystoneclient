@@ -180,8 +180,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.restore_mark_incomplete_as_error(ctxt, self.host)
         except Exception as ex:
             LOG.exception(ex)
-            
-        vault.mount_backup_media()
     
     @autolog.log_method(logger=Logger)    
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):

@@ -40,6 +40,7 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import service
 from workloadmgr import utils
+from workloadmgr.vault import vault
 
 if __name__ == '__main__':
     flags.parse_args(sys.argv)
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     utils.monkey_patch()
     launcher = service.ProcessLauncher()
     i = flags.FLAGS.get('workloads_workers')
+    vault.mount_backup_media()
     while i > 0:
           server = service.Service.create(binary='workloadmgr-workloads')
           launcher.launch_server(server)

@@ -56,6 +56,7 @@ if module_dir:
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
 TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
+WLM_USER = 'nova'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -1691,17 +1692,31 @@ def configure_host():
             subprocess.call(command, shell=False)            
             command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
             subprocess.check_call(command, shell=False) 
+            setting_str = config_data['storage_nfs_export']+'        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
+            found = 0
+            with open('/etc/fstab', 'r') as ins:
+                 for line in ins:
+                     if line == setting_str:
+                        found = 1
+                        break
+            if found == 0:
+               fs_file = open('/etc/fstab', 'a')
+               fs_file.write(setting_str)
+               fs_file.close()
 
-            #create a temp file to check read write permissions for root user. In future, we need it check with nova user
             try:
                 temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
-                test_pattern = 'Testing read write permissions\n'
-                with open(temp_file_name, 'w') as temp_file:
-                    temp_file.write(test_pattern)
-                with open(temp_file_name, 'r') as temp_file:
-                    assert temp_file.readline() == test_pattern                    
-                remove(temp_file_name)
+                command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
+                subprocess.check_call(command, shell=False)
+                command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
+                subprocess.check_call(command, shell=True)
+                command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
+                subprocess.check_call(command, shell=True)
+                command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                subprocess.check_call(command, shell=False)
             except Exception as exception:
+                command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                subprocess.check_call(command, shell=False)
                 raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
             
         else:       
