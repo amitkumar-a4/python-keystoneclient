@@ -1692,7 +1692,8 @@ def configure_host():
             subprocess.call(command, shell=False)            
             command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
             subprocess.check_call(command, shell=False) 
-            setting_str = config_data['storage_nfs_export']+'        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
+            setting_str = config_data['storage_nfs_export']+ \
+                          '        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
             found = 0
             with open('/etc/fstab', 'r') as ins:
                  for line in ins:
