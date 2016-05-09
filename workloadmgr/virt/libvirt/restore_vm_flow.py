@@ -769,6 +769,58 @@ class RestoreInstanceFromImage(task.Task):
             pass
         pass
 
+
+class AdjustSG(task.Task):
+    """
+       Adjust security groups
+    """
+
+    def execute(self, context, restored_instance_id, restore_type,
+                restored_security_groups):
+        return self.execute_with_log(context, restored_instance_id,
+                                     restore_type, restored_security_groups)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'AdjustSG.execute')
+    def execute_with_log(self, context, restored_instance_id,
+                         restore_type, restored_security_groups):
+       
+        try:
+            self.db = db = WorkloadMgrDB().db
+            self.cntx = amqp.RpcContext.from_dict(context)
+
+            # refresh the token
+            user_id = self.cntx.user
+            project_id = self.cntx.tenant
+            self.cntx = nova._get_tenant_context(user_id, project_id)
+        
+            self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
+            sec_groups = compute_service.list_security_group(self.cntx, restored_instance_id)
+
+            sec_group_ids = [sec.id for sec in sec_groups]
+            ids_to_remove = set(sec_group_ids) - set(restored_security_groups.values())
+            ids_to_add = set(restored_security_groups.values()) - set(sec_group_ids)
+
+            # remove security groups that were not asked for
+            for sec in ids_to_remove:
+                compute_service.remove_security_group(self.cntx, restored_instance_id,
+                                                      sec)
+
+            for sec in ids_to_add:
+                compute_service.add_security_group(self.cntx, restored_instance_id,
+                                                   sec)
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = "Could not update security groups on the " \
+                  "restored instance %s" % retored_instance_id
+            LOG.warning(msg)
+
+    @autolog.log_method(Logger, 'AdjustSG.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
 class AttachVolume(task.Task):
     """
        Attach volume to the instance
@@ -1126,6 +1178,16 @@ def RestoreInstance(context, instance, snapshotobj, restoreid):
                                 provides='restored_instance_id'))
     return flow
 
+
+def AdjustInstanceSecurityGroups(context, instance, snapshotobj, restoreid):
+    flow = lf.Flow("adjustinstancesecuritygrouplf")
+    db = WorkloadMgrDB().db
+
+    flow.add(AdjustSG("AdjustSG"))
+
+    return flow
+
+
 def AttachVolumes(context, instance, snapshotobj, restoreid):
     flow = lf.Flow("attachvolumeslf")
     db = WorkloadMgrDB().db
@@ -1264,6 +1326,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # create nova from image id
     childflow = RestoreInstance(cntx, instance, snapshot_obj, restore['id'])
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    # create nova from image id
+    childflow = AdjustInstanceSecurityGroups(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 

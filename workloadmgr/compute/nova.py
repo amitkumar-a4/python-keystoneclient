@@ -607,6 +607,50 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
+    def list_security_group(self, context, server_id, **kwargs):
+        """
+        List security groups on the server
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+
+        server = namedtuple('server', 'id')
+        s = server(id=server_id)
+        client = kwargs['client']
+
+        return client.servers.list_security_group(server=s)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False)
+    def add_security_group(self, context, server_id, security_group_id, **kwargs):
+        """
+        Add security group identified by security group id
+        :param server: The :class:`Server` (or its ID) to query.
+        :param security_group_id: Security group id
+        """
+
+        server = namedtuple('server', 'id')
+        s = server(id=server_id)
+        client = kwargs['client']
+
+        return client.servers.add_security_group(server=s, security_group=security_group_id)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False)
+    def remove_security_group(self, context, server_id, security_group_id, **kwargs):
+        """
+        Removes a security group identified by the security group_id
+        :param server: The :class:`Server` (or its ID) to query.
+        :param security_group_id: Security group id
+        """
+
+        server = namedtuple('server', 'id')
+        s = server(id=server_id)
+        client = kwargs['client']
+
+        return client.servers.remove_security_group(server=s, security_group=security_group_id)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False)
     def attach_volume(self, context, server_id, volume_id, device, **kwargs):
         """
         Attach a volume identified by the volume ID to the given server ID
