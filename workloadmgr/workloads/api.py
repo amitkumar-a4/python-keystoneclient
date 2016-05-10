@@ -10,6 +10,7 @@ import socket
 import cPickle as pickle
 import json
 import importlib
+import uuid
 
 from eventlet import greenthread
 
@@ -1858,3 +1859,50 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
       
+    @autolog.log_method(logger=Logger)
+    def trust_create(self, context, role_name):
+
+        setting = {u'category': "identity",
+                   u'name': "trust-%s" % context.project_id,
+                   u'description': u'token id for user %s project %s' % \
+                                   (context.user_id, context.project_id),
+                   u'value': str(uuid.uuid4()),
+                   u'is_public': False,
+                   u'is_hidden': False,
+                   u'type': "trust_id",}
+        created_settings = []
+        try:
+            created_settings.append(self.db.setting_create(context, setting))
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return created_settings 
+
+
+    @autolog.log_method(logger=Logger)
+    def trust_delete(self, context, name):
+
+        trust = self.db.setting_get_all(context, name)
+        if trust.type != "trust_id":
+            msg = _("No trust record by name %s" % name)
+            raise wlm_exceptions.Invalid(reason=msg)
+
+        self.db.setting_delete(context,name)
+
+
+    @autolog.log_method(logger=Logger)
+    def trust_list(self, context):
+
+        settings =  self.db.setting_get_all(context)
+
+        trust = [t for t in settings if t.type == "trust_id"]
+        return trust
+
+    @autolog.log_method(logger=Logger)
+    def trust_get(self, context, name):
+        try:
+            return self.db.setting_get(context, name)
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return None
