@@ -108,7 +108,8 @@ class Manager(base.Base):
                 continue
 
             self._ticks_to_skip[task_name] = task._ticks_between_runs
-            LOG.debug(_("Running periodic task %(full_task_name)s"), locals())
+            #Commenting the below log statement to remove the clutter in log 
+            #LOG.debug(_("Running periodic task %(full_task_name)s"), locals())
 
             try:
                 task(self, context)
