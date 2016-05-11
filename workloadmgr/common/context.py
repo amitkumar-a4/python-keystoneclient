@@ -160,14 +160,6 @@ class RequestContext(context.RequestContext):
         if self._trusts_auth_plugin:
             return self._trusts_auth_plugin
 
-        LOG.warning(_LW('Using the keystone_authtoken user as the triliovault '
-                        'trustee user directly is deprecated. Please add the '
-                        'trustee credentials you need to the %s section of '
-                        'your workloadmgr.conf file.') % TRUSTEE_CONF_GROUP)
-
-        #cfg.CONF.import_group('keystone_authtoken',
-                              #'keystonemiddleware.auth_token')
-
         trustee_user_domain = 'default'
         if 'user_domain_id' in cfg.CONF.keystone_authtoken:
             trustee_user_domain = cfg.CONF.keystone_authtoken.user_domain_id

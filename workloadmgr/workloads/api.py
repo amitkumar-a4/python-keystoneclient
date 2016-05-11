@@ -1885,7 +1885,7 @@ class API(base.Base):
         trust_context = keystoneclient.create_trust_context()
 
         setting = {u'category': "identity",
-                   u'name': "trust-%s" % context.project_id,
+                   u'name': "trust-%s" % str(uuid.uuid4()),
                    u'description': u'token id for user %s project %s' % \
                                    (context.user_id, context.project_id),
                    u'value': trust_context.trust_id,
@@ -1904,7 +1904,7 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def trust_delete(self, context, name):
 
-        trust = self.db.setting_get_all(context, name)
+        trust = self.db.setting_get(context, name)
         if trust.type != "trust_id":
             msg = _("No trust record by name %s" % name)
             raise wlm_exceptions.Invalid(reason=msg)
@@ -1918,8 +1918,8 @@ class API(base.Base):
 
             clients.initialise()
             keystoneclient = clients.Clients(cntx).client("keystone")
-            keystoneclient.delete_trust(trust.trust_id)
-        except:
+            keystoneclient.delete_trust(trust.value)
+        except Exception as ex:
             pass
 
         self.db.setting_delete(context,name)

@@ -145,14 +145,11 @@ class KeystoneClientV3(object):
             LOG.error(_LE("Domain admin client authentication failed"))
             raise exception.AuthorizationFailure()
 
-        trustor_user_id = self.context.auth_plugin.get_user_id(self.session)
-        trustor_proj_id = self.context.auth_plugin.get_project_id(self.session)
+        trustor_user_id = self.context.trustor_user_id
+        trustor_proj_id = self.context.tenant_id
 
-        # inherit the roles of the trustor, unless set trusts_delegated_roles
-        if cfg.CONF.trusts_delegated_roles:
-            roles = cfg.CONF.trusts_delegated_roles
-        else:
-            roles = self.context.roles
+        # inherit the roles of the trustor
+        roles = self.context.roles
 
         try:
             trust = self.client.trusts.create(trustor_user=trustor_user_id,
