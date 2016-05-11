@@ -50,7 +50,7 @@ class RequestContext(context.RequestContext):
     """
 
     def __init__(self, auth_token=None, username=None, password=None,
-                 tenant=None, user_id=None,
+                 tenant=None, user_id=None, project_id=None,
                  tenant_id=None, auth_url=None, roles=None, is_admin=None,
                  read_only=False, show_deleted=False,
                  overwrite=True, trust_id=None, trustor_user_id=None,
@@ -78,7 +78,8 @@ class RequestContext(context.RequestContext):
         self.user_id = user_id
         self.password = password
         self.region_name = region_name
-        self.tenant_id = tenant_id
+        self.tenant_id = tenant_id or project_id
+        self.project_id = tenant_id or project_id
         self.auth_token_info = auth_token_info
         self.auth_url = auth_url
         self.roles = roles or []
@@ -117,6 +118,7 @@ class RequestContext(context.RequestContext):
                 'password': self.password,
                 'tenant': self.tenant,
                 'tenant_id': self.tenant_id,
+                'project_id': self.tenant_id,
                 'trust_id': self.trust_id,
                 'trustor_user_id': self.trustor_user_id,
                 'auth_token_info': self.auth_token_info,

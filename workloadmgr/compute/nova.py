@@ -10,6 +10,7 @@ Handles all requests relating to compute + nova.
 import time
 import glob
 import itertools
+import inspect
 import pkgutil
 import os
 import imp
@@ -31,7 +32,7 @@ from novaclient.v1_1 import client as nova_client
 from neutronclient.common import exceptions as nc_exc
 
 from workloadmgr.db import base
-from workloadmgr import context
+from workloadmgr.common import context
 from workloadmgr import exception
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import excutils
@@ -79,8 +80,6 @@ nova_opts = [
     cfg.IntOpt('nova_url_timeout',
                default=600,
                help='timeout value for connecting to nova in seconds'),
-
-
 ]
 
 CONF = cfg.CONF
@@ -293,16 +292,20 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                         argv.update({'client': client})
                         return func(*args, **argv)
             except Exception as ex:
-                if ignore_exception is False:
+                if ignore_exception is True:
                     LOG.exception(ex)
-                    if ex.code == 400 or ex.code == 404:
+                    if nova_exception.BadRequest in \
+                        inspect.getmro(ex.__class__) or \
+                        nova_exception.NotFound in \
+                        inspect.getmro(ex.__class__):
                         return
-                    if contego is True:
-                        msg = 'Unable to call %s; Please check contego \
-                               logs for more details' % func.func_name
-                        raise exception.ErrorOccurred(msg)
-                    else:
-                        raise
+
+                if contego is True:
+                    msg = 'Unable to call %s; Please check contego \
+                           logs for more details' % func.func_name
+                    raise exception.ErrorOccurred(msg)
+                else:
+                    raise
 
         return func_wrapper
     return exception_handler_decorator
@@ -834,7 +837,7 @@ class API(base.Base):
         return client.contego.vast_prepare(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=True, contego=True)
+    @exception_handler(ignore_exception=False, contego=True)
     def vast_freeze(self, context, server, params, **kwargs):
         """
         FREEZE an instance
@@ -844,7 +847,7 @@ class API(base.Base):
         return client.contego.vast_freeze(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=True, contego=True)
+    @exception_handler(ignore_exception=False, contego=True)
     def vast_thaw(self, context, server, params, **kwargs):
         """
         Thaw an instance
@@ -917,7 +920,7 @@ class API(base.Base):
         return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False, contego=True)
+    @exception_handler(ignore_exception=True, contego=True)
     @autolog.log_method(logger=Logger)
     def vast_finalize(self, context, server, params, **kwargs):
         """
@@ -928,7 +931,7 @@ class API(base.Base):
         return client.contego.vast_finalize(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False, contego=True)
+    @exception_handler(ignore_exception=True, contego=True)
     @autolog.log_method(logger=Logger)
     def vast_reset(self, context, server, params, **kwargs):
         """
