@@ -165,7 +165,7 @@ class KeystoneClientV3(object):
             LOG.debug("Failed to find roles %s for user %s"
                       % (roles, trustor_user_id))
             raise exception.MissingCredentialError(
-                required=_("roles %s") % roles)
+                message="Invalid roles %s" % roles)
 
         trust_context = context.RequestContext.from_dict(
             self.context.to_dict())
