@@ -32,11 +32,13 @@ from novaclient.v1_1 import client as nova_client
 from neutronclient.common import exceptions as nc_exc
 
 from workloadmgr.db import base
-from workloadmgr.common import context
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
+from workloadmgr.common import context as wlm_context
 from workloadmgr import exception
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.common import clients
 
 from workloadmgr import autolog
 from workloadmgr.decorators import retry
@@ -147,6 +149,7 @@ def _discover_via_entry_points():
 
         yield name, module
 
+##### REMOVETHIS #####
 def _get_tenant_context(user_id, tenant_id):
     try:
         httpclient = client.HTTPClient(
@@ -161,86 +164,87 @@ def _get_tenant_context(user_id, tenant_id):
                 auth_system=CONF.nova_auth_system,
                 insecure=CONF.nova_api_insecure)
         httpclient.authenticate()
-        tenantcontext = context.RequestContext(user_id=user_id, project_id=tenant_id,
+        tenantcontext = wlm_context.RequestContext(user_id=user_id, project_id=tenant_id,
                                                is_admin=True, auth_token=httpclient.auth_token)
     except Exception:
         with excutils.save_and_reraise_exception():
             LOG.exception(_("_get_auth_token() failed"))
     return tenantcontext
 
-def _get_httpclient(production):
+def novaclient(context, production=True, refresh_token=False, extensions = None):
     try:
-        if production:
-            httpclient = client.HTTPClient(
-                user=CONF.nova_admin_username,
-                password=CONF.nova_admin_password,
-                projectid=CONF.nova_admin_tenant_name,
-                service_type='compute',
-                endpoint_type='adminURL',
-                region_name=CONF.nova_production_region_name,
-                auth_url=CONF.nova_admin_auth_url,
-                timeout=CONF.nova_url_timeout,
-                auth_system=CONF.nova_auth_system,
-                insecure=CONF.nova_api_insecure)
-        else:
-            httpclient = client.HTTPClient(
-                user=CONF.nova_admin_username,
-                password=CONF.nova_admin_password,
-                projectid=CONF.nova_admin_tenant_name,
-                service_type='compute',
-                endpoint_type='adminURL',
-                region_name=CONF.nova_tvault_region_name,
-                auth_url=CONF.nova_admin_auth_url,
-                timeout=CONF.nova_url_timeout,
-                auth_system=CONF.nova_auth_system,
-                insecure=CONF.nova_api_insecure)
-        httpclient.authenticate()
-    except Exception:
-        with excutils.save_and_reraise_exception():
-            LOG.exception(_("_get_auth_token() failed"))
-    return httpclient
+        # load keystone_authtoken by importing keystonemiddleware
+        # if it is already loaded, just ignore the exception
+        cfg.CONF.import_group('keystone_authtoken',
+                              'keystonemiddleware.auth_token')
+    except:
+        pass
 
-def novaclient(context, production, refresh_token=False, extensions = None):
-    if refresh_token:
-        httpclient = _get_httpclient(production)
-        if production == True:
-            url = CONF.nova_production_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
-            c = nova_client.Client(CONF.nova_admin_username,
-                                   CONF.nova_admin_password,
-                                   project_id=httpclient.tenant_id,
-                                   auth_url=url,
-                                   insecure=CONF.nova_api_insecure,
-                                   extensions = extensions,
-                                   timeout=CONF.nova_url_timeout)
-        else:
-            url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
-            c = nova_client.Client(CONF.nova_admin_username,
-                                   CONF.nova_admin_password,
-                                   project_id=httpclient.tenant_id,
-                                   auth_url=url,
-                                   insecure=CONF.nova_api_insecure,
-                                   extensions = extensions,
-                                   timeout=CONF.nova_url_timeout)
-        LOG.debug(_('Novaclient connection created using URL: %s') % url)
-        c.client.auth_token = httpclient.auth_token
-        c.client.management_url = url
+    db = WorkloadMgrDB().db
+    trusts =  db.setting_get_all(context)
+
+    trust = [t for t in trusts if t.type == "trust_id"]
+
+    ## FIXIT
+    ## WE WILL NEED TO USE AUTH_TOKEN in the CONTEXT
+    import pdb;pdb.set_trace()
+
+    # pick the first trust. Usually it should not be more than one trust
+    if len(trust):
+        trust_id = trust[0].value
+
+        context = wlm_context.RequestContext(
+            username=CONF.keystone_authtoken.admin_user,
+            password=CONF.keystone_authtoken.admin_password,
+            trust_id=trust_id,
+            tenant_id=context.project_id,
+            user_domain_id='default',
+            is_admin=False)
+
+        clients.initialise()
+        nova_plugin = clients.Clients(context)
+        novaclient = nova_plugin.client("nova")
+        novaclient.client_plugin = novaclient
     else:
-        if production == True:
-            url = CONF.nova_production_endpoint_template % context.to_dict()
+        # trusts are not enabled
+        if refresh_token:
+            if production == True:
+                url = CONF.nova_production_endpoint_template.replace('%(project_id)s', context.tenant_id)
+                novaclient = nova_client.Client(CONF.nova_admin_username,
+                                       CONF.nova_admin_password,
+                                       project_id=context.tenant_id,
+                                       auth_url=url,
+                                       insecure=CONF.nova_api_insecure,
+                                       extensions = extensions,
+                                       timeout=CONF.nova_url_timeout)
+            else:
+                url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', context.tenant_id)
+                novaclient = nova_client.Client(CONF.nova_admin_username,
+                                       CONF.nova_admin_password,
+                                       project_id=context.tenant_id,
+                                       auth_url=url,
+                                       insecure=CONF.nova_api_insecure,
+                                       extensions = extensions,
+                                       timeout=CONF.nova_url_timeout)
+            LOG.debug(_('Novaclient connection created using URL: %s') % url)
         else:
-            url = CONF.nova_tvault_endpoint_template % context.to_dict()
-        LOG.debug(_('Novaclient connection created using URL: %s') % url)
-        c = nova_client.Client(context.user_id,
-                               context.auth_token,
-                               project_id=context.project_id,
-                               auth_url=url,
-                               insecure=CONF.nova_api_insecure,
-                               extensions = extensions,
-                               timeout=CONF.nova_url_timeout)
-        # noauth extracts user_id:tenant_id from auth_token
-        c.client.auth_token = context.auth_token or '%s:%s' % (context.user_id, context.project_id)
-        c.client.management_url = url
-    return c
+            if production == True:
+                url = CONF.nova_production_endpoint_template % context.to_dict()
+            else:
+                url = CONF.nova_tvault_endpoint_template % context.to_dict()
+            LOG.debug(_('Novaclient connection created using URL: %s') % url)
+            novaclient = nova_client.Client(context.user_id,
+                                   context.auth_token,
+                                   project_id=context.project_id,
+                                   auth_url=url,
+                                   insecure=CONF.nova_api_insecure,
+                                   extensions = extensions,
+                                   timeout=CONF.nova_url_timeout)
+            # noauth extracts user_id:tenant_id from auth_token
+            novaclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id, context.project_id)
+            novaclient.client.management_url = url
+
+    return novaclient
 
 def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_template):
     httpclient = client.HTTPClient(
