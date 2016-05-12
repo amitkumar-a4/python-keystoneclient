@@ -149,10 +149,45 @@ def _discover_via_entry_points():
 
         yield name, module
 
-##### REMOVETHIS #####
+try:
+    # load keystone_authtoken by importing keystonemiddleware
+    # if it is already loaded, just ignore the exception
+    cfg.CONF.import_group('keystone_authtoken',
+                          'keystonemiddleware.auth_token')
+except:
+    pass
+
 def _get_tenant_context(user_id, tenant_id):
-    try:
-        httpclient = client.HTTPClient(
+
+    context = wlm_context.RequestContext(
+                user_id=user_id,
+                project_id=tenant_id)
+
+    db = WorkloadMgrDB().db
+    context.read_deleted = 'no'
+    trusts =  db.setting_get_all(context)
+
+    trust = [t for t in trusts if t.type == "trust_id"]
+
+    if len(trust):
+        trust_id = trust[0].value
+        context = wlm_context.RequestContext(
+            username=CONF.keystone_authtoken.admin_user,
+            password=CONF.keystone_authtoken.admin_password,
+            trust_id=trust_id,
+            tenant_id=context.project_id,
+            trustor_user_id=context.user_id,
+            user_domain_id='default',
+            is_admin=False)
+
+        clients.initialise()
+        client_plugin = clients.Clients(context)
+        kclient = client_plugin.client("keystone")
+        context.auth_token = kclient.auth_token
+        context.user_id = user_id
+    else:
+        try:
+            httpclient = client.HTTPClient(
                 user=CONF.nova_admin_username,
                 password=CONF.nova_admin_password,
                 tenant_id=tenant_id,
@@ -163,43 +198,46 @@ def _get_tenant_context(user_id, tenant_id):
                 timeout=CONF.nova_url_timeout,
                 auth_system=CONF.nova_auth_system,
                 insecure=CONF.nova_api_insecure)
-        httpclient.authenticate()
-        tenantcontext = wlm_context.RequestContext(user_id=user_id, project_id=tenant_id,
-                                               is_admin=True, auth_token=httpclient.auth_token)
-    except Exception:
-        with excutils.save_and_reraise_exception():
-            LOG.exception(_("_get_auth_token() failed"))
-    return tenantcontext
+            httpclient.authenticate()
+            context = wlm_context.RequestContext(
+                user_id=user_id, project_id=tenant_id,
+                is_admin=True, auth_token=httpclient.auth_token)
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_("_get_auth_token() failed"))
+
+    return context
+
 
 def novaclient(context, production=True, refresh_token=False, extensions = None):
-    try:
-        # load keystone_authtoken by importing keystonemiddleware
-        # if it is already loaded, just ignore the exception
-        cfg.CONF.import_group('keystone_authtoken',
-                              'keystonemiddleware.auth_token')
-    except:
-        pass
 
     db = WorkloadMgrDB().db
+    context.read_deleted = 'no'
     trusts =  db.setting_get_all(context)
 
     trust = [t for t in trusts if t.type == "trust_id"]
-
-    ## FIXIT
-    ## WE WILL NEED TO USE AUTH_TOKEN in the CONTEXT
-    import pdb;pdb.set_trace()
 
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
         trust_id = trust[0].value
 
-        context = wlm_context.RequestContext(
-            username=CONF.keystone_authtoken.admin_user,
-            password=CONF.keystone_authtoken.admin_password,
-            trust_id=trust_id,
-            tenant_id=context.project_id,
-            user_domain_id='default',
-            is_admin=False)
+        if refresh_token:
+            context = wlm_context.RequestContext(
+                username=CONF.keystone_authtoken.admin_user,
+                password=CONF.keystone_authtoken.admin_password,
+                trust_id=trust_id,
+                tenant_id=context.project_id,
+                trustor_user_id=context.user_id,
+                user_domain_id='default',
+                is_admin=False)
+        else:
+            context = wlm_context.RequestContext(
+                trustor_user_id=context.user_id,
+                project_id=context.project_id,
+                auth_token=context.auth_token,
+                trust_id=trust_id,
+                user_domain_id='default',
+                is_admin=False)
 
         clients.initialise()
         nova_plugin = clients.Clients(context)
@@ -240,6 +278,7 @@ def novaclient(context, production=True, refresh_token=False, extensions = None)
                                    insecure=CONF.nova_api_insecure,
                                    extensions = extensions,
                                    timeout=CONF.nova_url_timeout)
+
             # noauth extracts user_id:tenant_id from auth_token
             novaclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id, context.project_id)
             novaclient.client.management_url = url
@@ -841,7 +880,7 @@ class API(base.Base):
         return client.contego.vast_prepare(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False, contego=True)
+    @exception_handler(ignore_exception=True, contego=True)
     def vast_freeze(self, context, server, params, **kwargs):
         """
         FREEZE an instance
@@ -851,7 +890,7 @@ class API(base.Base):
         return client.contego.vast_freeze(server=server, params=params)
 
     @synchronized(novalock)
-    @exception_handler(ignore_exception=False, contego=True)
+    @exception_handler(ignore_exception=True, contego=True)
     def vast_thaw(self, context, server, params, **kwargs):
         """
         Thaw an instance
