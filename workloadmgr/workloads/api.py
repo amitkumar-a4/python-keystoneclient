@@ -1255,7 +1255,9 @@ class API(base.Base):
                         nic = {'mac_address': nic_data['mac_address'],
                                'ip_address': nic_data['ip_address'],}
                         nic['network'] = {'id': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'),
-                                          'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name')}
+                                          'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name'),
+                                          'cidr':nic_data['cidr'],
+                                          'network_type':nic_data['network_type']}
                         
                         pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')                        
                         if pit_id:
