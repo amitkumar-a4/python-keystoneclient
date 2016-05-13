@@ -1,3 +1,8 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright (c) 2013 TrilioData, Inc.
+# All Rights Reserved.
+
 from keystoneclient import access
 from keystoneclient import auth
 from keystoneclient.auth.identity import access as access_plugin

@@ -404,7 +404,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)  
                 
             context = nova._get_tenant_context(context.user_id,
-                                               context.tenant_id)
+                                               context.project_id)
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
                                                 {'host': self.host,

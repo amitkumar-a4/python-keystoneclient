@@ -645,8 +645,8 @@ class LibvirtDriver(driver.ComputeDriver):
             cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
         
         
-        user_id = cntx.user
-        project_id = cntx.tenant
+        user_id = cntx.user_id
+        project_id = cntx.tenant_id
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
             cntx = nova._get_tenant_context(user_id, project_id)
@@ -777,8 +777,8 @@ class LibvirtDriver(driver.ComputeDriver):
                     except nova_unauthorized as ex:
                         LOG.exception(ex)
                         # recreate the token here
-                        user_id = cntx.user
-                        project_id = cntx.tenant
+                        user_id = cntx.user_id
+                        project_id = cntx.tenant_id
                         cntx = nova._get_tenant_context(user_id, project_id)
                         status = {'result': 'retry'}
      
@@ -948,8 +948,8 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
     def vast_finalize(self, cntx, compute_service, instance, snapshot,
                       snapshot_data_ex, failed=False):
-        user_id = cntx.user
-        project_id = cntx.tenant
+        user_id = cntx.user_id
+        project_id = cntx.tenant_id
         cntx = nova._get_tenant_context(user_id, project_id)
 
         snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'],
@@ -1001,8 +1001,8 @@ class LibvirtDriver(driver.ComputeDriver):
                      break;
               except nova_unauthorized as ex:
                      LOG.exception(ex)
-                     user_id = cntx.user
-                     project_id = cntx.tenant
+                     user_id = cntx.user_id
+                     project_id = cntx.tenant_id
                      cntx = nova._get_tenant_context(user_id, project_id)
               except Exception as ex:
                      LOG.exception(ex)
