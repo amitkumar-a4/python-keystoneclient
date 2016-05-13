@@ -632,9 +632,6 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.upload_snapshot')
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
         # Always attempt with a new token to avoid timeouts
-        user_id = cntx.user
-        project_id = cntx.tenant
-        cntx = nova._get_tenant_context(user_id, project_id)
 
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
@@ -648,10 +645,10 @@ class LibvirtDriver(driver.ComputeDriver):
             cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
         
         
+        user_id = cntx.user
+        project_id = cntx.tenant
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
-            user_id = cntx.user
-            project_id = cntx.tenant
             cntx = nova._get_tenant_context(user_id, project_id)
             
             snapshot_vm_resource_metadata =  {'disk_info': json.dumps(disk_info)}
@@ -770,8 +767,6 @@ class LibvirtDriver(driver.ComputeDriver):
                 status = {'result': 'retry'}
                 while status['result'] == 'retry':
                     try:
-                        user_id = cntx.user
-                        project_id = cntx.tenant
                         cntx = nova._get_tenant_context(user_id, project_id)
                         status = compute_service.vast_data_transfer(cntx,
                                              instance['vm_id'],
@@ -826,14 +821,15 @@ class LibvirtDriver(driver.ComputeDriver):
                                     LOG.exception(ex)                                    
                                     
                             except Exception as ex:
-                                async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                                           instance['vm_id'],
-                                                                                           {'metadata': progress_tracker_metadata})                                  
+                                async_task_status = compute_service.vast_async_task_status(
+                                     cntx, instance['vm_id'],
+                                     {'metadata': progress_tracker_metadata})                                  
                                                       
                         else:
-                            async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                                                       instance['vm_id'],
-                                                                                       {'metadata': progress_tracker_metadata})
+                            async_task_status = compute_service.vast_async_task_status(
+                                 cntx, 
+                                 instance['vm_id'],
+                                 {'metadata': progress_tracker_metadata})
                         if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
                             for line in async_task_status['status']:
                                 if 'Down' in line:
@@ -851,8 +847,6 @@ class LibvirtDriver(driver.ComputeDriver):
                     except nova_unauthorized as ex:
                         LOG.exception(ex)
                         # recreate the token here
-                        user_id = cntx.user
-                        project_id = cntx.tenant
                         cntx = nova._get_tenant_context(user_id, project_id)
                     except Exception as ex:
                         LOG.exception(ex)
@@ -874,9 +868,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                                 'status': 'available'}
                 vm_disk_resource_snap = db.vm_disk_resource_snap_update(cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 if vm_disk_resource_snap_backing:
-                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(cntx, 
-                                                                                    vm_disk_resource_snap_backing.id,
-                                                                                    {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
+                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(
+                        cntx, vm_disk_resource_snap_backing.id,
+                        {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
                     # Upload snapshot metadata to the vault
                     snapshot_vm_resource_backing = db.snapshot_vm_resource_get(cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
                     workload_utils.upload_snapshot_db_entry(cntx, snapshot_vm_resource_backing.snapshot_id) 

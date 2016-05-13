@@ -90,6 +90,7 @@ class RequestContext(context.RequestContext):
         self.policy = policy.Enforcer()
         self._auth_plugin = auth_plugin
         self._trusts_auth_plugin = trusts_auth_plugin
+        self.read_deleted = 'no'
 
         if is_admin is None:
             self.is_admin = self.policy.check_is_admin(self)

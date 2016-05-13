@@ -164,7 +164,6 @@ def _get_tenant_context(user_id, tenant_id):
                 project_id=tenant_id)
 
     db = WorkloadMgrDB().db
-    context.read_deleted = 'no'
     trusts =  db.setting_get_all(context)
 
     trust = [t for t in trusts if t.type == "trust_id"]
@@ -212,7 +211,6 @@ def _get_tenant_context(user_id, tenant_id):
 def novaclient(context, production=True, refresh_token=False, extensions = None):
 
     db = WorkloadMgrDB().db
-    context.read_deleted = 'no'
     trusts =  db.setting_get_all(context)
 
     trust = [t for t in trusts if t.type == "trust_id"]
