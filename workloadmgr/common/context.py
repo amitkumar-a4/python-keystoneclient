@@ -61,7 +61,8 @@ class RequestContext(context.RequestContext):
                  overwrite=True, trust_id=None, trustor_user_id=None,
                  request_id=None, auth_token_info=None, region_name=None,
                  auth_plugin=None, trusts_auth_plugin=None,
-                 user_domain_id=None, project_domain_id=None, **kwargs):
+                 user_domain_id=None, project_domain_id=None,
+                 remote_address=None, **kwargs):
         """Initialisation of the request context.
 
         :param overwrite: Set to False to ensure that the greenthread local
@@ -96,6 +97,7 @@ class RequestContext(context.RequestContext):
         self._auth_plugin = auth_plugin
         self._trusts_auth_plugin = trusts_auth_plugin
         self.read_deleted = 'no'
+        self.remote_address = remote_address
 
         if is_admin is None:
             self.is_admin = self.policy.check_is_admin(self)

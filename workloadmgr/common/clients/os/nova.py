@@ -12,6 +12,7 @@ import os
 import pkgutil
 import string
 
+from novaclient import shell as novashell
 from novaclient import client as nc
 from novaclient import exceptions
 from oslo_config import cfg
@@ -59,7 +60,9 @@ class NovaClientPlugin(client_plugin.ClientPlugin):
         endpoint_type = self._get_client_option(CLIENT_NAME, 'endpoint_type')
         management_url = self.url_for(service_type=self.COMPUTE,
                                       endpoint_type=endpoint_type)
-        extensions = nc.discover_extensions(NOVACLIENT_VERSION)
+
+        computeshell = novashell.OpenStackComputeShell()
+        extensions = computeshell._discover_extensions(NOVACLIENT_VERSION)
 
         args = {
             'project_id': self.context.tenant_id,
