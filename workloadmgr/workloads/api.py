@@ -403,6 +403,18 @@ class API(base.Base):
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
+
+        """
+        Create a trust if one is not already established
+        """
+
+        try:
+            if not self.trust_list(context):
+                self.trust_create(context, vault.CONF.trustee_role)
+        except Exception as ex:
+            LOG.exception(ex)
+            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
+
         """
         Make the RPC call to create a workload.
         """

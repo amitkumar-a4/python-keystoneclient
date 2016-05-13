@@ -132,6 +132,7 @@ class RequestContext(context.RequestContext):
                 'region_name': self.region_name,
                 'user_identity': user_idt,
                 'user_domain_id': self.user_domain,
+                'read_deleted': self.read_deleted,
                 'project_domain_id': self.project_domain}
 
     @classmethod

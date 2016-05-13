@@ -84,8 +84,8 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
 
         # refresh the token. token may have been invalidated during long running
         # tasks during upload and post snapshot processing
-        user_id = cntx.user
-        project_id = cntx.tenant
+        user_id = cntx.user_id
+        project_id = cntx.tenant_id
         cntx = nova._get_tenant_context(user_id, project_id)
         
         def _snapshot_neutron_networks(instance):
@@ -562,8 +562,8 @@ def delete_restored_vm(cntx, db, instance, restore):
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_flavor')
 def restore_vm_flavor(cntx, db, instance, restore):
 
-    user_id = cntx.user
-    project_id = cntx.tenant
+    user_id = cntx.user_id
+    project_id = cntx.tenant_id
     cntx = nova._get_tenant_context(user_id, project_id)
 
     restore_obj = db.restore_update( cntx, restore['id'],
@@ -629,8 +629,8 @@ def restore_vm_flavor(cntx, db, instance, restore):
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_keypairs')
 def restore_keypairs(cntx, db, instances):
 
-    user_id = cntx.user
-    project_id = cntx.tenant
+    user_id = cntx.user_id
+    project_id = cntx.tenant_id
     cntx = nova._get_tenant_context(user_id, project_id)
 
     compute_service = nova.API(production=True)
@@ -818,7 +818,7 @@ def restore_vm_networks(cntx, db, restore):
                       'fixed_ips': [{'ip_address': ip_address,
                                      'subnet_id': subnet_id} ],
                       'network_id': network_id,
-                      'tenant_id': cntx.tenant}
+                      'tenant_id': cntx.tenant_id}
 
             new_port = network_service.create_port(cntx, **params)
                
@@ -929,8 +929,8 @@ def restore_vm_networks(cntx, db, restore):
 
         raise Exception("Could not find the network that matches the restore options")
 
-    user_id = cntx.user
-    project_id = cntx.tenant
+    user_id = cntx.user_id
+    project_id = cntx.tenant_id
     cntx = nova._get_tenant_context(user_id, project_id)
 
     restore_obj = db.restore_update( cntx, restore['id'], {'progress_msg': 'Restoring network resources'})    
@@ -1090,8 +1090,8 @@ def restore_vm_security_groups(cntx, db, restore):
         return True
 
     # refresh token
-    user_id = cntx.user
-    project_id = cntx.tenant
+    user_id = cntx.user_id
+    project_id = cntx.tenant_id
     cntx = nova._get_tenant_context(user_id, project_id)
 
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
@@ -1165,8 +1165,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
   
     # call with new context
-    user_id = cntx.user
-    project_id = cntx.tenant
+    user_id = cntx.user_id
+    project_id = cntx.tenant_id
     cntx = nova._get_tenant_context(user_id, project_id)
     return virtdriver.restore_vm( cntx, db, instance, restore, 
                                   restored_net_resources,

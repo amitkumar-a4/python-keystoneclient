@@ -249,7 +249,7 @@ class API(base.Base):
     @exception_handler()
     def get(self, context, volume_id, no_translate=False, **kwargs):
         client = kwargs['client']
-        item = cinderclient(context).volumes.get(volume_id)
+        item = client.volumes.get(volume_id)
         if no_translate:
             return item
         else:
@@ -350,8 +350,6 @@ class API(base.Base):
 
         client = kwargs['client']
         createargs = dict(snapshot_id=snapshot_id,
-                          display_name=name,
-                          display_description=description,
                           volume_type=volume_type,
                           user_id=context.user_id,
                           project_id=context.project_id,
@@ -359,7 +357,14 @@ class API(base.Base):
                           metadata=metadata,
                           imageRef=image_id)
 
-        item = cinderclient(context).volumes.create(size, **createargs)
+        if client.volume_api_version == 1:
+            createargs['display_name'] = name
+            createargs['display_description'] = description
+        else:
+            createargs['name'] = name
+            createargs['description'] = description
+
+        item = client.volumes.create(size, **createargs)
         return _untranslate_volume_summary_view(context, item)
 
     @exception_handler()
