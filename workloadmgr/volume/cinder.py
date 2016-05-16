@@ -338,7 +338,7 @@ class API(base.Base):
         return client.\
                  volumes.terminate_connection(volume['id'], connector)
 
-    @exception_handler(True)
+    @exception_handler()
     def create(self, context, size, name, description, snapshot=None,
                image_id=None, volume_type=None, metadata=None,
                availability_zone=None, **kwargs):

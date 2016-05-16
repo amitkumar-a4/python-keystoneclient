@@ -623,7 +623,6 @@ def _register_service():
                                              enabled=True)
             
             keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['admin_tenant_id'])
 
         except Exception as exception:
             if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":

@@ -814,7 +814,7 @@ class AdjustSG(task.Task):
         except Exception as ex:
             LOG.exception(ex)
             msg = "Could not update security groups on the " \
-                  "restored instance %s" % retored_instance_id
+                  "restored instance %s" % restored_instance_id
             LOG.warning(msg)
 
     @autolog.log_method(Logger, 'AdjustSG.revert')
