@@ -10,28 +10,34 @@ import socket
 import cPickle as pickle
 import json
 import importlib
+import uuid
 
 from eventlet import greenthread
 
 from datetime import datetime
 from datetime import timedelta
 import time
-import threading
 from distutils import version
+from sqlalchemy import create_engine
+import threading
+
+from oslo_config import cfg
+
+from workloadmgr.common import clients
+from workloadmgr.common import context as wlm_context
+from workloadmgr.common import workloadmgr_keystoneclient
+from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common import jsonutils
 
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStore
-from sqlalchemy import create_engine
 
-from novaclient import client
 from workloadmgr import utils
 from workloadmgr.workloads import rpcapi as workloads_rpcapi
 from workloadmgr.scheduler import rpcapi as scheduler_rpcapi
 from workloadmgr.db import base
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr import flags
-from workloadmgr.openstack.common import log as logging
-from workloadmgr.openstack.common import jsonutils
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.image import glance
@@ -397,6 +403,18 @@ class API(base.Base):
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
+
+        """
+        Create a trust if one is not already established
+        """
+
+        try:
+            if not self.trust_list(context):
+                self.trust_create(context, vault.CONF.trustee_role)
+        except Exception as ex:
+            LOG.exception(ex)
+            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
+
         """
         Make the RPC call to create a workload.
         """
@@ -833,7 +851,12 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         total_capacity, total_utilization = vault.get_total_capacity(context)
-        storage_usage = {'storage_type':vault.CONF.vault_storage_type,'total': 0, 'full': 0, 'incremental': 0, 'total_capacity': total_capacity, 'total_utilization': total_utilization}        
+        storage_usage = {'storage_type': vault.CONF.vault_storage_type,
+                         'total': 0,
+                         'full': 0,
+                         'incremental': 0,
+                         'total_capacity': total_capacity,
+                         'total_utilization': total_utilization }
         try:
             for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
                 for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes', project_only='yes'):
@@ -1858,3 +1881,75 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
       
+    @autolog.log_method(logger=Logger)
+    def trust_create(self, context, role_name):
+
+        # create trust
+        cntx = wlm_context.RequestContext(
+            trustor_user_id=context.user_id,
+            auth_token=context.auth_token,
+            tenant_id=context.project_id,
+            roles=[role_name],
+            is_admin=False)
+
+        clients.initialise()
+        keystoneclient = clients.Clients(cntx).client("keystone")
+        trust_context = keystoneclient.create_trust_context()
+
+        setting = {u'category': "identity",
+                   u'name': "trust-%s" % str(uuid.uuid4()),
+                   u'description': u'token id for user %s project %s' % \
+                                   (context.user_id, context.project_id),
+                   u'value': trust_context.trust_id,
+                   u'is_public': False,
+                   u'is_hidden': False,
+                   u'type': "trust_id",}
+        created_settings = []
+        try:
+            created_settings.append(self.db.setting_create(context, setting))
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return created_settings 
+
+
+    @autolog.log_method(logger=Logger)
+    def trust_delete(self, context, name):
+
+        trust = self.db.setting_get(context, name)
+        if trust.type != "trust_id":
+            msg = _("No trust record by name %s" % name)
+            raise wlm_exceptions.Invalid(reason=msg)
+
+        try:
+            cntx = wlm_context.RequestContext(
+                trustor_user_id=context.user_id,
+                auth_token=context.auth_token,
+                tenant_id=context.project_id,
+                is_admin=False)
+
+            clients.initialise()
+            keystoneclient = clients.Clients(cntx).client("keystone")
+            keystoneclient.delete_trust(trust.value)
+        except Exception as ex:
+            pass
+
+        self.db.setting_delete(context,name)
+
+
+    @autolog.log_method(logger=Logger)
+    def trust_list(self, context):
+
+        settings =  self.db.setting_get_all(context)
+
+        trust = [t for t in settings if t.type == "trust_id"]
+        return trust
+
+    @autolog.log_method(logger=Logger)
+    def trust_get(self, context, name):
+        try:
+            return self.db.setting_get(context, name)
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return None

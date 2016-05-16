@@ -42,7 +42,7 @@ from oslo.config import cfg
 from taskflow.patterns import linear_flow as lf
 from taskflow import engines
 
-from workloadmgr import context
+from workloadmgr.common import context as wlm_context
 from workloadmgr import flags
 from workloadmgr import manager
 from workloadmgr import mountutils
@@ -171,7 +171,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Do any initialization that needs to be run if this is a standalone service.
         """
 
-        ctxt = context.get_admin_context()        
+        ctxt = wlm_context.get_admin_context()        
         
         LOG.info(_("Cleaning up incomplete operations"))
         
@@ -401,6 +401,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)  
                 
+            context = nova._get_tenant_context(context.user_id,
+                                               context.project_id)
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
                                                 {'host': self.host,
@@ -706,6 +708,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)
                             
+            context = nova._get_tenant_context(context.user_id,
+                                               context.project_id)
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)

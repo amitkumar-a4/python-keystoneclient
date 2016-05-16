@@ -151,6 +151,13 @@ class Invalid(WorkloadMgrException):
     message = _("Unacceptable parameters: %(reason)s")
     code = 400
 
+class Forbidden(WorkloadMgrException):
+    message = _("You are not authorized to use %(action)s.")
+
+
+class MissingCredentialError(WorkloadMgrException):
+    msg_fmt = _("Missing required credential: %(required)s")
+
 
 class InvalidSnapshot(Invalid):
     message = _("Invalid snapshot") + ": %(reason)s"

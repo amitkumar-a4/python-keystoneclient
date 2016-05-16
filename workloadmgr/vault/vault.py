@@ -90,6 +90,9 @@ wlm_vault_opts = [
     cfg.StrOpt('vault_write_chunk_size_kb',
                default=32,
                help='Write size in KB'),
+    cfg.StrOpt('trustee_role',
+               default='Member',
+               help='Role that trustee will impersonate'),                                                         
                                                                             
 ]
 
