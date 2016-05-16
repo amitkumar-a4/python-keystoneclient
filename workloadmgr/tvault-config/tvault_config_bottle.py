@@ -1977,8 +1977,8 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_insecure = ', 'glance_api_insecure = True')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_api_insecure = ', 'neutron_api_insecure = True')
 
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'identity_uri = ', config_data['keystone_admin_url'])
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', config_data['keystone_public_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'identity_uri = ', 'identity_uri = ' + config_data['keystone_admin_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', 'auth_uri = ' + config_data['keystone_public_url'])
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
