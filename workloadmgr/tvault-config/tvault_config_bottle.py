@@ -624,7 +624,6 @@ def _register_service():
                                              enabled=True)
             
             keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['admin_tenant_id'])
 
         except Exception as exception:
             if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
@@ -1994,8 +1993,8 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_insecure = ', 'glance_api_insecure = True')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_api_insecure = ', 'neutron_api_insecure = True')
 
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'identity_uri = ', config_data['keystone_admin_url'])
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', config_data['keystone_public_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'identity_uri = ', 'identity_uri = ' + config_data['keystone_admin_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', 'auth_uri = ' + config_data['keystone_public_url'])
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])

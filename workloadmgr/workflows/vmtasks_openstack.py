@@ -189,7 +189,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 network_service.get_networks(cntx)
                 nics = _snapshot_neutron_networks(instance)
                 network_type = "neutron"
-            except neutron_exceptions.EndpointNotFound:
+            except Exception as ex:
                 # This is configured to use nova network
                 nics = _snapshot_nova_networks(instance)
                 network_type = "nova"
@@ -407,7 +407,8 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
     try:
         network_service.get_networks(cntx)
         _snapshot_neutron_security_groups()
-    except neutron_exceptions.EndpointNotFound:
+    #except neutron_exceptions.EndpointNotFound:
+    except Exception as ex:
         # This is configured to use nova network
         _snapshot_nova_security_groups()
 
