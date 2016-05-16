@@ -1993,7 +1993,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_insecure = ', 'glance_api_insecure = True')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_api_insecure = ', 'neutron_api_insecure = True')
 
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'identity_uri = ', 'identity_uri = ' + config_data['keystone_admin_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_url = ', 'auth_url = ' + config_data['keystone_admin_url'].strip("v3").strip("v2.0"))
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', 'auth_uri = ' + config_data['keystone_public_url'])
 
         #configure api-paste
