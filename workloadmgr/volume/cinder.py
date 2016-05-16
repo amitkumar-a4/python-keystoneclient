@@ -11,14 +11,19 @@ import copy
 import sys
 from functools import wraps
 
+from oslo.config import cfg
+
 from cinderclient import exceptions as cinder_exception
 from cinderclient import service_catalog
 from cinderclient.v1 import client as cinder_client
-from oslo.config import cfg
 
 from workloadmgr.db import base
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import exception
+from workloadmgr.common import context as wlm_context
 from workloadmgr.openstack.common import log as logging
+
+from workloadmgr.common import clients
 
 cinder_opts = [
     cfg.StrOpt('cinder_catalog_info',
@@ -43,7 +48,6 @@ cinder_opts = [
                default=True,
                help='Allow attach between instance and volume in different '
                     'availability zones.'),
-               
 ]
 
 CONF = cfg.CONF
@@ -52,7 +56,7 @@ CONF.register_opts(cinder_opts)
 LOG = logging.getLogger(__name__)
 
     
-def cinderclient(context):
+def cinderclient(context, refresh_token=False):
 
     # FIXME: the cinderclient ServiceCatalog object is mis-named.
     #        It actually contains the entire access blob.
@@ -83,17 +87,49 @@ def cinderclient(context):
 
     LOG.debug(_('Cinderclient connection created using URL: %s') % url)
 
-    c = cinder_client.Client(context.user_id,
-                             context.auth_token,
-                             project_id=context.project_id,
-                             auth_url=url,
-                             insecure=CONF.cinder_api_insecure,
-                             retries=CONF.cinder_http_retries)
-    # noauth extracts user_id:project_id from auth_token
-    c.client.auth_token = context.auth_token or '%s:%s' % (context.user_id,
+    db = WorkloadMgrDB().db
+    trusts =  db.setting_get_all(context)
+
+    trust = [t for t in trusts if t.type == "trust_id"]
+
+    # pick the first trust. Usually it should not be more than one trust
+    if len(trust):
+        trust_id = trust[0].value
+
+        if refresh_token:
+            context = wlm_context.RequestContext(
+                username=CONF.keystone_authtoken.admin_user,
+                password=CONF.keystone_authtoken.admin_password,
+                trust_id=trust_id,
+                tenant_id=context.project_id,
+                trustor_user_id=context.user_id,
+                user_domain_id='default',
+                is_admin=False)
+        else:
+            context = wlm_context.RequestContext(
+                trustor_user_id=context.user_id,
+                project_id=context.project_id,
+                auth_token=context.auth_token,
+                trust_id=trust_id,
+                user_domain_id='default',
+                is_admin=False)
+
+        clients.initialise()
+        client_plugin = clients.Clients(context)
+        cinderclient = client_plugin.client("cinder")
+        cinderclient.client_plugin = cinderclient
+    else:
+        cinderclient = cinder_client.Client(context.user_id,
+                                 context.auth_token,
+                                 project_id=context.project_id,
+                                 auth_url=url,
+                                 insecure=CONF.cinder_api_insecure,
+                                 retries=CONF.cinder_http_retries)
+        # noauth extracts user_id:project_id from auth_token
+        cinderclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id,
                                                            context.project_id)
-    c.client.management_url = url
-    return c
+        cinderclient.client.management_url = url
+    return cinderclient
 
 
 def _untranslate_volume_summary_view(context, vol):
@@ -160,20 +196,20 @@ def _untranslate_snapshot_summary_view(context, snapshot):
     return d
 
 
-def _reraise_translated_volume_exception(volume_id=None):
-    """Transform the exception for the volume but keep its traceback
-    intact."""
-    exc_type, exc_value, exc_trace = sys.exc_info()
-    new_exc = self._translate_volume_exception(volume_id, exc_value)
-    raise new_exc, None, exc_trace
-
-
-def _translate_volume_exception(self, volume_id, exc_value):
+def _translate_volume_exception(volume_id, exc_value):
     if isinstance(exc_value, cinder_exception.NotFound):
         return exception.VolumeNotFound(volume_id=volume_id)
     elif isinstance(exc_value, cinder_exception.BadRequest):
         return exception.InvalidInput(reason=exc_value.message)
     return exc_value
+
+
+def _reraise_translated_volume_exception(volume_id=None):
+    """Transform the exception for the volume but keep its traceback
+    intact."""
+    exc_type, exc_value, exc_trace = sys.exc_info()
+    new_exc = _translate_volume_exception(volume_id, exc_value)
+    raise new_exc, None, exc_trace
 
 
 def exception_handler(ignore_exception=False, refresh_token=True):
@@ -188,13 +224,14 @@ def exception_handler(ignore_exception=False, refresh_token=True):
                 except cinder_exception.Unauthorized as unauth_ex:
                     if refresh_token is True:
                         argv.pop('client')
-                        client = cinderclient(args[1])
+                        client = cinderclient(args[1], 
+                                              refresh_token=True)
                         argv.update({'client': client})
                         return func(*args, **argv)
             except Exception as ex:
                 if ignore_exception is False:
                     LOG.exception(ex)
-                    self._reraise_translated_volume_exception(None)
+                    _reraise_translated_volume_exception(None)
 
         return func_wrapper
     return exception_handler_decorator
@@ -203,16 +240,16 @@ def exception_handler(ignore_exception=False, refresh_token=True):
 class API(base.Base):
     """API for interacting with the volume manager."""
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def get_types(self, context, **kwargs):
         client = kwargs['client']
         types = client.volume_types.list()
         return types
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def get(self, context, volume_id, no_translate=False, **kwargs):
         client = kwargs['client']
-        item = cinderclient(context).volumes.get(volume_id)
+        item = client.volumes.get(volume_id)
         if no_translate:
             return item
         else:
@@ -220,7 +257,7 @@ class API(base.Base):
 
         #self._reraise_translated_volume_exception(volume_id)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def get_all(self, context, search_opts={}):
         client = search_opts['client']
         search_opts.pop('client')
@@ -251,57 +288,57 @@ class API(base.Base):
             msg = _("already detached")
             raise exception.InvalidVolume(reason=msg)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def reserve_volume(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes.reserve(volume['id'])
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def unreserve_volume(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes.unreserve(volume['id'])
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def begin_detaching(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes.begin_detaching(volume['id'])
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def roll_detaching(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes.roll_detaching(volume['id'])
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def attach(self, context, volume, instance_uuid, mountpoint, **kwargs):
         client = kwargs['client']
         client.volumes.attach(volume['id'], instance_uuid,
                               mountpoint)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def detach(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes.detach(volume['id'])
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def set_bootable(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes._action('os-set_bootable',
                                volume['id'],
                                {'bootable': True})
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def initialize_connection(self, context, volume, connector, **kwargs):
         client = kwargs['client']
         return client.\
                  volumes.initialize_connection(volume['id'], connector)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def terminate_connection(self, context, volume, connector, **kwargs):
         client = kwargs['client']
         return client.\
                  volumes.terminate_connection(volume['id'], connector)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler(True)
     def create(self, context, size, name, description, snapshot=None,
                image_id=None, volume_type=None, metadata=None,
                availability_zone=None, **kwargs):
@@ -313,8 +350,6 @@ class API(base.Base):
 
         client = kwargs['client']
         createargs = dict(snapshot_id=snapshot_id,
-                          display_name=name,
-                          display_description=description,
                           volume_type=volume_type,
                           user_id=context.user_id,
                           project_id=context.project_id,
@@ -322,10 +357,17 @@ class API(base.Base):
                           metadata=metadata,
                           imageRef=image_id)
 
-        item = cinderclient(context).volumes.create(size, **createargs)
+        if client.volume_api_version == 1:
+            createargs['display_name'] = name
+            createargs['display_description'] = description
+        else:
+            createargs['name'] = name
+            createargs['description'] = description
+
+        item = client.volumes.create(size, **createargs)
         return _untranslate_volume_summary_view(context, item)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def delete(self, context, volume, **kwargs):
         client = kwargs['client']
         client.volumes.delete(volume['id'])
@@ -333,13 +375,13 @@ class API(base.Base):
     def update(self, context, volume, fields):
         raise NotImplementedError()
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def get_snapshot(self, context, snapshot_id, **kwargs):
         client = kwargs['client']
         item = client.volume_snapshots.get(snapshot_id)
         return _untranslate_snapshot_summary_view(context, item)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def get_all_snapshots(self, context, **kwargs):
         client = kwargs['client']
         items = client.volume_snapshots.list(detailed=True)
@@ -350,14 +392,14 @@ class API(base.Base):
 
         return rvals
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def create_snapshot(self, context, volume, name, description, **kwargs):
         client = kwargs['client']
         item = client.volume_snapshots.create(volume['id'], False,
                                               name, description)
         return _untranslate_snapshot_summary_view(context, item)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def create_snapshot_force(self, context, volume, name,
                               description, **kwargs):
         client = kwargs['client']
@@ -366,7 +408,7 @@ class API(base.Base):
 
         return _untranslate_snapshot_summary_view(context, item)
 
-    @exception_handler(ignore_exception=True)
+    @exception_handler()
     def delete_snapshot(self, context, snapshot, **kwargs):
         client = kwargs['client']
         client.volume_snapshots.delete(snapshot['id'])
