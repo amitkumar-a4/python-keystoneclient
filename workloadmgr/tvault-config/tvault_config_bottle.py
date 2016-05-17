@@ -479,6 +479,7 @@ def _authenticate_with_keystone():
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
+            config_data['service_tenant_name'] = tenant.name
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
             
@@ -1995,13 +1996,15 @@ def configure_service():
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_url = ', 'auth_url = ' + config_data['keystone_admin_url'].strip("v3").strip("v2.0"))
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', 'auth_uri = ' + config_data['keystone_public_url'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ', 'project_name = ' + config_data['service_tenant_name'])
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_protocol = ', 'auth_protocol = ' + config_data['keystone_admin_protocol'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
-        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])        
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_tenant_name = ', 'admin_tenant_name = ' + config_data['service_tenant_name'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:
