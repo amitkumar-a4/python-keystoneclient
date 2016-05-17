@@ -769,7 +769,7 @@ class LibvirtDriver(driver.ComputeDriver):
                         status = compute_service.vast_data_transfer(cntx,
                                              instance['vm_id'],
                                              {'path': backing['path'],
-                                              'file_format': backing['file_format'], 
+                                              'file_format': backing.get('file_format', 'unknown'), 
                                               'metadata': snapshot_vm_disk_resource_metadata,
                                               'disk_info': disk_info
                                              })

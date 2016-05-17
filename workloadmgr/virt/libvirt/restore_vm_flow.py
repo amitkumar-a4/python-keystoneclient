@@ -101,12 +101,18 @@ class PrepareBackupImage(task.Task):
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
-        
         image_info = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
-        #upload the bottom of the chain to glance
-        restore_file_path = image_info.backing_file
-        image_overlay_file_path = vm_disk_resource_snap.vault_path
-        image_virtual_size = image_info.virtual_size
+        
+        if snapshot_vm_resource.resource_name == 'vda':
+            #upload the bottom of the chain to glance
+            restore_file_path = image_info.backing_file
+            image_overlay_file_path = vm_disk_resource_snap.vault_path
+            image_virtual_size = image_info.virtual_size
+        else:
+            restore_file_path = vm_disk_resource_snap.vault_path
+            image_overlay_file_path = 'not-applicable'
+            image_virtual_size = image_info.virtual_size
+
         return restore_file_path, image_overlay_file_path, image_virtual_size
 
         """
@@ -872,7 +878,7 @@ class AttachVolume(task.Task):
                 now = timeutils.utcnow()
                 if (now - start_time) > datetime.timedelta(minutes=4):
                     raise exception.ErrorOccurred(reason='Timeout waiting for the volume ' + volume_id + ' to be available')                   
-                
+            
             LOG.debug('Attaching volume ' + volume_id)
             compute_service.attach_volume(self.cntx, restored_instance_id, volume_id, ('/dev/' + devname))
             time.sleep(15)
@@ -957,7 +963,7 @@ class CopyBackupImageToVolume(task.Task):
 
                     # if we don't see any update to file time for 5 minutes, something is wrong
                     # deal with it.
-                    if time.time() - progstat.st_mtime > 600:
+                    if time.time() - progstat.st_mtime > 6000:
                         raise Exception("No update to %s modified time for last 5 minutes. "
                                         "Contego may have creashed. Bailing out" % 
                                         progress_tracking_file_path)
