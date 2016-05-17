@@ -707,6 +707,8 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                     raise Exception("Network by netid %s not found" % net.id)
             if network_type != 'neutron' and network_type is not None:
                 for ip in IPNetwork(net.cidr):
+                    import pdb; pdb.set_trace()
+                    break
                     if ip >= IPAddress(net.dhcp_start) and \
                         ip != IPAddress(net.gateway):
                         ipinfo = compute_service.get_fixed_ip(cntx, str(ip))

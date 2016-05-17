@@ -2599,6 +2599,7 @@ def main():
     #configure the networking
     try:
         try:
+            import pdb; pdb.set_trace()
             ovfEnv = subprocess.Popen("echo `vmtoolsd --cmd \"info-get guestinfo.ovfenv\"`", shell=True, stdout=subprocess.PIPE).stdout.read()
             propertyMap = getPropertyMap(ovfEnv)
             
