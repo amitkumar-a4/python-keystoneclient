@@ -246,6 +246,11 @@ class UploadImageToGlance(task.Task):
         user_id = self.cntx.user
         project_id = self.cntx.tenant
         self.cntx = nova._get_tenant_context(user_id, project_id)
+        
+        # Add hw_qemu_guest_agent information to image metadata if available
+        status_hw_qemu_guest_agent = db.get_metadata_value(snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
+        if str(status_hw_qemu_guest_agent).lower() in ['yes', 'no']:
+            image_metadata['properties']['hw_qemu_guest_agent'] = status_hw_qemu_guest_agent
 
         self.restored_image = restored_image = self.image_service.create(self.cntx, image_metadata)
         if restore_obj['restore_type'] == 'test':
