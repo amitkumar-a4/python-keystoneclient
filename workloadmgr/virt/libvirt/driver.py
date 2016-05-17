@@ -755,6 +755,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 snapshot_vm_resource_metadata['disk_format'] = glance_image['disk_format']
                 snapshot_vm_resource_metadata['min_ram'] = glance_image['min_ram']
                 snapshot_vm_resource_metadata['min_disk'] = glance_image['min_disk']                                                                  
+                if 'hw_qemu_guest_agent' in glance_image['properties'].keys():
+                    snapshot_vm_resource_metadata['hw_qemu_guest_agent'] = glance_image['properties']['hw_qemu_guest_agent']               
             else:
                 snapshot_vm_resource_metadata['image_id'] = None
 
