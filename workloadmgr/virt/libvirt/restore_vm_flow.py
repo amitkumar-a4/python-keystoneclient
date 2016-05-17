@@ -204,7 +204,17 @@ class UploadImageToGlance(task.Task):
         snapshot_id = restore_obj.snapshot_id
         self.image_service = glance.get_default_image_service(\
                                   production= (restore_obj['restore_type'] != 'test'))
-
+        
+        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id)
+        try:
+            org_image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+            org_glance_image = self.image_service.show(self.cntx, org_image_id)
+            if org_glance_image:
+                return org_glance_image['id'], org_glance_image['disk_format']
+        except:
+            pass
+        
         progressmsg = _('Uploading image of instance %(vmid)s from \
                         snapshot %(snapshot_id)s') % \
                         {'vmid': vmid, 'snapshot_id': snapshot_id}
@@ -213,9 +223,6 @@ class UploadImageToGlance(task.Task):
 
         db.restore_update(self.cntx,  restore_id,
                           {'progress_msg': progressmsg, 'status': 'uploading' })                  
-        #upload to glance
-        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
-        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id)
         image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_name')
         if not image_name:
             image_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
@@ -287,7 +294,7 @@ class UploadImageToGlance(task.Task):
             raise Exception("Cannot create glance image")
 
         self.image_id = restored_image['id']
-        return restored_image['id'], 'image_type_qcow2'
+        return restored_image['id'], restored_image['disk_format']
 
     @autolog.log_method(Logger, 'UploadImageToGlance.revert')
     def revert_with_log(self, *args, **kwargs):

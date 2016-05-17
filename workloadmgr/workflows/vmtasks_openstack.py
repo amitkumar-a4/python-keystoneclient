@@ -706,15 +706,17 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                 if net.id != nic_info['net-id']:
                     raise Exception("Network by netid %s not found" % net.id)
             if network_type != 'neutron' and network_type is not None:
+                """
+                #dhcp_start is not available. Is it because we are using trust feature?
                 for ip in IPNetwork(net.cidr):
-                    import pdb; pdb.set_trace()
-                    break
                     if ip >= IPAddress(net.dhcp_start) and \
                         ip != IPAddress(net.gateway):
                         ipinfo = compute_service.get_fixed_ip(cntx, str(ip))
                         if not ipinfo.hostname:
                             nic_info['v4-fixed-ip'] = str(ip)
                             break
+                """
+                pass
             else:
                 if nic_data['mac_address'] in restored_net_resources and \
                    'id' in restored_net_resources[nic_data['mac_address']]:
@@ -733,7 +735,7 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                         new_network = restored_net_resources[pit_id]
                         nic_info.setdefault('network-id', new_network['id']) 
                     except:
-                           pass
+                        pass
 
                     #TODO(giri): the ip address sometimes may not be available due to one of the router or network
                     #interfaces taking them over
