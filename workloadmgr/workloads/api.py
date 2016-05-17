@@ -407,7 +407,7 @@ class API(base.Base):
         """
         Create a trust if one is not already established
         """
-
+        
         try:
             if not self.trust_list(context):
                 self.trust_create(context, vault.CONF.trustee_role)
@@ -704,17 +704,20 @@ class API(base.Base):
         AUDITLOG.log(context,'Import Workloads Requested', None)
         try:
             workloads = []
-            import_workload_module = None
+            import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  models.DB_VERSION.replace('.', '_'))
+            import_settings_method = getattr(import_workload_module, 'import_settings')
+            import_settings_method(context, models.DB_VERSION)            
+            
             workload_url = vault.get_workloads(context)
             workload_url_iterate = []
 
             if len(workload_ids) > 0:
-               for workload in workload_url:
-                   if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
-                      workload_url_iterate.append(workload)
+                for workload in workload_url:
+                    if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
+                        workload_url_iterate.append(workload)
             else:
-               for workload in workload_url:
-                   workload_url_iterate.append(workload)
+                for workload in workload_url:
+                    workload_url_iterate.append(workload)
 
             del workload_url[:]
             for workload_url in workload_url_iterate:
@@ -740,10 +743,6 @@ class API(base.Base):
                     workloads.append(workload)
                 except Exception as ex:
                     LOG.exception(ex)
-            if not import_workload_module:
-                import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_1_0_125')
-            import_settings_method = getattr(import_workload_module, 'import_settings')
-            import_settings_method(context, models.DB_VERSION)
         except Exception as ex:
             LOG.exception(ex)
         finally:
