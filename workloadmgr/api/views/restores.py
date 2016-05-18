@@ -118,6 +118,7 @@ class ViewBuilder(common.ViewBuilder):
         d['description'] =  restore['display_description']
         d['host'] = restore['host']
         d['size'] = restore['size']        
+        d['uploaded_size'] =  min(restore['uploaded_size'],restore['size'])
         d['progress_percent'] =  restore['progress_percent']          
         d['progress_msg'] =  restore['progress_msg'] 
         d['warning_msg'] =  restore['warning_msg']

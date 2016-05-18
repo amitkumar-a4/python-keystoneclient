@@ -243,8 +243,8 @@ class UploadImageToGlance(task.Task):
         LOG.debug('Uploading image ' + restore_file_path)
 
         # refresh the token
-        user_id = self.cntx.user
-        project_id = self.cntx.tenant
+        user_id = self.cntx.user_id
+        project_id = self.cntx.tenant_id
         self.cntx = nova._get_tenant_context(user_id, project_id)
 
         self.restored_image = restored_image = self.image_service.create(self.cntx, image_metadata)
@@ -284,8 +284,8 @@ class UploadImageToGlance(task.Task):
     @autolog.log_method(Logger, 'UploadImageToGlance.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
-            user_id = self.cntx.user
-            project_id = self.cntx.tenant
+            user_id = self.cntx.user_id
+            project_id = self.cntx.tenant_id
             self.cntx = nova._get_tenant_context(user_id, project_id)
             self.image_service.delete(self.cntx, self.imageid)
         except:
@@ -353,8 +353,8 @@ class RestoreVolumeFromImage(task.Task):
             except nova_unauthorized as ex:
                 LOG.exception(ex)
                 # recreate the token here
-                user_id = self.cntx.user
-                project_id = self.cntx.tenant
+                user_id = self.cntx.user_id
+                project_id = self.cntx.tenant_id
                 self.cntx = nova._get_tenant_context(user_id, project_id)
 
         self.image_service.delete(self.cntx, imageid)
@@ -708,8 +708,8 @@ class RestoreInstanceFromImage(task.Task):
             restored_instance_name = instance_options['name']
 
         # refresh the token
-        user_id = self.cntx.user
-        project_id = self.cntx.tenant
+        user_id = self.cntx.user_id
+        project_id = self.cntx.tenant_id
         self.cntx = nova._get_tenant_context(user_id, project_id)
 
         restored_compute_image = compute_service.get_image(self.cntx, imageid)
@@ -769,6 +769,58 @@ class RestoreInstanceFromImage(task.Task):
             pass
         pass
 
+
+class AdjustSG(task.Task):
+    """
+       Adjust security groups
+    """
+
+    def execute(self, context, restored_instance_id, restore_type,
+                restored_security_groups):
+        return self.execute_with_log(context, restored_instance_id,
+                                     restore_type, restored_security_groups)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'AdjustSG.execute')
+    def execute_with_log(self, context, restored_instance_id,
+                         restore_type, restored_security_groups):
+       
+        try:
+            self.db = db = WorkloadMgrDB().db
+            self.cntx = amqp.RpcContext.from_dict(context)
+
+            # refresh the token
+            user_id = self.cntx.user_id
+            project_id = self.cntx.tenant_id
+            self.cntx = nova._get_tenant_context(user_id, project_id)
+        
+            self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
+            sec_groups = compute_service.list_security_group(self.cntx, restored_instance_id)
+
+            sec_group_ids = [sec.id for sec in sec_groups]
+            ids_to_remove = set(sec_group_ids) - set(restored_security_groups.values())
+            ids_to_add = set(restored_security_groups.values()) - set(sec_group_ids)
+
+            # remove security groups that were not asked for
+            for sec in ids_to_remove:
+                compute_service.remove_security_group(self.cntx, restored_instance_id,
+                                                      sec)
+
+            for sec in ids_to_add:
+                compute_service.add_security_group(self.cntx, restored_instance_id,
+                                                   sec)
+        except Exception as ex:
+            LOG.exception(ex)
+            msg = "Could not update security groups on the " \
+                  "restored instance %s" % restored_instance_id
+            LOG.warning(msg)
+
+    @autolog.log_method(Logger, 'AdjustSG.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
 class AttachVolume(task.Task):
     """
        Attach volume to the instance
@@ -788,8 +840,8 @@ class AttachVolume(task.Task):
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
         # refresh the token
-        user_id = self.cntx.user
-        project_id = self.cntx.tenant
+        user_id = self.cntx.user_id
+        project_id = self.cntx.tenant_id
         self.cntx = nova._get_tenant_context(user_id, project_id)
         
         self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
@@ -850,8 +902,8 @@ class CopyBackupImageToVolume(task.Task):
 
         # Get a new token, just to be safe
         cntx = amqp.RpcContext.from_dict(context)
-        user_id = cntx.user
-        project_id = cntx.tenant
+        user_id = cntx.user_id
+        project_id = cntx.tenant_id
         cntx = nova._get_tenant_context(user_id, project_id)
         vast_params = {'volume_id': volumeid,
                        'backup_image_file_path': restored_file_path,
@@ -911,8 +963,8 @@ class CopyBackupImageToVolume(task.Task):
             except nova_unauthorized as ex:
                 LOG.exception(ex)
                 # recreate the token here
-                user_id = cntx.user
-                project_id = cntx.tenant
+                user_id = cntx.user_id
+                project_id = cntx.tenant_id
                 cntx = nova._get_tenant_context(user_id, project_id)
             except Exception as ex:
                 LOG.exception(ex)
@@ -1126,6 +1178,16 @@ def RestoreInstance(context, instance, snapshotobj, restoreid):
                                 provides='restored_instance_id'))
     return flow
 
+
+def AdjustInstanceSecurityGroups(context, instance, snapshotobj, restoreid):
+    flow = lf.Flow("adjustinstancesecuritygrouplf")
+    db = WorkloadMgrDB().db
+
+    flow.add(AdjustSG("AdjustSG"))
+
+    return flow
+
+
 def AttachVolumes(context, instance, snapshotobj, restoreid):
     flow = lf.Flow("attachvolumeslf")
     db = WorkloadMgrDB().db
@@ -1185,8 +1247,9 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg}) 
    
     # refresh the token so we are attempting each VM restore with a new token
-    user_id = cntx.user
-    project_id = cntx.tenant
+    user_id = cntx.user_id
+    project_id = cntx.tenant_id
+
     cntx = nova._get_tenant_context(user_id, project_id)
 
     context_dict = dict([('%s' % key, value)
@@ -1264,6 +1327,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # create nova from image id
     childflow = RestoreInstance(cntx, instance, snapshot_obj, restore['id'])
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    # create nova from image id
+    childflow = AdjustInstanceSecurityGroups(cntx, instance, snapshot_obj, restore['id'])
     if childflow:
         _restorevmflow.add(childflow)
 
