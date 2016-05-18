@@ -1900,6 +1900,7 @@ class API(base.Base):
                    u'description': u'token id for user %s project %s' % \
                                    (context.user_id, context.project_id),
                    u'value': trust_context.trust_id,
+                   u'user_id': context.user_id,
                    u'is_public': False,
                    u'is_hidden': False,
                    u'type': "trust_id",}
@@ -1939,9 +1940,12 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def trust_list(self, context):
 
-        settings =  self.db.setting_get_all(context)
+        settings =  self.db.setting_get_all_by_project(
+                        context, context.project_id)
 
-        trust = [t for t in settings if t.type == "trust_id"]
+        trust = [t for t in settings if t.type == "trust_id" and \
+                 t.user_id == context.user_id and \
+                 t.project_id == context.project_id]
         return trust
 
     @autolog.log_method(logger=Logger)
