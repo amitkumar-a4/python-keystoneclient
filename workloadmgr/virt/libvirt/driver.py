@@ -676,11 +676,11 @@ class LibvirtDriver(driver.ComputeDriver):
                                 snapshot_vm_resource_metadata['volume_id']
 
                             if 'display_description' in cinder_volume.keys():
-                               description = cinder_volume['display_description']
+                                description = cinder_volume['display_description']
                             elif 'description' in cinder_volume.keys():
-                                 description = cinder_volume['description']
+                                description = cinder_volume['description']
                             else:
-                                 description = ''
+                                description = ''
                             snapshot_vm_resource_metadata['volume_description'] = description
                             snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
                             snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']
@@ -733,8 +733,6 @@ class LibvirtDriver(driver.ComputeDriver):
             for i, backing in enumerate(backings):
                 vm_disk_resource_snap_id = str(uuid.uuid4())
                 vm_disk_resource_snap_metadata = {} # Dictionary to hold the metadata
-                if(disk_info['dev'] == 'vda'):
-                    vm_disk_resource_snap_metadata['base_image_ref'] = 'TODO'
                 vm_disk_resource_snap_metadata['disk_format'] = 'qcow2'
 
                 if vm_disk_resource_snap_backing:

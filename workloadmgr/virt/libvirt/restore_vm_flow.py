@@ -103,7 +103,8 @@ class PrepareBackupImage(task.Task):
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
         image_info = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
         
-        if snapshot_vm_resource.resource_name == 'vda' and db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
+        if snapshot_vm_resource.resource_name == 'vda' and \
+            db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
             restore_file_path = image_info.backing_file
             image_overlay_file_path = vm_disk_resource_snap.vault_path
@@ -115,6 +116,7 @@ class PrepareBackupImage(task.Task):
 
         return restore_file_path, image_overlay_file_path, image_virtual_size
 
+        """
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') == None and \
            vault.commit_supported() == True:
             image_info = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
@@ -176,7 +178,7 @@ class PrepareBackupImage(task.Task):
         image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_staging_path)
         self.restored_file_path = vm_disk_resource_snap_staging_path
         return (self.restored_file_path, image_info.virtual_size)
-        
+        """
     @autolog.log_method(Logger, 'PrepareBackupImage.revert')
     def revert_with_log(self, *args, **kwargs):
         try:
@@ -235,9 +237,9 @@ class UploadImageToGlance(task.Task):
         time_offset = datetime.datetime.now() - datetime.datetime.utcnow()
         index = image_name.index('_Snapshot_') if '_Snapshot_' in image_name else -1
         if index != -1:
-           image_name = image_name[:index] + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+            image_name = image_name[:index] + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         else:
-             image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
+            image_name = image_name + '_Snapshot_' + (snapshot_obj.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p")
         if db.get_metadata_value(vm_disk_resource_snap.metadata, 'disk_format') == 'vmdk':
             image_metadata = {'is_public': False,
                               'status': 'active',
@@ -935,13 +937,14 @@ class CopyBackupImageToVolume(task.Task):
         user_id = cntx.user_id
         project_id = cntx.tenant_id
         cntx = nova._get_tenant_context(user_id, project_id)
-        vast_params = {'volume_id': volumeid,
+        vast_params = {'volume_id': volume_id, 'volume_type': volume_type,
+                       'image_id': image_id, 'image_type' : image_type,
                        'backup_image_file_path': restored_file_path,
                        'image_overlay_file_path': image_overlay_file_path,
                        'progress_tracking_file_path': progress_tracking_file_path}
         compute_service.copy_backup_image_to_volume(cntx, restored_instance_id, vast_params)
 
-        statinfo = os.stat(restored_file_path)
+        statinfo = os.stat(restored_file_path or image_overlay_file_path)
         prev_copied_size_incremental = 0
         while True:
             try:
@@ -1113,6 +1116,7 @@ def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, 
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                 volume_type='volume_type_'+snapshot_vm_resource.id),
                                     provides=('restore_file_path_' + str(snapshot_vm_resource.id),
+                                              'image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
@@ -1130,15 +1134,16 @@ def LinearUploadImagesToGlance(context, instance, instance_options,
             flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
                                          rebind=dict( vm_resource_id=snapshot_vm_resource.id,
                                                       restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
-                                         provides='image_id_' + str(snapshot_vm_resource.id)))
+                                         provides=('image_id_' + str(snapshot_vm_resource.id),
+                                                   'image_type_' + str(snapshot_vm_resource.id))))
         elif db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-
             if not is_supported_backend(store['volume_type_'+snapshot_vm_resource.id]):
                 # Fallback to default mode of glance backed images
                 flow.add(UploadImageToGlance("UploadImagesToGlance" + snapshot_vm_resource.id,
-                                         rebind=dict( vm_resource_id=snapshot_vm_resource.id,
-                                                      restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
-                                         provides='image_id_' + str(snapshot_vm_resource.id)))
+                                             rebind=dict( vm_resource_id=snapshot_vm_resource.id,
+                                                          restore_file_path='restore_file_path_'+snapshot_vm_resource.id),
+                                             provides=('image_id_' + str(snapshot_vm_resource.id),
+                                                       'image_type_' + str(snapshot_vm_resource.id))))
 
     return flow
 
@@ -1245,7 +1250,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
             continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
-                                  rebind=dict(volumeid='volume_id_' + str(snapshot_vm_resource.id),
+                                  rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id),
                                               volume_type='volume_type_'+str(snapshot_vm_resource.id),
                                               restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
@@ -1341,9 +1346,9 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
             store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
 
         if snapshot_vm_resource.resource_type == 'nic':
-           vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
-           nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
-           mac_address = nic_data['mac_address']
+            vm_nic_snapshot = db.vm_network_resource_snap_get(cntx, snapshot_vm_resource.id)
+            nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
+            mac_address = nic_data['mac_address']
 
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
