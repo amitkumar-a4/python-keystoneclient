@@ -1902,7 +1902,7 @@ class API(base.Base):
                    u'value': trust_context.trust_id,
                    u'user_id': context.user_id,
                    u'is_public': False,
-                   u'is_hidden': False,
+                   u'is_hidden': True,
                    u'type': "trust_id",}
         created_settings = []
         try:
