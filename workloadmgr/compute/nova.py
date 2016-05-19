@@ -183,8 +183,8 @@ def _get_tenant_context(user_id, tenant_id):
             username=CONF.keystone_authtoken.admin_user,
             password=CONF.keystone_authtoken.admin_password,
             trust_id=trust_id,
-            tenant_id=context.project_id,
-            trustor_user_id=context.user_id,
+            tenant_id=tenant_id,
+            trustor_user_id=user_id,
             user_domain_id='default',
             is_admin=False)
 
