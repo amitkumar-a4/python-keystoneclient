@@ -103,7 +103,7 @@ class PrepareBackupImage(task.Task):
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
         image_info = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
         
-        if snapshot_vm_resource.resource_name == 'vda':
+        if snapshot_vm_resource.resource_name == 'vda' and db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
             restore_file_path = image_info.backing_file
             image_overlay_file_path = vm_disk_resource_snap.vault_path
