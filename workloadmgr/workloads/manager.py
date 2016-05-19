@@ -381,6 +381,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     "workload_id", workload_id)
                 compute_service.set_meta_item(context, vm.vm_id,
                                     "workload_name", workload['display_name'])
+
+            workload_utils.upload_workload_db_entry(context, workload_id)
+            
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
@@ -798,6 +801,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             restore_object_store_transfer_time = 0            
             workload_vms = self.db.workload_vms_get(context, workload.id)
             if target_platform == 'openstack':
+               workload_def_updated = False
                for restored_vm in self.db.restored_vms_get(context, restore_id):
                    instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
                    if instance == None:
@@ -845,6 +849,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'vm_name': instance.name,
                                      'status': 'available'}
                            vm = self.db.workload_vms_create(context, values)
+                           workload_def_updated = True
                            compute_service.set_meta_item(context, vm.vm_id,
                                      "workload_id", workload.id)
                            compute_service.set_meta_item(context, vm.vm_id,
@@ -852,6 +857,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                    restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                    restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
+               if workload_def_updated == True:
+                  workload_utils.upload_workload_db_entry(context, workload.id)             
 
             if restore_type == 'test':
                 self.db.restore_update( context,

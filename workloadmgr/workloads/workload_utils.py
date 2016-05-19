@@ -13,6 +13,21 @@ Logger = autolog.Logger(LOG)
 
 db = WorkloadMgrDB().db
 
+def upload_workload_db_entry(cntx, workload_id):
+    parent = vault.get_workload_path({'workload_id': workload_id})
+    workload_db = db.workload_get(cntx, workload_id)
+    for kvpair in workload_db.metadata:
+        if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
+            kvpair['value'] = '******'
+    workload_json = jsonutils.dumps(workload_db)
+    path = parent + "/workload_db"
+    vault.put_object(path, workload_json)
+
+    workload_vms_db = db.workload_vms_get(cntx, workload_id)
+    workload_vms_json = jsonutils.dumps(workload_vms_db)
+    path = parent + "/workload_vms_db"
+    vault.put_object(path, workload_vms_json)
+
 def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
     db = WorkloadMgrDB().db
     

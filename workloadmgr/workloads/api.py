@@ -45,6 +45,7 @@ from workloadmgr import context
 from workloadmgr.workflows import vmtasks
 from workloadmgr.vault import vault
 from workloadmgr.openstack.common import timeutils
+from workloadmgr.workloads import workload_utils
 from workloadmgr import auditlog
 from workloadmgr import autolog
 from workloadmgr.db.sqlalchemy import models
@@ -608,6 +609,8 @@ class API(base.Base):
                                         'workload_name', workload['name'])
 
         workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
+
+        workload_utils.upload_workload_db_entry(context, workload_id)
             
         AUDITLOG.log(context,'Workload \'' + workload_obj['display_name'] + '\' Modify Submitted', workload_obj)
             
