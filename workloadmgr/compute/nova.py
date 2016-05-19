@@ -157,16 +157,25 @@ try:
 except:
     pass
 
-def _get_tenant_context(user_id, tenant_id):
+def _get_trusts(user_id, tenant_id):
 
+    db = WorkloadMgrDB().db
     context = wlm_context.RequestContext(
                 user_id=user_id,
                 project_id=tenant_id)
 
-    db = WorkloadMgrDB().db
-    trusts =  db.setting_get_all(context)
+    settings = db.setting_get_all_by_project(
+                        context, context.project_id)
 
-    trust = [t for t in trusts if t.type == "trust_id"]
+    trust = [t for t in settings if t.type == "trust_id" and \
+             t.project_id == context.project_id and \
+             t.user_id == context.user_id]
+    return trust
+
+
+def _get_tenant_context(user_id, tenant_id):
+
+    trust = _get_trusts(user_id, tenant_id)
 
     if len(trust):
         trust_id = trust[0].value
@@ -210,10 +219,7 @@ def _get_tenant_context(user_id, tenant_id):
 
 def novaclient(context, production=True, refresh_token=False, extensions = None):
 
-    db = WorkloadMgrDB().db
-    trusts =  db.setting_get_all(context)
-
-    trust = [t for t in trusts if t.type == "trust_id"]
+    trust = _get_trusts(context.user_id, context.tenant_id)
 
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
