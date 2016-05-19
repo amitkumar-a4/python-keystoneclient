@@ -171,6 +171,12 @@ class RequestContext(context.RequestContext):
         if self._trusts_auth_plugin:
             return self._trusts_auth_plugin
 
+        try:
+            cfg.CONF.import_group('keystone_authtoken',
+                                  'keystonemiddleware.auth_token')
+        except:
+            pass
+
         trustee_user_domain = 'default'
         if 'user_domain_id' in cfg.CONF.keystone_authtoken:
             trustee_user_domain = cfg.CONF.keystone_authtoken.user_domain_id

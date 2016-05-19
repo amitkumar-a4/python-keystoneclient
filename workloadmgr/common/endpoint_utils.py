@@ -24,6 +24,9 @@ def get_auth_uri(v3=True):
         return discover.url_for('3.0')
     else:
         # Import auth_token to have keystone_authtoken settings setup.
-        #importutils.import_module('keystonemiddleware.auth_token')
+        try:
+            importutils.import_module('keystonemiddleware.auth_token')
+        except:
+            pass
         auth_uri = cfg.CONF.keystone_authtoken.auth_uri
         return auth_uri.replace('v2.0', 'v3') if auth_uri and v3 else auth_uri
