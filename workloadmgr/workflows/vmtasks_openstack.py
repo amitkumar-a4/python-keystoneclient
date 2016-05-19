@@ -659,6 +659,12 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
 
     db.restore_update( cntx, restore['id'],
                        {'progress_msg': 'Restoring network interfaces for Instance ' + instance['vm_id']})
+    
+    restore_obj = db.restore_get(cntx, restore['id']) 
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = utils.get_instance_restore_options(restore_options, instance['vm_id'],'openstack')
+    oneclickrestore = 'oneclickrestore' in restore_options and restore_options['oneclickrestore']
+              
     restored_nics = []
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'], restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
@@ -716,7 +722,8 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                             nic_info['v4-fixed-ip'] = str(ip)
                             break
                 """
-                pass
+                if not oneclickrestore:
+                    nic_info.pop('v4-fixed-ip')
             else:
                 if nic_data['mac_address'] in restored_net_resources and \
                    'id' in restored_net_resources[nic_data['mac_address']]:
