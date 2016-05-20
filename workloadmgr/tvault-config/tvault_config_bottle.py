@@ -610,7 +610,18 @@ def _register_service():
                 if role.name == 'admin':
                     admin_role = role
                     break                
-        
+     
+            # assign know roles otherwise default to one of the roles
+            rolenames = [role.name for role in roles \
+                         if role.name not in ['ResellerAdmin', 'service',
+                                              'admin', 'services']]
+            if '_member_' in rolenames:
+                config_data['trustee_role'] = '_member_'
+            elif 'Member' in rolenames:
+                config_data['trustee_role'] = 'Member'
+            else:
+                config_data['trustee_role'] = rolenames.pop(0)
+
             try:
                 keystone.users.delete(wlm_user.id)
             except Exception as exception:
@@ -1997,6 +2008,8 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_url = ', 'auth_url = ' + config_data['keystone_admin_url'].strip("v3").strip("v2.0"))
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', 'auth_uri = ' + config_data['keystone_public_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ', 'project_name = ' + config_data['service_tenant_name'])
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ', 'trustee_role = ' + config_data['trustee_role'])
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
