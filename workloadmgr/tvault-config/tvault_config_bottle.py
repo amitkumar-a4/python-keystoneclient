@@ -624,20 +624,13 @@ def _register_service():
             else:
                 config_data['trustee_role'] = rolenames.pop(0)
 
-            try:
-                keystone.users.delete(wlm_user.id)
-            except Exception as exception:
-                if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
-                   raise exception
-            
-            
-            wlm_user = keystone.users.create(config_data['workloadmgr_user'],
-                                             config_data['workloadmgr_user_password'],
-                                             'workloadmgr@triliodata.com',
-                                             tenant_id=config_data['service_tenant_id'],
-                                             enabled=True)
-            
-            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+            if wlm_user == None:
+                wlm_user = keystone.users.create(config_data['workloadmgr_user'],
+                                                 config_data['workloadmgr_user_password'],
+                                                 'workloadmgr@triliodata.com',
+                                                 tenant_id=config_data['service_tenant_id'],
+                                                 enabled=True)
+                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
 
         except Exception as exception:
             if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
