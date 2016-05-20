@@ -619,6 +619,8 @@ def _register_service():
                 config_data['trustee_role'] = '_member_'
             elif 'Member' in rolenames:
                 config_data['trustee_role'] = 'Member'
+            elif 'member' in rolenames:
+                config_data['trustee_role'] = 'member'
             else:
                 config_data['trustee_role'] = rolenames.pop(0)
 
