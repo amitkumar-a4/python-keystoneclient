@@ -969,9 +969,9 @@ class CopyBackupImageToVolume(task.Task):
                     if progstat.st_mtime > basestat.st_mtime:
                         basestat = progstat
                         basetime = time.time()
-                    elif time.time() - basetime > 1800:
-                        raise Exception("No update to %s modified time for last 5 minutes. "
-                                        "Contego may have creashed. Bailing out" % 
+                    elif time.time() - basetime > 600:
+                        raise Exception("No update to %s modified time for last 10 minutes. "
+                                        "Contego may have errored. Aborting Operation" % 
                                         progress_tracking_file_path)
                 else:
                     # For swift based backup media

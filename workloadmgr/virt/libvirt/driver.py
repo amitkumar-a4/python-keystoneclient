@@ -749,6 +749,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                                  'status': 'creating'}     
 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(cntx, vm_disk_resource_snap_values)
+                progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : vm_disk_resource_snap_id}
+                progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)                
                 #upload to backup store
                 snapshot_vm_disk_resource_metadata = {'workload_id': snapshot['workload_id'],
                                                       'workload_name': workload_obj.display_name,
@@ -757,7 +759,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                                       'snapshot_vm_name': instance['vm_name'],
                                                       'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                       'snapshot_vm_resource_name':  disk_info['dev'],
-                                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,}
+                                                      'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
+                                                      'progress_tracking_file_path': progress_tracking_file_path}
 
                 vault_url = vault.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
 
@@ -796,8 +799,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 start_time = timeutils.utcnow()
                 data_transfer_completed = False
-                progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : vm_disk_resource_snap_id}
-                progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
                 uploaded_size = 0
                 uploaded_size_incremental = 0
                 previous_uploaded_size = 0
