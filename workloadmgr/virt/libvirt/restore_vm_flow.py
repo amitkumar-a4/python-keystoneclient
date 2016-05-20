@@ -944,8 +944,11 @@ class CopyBackupImageToVolume(task.Task):
                        'progress_tracking_file_path': progress_tracking_file_path}
         compute_service.copy_backup_image_to_volume(cntx, restored_instance_id, vast_params)
 
-        statinfo = os.stat(restored_file_path or image_overlay_file_path)
+        image_info = qemuimages.qemu_img_info(restored_file_path or image_overlay_file_path)
         prev_copied_size_incremental = 0
+
+        basestat = os.stat(progress_tracking_file_path)
+        basetime = time.time()
         while True:
             try:
                 time.sleep(10)
@@ -963,7 +966,10 @@ class CopyBackupImageToVolume(task.Task):
 
                     # if we don't see any update to file time for 5 minutes, something is wrong
                     # deal with it.
-                    if time.time() - progstat.st_mtime > 6000:
+                    if progstat.st_mtime > basestat.st_mtime:
+                        basestat = progstat
+                        basetime = time.time()
+                    elif time.time() - basetime > 1800:
                         raise Exception("No update to %s modified time for last 5 minutes. "
                                         "Contego may have creashed. Bailing out" % 
                                         progress_tracking_file_path)
@@ -987,7 +993,7 @@ class CopyBackupImageToVolume(task.Task):
                             break;
 
                 copied_size_incremental = int(float(percentage) * \
-                                                   statinfo.st_size/100)
+                                                   image_info.virtual_size/100)
                 restore_obj = db.restore_update(cntx, restore_id,
                                            {'uploaded_size_incremental': copied_size_incremental - \
                                                                    prev_copied_size_incremental})
@@ -1005,7 +1011,7 @@ class CopyBackupImageToVolume(task.Task):
                 raise ex
 
         restore_obj = db.restore_update(cntx, restore_id,
-                                        {'uploaded_size_incremental': statinfo.st_size})
+                                        {'uploaded_size_incremental': image_info.virtual_size})
 
     @autolog.log_method(Logger, 'CopyBackupImageToVolume.revert')
     def revert_with_log(self, *args, **kwargs):
