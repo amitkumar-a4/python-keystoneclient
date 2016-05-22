@@ -1995,11 +1995,19 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_insecure = ', 'glance_api_insecure = True')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_api_insecure = ', 'neutron_api_insecure = True')
 
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_url = ', 'auth_url = ' + config_data['keystone_admin_url'].strip("v3").strip("v2.0"))
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ', 'auth_uri = ' + config_data['keystone_public_url'])
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ', 'project_name = ' + config_data['service_tenant_name'])
-
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ', 'trustee_role = ' + config_data['trustee_role'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_url = ',
+                     'auth_url = ' + config_data['keystone_admin_url'].\
+                     strip("v3").strip("v2.0"),
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
+                     'auth_uri = ' + config_data['keystone_public_url'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ',
+                     'project_name = ' + config_data['service_tenant_name'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
+                     'trustee_role = ' + config_data['trustee_role'],
+                     starts_with=True)
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
