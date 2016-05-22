@@ -633,13 +633,8 @@ def _register_service():
                 keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
 
         except Exception as exception:
-            if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
-                pass
-            elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
-                pass            
-            else:
-                bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-                raise exception        
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception        
         
 
     #delete orphan wlm services
