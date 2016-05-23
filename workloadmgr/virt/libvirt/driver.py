@@ -429,24 +429,24 @@ class LibvirtDriver(driver.ComputeDriver):
             fminstance = compute_service.get_server_by_id(cntx, mount_vm_id,
                                                             admin=True)
             if fminstance == None:
-                raise Exception("TrilioVault File Manager does not exists")
+                LOG.warning("TrilioVault File Manager does not exists")
+            else:
 
-            compute_service.reboot(cntx, fminstance, reboot_type='HARD')
-            start_time = timeutils.utcnow()
-            while True:
-                time.sleep(1)
-                fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
+                compute_service.reboot(cntx, fminstance, reboot_type='HARD')
+                start_time = timeutils.utcnow()
+                while True:
+                    time.sleep(1)
+                    fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
                                                             admin=True)
-                if not fminstance.__dict__['OS-EXT-STS:task_state']:
-                    break
-                now = timeutils.utcnow()
-                if (now - start_time) > datetime.timedelta(minutes=4):
-                    raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                   
+                    if not fminstance.__dict__['OS-EXT-STS:task_state']:
+                        break
+                    now = timeutils.utcnow()
+                    if (now - start_time) > datetime.timedelta(minutes=4):
+                        raise exception.ErrorOccurred(reason='Timeout rebooting file manager instance')                   
 
-            if fminstance.status.lower() != "active":
-                raise Exception("File Manager VM is not rebooted successfully")
+                if fminstance.status.lower() != "active":
+                    raise Exception("File Manager VM is not rebooted successfully")
              
-
             return fminstance
         compute_service = nova.API(production=True)
         fminstance = _reboot_fminstance()
