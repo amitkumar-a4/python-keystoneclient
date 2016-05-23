@@ -1341,7 +1341,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
             progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
             if volume_id:
-                volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+                volume_type = db.get_metadata_value(
+                    snapshot_vm_resource.metadata, 'volume_type') or "None"
                 new_volume_type = get_new_volume_type(instance_options,
                                                       volume_id.lower(),
                                                       volume_type)
