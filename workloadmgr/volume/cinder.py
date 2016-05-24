@@ -15,7 +15,7 @@ from oslo.config import cfg
 
 from cinderclient import exceptions as cinder_exception
 from cinderclient import service_catalog
-from cinderclient.v1 import client as cinder_client
+from cinderclient.v2 import client as cinder_client
 
 from workloadmgr.db import base
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -142,6 +142,10 @@ def cinderclient(context, refresh_token=False):
         cinderclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id,
                                                            context.project_id)
         cinderclient.client.management_url = url
+        if "v1" in url.split('/'):
+            cinderclient.volume_api_version = 1
+        else:
+            cinderclient.volume_api_version = 2
     return cinderclient
 
 
@@ -370,12 +374,8 @@ class API(base.Base):
                           metadata=metadata,
                           imageRef=image_id)
 
-        if client.volume_api_version == 1:
-            createargs['display_name'] = name
-            createargs['display_description'] = description
-        else:
-            createargs['name'] = name
-            createargs['description'] = description
+        createargs['name'] = name
+        createargs['description'] = description
 
         item = client.volumes.create(size, **createargs)
         return _untranslate_volume_summary_view(context, item)
