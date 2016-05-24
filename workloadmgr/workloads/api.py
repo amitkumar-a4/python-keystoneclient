@@ -1379,6 +1379,18 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
         """
+        Create a trust if one is not already established
+        TODO(Murali): Turn this into a decorator
+        """
+
+        try:
+            if not self.trust_list(context):
+                self.trust_create(context, vault.CONF.trustee_role)
+        except Exception as ex:
+            LOG.exception(ex)
+            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
+
+        """
         Make the RPC call to restore a snapshot.
         """
         try:
