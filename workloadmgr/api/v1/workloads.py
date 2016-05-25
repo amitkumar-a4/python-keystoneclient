@@ -231,16 +231,21 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             all_workloads = None
             #Get value of query parameter 'all_workloads'
+            page_number = None
             if ('QUERY_STRING' in req.environ):                
                 var = parse_qs(req.environ['QUERY_STRING'])
                 all_workloads = var.get('all_workloads',[''])[0]
                 all_workloads = bool(escape(all_workloads))
+                page_number = var.get('page_number',[''])[0]
             
             workloads_all = None
             if all_workloads is True:                            
                 workloads_all = self.workload_api.workload_get_all_by_admin(context)
             else:
-                workloads_all = self.workload_api.workload_get_all(context)
+                if page_number:
+                    workloads_all = self.workload_api.workload_get_all(context,search_opts={'page_number':page_number})
+                else:
+                    workloads_all = self.workload_api.workload_get_all(context)
             limited_list = common.limited(workloads_all, req)
             #TODO(giri): implement the search_opts to specify the filters
             workloads = []
@@ -795,6 +800,8 @@ class WorkloadMgrsController(wsgi.Controller):
             settings = None            
             if (body and 'settings' in body):
                 settings = settings_module.set_settings(context, body['settings'])
+            if (body and 'page_size' in body['settings']):
+                settings = self.workload_api.setting_get(context,'page_size')                
             if not settings:
                 settings = settings_module.get_settings(context)
             return {'settings': settings}

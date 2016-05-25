@@ -387,7 +387,10 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_get_all(self, context, search_opts={}):
-        workloads = self.db.workload_get_all(context)
+        if 'page_number' in search_opts:
+            workloads = self.db.workload_get_all(context,page_number=search_opts['page_number'])
+        else:
+            workloads = self.db.workload_get_all(context)
         return workloads
 
     @autolog.log_method(logger=Logger)
