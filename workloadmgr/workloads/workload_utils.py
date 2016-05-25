@@ -13,7 +13,23 @@ Logger = autolog.Logger(LOG)
 
 db = WorkloadMgrDB().db
 
+def upload_settings_db_entry(cntx):
+    #use context as none since we want settings of all users/tenants
+    #TODO: implement settings persistance per user/tenant
+    settings_db = db.setting_get_all(None, read_deleted = 'no')
+    for setting in settings_db:
+        if 'password' in setting.name.lower():
+            setting.value = '******'
+        for kvpair in setting.metadata:
+            if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
+                kvpair['value'] = '******'
+    settings_jason = jsonutils.dumps(settings_db)            
+    path = vault.get_vault_data_directory() + "/settings_db"
+    vault.put_object(path, settings_jason)
+        
 def upload_workload_db_entry(cntx, workload_id):
+    upload_settings_db_entry(cntx)
+    
     parent = vault.get_workload_path({'workload_id': workload_id})
     workload_db = db.workload_get(cntx, workload_id)
     for kvpair in workload_db.metadata:
@@ -29,19 +45,8 @@ def upload_workload_db_entry(cntx, workload_id):
     vault.put_object(path, workload_vms_json)
 
 def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
-    db = WorkloadMgrDB().db
+    upload_settings_db_entry(cntx)
     
-    settings_db = db.setting_get_all(cntx)
-    for setting in settings_db:
-        if 'password' in setting.name.lower():
-            setting.value = '******'
-        for kvpair in setting.metadata:
-            if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
-                kvpair['value'] = '******'
-    settings_jason = jsonutils.dumps(settings_db)            
-    path = vault.get_vault_data_directory() + "/settings_db"
-    vault.put_object(path, settings_jason)
-
     snapshot = db.snapshot_get(cntx, snapshot_id, read_deleted='yes')
     if snapshot['data_deleted']:
         return
