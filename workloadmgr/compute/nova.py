@@ -16,7 +16,6 @@ import os
 import imp
 import pkg_resources
 import six
-import json
 from six.moves.urllib import parse
 from threading import Lock
 from collections import namedtuple
