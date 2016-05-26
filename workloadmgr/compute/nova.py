@@ -16,6 +16,7 @@ import os
 import imp
 import pkg_resources
 import six
+import json
 from six.moves.urllib import parse
 from threading import Lock
 from collections import namedtuple
@@ -350,6 +351,8 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                 if contego is True:
                     msg = 'Unable to call %s; Please check contego \
                            logs for more details' % func.func_name
+                    if ex.code == 413:
+                       msg = ex.message
                     raise exception.ErrorOccurred(msg)
                 else:
                     raise
