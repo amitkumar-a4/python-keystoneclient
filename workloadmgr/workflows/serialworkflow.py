@@ -42,7 +42,6 @@ def get_vms(cntx, workload_id):
     
     compute_service = nova.API(production=True)
     instances = compute_service.get_servers(cntx, admin=True)
-    hypervisors = compute_service.get_hypervisors(cntx)
 
     keypairs = {}
 
@@ -61,11 +60,6 @@ def get_vms(cntx, workload_id):
                 raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in nova inventory") % vm.vm_name)
         
         vm_hypervisor = None
-        for hypervisor in hypervisors:
-            if hypervisor.hypervisor_hostname == vm_instance.__dict__['OS-EXT-SRV-ATTR:hypervisor_hostname']:
-                vm_hypervisor = hypervisor
-        if vm_hypervisor == None:
-            pass #TODO(giri): Throw exception
        
         vm = {
               'vm_id' : vm_instance.id,
@@ -74,8 +68,8 @@ def get_vms(cntx, workload_id):
               'vm_flavor_id' : vm_instance.flavor['id'],
               'hostname': vm_instance.name,
               'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
-              'hypervisor_hostname' : vm_hypervisor.hypervisor_hostname,
-              'hypervisor_type' :  vm_hypervisor.hypervisor_type
+              'hypervisor_hostname' : None,
+              'hypervisor_type' :  "QEMU"
              }
 
         if vm_instance.key_name and not vm_instance.key_name in keypairs:

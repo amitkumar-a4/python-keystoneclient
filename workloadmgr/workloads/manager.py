@@ -42,7 +42,7 @@ from oslo.config import cfg
 from taskflow.patterns import linear_flow as lf
 from taskflow import engines
 
-from workloadmgr import context
+from workloadmgr.common import context as wlm_context
 from workloadmgr import flags
 from workloadmgr import manager
 from workloadmgr import mountutils
@@ -175,7 +175,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Do any initialization that needs to be run if this is a standalone service.
         """
 
-        ctxt = context.get_admin_context()        
+        ctxt = wlm_context.get_admin_context()        
         
         LOG.info(_("Cleaning up incomplete operations"))
         
@@ -184,8 +184,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.restore_mark_incomplete_as_error(ctxt, self.host)
         except Exception as ex:
             LOG.exception(ex)
-            
-        vault.mount_backup_media()
     
     @autolog.log_method(logger=Logger)    
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):
@@ -387,6 +385,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     "workload_id", workload_id)
                 compute_service.set_meta_item(context, vm.vm_id,
                                     "workload_name", workload['display_name'])
+
+            workload_utils.upload_workload_db_entry(context, workload_id)
+            
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
@@ -407,6 +408,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)  
                 
+            context = nova._get_tenant_context(context.user_id,
+                                               context.project_id)
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
                                                 {'host': self.host,
@@ -718,6 +721,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)
                             
+            context = nova._get_tenant_context(context.user_id,
+                                               context.project_id)
             restore = self.db.restore_get(context, restore_id)
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
@@ -806,6 +811,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             restore_object_store_transfer_time = 0            
             workload_vms = self.db.workload_vms_get(context, workload.id)
             if target_platform == 'openstack':
+               workload_def_updated = False
                for restored_vm in self.db.restored_vms_get(context, restore_id):
                    instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
                    if instance == None:
@@ -853,6 +859,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'vm_name': instance.name,
                                      'status': 'available'}
                            vm = self.db.workload_vms_create(context, values)
+                           workload_def_updated = True
                            compute_service.set_meta_item(context, vm.vm_id,
                                      "workload_id", workload.id)
                            compute_service.set_meta_item(context, vm.vm_id,
@@ -860,6 +867,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
                    restore_data_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'data_transfer_time', '0'))
                    restore_object_store_transfer_time += int(self.db.get_metadata_value(restored_vm.metadata, 'object_store_transfer_time', '0'))                                        
+               if workload_def_updated == True:
+                  workload_utils.upload_workload_db_entry(context, workload.id)             
 
             if restore_type == 'test':
                 self.db.restore_update( context,

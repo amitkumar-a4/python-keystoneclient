@@ -56,6 +56,7 @@ if module_dir:
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
 TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
+WLM_USER = 'nova'
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -474,6 +475,7 @@ def _authenticate_with_keystone():
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
+            config_data['service_tenant_name'] = tenant.name
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
             
@@ -614,31 +616,31 @@ def _register_service():
                 if role.name == 'admin':
                     admin_role = role
                     break                
-        
-            try:
-                keystone.users.delete(wlm_user.id)
-            except Exception as exception:
-                if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
-                   raise exception
-            
-            
-            wlm_user = keystone.users.create(config_data['workloadmgr_user'],
-                                             config_data['workloadmgr_user_password'],
-                                             'workloadmgr@triliodata.com',
-                                             tenant_id=config_data['service_tenant_id'],
-                                             enabled=True)
-            
-            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
-            keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['admin_tenant_id'])
+     
+            # assign know roles otherwise default to one of the roles
+            rolenames = [role.name for role in roles \
+                         if role.name not in ['ResellerAdmin', 'service',
+                                              'admin', 'services']]
+            if '_member_' in rolenames:
+                config_data['trustee_role'] = '_member_'
+            elif 'Member' in rolenames:
+                config_data['trustee_role'] = 'Member'
+            elif 'member' in rolenames:
+                config_data['trustee_role'] = 'member'
+            else:
+                config_data['trustee_role'] = rolenames.pop(0)
+
+            if wlm_user == None:
+                wlm_user = keystone.users.create(config_data['workloadmgr_user'],
+                                                 config_data['workloadmgr_user_password'],
+                                                 'workloadmgr@triliodata.com',
+                                                 tenant_id=config_data['service_tenant_id'],
+                                                 enabled=True)
+                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
 
         except Exception as exception:
-            if str(exception.__class__) == "<class 'keystoneclient.apiclient.exceptions.Conflict'>":
-                pass
-            elif str(exception.__class__) == "<class 'keystoneclient.openstack.common.apiclient.exceptions.Conflict'>":
-                pass            
-            else:
-                bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-                raise exception        
+            bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+            raise exception        
         
 
     #delete orphan wlm services
@@ -1699,17 +1701,32 @@ def configure_host():
             subprocess.call(command, shell=False)            
             command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
             subprocess.check_call(command, shell=False) 
+            setting_str = config_data['storage_nfs_export']+ \
+                          '        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
+            found = 0
+            with open('/etc/fstab', 'r') as ins:
+                 for line in ins:
+                     if line == setting_str:
+                        found = 1
+                        break
+            if found == 0:
+               fs_file = open('/etc/fstab', 'a')
+               fs_file.write(setting_str)
+               fs_file.close()
 
-            #create a temp file to check read write permissions for root user. In future, we need it check with nova user
             try:
                 temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
-                test_pattern = 'Testing read write permissions\n'
-                with open(temp_file_name, 'w') as temp_file:
-                    temp_file.write(test_pattern)
-                with open(temp_file_name, 'r') as temp_file:
-                    assert temp_file.readline() == test_pattern                    
-                remove(temp_file_name)
+                command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
+                subprocess.check_call(command, shell=False)
+                command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
+                subprocess.check_call(command, shell=True)
+                command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
+                subprocess.check_call(command, shell=True)
+                command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                subprocess.check_call(command, shell=False)
             except Exception as exception:
+                command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                subprocess.check_call(command, shell=False)
                 raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
             
         else:       
@@ -1992,13 +2009,28 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_api_insecure = ', 'cinder_api_insecure = True')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_insecure = ', 'glance_api_insecure = True')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_api_insecure = ', 'neutron_api_insecure = True')
-        
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_url = ',
+                     'auth_url = ' + config_data['keystone_admin_url'].\
+                     strip("v3").strip("v2.0"),
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
+                     'auth_uri = ' + config_data['keystone_public_url'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ',
+                     'project_name = ' + config_data['service_tenant_name'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
+                     'trustee_role = ' + config_data.get('trustee_role', '_member_'),
+                     starts_with=True)
+
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_protocol = ', 'auth_protocol = ' + config_data['keystone_admin_protocol'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
-        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])        
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_tenant_name = ', 'admin_tenant_name = ' + config_data['service_tenant_name'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:

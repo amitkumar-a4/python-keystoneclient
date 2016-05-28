@@ -17,6 +17,7 @@ from workloadmgr.api.v1 import restores
 from workloadmgr.api.v1 import testbubbles
 from workloadmgr.api.v1 import workloadtypes
 from workloadmgr.api.v1 import settings
+from workloadmgr.api.v1 import trusts
 from workloadmgr.api.v1 import tasks
 
 LOG = logging.getLogger(__name__)
@@ -129,6 +130,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workloads/settings",
                        controller=self.resources['workloads'],
                        action='settings',
+                       conditions={"method": ['POST']})
+
+        #workload trusts
+        mapper.connect("workloads_trusts",
+                       "/{project_id}/workloads/trusts",
+                       controller=self.resources['workloads'],
+                       action='trusts',
                        conditions={"method": ['POST']})
        
         #Test email configuration
@@ -493,7 +501,39 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['settings'],
                        action='delete',
                        conditions={"method": ['DELETE']}) 
+
+        ###################################################################################################
+        self.resources['trusts'] = trusts.create_resource(ext_mgr)
         
+        #create settings
+        mapper.connect("create_trust",
+                       "/{project_id}/trusts",
+                       controller=self.resources['trusts'],
+                       action='create',
+                       conditions={"method": ['POST']}) 
+        
+        #get the list of settings
+        mapper.connect("get_trusts_list",
+                       "/{project_id}/trusts",
+                       controller=self.resources['trusts'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the specified setting
+        mapper.connect("get_trusts",
+                       "/{project_id}/trusts/{name}",
+                       controller=self.resources['trusts'],
+                       action='show',
+                       conditions={"method": ['GET']})
+        
+        #delete a setting
+        mapper.connect("delete_trusts",
+                       "/{project_id}/trusts/{name}",
+                       controller=self.resources['trusts'],
+                       action='delete',
+                       conditions={"method": ['DELETE']}) 
+
+        ###################################################################################################
         #get the specified task
         mapper.connect("get_task",
                        "/{project_id}/task/{id}",

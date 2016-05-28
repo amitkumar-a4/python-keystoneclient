@@ -53,7 +53,7 @@ class ViewBuilder(common.ViewBuilder):
             d['instances'] = instances
         #d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
-        d['description'] =  snapshot['display_description']   
+        d['description'] =  snapshot['display_description']
         d['host'] = snapshot['host']       
         return {'snapshot': d}       
 
@@ -95,6 +95,7 @@ class ViewBuilder(common.ViewBuilder):
         d['host'] = snapshot['host']       
         d['size'] = snapshot['size']
         d['restore_size'] = snapshot['restore_size']
+        d['uploaded_size'] =  min(snapshot['uploaded_size'],snapshot['size']) 
         d['progress_percent'] =  snapshot['progress_percent']          
         d['progress_msg'] =  snapshot['progress_msg'] 
         d['warning_msg'] =  snapshot['warning_msg']

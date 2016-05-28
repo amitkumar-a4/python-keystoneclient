@@ -90,6 +90,9 @@ wlm_vault_opts = [
     cfg.StrOpt('vault_write_chunk_size_kb',
                default=32,
                help='Write size in KB'),
+    cfg.StrOpt('trustee_role',
+               default='Member',
+               help='Role that trustee will impersonate'),                                                         
                                                                             
 ]
 
@@ -203,8 +206,9 @@ def mount_backup_media():
     elif CONF.vault_storage_type == 'vault':
         pass  
     elif CONF.vault_storage_type == 'nfs':        
-        command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_data_directory]
-        subprocess.check_call(command, shell=False) 
+         command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_data_directory]
+         subprocess.check_call(command, shell=False) 
+         
     else: # das, swift-i, swift-s, s3
         if CONF.vault_storage_das_device != 'none':      
             try:
