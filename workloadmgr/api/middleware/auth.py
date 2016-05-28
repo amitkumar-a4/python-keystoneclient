@@ -13,7 +13,7 @@ import webob.dec
 import webob.exc
 
 from workloadmgr.api import wsgi
-from workloadmgr import context
+from workloadmgr.common import context
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import wsgi as base_wsgi
@@ -84,8 +84,8 @@ class WorkloadMgrKeystoneContext(base_wsgi.Middleware):
         remote_address = req.remote_addr
         if FLAGS.use_forwarded_for:
             remote_address = req.headers.get('X-Forwarded-For', remote_address)
-        ctx = context.RequestContext(user_id,
-                                     project_id,
+        ctx = context.RequestContext(user_id=user_id,
+                                     project_id=project_id,
                                      roles=roles,
                                      auth_token=auth_token,
                                      remote_address=remote_address)
