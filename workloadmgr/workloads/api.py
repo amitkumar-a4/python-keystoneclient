@@ -1947,6 +1947,10 @@ class API(base.Base):
     def trust_create(self, context, role_name):
 
         # create trust
+
+        if hasattr(context, 'roles'):
+           role_name = context.roles[0]
+
         cntx = wlm_context.RequestContext(
             trustor_user_id=context.user_id,
             auth_token=context.auth_token,
