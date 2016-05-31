@@ -2904,7 +2904,7 @@ def _setting_get(context, setting_name, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
     get_hidden = kwargs.get('get_hidden', False)         
-    return model_query(context, models.Settings, **kwargs).\
+    result = model_query(context, models.Settings, **kwargs).\
                         options(sa_orm.joinedload(models.Settings.metadata)).\
                         filter_by(hidden=get_hidden).\
                         filter(or_(models.Settings.name==setting_name , models.Settings.value==setting_name)).\
