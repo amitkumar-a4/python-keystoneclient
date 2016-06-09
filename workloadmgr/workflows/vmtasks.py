@@ -1015,7 +1015,7 @@ def UnorderedUnPauseVMs(instances):
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
         else:
-             flow.add(NoneTask("UnorderedUnPauseVMs"))
+             flow.add(NoneTask("UnorderedUnPauseVMs" + item['vm_id']))
     
     return flow
 
@@ -1026,7 +1026,7 @@ def LinearUnPauseVMs(instances):
             flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
                      rebind=dict(instance = "instance_" + item['vm_id'])))
         else:
-             flow.add(NoneTask("LinearUnPauseVMs"))
+             flow.add(NoneTask("LinearUnPauseVMs" + item['vm_id']))
 
     return flow
 
