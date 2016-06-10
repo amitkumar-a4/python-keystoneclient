@@ -22,6 +22,7 @@ import os
 import sys
 
 import eventlet
+import time
 
 eventlet.monkey_patch()
 
@@ -53,4 +54,5 @@ if __name__ == '__main__':
           server = service.Service.create(binary='workloadmgr-workloads')
           launcher.launch_server(server)
           i = i - 1
+          time.sleep(8)
     launcher.wait()
