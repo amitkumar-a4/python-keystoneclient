@@ -1521,6 +1521,18 @@ def get_ip_addresses():
             addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
             if ifaceName in ('eth0', 'eth1'):
                 ip_addresses += addresses
+                
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/tvault-config/tvault-config.conf')
+        config_data = dict(Config._defaults)
+        if config_data['config_status'] == 'success':
+            tvault_ipaddress = config_data['tvault_ipaddress']
+            floating_ipaddress = config_data['floating_ipaddress']
+            if tvault_ipaddress not in ip_addresses:
+                ip_addresses.insert(0, str(tvault_ipaddress))
+            if floating_ipaddress not in ip_addresses:
+                ip_addresses.insert(0, str(floating_ipaddress))
+                 
     except Exception as ex:
         pass
     try:
