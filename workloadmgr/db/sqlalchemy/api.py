@@ -2904,12 +2904,12 @@ def _setting_get(context, setting_name, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
     get_hidden = kwargs.get('get_hidden', False)         
-    result = model_query(context, models.Settings, **kwargs).\
-                        options(sa_orm.joinedload(models.Settings.metadata)).\
-                        filter_by(hidden=get_hidden).\
-                        filter(or_(models.Settings.name==setting_name , models.Settings.value==setting_name)).\
-                        filter_by(project_id=context.project_id).\
-                        first()
+    result = model_query(   context, models.Settings, **kwargs).\
+                    filter_by(hidden=get_hidden).\
+                    options(sa_orm.joinedload(models.Settings.metadata)).\
+                    filter_by(name=setting_name).\
+                    filter_by(project_id=context.project_id).\
+                    first()
 
     if not result:
         if setting_name == 'page_size':
