@@ -92,46 +92,46 @@
 		<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
 	</div><br>   	      
 
-        <div class="panel-group" id="accordion" >
-		  <div class="panel panel-default" id="panel9">
-		    <div class="panel-heading">
-		      <h4 class="panel-title">
-		        <a data-toggle="collapse" data-target="#collapseNine" href="#collapseNine">
-		          NTP
-		        </a>
-		      </h4>
-		    </div>
-		    <div id="collapseNine" class="panel-collapse collapse in">
-		      <div class="panel-body">
-                        <div class="input-group">
-                             %if 'ntp_enabled' in locals() and ntp_enabled == 'on':
-								<input name="ntp-enabled" checked id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px;">(List ntp servers separated by comma) </span>
-							%else:
-								<input name="ntp-enabled" id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px">(List ntp servers separated by comma) </span>
-							%end    		
-                        </div>
-                        <br />
-	    		<div class="input-group" >                                        
-					<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-	    			        <input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
-	    		</div>
-                        <br />
-                        <div class="input-group">
-	                     <label class="input-group-addon">Timezone&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                             <select name="timezone" id="timezone" class="form-control">
-                             %for tz in timezones:
-                                   %if tz==timezone:
-                                       <option value="{{tz}}" selected>{{tz}}</option>
-                                   %else:
-                                        <option value="{{tz}}">{{tz}}</option>
-                                   %end
-                            %end
-                            </select>
-                        </div>
-	 	      </div>
-		    </div>
-		  </div>
-		</div> 
+	<div class="panel-group" id="accordion" >
+	  <div class="panel panel-default" id="panel9">
+	    <div class="panel-heading">
+	      <h4 class="panel-title">
+	        <a data-toggle="collapse" data-target="#collapseNine" href="#collapseNine">
+	          NTP
+	        </a>
+	      </h4>
+	    </div>
+	    <div id="collapseNine" class="panel-collapse collapse in">
+	      <div class="panel-body">
+	        <div class="input-group">
+				%if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+					<input name="ntp-enabled" checked id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px;">(List ntp servers separated by comma) </span>
+				%else:
+					<input name="ntp-enabled" id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px">(List ntp servers separated by comma) </span>
+				%end    		
+	        </div>
+	        <br />
+			<div class="input-group" >                                        
+				<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+				<input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
+			</div>
+	        <br />
+	        <div class="input-group">
+	         <label class="input-group-addon">Timezone&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+	            <select name="timezone" id="timezone" class="form-control">
+	            %for tz in timezones:
+					%if tz==timezone:
+						<option value="{{tz}}" selected>{{tz}}</option>
+					%else:
+						<option value="{{tz}}">{{tz}}</option>
+					%end
+				%end
+	            </select>
+	        </div>
+	      </div>
+	    </div>
+	  </div>
+	</div> 
 	
 	<div class="panel-group" id="accordion">
 	  <div class="panel panel-default" id="panel3">
@@ -145,41 +145,15 @@
 		<div id="collapseThree" class="panel-collapse collapse in">
 		  <div class="panel-body">
 			<div class="input-group" >
-				%if 'storage_type' in locals() and storage_type == 'local':
-					<input name="storage-type" id="storage-type-local" type="radio"  value="local" checked> Local Device
-				%elif 'storage_type' not in locals():
-					<input name="storage-type" checked id="storage-type-local" type="radio"  value="local"> Local Device						
-				%else:
-					<input name="storage-type" id="storage-type-local" type="radio"  value="local"> Local Device
-				%end
-				<div class="row"> 
-					<div class="col-md-12"> 
-						<input name="storage-local-device" {{'value=' + storage_local_device if defined('storage_local_device') else ''}} id="storage-local-device" type="text" required placeholder="/dev/vdb" value="/dev/vdb" class="form-control" />
-						%if 'create_file_system' in locals() and create_file_system == 'on':
-							<input name="create-file-system" checked id="create-file-system" type="checkbox" onclick='warnCreateFileSystem(this)';> Create File System
-						%else:
-							<input name="create-file-system" id="create-file-system" type="checkbox" onclick='warnCreateFileSystem(this)';> Create File System
-						%end    					
-					</div>
-				</div>
-				<br/>
-				<div class="row"> 
-					<div class="col-md-12"> 				
-						%if 'storage_type' in locals() and storage_type == 'nfs':
-							<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs" checked> NFS Export
-						%else:
-							<input name="storage-type" id="storage-type-nfs" type="radio"  value="nfs" > NFS Export
-						%end      			
-						<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" value="server:/var/nfs" class="form-control" />
-					</div>
-				</div>
-				<br/>
+		        <label class="input-group-addon">NFS Export&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" />
 			</div>
 		  </div>
 		</div>
 	  </div>
 	</div>
 
+	<!-- Swift is not yet supported
 	<div class="panel-group" id="accordion">
 	  <div class="panel panel-default" id="panel5">
 		<div class="panel-heading">
@@ -203,6 +177,7 @@
 		</div>
 	  </div>
 	</div>
+	Swift is not yet supported -->
     
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
   </form>
