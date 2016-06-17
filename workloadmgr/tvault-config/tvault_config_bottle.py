@@ -2023,6 +2023,9 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' + config_data.get('trustee_role', '_member_'),
                      starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
+                     'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
+                     starts_with=True)
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
