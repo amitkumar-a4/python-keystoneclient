@@ -1571,7 +1571,6 @@ def configure_form_vmware():
     timezone = get_localzone().zone
     config_database['timezones'] = all_timezones
     config_database['timezone'] = timezone
-    config_database['create_file_system'] = 'off'
     config_database['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_database
 
@@ -1690,60 +1689,45 @@ def configure_host():
         except Exception as exception:
             pass                
 
-        if config_data['storage_type'] == 'nfs':
-            if not os.path.isdir('/var/triliovault'):
-               command = ['sudo', 'mkdir', '/var/triliovault']
-               subprocess.call(command, shell=False)
-               os.chmod('/var/triliovault',0777)
+        #mount nfs export
+        if not os.path.isdir('/var/triliovault'):
+           command = ['sudo', 'mkdir', '/var/triliovault']
+           subprocess.call(command, shell=False)
+           os.chmod('/var/triliovault',0777)
 
-            replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
-            command = ['sudo', 'service', 'rpcbind', 'restart']
-            subprocess.call(command, shell=False)            
-            command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
-            subprocess.check_call(command, shell=False) 
-            setting_str = config_data['storage_nfs_export']+ \
-                          '        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
-            found = 0
-            with open('/etc/fstab', 'r') as ins:
-                 for line in ins:
-                     if line == setting_str:
-                        found = 1
-                        break
-            if found == 0:
-               fs_file = open('/etc/fstab', 'a')
-               fs_file.write(setting_str)
-               fs_file.close()
+        replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
+        command = ['sudo', 'service', 'rpcbind', 'restart']
+        subprocess.call(command, shell=False)            
+        command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
+        subprocess.check_call(command, shell=False) 
+        setting_str = config_data['storage_nfs_export']+ \
+                      '        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
+        found = 0
+        with open('/etc/fstab', 'r') as ins:
+             for line in ins:
+                 if line == setting_str:
+                    found = 1
+                    break
+        if found == 0:
+           fs_file = open('/etc/fstab', 'a')
+           fs_file.write(setting_str)
+           fs_file.close()
 
-            try:
-                temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
-                command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
-                subprocess.check_call(command, shell=False)
-                command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
-                subprocess.check_call(command, shell=True)
-                command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
-                subprocess.check_call(command, shell=True)
-                command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
-                subprocess.check_call(command, shell=False)
-            except Exception as exception:
-                command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
-                subprocess.check_call(command, shell=False)
-                raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
-            
-        else:       
-            command = ['sudo', 'rescan-scsi-bus']
-            subprocess.call(command, shell=False)
-            
-            if config_data['create_file_system'] == 'on':
-                command = ['sudo', 'mkfs.ext4', '-F', config_data['storage_local_device']]
-                subprocess.call(command, shell=False) 
-            
-            command = ['sudo', 'mkdir', '/var/triliovault']
-            subprocess.call(command, shell=False)
-            
-            command = ['sudo', 'mount', config_data['storage_local_device'], '/var/triliovault']
+        try:
+            temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
+            command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
             subprocess.check_call(command, shell=False)
-    
-        
+            command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
+            subprocess.check_call(command, shell=True)
+            command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
+            subprocess.check_call(command, shell=True)
+            command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+            subprocess.check_call(command, shell=False)
+        except Exception as exception:
+            command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+            subprocess.check_call(command, shell=False)
+            raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
+            
         if config_data['ntp_enabled'] != 'off':
             ntp_setup()
     except Exception as exception:
@@ -1969,12 +1953,9 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['vault_swift_url'])
         
-        if config_data['storage_type'] == 'nfs': 
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
-        else:
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = das')
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_das_device = ', 'vault_storage_das_device = ' + config_data['storage_local_device'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
+
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-s')
@@ -2025,7 +2006,7 @@ def configure_service():
                      starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
                      'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
-                     starts_with=True)
+                     starts_with=True)        
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
@@ -2325,12 +2306,6 @@ def configure_vmware():
         
         config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
         config_data['timezone'] = config_inputs['timezone']
-        config_data['storage_type'] = config_inputs['storage-type']
-        config_data['storage_local_device'] = config_inputs['storage-local-device']
-        if 'create-file-system' in config_inputs:
-            config_data['create_file_system'] = config_inputs['create-file-system']
-        else:
-            config_data['create_file_system'] = 'off'
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
         
@@ -2458,13 +2433,6 @@ def configure_openstack():
         config_data['workloadmgr_user'] = 'triliovault'
         config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
 
-        config_data['storage_type'] = config_inputs['storage-type']
-        config_data['storage_local_device'] = config_inputs['storage-local-device'].strip()
-        if 'create-file-system' in config_inputs:
-            config_data['create_file_system'] = config_inputs['create-file-system']
-        else:
-            config_data['create_file_system'] = 'off'
-        
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
         
         config_data['swift_auth_version'] = ''
@@ -2472,8 +2440,8 @@ def configure_openstack():
         config_data['swift_username'] = ''
         config_data['swift_password'] = ''
         config_data['swift_tenantname'] = ''
-        config_data['swift_container_prefix'] = config_inputs['swift-container-prefix'].strip()        
-        config_data['swift_url_template'] = config_inputs['swift-url-template'].strip()
+        config_data['swift_container_prefix'] = '' #config_inputs['swift-container-prefix'].strip()        
+        config_data['swift_url_template'] = '' #config_inputs['swift-url-template'].strip()
         
         bottle.redirect("/task_status_openstack")
     except Exception as exception:
@@ -2725,7 +2693,7 @@ def main():
     except Exception as exception:
         #TODO: implement logging
         pass
-
+    
     http_thread = Thread(target=main_http)
     http_thread.daemon = True # thread dies with the program
     http_thread.start()
