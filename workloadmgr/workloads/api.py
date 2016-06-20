@@ -1532,8 +1532,20 @@ class API(base.Base):
         """
         Make the RPC call to Mount the snapshot.
         """
+        compute_service = nova.API(production=True)
         try:
-            snapshot = self.snapshot_get(context, snapshot_id)
+            snapshot = self.snapshot_get(context, snapshot_id)           
+            for instance in snapshot['instances']:
+                status_hw_qemu_guest_agent = False        
+                for vm_resource in self.db.snapshot_vm_resources_get(context, instance['id'], snapshot_id):                    
+                    for kvpair in vm_resource.metadata:                          
+                        if str(kvpair['key'])  == 'hw_qemu_guest_agent':
+                            if str(kvpair['value']) == 'yes':                                
+                                status_hw_qemu_guest_agent = True
+                server = compute_service.get_server_by_id(context, instance['id'])                
+                if status_hw_qemu_guest_agent is not True or server.config_drive != 'True':
+                    raise Exception("Recovery manager instance should be created with Configuration Drive")
+
             if not snapshot:
                 msg = _('Invalid snapshot id')
                 raise wlm_exceptions.Invalid(reason=msg)
