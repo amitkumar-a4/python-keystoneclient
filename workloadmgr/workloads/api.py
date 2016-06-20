@@ -1542,7 +1542,7 @@ class API(base.Base):
             if 'hw_qemu_guest_agent' in metadata['properties'].keys():
                 if metadata['properties']['hw_qemu_guest_agent'] == 'yes':
                     status_hw_qemu_guest_agent = True
-\
+
             if status_hw_qemu_guest_agent is not True or server.config_drive != 'True':
                 raise Exception("Recovery manager instance should be created with Configuration Drive")
             if not snapshot:
