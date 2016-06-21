@@ -1535,18 +1535,17 @@ class API(base.Base):
         compute_service = nova.API(production=True)
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
-            status_hw_qemu_guest_agent = False            
             server = compute_service.get_server_by_id(context, mount_vm_id)
-            image_service, image_id = glance.get_remote_image_service(context, server.image['id'])
-            metadata = image_service.show(context, server.image['id'])
-            if 'hw_qemu_guest_agent' in metadata['properties'].keys():
-                if metadata['properties']['hw_qemu_guest_agent'] == 'yes':
-                    status_hw_qemu_guest_agent = True
-
             if server.config_drive != 'True':
-                raise Exception("Recovery manager instance should be created with Configuration Drive")
-            if status_hw_qemu_guest_agent is not True:
-                raise Exception("Recovery manager instance should be created with glance image property 'hw_qemu_guest_agent=yes'")
+                raise Exception("Recovery manager instance needs to be created with Configuration Drive")
+            (image_service, image_id) = glance.get_remote_image_service(context, server.image['id'])
+            metadata = image_service.show(context, server.image['id'])
+            error_msg = "Recovery manager instance needs to be created with glance image property 'hw_qemu_guest_agent=yes'"
+            if 'hw_qemu_guest_agent' in metadata['properties'].keys():
+                if metadata['properties']['hw_qemu_guest_agent'] != 'yes':
+                    raise Exception(error_msg)
+            else:
+                raise Exception(error_msg)
 
             if not snapshot:
                 msg = _('Invalid snapshot id')
