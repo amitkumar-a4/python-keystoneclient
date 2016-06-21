@@ -1543,8 +1543,11 @@ class API(base.Base):
                 if metadata['properties']['hw_qemu_guest_agent'] == 'yes':
                     status_hw_qemu_guest_agent = True
 
-            if status_hw_qemu_guest_agent is not True or server.config_drive != 'True':
+            if server.config_drive != 'True':
                 raise Exception("Recovery manager instance should be created with Configuration Drive")
+            if status_hw_qemu_guest_agent is not True:
+                raise Exception("Recovery manager instance should be created with glance image property 'hw_qemu_guest_agent=yes'")
+
             if not snapshot:
                 msg = _('Invalid snapshot id')
                 raise wlm_exceptions.Invalid(reason=msg)
