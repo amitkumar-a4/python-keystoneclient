@@ -26,6 +26,7 @@ from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import settings as settings_module
+from workloadmgr import exception as wlm_exceptions
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
