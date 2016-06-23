@@ -35,7 +35,6 @@ import os
 # Import the email modules
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from keystoneclient.v2_0 import client as keystone_v2
 
 from oslo.config import cfg
 
@@ -1282,8 +1281,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
 
             try:
-                keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
-                user = keystone.users.get(context.user_id)
+                user = vault.get_user_to_get_email_address(context)
                 if user.email is None or user.email == '':
                     user.email = settings.get_settings(context).get('smtp_default_recipient')
             except:
