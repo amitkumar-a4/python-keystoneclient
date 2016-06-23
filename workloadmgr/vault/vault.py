@@ -39,6 +39,10 @@ from os import environ, walk, _exit as os_exit
 from threading import Thread
 from functools import wraps
 
+from keystoneauth1.identity import v2
+from keystoneauth1 import session
+from keystoneclient.v2_0 import client as keystone_v2
+
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
@@ -130,6 +134,30 @@ def run_async(func):
         return func_hl
 
     return async_func
+
+def get_user_to_get_email_address(context):
+    try:
+        username=CONF.get('keystone_authtoken').username 
+    except:
+           username=CONF.get('keystone_authtoken').admin_user
+    try:
+        password=CONF.get('keystone_authtoken').password 
+    except:
+           password=CONF.get('keystone_authtoken').admin_password
+    try:
+        tenant_name=CONF.get('keystone_authtoken').project_name
+    except:
+           project_id = context.project_id
+           context.project_id = 'Configurator'
+           tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
+           context.project_id = project_id
+    auth_url=CONF.keystone_endpoint_url
+    auth = v2.Password(username=username, password=password,
+    tenant_name=tenant_name, auth_url=auth_url)
+    sess = session.Session(auth=auth)
+    keystone_client = keystone_v2.Client(session=sess)
+    user = keystone_client.users.get(context.user_id)
+    return user
 
 def get_progress_tracker_directory(tracker_metadata):
     progress_tracker_directory = ''

@@ -19,7 +19,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
-
+from workloadmgr.vault import vault
 
 LOG = logging.getLogger(__name__)
 
@@ -91,6 +91,13 @@ class SettingsController(wsgi.Controller):
                 get_hidden = escape(get_hidden)                
                 if get_hidden.lower() == 'true':
                     get_hidden = True              
+
+            if name == 'user_email_address_'+context.user_id:
+               user = vault.get_user_to_get_email_address(context)
+               user_obj = {}
+               user_obj['email'] = user.email
+               return {'setting' : user_obj}
+
             try:
                 setting = self.workload_api.setting_get(context, name, get_hidden)
             except wlm_exceptions.NotFound:
