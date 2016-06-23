@@ -711,12 +711,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)
                             
+            workload = self.db.workload_get(context, snapshot.workload_id)
+            snapshot = self.db.snapshot_get(context, restore.snapshot_id)
+            restore = self.db.restore_get(context, restore_id)
+
             context = nova._get_tenant_context(context.user_id,
                                                context.project_id)
-            restore = self.db.restore_get(context, restore_id)
-            snapshot = self.db.snapshot_get(context, restore.snapshot_id)
-            workload = self.db.workload_get(context, snapshot.workload_id)
-            
+
             vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
 
             target_platform = 'vmware'
@@ -765,7 +766,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     if instance_options and instance_options.get('include', True) == False:
                         continue
                     else:
-                        instance = compute_service.get_server_by_id(context, vm.vm_id, admin=True)
+                        instance = compute_service.get_server_by_id(context, vm.vm_id, admin=False)
                         if instance:
                             msg = _('Original instance ' +  vm.vm_name + ' is still present. '
                                     'Please delete this instance and try again.')
@@ -803,7 +804,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if target_platform == 'openstack':
                workload_def_updated = False
                for restored_vm in self.db.restored_vms_get(context, restore_id):
-                   instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=True)
+                   instance = compute_service.get_server_by_id(context, restored_vm.vm_id, admin=False)
                    if instance == None:
                       pass 
                    else:
@@ -1130,7 +1131,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
 
         except Exception as ex:
-            self.snapshot_dismount(context, snapshot['id'])
+            try:
+                self.snapshot_dismount(context, snapshot['id'])
+            except:
+                pass
             LOG.exception(ex)
             raise
 

@@ -217,7 +217,7 @@ def _get_tenant_context(user_id, tenant_id):
     return context
 
 
-def novaclient(context, production=True, refresh_token=False, extensions = None):
+def novaclient(context, production=True, refresh_token=False, extensions=None):
 
     trust = _get_trusts(context.user_id, context.tenant_id)
 
@@ -598,16 +598,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
 
-        try:
-            client = novaclient(context, self._production)
-            return client.servers.delete(server=server)
-        except nova_exception.Unauthorized as unauth_ex:
-            client = novaclient(context, self._production, admin=True)
-            return client.servers.delete(server=server)
-        except Exception as ex:
-            LOG.exception(ex)
-            #TODO(gbasava): Handle the exception
-            return
+        client = kwargs['client']
+        return client.servers.delete(server=server)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
@@ -617,16 +609,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
 
-        try:
-            client = novaclient(context, self._production)
-            return client.servers.force_delete(server=server)
-        except nova_exception.Unauthorized as unauth_ex:
-            client = novaclient(context, self._production, admin=True)
-            return client.servers.force_delete(server=server)
-        except Exception as ex:
-            LOG.exception(ex)
-            #TODO(gbasava): Handle the exception
-            return
+        client = kwargs['client']
+        return client.servers.force_delete(server=server)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=True)
