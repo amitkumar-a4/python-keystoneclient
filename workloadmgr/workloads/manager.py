@@ -711,13 +711,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)
                             
-            workload = self.db.workload_get(context, snapshot.workload_id)
-            snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             restore = self.db.restore_get(context, restore_id)
+            snapshot = self.db.snapshot_get(context, restore.snapshot_id)
+            workload = self.db.workload_get(context, snapshot.workload_id)
 
             context = nova._get_tenant_context(context.user_id,
                                                context.project_id)
 
+            restore_user_selected_value = 'Selective Restore'
             vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
 
             target_platform = 'vmware'
@@ -747,7 +748,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                  })
 
             values = {'status': 'executing'}
-            restore_user_selected_value = 'Selective Restore'
             if options and 'oneclickrestore' in options and options['oneclickrestore']:
                 restore_user_selected_value = 'Oneclick Restore'
                 # Override traget platfrom for clinets not specified on oneclick
