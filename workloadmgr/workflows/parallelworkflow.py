@@ -41,7 +41,7 @@ def get_vms(cntx, workload_id):
     db = vmtasks.WorkloadMgrDB().db
 
     compute_service = nova.API(production=True)
-    instances = compute_service.get_servers(cntx, admin=True)
+    instances = compute_service.get_servers(cntx, admin=False)
 
     keypairs = {}
 
