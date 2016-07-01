@@ -11,7 +11,7 @@ from workloadmgr.apscheduler.job import Job
 from workloadmgr.openstack.common import timeutils
 
 try:
-    from sqlalchemy import *
+    from sqlalchemy import *  # nopep8
 except ImportError:  # pragma: nocover
     raise ImportError('SQLAlchemyJobStore requires SQLAlchemy installed')
 

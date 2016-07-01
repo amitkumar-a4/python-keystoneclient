@@ -7,33 +7,24 @@
 Workflow for taking snapshot of mongodb instances
 '''
 
-import contextlib
 import os
-import random
 import sys
 import time
 
 import json
-import datetime
 import paramiko
-import uuid
 from tempfile import mkstemp
 import subprocess
 
 from taskflow import engines
 from taskflow.utils import misc
-from taskflow.listeners import printing
 from taskflow.patterns import unordered_flow as uf
 from taskflow.patterns import linear_flow as lf
-from taskflow.patterns import graph_flow as gf
 from taskflow import task
-from taskflow import flow
-from taskflow.utils import reflection
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
-import workloadmgr.context as context
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import utils
@@ -44,8 +35,6 @@ import vmtasks
 import workflow
 
 import pymongo
-from pymongo import MongoClient
-from pymongo import MongoReplicaSetClient
 from pymongo import MongoClient, ReadPreference
 
 
@@ -56,7 +45,8 @@ top_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                        os.pardir))
 sys.path.insert(0, top_dir)
 
-#from workloadmgr import exception
+
+# from workloadmgr import exception
 #
 # Function that create the connection to the mongos server to be use as
 # primary source of information in order to pick the servers. host, port
@@ -66,29 +56,32 @@ sys.path.insert(0, top_dir)
 def connect_server(host, port, user, password, verbose=False):
     try:
         connection = None
-        if user!='':
-            auth = 'mongodb://' + user + ':' + password + '@' + host + ':' + str(port)
+        if user != '':
+            auth = 'mongodb://' + user + ':' + password + '@' +\
+                   host + ':' + str(port)
             connection = MongoClient(auth)
         else:
-            auth=''
-            connection = MongoClient(host,int(port))
+            auth = ''
+            connection = MongoClient(host, int(port))
 
         if verbose:
-            LOG.debug(_('Connected to ' + host +  ' on port ' + port +  '...'))
+            LOG.debug(_('Connected to ' + host + ' on port ' + port + '...'))
 
     except Exception as ex:
         LOG.error(_('Oops!  There was an error.  Try again...'))
         LOG.error(_(ex))
         if ex.__class__.__name__ == 'ConnectionFailure':
-           error = _('Failed to connect MongoDB node %s') % (str(host))
+            error = _('Failed to connect MongoDB node %s') % (str(host))
         elif ex.__class__.__name__ == 'ConfigurationError':
-             error = _('Wrong username/password entered for MongoDB node  %s') % (str(host))
+            error = _('Wrong username/password entered for \
+                       MongoDB node  %s') % (str(host))
         else:
-             error = _('Failed to connect MongoDB node %s') % (str(host))
+            error = _('Failed to connect MongoDB node %s') % (str(host))
 
         raise exception.ErrorOccurred(reason=error)
 
     return connection
+
 
 def isShardedCluster(conn):
     try:
@@ -96,7 +89,9 @@ def isShardedCluster(conn):
         return not ('primary' in status and 'secondary' in status)
     except Exception as ex:
         LOG.exception(ex)
-        raise exception.ErrorOccurred(reason=_("Cannot connect to mongos server.Check database settings in Credentials tab and try again"))
+        raise exception.ErrorOccurred(reason=_("Cannot connect to mongos \
+            server. Check database settings in Credentials tab and try again"))
+
 
 def getShards(conn):
     try:
@@ -105,12 +100,15 @@ def getShards(conn):
         shards = collection.find()
         return shards
     except Exception, e:
-        LOG.error('There was an error getting shards:' + str(e) + 'Try again...')
+        LOG.error('There was an error getting shards:' +
+                  str(e) + 'Try again...')
+
 
 class DisableProfiling(task.Task):
 
     def execute(self, DBHost, DBPort, DBUser, DBPassword):
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
+
         # Make sure profile is disabled, but also save current
         # profiling state in the flow record? so revert as well
         # as ResumeDB task sets the right profiling level
@@ -129,14 +127,13 @@ class DisableProfiling(task.Task):
                 self.cfgclient.admin.set_profiling_level(pymongo.OFF)
                 return proflevel
             except:
-                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                LOG.debug(_('"' + cfghost + '" appears to be offline'))
                 pass
 
         LOG.error(_("Cannot find config server to disable profiling. \
-                           Make sure your mongodb cluster is up and running"))
+                     Make sure your mongodb cluster is up and running"))
         raise Exception(_("Cannot find config server to disable profiling. \
                            Make sure your mongodb cluster is up and running"))
-
 
     def revert(self, *args, **kwargs):
         try:
@@ -147,6 +144,7 @@ class DisableProfiling(task.Task):
             LOG.exception(ex)
         finally:
             pass
+
 
 class EnableProfiling(task.Task):
 
@@ -167,7 +165,7 @@ class EnableProfiling(task.Task):
                 self.cfgclient.admin.set_profiling_level(proflevel)
                 return
             except:
-                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                LOG.debug(_('"' + cfghost + '" appears to be offline'))
                 pass
 
         LOG.error(_("Cannot enable profiling. \
@@ -183,8 +181,9 @@ class PauseDBInstance(task.Task):
         # Flush the database and hold the write # lock the instance.
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
-        self.client = connect_server(host_info[0], int(host_info[1]), DBUser, DBPassword)
-        self.client.fsync(lock = True)
+        self.client = connect_server(host_info[0], int(host_info[1]),
+                                     DBUser, DBPassword)
+        self.client.fsync(lock=True)
 
         # Add code to wait until the fsync operations is complete
 
@@ -205,8 +204,10 @@ class ResumeDBInstance(task.Task):
         LOG.debug(_('ResumeDBInstance'))
         host_info = h['secondaryReplica'].split(':')
         LOG.debug(_(host_info))
-        self.client = connect_server(host_info[0], int(host_info[1]), DBUser, DBPassword)
+        self.client = connect_server(host_info[0], int(host_info[1]),
+                                     DBUser, DBPassword)
         self.client.unlock()
+
 
 class PauseBalancer(task.Task):
 
@@ -222,29 +223,33 @@ class PauseBalancer(task.Task):
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
             try:
-                self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
+                self.client = connect_server(cfghost, cfgport,
+                                             DBUser, DBPassword)
                 db = self.client.config
 
-                timeout = settings.get_settings().get('mongodb_stop_balancer_timeout', '300')
+                timeout = settings.get_settings().get(
+                    'mongodb_stop_balancer_timeout', '300')
                 currtime = time.time()
-                db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': True}}, True);
+                db.settings.update({'_id': 'balancer'},
+                                   {'$set': {'stopped': True}}, True)
                 balancer_info = db.locks.find_one({'_id': 'balancer'})
                 while int(str(balancer_info['state'])) > 0 and\
-                      time.time() - currtime < timeout :
+                          time.time() - currtime < timeout:  # nopep8
                     time.sleep(5)
                     LOG.debug(_('\t\twaiting for balancer to stop...'))
                     balancer_info = db.locks.find_one({'_id': 'balancer'})
 
                 if int(str(balancer_info['state'])) > 0:
                     LOG.error(_("Cannot stop the balancer with in the \
-                                mongodb_stop_balancer_timeout(%d) interval") %\
-                                mongodb_stop_balancer_timeout)
-                    raise Exception(_("Cannot stop the balancer with in the \
-                                mongodb_stop_balancer_timeout(%d) interval") %\
-                                mongodb_stop_balancer_timeout)
+                              mongodb_stop_balancer_timeout(%d) interval") %
+                              timeout)
+                    raise Exception(
+                        _("Cannot stop the balancer with in the \
+                        mongodb_stop_balancer_timeout(%d) interval") %
+                        timeout)
                 return
             except:
-                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                LOG.debug(_('"' + cfghost + '" appears to be offline'))
                 pass
         LOG.error(_("Cannot pause balancer. \
                     Make sure your mongodb cluster is up and running"))
@@ -255,11 +260,14 @@ class PauseBalancer(task.Task):
         try:
             # Resume DB
             db = self.client.config
-            db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
+            db.settings.update({'_id': 'balancer'},
+                               {'$set': {'stopped': False}}, True)
         except Exception as ex:
             LOG.exception(ex)
         finally:
             pass
+
+
 class ResumeBalancer(task.Task):
 
     def execute(self, DBHost, DBPort, DBUser, DBPassword):
@@ -274,38 +282,42 @@ class ResumeBalancer(task.Task):
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
             try:
-                self.client = connect_server(cfghost, cfgport, DBUser, DBPassword)
+                self.client = connect_server(cfghost, cfgport,
+                                             DBUser, DBPassword)
 
                 db = self.client.config
-                db.settings.update({'_id': 'balancer'}, {'$set': {'stopped': False}}, True);
+                db.settings.update({'_id': 'balancer'},
+                                   {'$set': {'stopped': False}}, True)
                 return
             except:
-                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                LOG.debug(_('"' + cfghost + '" appears to be offline'))
                 pass
 
         LOG.error(_("Cannot resume balancer. \
-                    Make sure your mongodb cluster is up and running"))
+                  Make sure your mongodb cluster is up and running"))
         raise Exception(_("Cannot resume balancer. \
-                           Make sure your mongodb cluster is up and running"))
+                        Make sure your mongodb cluster is up and running"))
+
 
 class ShutdownConfigServer(task.Task):
 
     #
-    #db.runCommand('getShardMap')
-    #{
-    #'map' : {
-        #'node2:27021' : 'node2:27021',
-        #'node3:27021' : 'node3:27021',
-        #'node4:27021' : 'node4:27021',
-        #'config' : 'node2:27019,node3:27019,node4:27019',
-        #'shard0000' : 'node2:27021',
-        #'shard0001' : 'node3:27021',
-        #'shard0002' : 'node4:27021'
-    #},
-    #'ok' : 1
-    #}
-    #'''
-    def execute(self, DBHost, DBPort, DBUser, DBPassword, HostUsername, HostPassword, HostSSHPort=22, RunAsRoot=False):
+    # db.runCommand('getShardMap')
+    # {
+    # 'map' : {
+    #    'node2:27021' : 'node2:27021',
+    #    'node3:27021' : 'node3:27021',
+    #    'node4:27021' : 'node4:27021',
+    #    'config' : 'node2:27019,node3:27019,node4:27019',
+    #    'shard0000' : 'node2:27021',
+    #    'shard0001' : 'node3:27021',
+    #    'shard0002' : 'node4:27021'
+    #    },
+    # 'ok' : 1
+    # }
+    # '''
+    def execute(self, DBHost, DBPort, DBUser, DBPassword,
+                HostUsername, HostPassword, HostSSHPort=22, RunAsRoot=False):
         # Get the list of config servers
         # shutdown one of them
         self.client = connect_server(DBHost, DBPort, DBUser, DBPassword)
@@ -322,7 +334,8 @@ class ShutdownConfigServer(task.Task):
 
                 cmdlineopts = self.cfgclient.admin.command('getCmdLineOpts')
 
-                command = 'mongod --shutdown --port ' + cfgport + ' --configsvr'
+                command = 'mongod --shutdown --port ' + \
+                          cfgport + ' --configsvr'
                 if RunAsRoot:
                     command = 'sudo ' + command
 
@@ -331,26 +344,31 @@ class ShutdownConfigServer(task.Task):
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
                     if HostPassword == '':
-                        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+                        client.set_missing_host_key_policy(
+                            paramiko.WarningPolicy())
                     else:
-                        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
+                        client.set_missing_host_key_policy(
+                            paramiko.AutoAddPolicy())
+                    client.connect(cfghost, port=HostSSHPort,
+                                   username=HostUsername,
+                                   password=HostPassword, timeout=120)
 
-                    stdin, stdout, stderr = client.exec_command(command, timeout=120)
+                    stdin, stdout, stderr = client.exec_command(
+                        command, timeout=120)
                     LOG.debug(_(stdout.read()))
                 finally:
                     client.close()
 
-                # Also make sure the config server command line operations are saved
+                # Also make sure the config server command line
+                # operations are saved
                 return cfgsrv, cmdlineopts
             except:
-                LOG.debug(_( '"' + cfghost +'" appears to be offline'))
+                LOG.debug(_('"' + cfghost + '" appears to be offline'))
                 pass
         LOG.error(_("Cannot shutdown configsrv. \
-                    Make sure your mongodb cluster is up and running"))
+                  Make sure your mongodb cluster is up and running"))
         raise Exception(_("Cannot shutdown configsrv. \
-                           Make sure your mongodb cluster is up and running"))
-
+                        Make sure your mongodb cluster is up and running"))
 
         def revert(self, *args, **kwargs):
             client = None
@@ -358,23 +376,27 @@ class ShutdownConfigServer(task.Task):
                 # Make sure all config servers are resumed
                 cfghost = kwargs['result']['cfgsrv'].split(':')[0]
 
-                #ssh into the cfg host and start the config server
+                # ssh into the cfg host and start the config server
                 if not isinstance(kwargs['result'], misc.Failure):
-                    port = kwargs['HostSSHPort']
-
                     command = ''
                     for c in kwargs['cfgsrvcmdline']['argv']:
-                        command  = command + c + ' '
+                        command = command + c + ' '
 
                     client = paramiko.SSHClient()
                     client.load_system_host_keys()
                     if HostPassword == '':
-                        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+                        client.set_missing_host_key_policy(
+                            paramiko.WarningPolicy())
                     else:
-                        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    client.connect(cfghost, port=kwargs['HostSSHPort'], username=kwargs['HostUsername'], password=kwargs['HostPassword'], timeout=120)
+                        client.set_missing_host_key_policy(
+                            paramiko.AutoAddPolicy())
+                    client.connect(cfghost, port=kwargs['HostSSHPort'],
+                                   username=kwargs['HostUsername'],
+                                   password=kwargs['HostPassword'],
+                                   timeout=120)
 
-                    stdin, stdout, stderr = client.exec_command(command, timeout=120)
+                    stdin, stdout, stderr = client.exec_command(
+                        command, timeout=120)
                     LOG.debug(_(stdout.read()))
 
                 LOG.debug(_('ShutdownConfigServer:revert'))
@@ -385,16 +407,17 @@ class ShutdownConfigServer(task.Task):
                 if client:
                     client.close()
 
+
 class ResumeConfigServer(task.Task):
 
-    def execute(self, cfgsrv, cfgsrvcmdline, HostUsername, HostPassword, HostSSHPort=22, RunAsRoot=False):
+    def execute(self, cfgsrv, cfgsrvcmdline, HostUsername,
+                HostPassword, HostSSHPort=22, RunAsRoot=False):
         # Make sure all config servers are resumed
         cfghost = cfgsrv.split(':')[0]
-        port = 22
 
         command = ''
         for c in cfgsrvcmdline['argv']:
-            command  = command + c + ' '
+            command = command + c + ' '
 
         if RunAsRoot:
             command = 'sudo ' + command
@@ -406,15 +429,17 @@ class ResumeConfigServer(task.Task):
                 client.set_missing_host_key_policy(paramiko.WarningPolicy())
             else:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(cfghost, port=HostSSHPort, username=HostUsername, password=HostPassword, timeout=120)
+            client.connect(cfghost, port=HostSSHPort, username=HostUsername,
+                           password=HostPassword, timeout=120)
 
             stdin, stdout, stderr = client.exec_command(command, timeout=120)
             LOG.debug(_(stdout.read()))
         finally:
             client.close()
 
-        #ssh into the cfg host and start the config server
+        # ssh into the cfg host and start the config server
         LOG.debug(_('ResumeConfigServer'))
+
 
 # Assume there is no ordering dependency between instances
 # pause each VM in parallel.
@@ -422,21 +447,26 @@ def PauseDBInstances(hosts_list):
     flow = uf.Flow('PauseDBInstances')
 
     for index, h in enumerate(hosts_list):
-        host_info = h['secondaryReplica'].split(':')
-        flow.add(PauseDBInstance('PauseDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'DBUser', 'DBPassword']))
+        flow.add(PauseDBInstance('PauseDBInstance_' + h['secondaryReplica'],
+                                 rebind=['secondary_' + str(index),
+                                         'DBUser', 'DBPassword']))
 
     return flow
+
 
 def ResumeDBInstances(hosts_list):
     flow = uf.Flow('ResumeDBInstances')
 
     for index, h in enumerate(hosts_list):
-        host_info = h['secondaryReplica'].split(':')
-        flow.add(ResumeDBInstance('ResumeDBInstance_' + h['secondaryReplica'], rebind=['secondary_' + str(index), 'DBUser', 'DBPassword']))
+        flow.add(ResumeDBInstance('ResumeDBInstance_' + h['secondaryReplica'],
+                                  rebind=['secondary_' + str(index),
+                                          'DBUser', 'DBPassword']))
 
     return flow
 
-def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgroup):
+
+def secondaryhosts_to_backup(cntx, host, port, username,
+                             password, preferredgroup):
     #
     # Creating connection to mongos server
     #
@@ -463,15 +493,15 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
             hosts = hosts.replace(str(s['_id']), '').strip()
             hosts = hosts.replace('/', '').strip()
 
-            #print 'Getting secondary from hosts in ', hosts
+            # print 'Getting secondary from hosts in ', hosts
             # Get the replica set for each shard
             if username != '':
-                c = pymongo.MongoClient("mongodb://" + username + ":" +
-                                    password + "@" + hosts,
-                                    read_preference=ReadPreference.SECONDARY)
+                c = pymongo.MongoClient(
+                    "mongodb://" + username + ":" + password + "@" + hosts,
+                    read_preference=ReadPreference.SECONDARY)
             else:
-                c = pymongo.MongoClient(hosts, 
-                                        read_preference=ReadPreference.SECONDARY)
+                c = pymongo.MongoClient(
+                    hosts, read_preference=ReadPreference.SECONDARY)
 
             status = c.admin.command('replSetGetStatus')
 
@@ -489,24 +519,28 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
                         if m['name'] != preferredreplica:
                             continue
                         if m['stateStr'] == 'SECONDARY':
-                            hosts_to_backup.append({'replicaSetName': status['set'],
-                                                    'secondaryReplica': m['name']})
+                            hosts_to_backup.append(
+                                {'replicaSetName': status['set'],
+                                 'secondaryReplica': m['name']})
                         else:
                             LOG.error(_(preferredreplica + " state is " +
-                                        m['stateStr'] +
-                                        ". Will pick next secondary for backup"))
+                                      m['stateStr'] +
+                                      ". Will pick next secondary for backup"))
                             for m in status['members']:
                                 if m['stateStr'] == 'SECONDARY':
-                                    hosts_to_backup.append({'replicaSetName': status['set'],
-                                                            'secondaryReplica': m['name']})
+                                    hosts_to_backup.append(
+                                        {'replicaSetName': status['set'],
+                                         'secondaryReplica': m['name']})
                                     break
                             break
             else:
-                # if user did not specify preferred group, backup entire cluster
+                # if user did not specify preferred group,
+                # backup entire cluster
                 for m in status['members']:
                     if m['stateStr'] == 'SECONDARY':
-                        hosts_to_backup.append({'replicaSetName': status['set'],
-                                                'secondaryReplica': m['name']})
+                        hosts_to_backup.append(
+                            {'replicaSetName': status['set'],
+                             'secondaryReplica': m['name']})
                         break
     else:
         status = connection.admin.command('replSetGetStatus')
@@ -530,24 +564,27 @@ def secondaryhosts_to_backup(cntx, host, port, username, password, preferredgrou
                                 ". Will pick next secondary for backup"))
                     for m in status['members']:
                         if m['stateStr'] == 'SECONDARY':
-                            hosts_to_backup.append({'replicaSetName': status['set'],
-                                                    'secondaryReplica': m['name']})
+                            hosts_to_backup.append(
+                                {'replicaSetName': status['set'],
+                                 'secondaryReplica': m['name']})
                             break
                 break
         else:
             # if user did not specify preferred group, backup entire cluster
             for m in status['members']:
                 if m['stateStr'] == 'SECONDARY':
-                    hosts_to_backup.append({'replicaSetName': status['set'],
-                                                'secondaryReplica': m['name']})
+                    hosts_to_backup.append(
+                        {'replicaSetName': status['set'],
+                         'secondaryReplica': m['name']})
                     break
 
     if len(hosts_to_backup) == 0:
         raise Exception(_("Could not identify any hosts to backup. \
-                           Please make sure mongodb cluster is in a stable \
-                           and try again"))
-     
+                        Please make sure mongodb cluster is in a stable \
+                        and try again"))
+
     return hosts_to_backup
+
 
 def get_vms(cntx, dbhost, dbport, mongodbusername,
             mongodbpassword, sshport,
@@ -556,7 +593,8 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
     # Creating connection to mongos server
     #
     LOG.debug(_('Connecting to mongos server ' + dbhost))
-    connection = connect_server(dbhost, dbport, mongodbusername, mongodbpassword)
+    connection = connect_server(dbhost, dbport,
+                                mongodbusername, mongodbpassword)
 
     #
     # Getting sharding information
@@ -577,7 +615,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
             hosts = hosts.replace('/', '').strip()
             for h in hosts.split(','):
                 hostname = h.split(':')[0]
-                if not hostname in hostnames:
+                if hostname not in hostnames:
                     hostnames[hostname] = 1
 
         # Add config servers to the mix
@@ -586,11 +624,10 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
 
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
-            cfgport = cfgsrv.split(':')[1]
-            if not cfghost in hostnames:
+            if cfghost not in hostnames:
                 hostnames[cfghost] = 1
 
-        if not dbhost in hostnames:
+        if dbhost not in hostnames:
             hostnames[dbhost] = 1
     else:
         # this is a replica set
@@ -607,17 +644,22 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         try:
             mac_addresses = utils.get_mac_addresses(hostname, sshport,
                                                     username=hostusername,
-                                                    password=hostpassword, timeout=120)
+                                                    password=hostpassword,
+                                                    timeout=120)
             for mac in mac_addresses:
                 interfaces[mac.lower()] = hostname
 
         except Exception as ex:
             LOG.exception(ex)
-            LOG.info(_( '"' + hostname +'" appears to be offline. Cannot exec ifconfig' ))
+            LOG.info(_('"' + hostname + '" appears to be offline.\
+                     Cannot exec ifconfig'))
 
     if len(interfaces) == 0:
-        LOG.info(_("Unabled to login to VMs to discover MAC Addresses. Please check username/passwor and try again."))
-        raise Exception(_("Unabled to login to VMs to discover MAC Addresses. Please check username/passwor and try again."))
+        LOG.info(_("Unabled to login to VMs to discover MAC Addresses. \
+                 Please check username/passwor and try again."))
+        raise Exception(_("Unabled to login to VMs to discover \
+                        MAC Addresses. Please check username/password \
+                        and try again."))
 
     # query VM by ethernet and get instance info here
     # call nova list
@@ -630,34 +672,40 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         # The following logic helps for VMware VMs. For OpenStack instances,
         # look at the instance interfaces.
         for addr in json.loads(instance.metadata['networks']):
-            # IP Addresses
-            #this is our vm
+            # IP Addresses this is our vm
             if addr['macAddress'].lower() in interfaces:
                 hypervisor_hostname = None
                 hypervisor_type = "VMware vCenter Server"
                 clustername = "Unknown"
 
-                if 'cluster' in instance.metadata and instance.metadata['cluster']:
+                if 'cluster' in instance.metadata and \
+                   instance.metadata['cluster']:
                     if json.loads(instance.metadata['cluster']):
                         clusprop = json.loads(instance.metadata['cluster'])[0]
                         clustername = clusprop['name']
 
                 hypervisor_hostname = clustername
-                utils.append_unique(vms, {'vm_id' : instance.id,
-                                          'vm_name' : instance.name,
-                                          'vm_metadata' : instance.metadata,
-                                          'vm_flavor_id' : instance.flavor['id'],
-                                          'hostname' : interfaces[addr['macAddress'].lower()],
-                                          'vm_power_state' : instance.__dict__['OS-EXT-STS:power_state'],
-                                          'hypervisor_hostname' : hypervisor_hostname,
-                                          'hypervisor_type' :  hypervisor_type},
-                                          "vm_id")
+                vm_power_state = instance.__dict__['OS-EXT-STS:power_state']
+                utils.append_unique(
+                    vms,
+                    {'vm_id': instance.id,
+                     'vm_name': instance.name,
+                     'vm_metadata': instance.metadata,
+                     'vm_flavor_id': instance.flavor['id'],
+                     'hostname': interfaces[addr['macAddress'].lower()],
+                     'vm_power_state': vm_power_state,
+                     'hypervisor_hostname': hypervisor_hostname,
+                     'hypervisor_type':  hypervisor_type},
+                    "vm_id")
                 break
 
     if len(vms) == 0:
-        LOG.info(_("No VMs are discovered in tvault inventory. Please run discover and try again"))
-        raise Exception(_("No instances are discovered in tvault inventory. Please run discover and try again"))
+        LOG.info(_("No VMs are discovered in tvault inventory. \
+                 Please run discover and try again"))
+        raise Exception(_("No instances are discovered in tvault \
+                        inventory. Please run discover and try again"))
     return vms
+
 
 """
 MongoDBWorkflow Requires the following inputs in store:
@@ -671,11 +719,13 @@ MongoDBWorkflow Requires the following inputs in store:
     'port': 27017,                   # listening port of mongos service
     'username': 'ubuntu',            # mongodb admin user
     'password': 'ubuntu',            # mongodb admin password
-    'hostusername': 'ubuntu',            # username on the host for ssh operations
+    'hostusername': 'ubuntu',        # username on the host for ssh operations
     'hostpassword': '',              # username on the host for ssh operations
     'sshport' : 22,                  # ssh port that defaults to 22
-    'usesudo' : True,                # use sudo when shutdown and restart of mongod instances
+    'usesudo' : True,                # use sudo when shutdown and
+                                     # restart of mongod instances
 """
+
 
 class MongoDBWorkflow(workflow.Workflow):
     """
@@ -689,19 +739,19 @@ class MongoDBWorkflow(workflow.Workflow):
     def find_first_alive_node(self):
         # Iterate thru all hosts and pick the one that is alive
         if 'hostnames' in self._store:
-            for host in [self._store['DBHost']] + json.loads(self._store['hostnames']):
+            for host in [self._store['DBHost']] +\
+                         json.loads(self._store['hostnames']):
                 try:
-                    connection = connect_server(host,
-                                                int(self._store['DBPort']),
-                                                self._store['DBUser'],
-                                                self._store['DBPassword'])
+                    connect_server(host, int(self._store['DBPort']),
+                                   self._store['DBUser'],
+                                   self._store['DBPassword'])
                     self._store['DBHost'] = host
-                    LOG.debug(_( 'Chose "' + host +'" for mongodb connection'))
+                    LOG.debug(_('Chose "' + host + '" for mongodb connection'))
                     return
                 except:
-                    LOG.debug(_( '"' + host +'" appears to be offline'))
+                    LOG.debug(_('"' + host + '" appears to be offline'))
                     pass
-        #LOG.warning(_( 'MongoDB cluster appears to be offline'))
+        # LOG.warning(_( 'MongoDB cluster appears to be offline'))
 
     #
     # MongoDB flow is an directed acyclic flow.
@@ -709,37 +759,39 @@ class MongoDBWorkflow(workflow.Workflow):
     #               service running and will be used to discover the mongo db
     #               shards, their replicas etc
     # : port - port at which mongos service is running
-    # : usename/password - username and password to authenticate to the database
+    # : usename/password - username and password to authenticate
+    #                     to the database
     #
     def initflow(self, composite=False):
-        connection = connect_server(self._store['DBHost'], self._store['DBPort'],
-                                    self._store['DBUser'], self._store['DBPassword'])
+        connection = connect_server(self._store['DBHost'],
+                                    self._store['DBPort'],
+                                    self._store['DBUser'],
+                                    self._store['DBPassword'])
         isMongos = isShardedCluster(connection)
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        instances =  get_vms(cntx, self._store['DBHost'],
-                                   self._store['DBPort'],
-                                   self._store['DBUser'],
-                                   self._store['DBPassword'],
-                                   self._store['HostSSHPort'],
-                                   self._store['HostUsername'],
-                                   self._store['HostPassword'])
+        instances = get_vms(cntx, self._store['DBHost'],
+                            self._store['DBPort'],
+                            self._store['DBUser'],
+                            self._store['DBPassword'],
+                            self._store['HostSSHPort'],
+                            self._store['HostUsername'],
+                            self._store['HostPassword'])
         self._store['topology'] = self.topology()
-        hosts_to_backup = secondaryhosts_to_backup(cntx,
-                                                   self._store['DBHost'],
-                                                   self._store['DBPort'],
-                                                   self._store['DBUser'],
-                                                   self._store['DBPassword'],
-                                                   self._store['preferredgroup'])
+        hosts_to_backup = secondaryhosts_to_backup(
+            cntx, self._store['DBHost'],
+            self._store['DBPort'], self._store['DBUser'],
+            self._store['DBPassword'],
+            self._store['preferredgroup'])
 
-        self._store['instances'] = [];
+        self._store['instances'] = []
 
-        # Filter the VMs based on the preferred secondary replica 
+        # Filter the VMs based on the preferred secondary replica
         for index, vm in enumerate(instances):
             for index, srep in enumerate(hosts_to_backup):
                 if srep['secondaryReplica'].split(':')[0] == vm['hostname']:
                     self._store['instance_'+vm['vm_id']] = vm
-                    self._store['instances'].append(vm);
+                    self._store['instances'].append(vm)
                     break
 
         for index, item in enumerate(hosts_to_backup):
@@ -754,23 +806,21 @@ class MongoDBWorkflow(workflow.Workflow):
             cfgincluded = False
             for cfgsrv in cfgsrvs:
                 cfghost = cfgsrv.split(':')[0]
-                cfgport = cfgsrv.split(':')[1]
                 for inst in self._store['instances']:
                     if inst['hostname'] == cfghost:
                         cfgincluded = True
                         break
                 if cfgincluded:
                     break
-   
+
             if not cfgincluded:
                 cfgadded = False
                 for index, vm in enumerate(instances):
                     for cfgsrv in cfgsrvs:
                         cfghost = cfgsrv.split(':')[0]
-                        cfgport = cfgsrv.split(':')[1]
                         if cfghost == vm['hostname']:
                             self._store['instance_'+vm['vm_id']] = vm
-                            self._store['instances'].append(vm);
+                            self._store['instances'].append(vm)
                             cfgadded = True
                             break
                     if cfgadded:
@@ -781,7 +831,8 @@ class MongoDBWorkflow(workflow.Workflow):
         # Add disable profile task. Stopping balancer fails if profile process
         # is running
         if isMongos:
-            snapshotvms.add(DisableProfiling('DisableProfiling', provides='proflevel'))
+            snapshotvms.add(DisableProfiling('DisableProfiling',
+                                             provides='proflevel'))
             snapshotvms.add(PauseBalancer('PauseBalancer'))
 
         # This will be a flow that needs to be added to mongo db flow.
@@ -789,7 +840,9 @@ class MongoDBWorkflow(workflow.Workflow):
         snapshotvms.add(PauseDBInstances(hosts_to_backup))
 
         if isMongos:
-            snapshotvms.add(ShutdownConfigServer('ShutdownConfigServer', provides=('cfgsrv', 'cfgsrvcmdline')))
+            snapshotvms.add(
+                ShutdownConfigServer('ShutdownConfigServer',
+                                     provides=('cfgsrv', 'cfgsrvcmdline')))
 
         # This is an unordered pausing of VMs. This flow is created in
         # common tasks library. This routine takes instance ids from
@@ -808,8 +861,9 @@ class MongoDBWorkflow(workflow.Workflow):
         if isMongos:
             snapshotvms.add(ResumeConfigServer('ResumeConfigServer'))
 
-        # unlock all locekd replicas so it starts receiving all updates from primary and
-        # will eventually get into sync with primary
+        # unlock all locekd replicas so it starts receiving all
+        # updates from primary and # will eventually get into
+        # sync with primary
         snapshotvms.add(ResumeDBInstances(hosts_to_backup))
 
         if isMongos:
@@ -827,15 +881,18 @@ class MongoDBWorkflow(workflow.Workflow):
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             db = WorkloadMgrDB().db
             if 'snapshot' in self._store:
-                db.snapshot_update( cntx, self._store['snapshot']['id'],
-                                    {'progress_msg': 'Discovering MongoDB Databases'} )
+                db.snapshot_update(
+                    cntx, self._store['snapshot']['id'],
+                    {'progress_msg': 'Discovering MongoDB Databases'})
 
             fh, outfile_path = mkstemp()
             os.close(fh)
             fh, errfile_path = mkstemp()
             os.close(fh)
 
-            cmdspec = ["python", "/opt/stack/workloadmgr/workloadmgr/workflows/mongodbnodes.py",
+            cmdspec = ["python",
+                       "/opt/stack/workloadmgr/workloadmgr/"
+                       "workflows/mongodbnodes.py",
                        "--config-file", "/etc/workloadmgr/workloadmgr.conf",
                        "--defaultnode", self._store['DBHost'],
                        "--port", self._store['HostSSHPort'],
@@ -847,21 +904,19 @@ class MongoDBWorkflow(workflow.Workflow):
 
             if self._store.get('hostnames', None):
                 hosts = ""
-                for host in json.loads(self._store.get('hostnames',"")):
+                for host in json.loads(self._store.get('hostnames', "")):
                     hosts += host + ';'
 
                 cmdspec.extend(["--addlnodes", hosts])
             cmdspec.extend(["--outfile", outfile_path,
-                            "--errfile", errfile_path,
-                           ])
-            cmd = " ".join(cmdspec)
+                            "--errfile", errfile_path, ])
             for idx, opt in enumerate(cmdspec):
                 if opt == "--password":
                     cmdspec[idx+1] = self._store['HostPassword']
                     break
 
-            LOG.debug(_( 'Executing: ' + " ".join(cmdspec)))
-            process = subprocess.Popen(cmdspec,shell=False)
+            LOG.debug(_('Executing: ' + " ".join(cmdspec)))
+            process = subprocess.Popen(cmdspec, shell=False)
             stdoutdata, stderrdata = process.communicate()
             if process.returncode != 0:
                 reason = 'Error discovering MongoDB Databases'
@@ -870,7 +925,8 @@ class MongoDBWorkflow(workflow.Workflow):
                         reason = fh.read()
                         if len(reason) == 0:
                             reason = 'Error discovering MongoDB Databases'
-                        LOG.info(_('Error discovering MongoDB Databases: ' + reason))
+                        LOG.info(_('Error discovering MongoDB Databases: ' +
+                                 reason))
                     os.remove(errfile_path)
                 finally:
                     raise exception.ErrorOccurred(reason=reason)
@@ -902,8 +958,11 @@ class MongoDBWorkflow(workflow.Workflow):
         # Creating connection to mongos server
         #
         self.find_first_alive_node()
-        LOG.debug(_( 'Connecting to mongos server ' + self._store['DBHost']))
-        connection = connect_server(self._store['DBHost'], self._store['DBPort'], self._store['DBUser'], self._store['DBPassword'])
+        LOG.debug(_('Connecting to mongos server ' + self._store['DBHost']))
+        connection = connect_server(self._store['DBHost'],
+                                    self._store['DBPort'],
+                                    self._store['DBUser'],
+                                    self._store['DBPassword'])
 
         replicas = []
         replicahosts = {}
@@ -911,7 +970,7 @@ class MongoDBWorkflow(workflow.Workflow):
             #
             # Getting sharding information
             #
-            LOG.debug(_( 'Getting sharding configuration'))
+            LOG.debug(_('Getting sharding configuration'))
             shards = getShards(connection)
 
             # Get the replica set for each shard
@@ -925,19 +984,21 @@ class MongoDBWorkflow(workflow.Workflow):
             status = connection.admin.command('replSetGetStatus')
             s = []
             for m in status['members']:
-               s.append(m['name'])
+                s.append(m['name'])
             replicahosts[status['set']] = ",".join(s)
 
         for replica, hosts in replicahosts.iteritems():
             LOG.debug(_('Getting secondary from hosts in ' + hosts +
                         " for replica " + replica))
             if self._store['DBUser'] != '':
-                repl = pymongo.MongoClient("mongodb://" + self._store['DBUser'] + ":" +
-                                        self._store['DBPassword'] + "@" + hosts,
-                                        read_preference=ReadPreference.SECONDARY)
+                repl = pymongo.MongoClient(
+                    "mongodb://" + self._store['DBUser'] + ":" +
+                    self._store['DBPassword'] + "@" + hosts,
+                    read_preference=ReadPreference.SECONDARY)
             else:
-                repl = pymongo.MongoClient(hosts, 
-                                        read_preference=ReadPreference.SECONDARY)
+                repl = pymongo.MongoClient(
+                    hosts,
+                    read_preference=ReadPreference.SECONDARY)
             status = repl.admin.command('replSetGetStatus')
 
             replstatus = {}
@@ -962,11 +1023,13 @@ class MongoDBWorkflow(workflow.Workflow):
                 if ('electionTime' in m):
                     m.pop('electionTime')
                 if ("lastHeartbeatRecv" in m):
-                    replchild["lastHeartbeatRecv"] = str(m["lastHeartbeatRecv"])
+                    replchild["lastHeartbeatRecv"] = \
+                        str(m["lastHeartbeatRecv"])
                 if ("lastHeartbeat" in m):
                     replchild["lastHeartbeat"] = str(m["lastHeartbeat"])
                 if ("optime" in m):
-                    replchild["optime"] = m['optime'].as_datetime().strftime("%B %d, %Y")
+                    replchild["optime"] = \
+                        m['optime'].as_datetime().strftime("%B %d, %Y")
                 replchild["input"] = []
                 replchild["input"].append([])
                 replchild["input"].append([])
@@ -983,15 +1046,17 @@ class MongoDBWorkflow(workflow.Workflow):
 
         # Covert the topology into generic topology that can be
         # returned as restful payload
-        mongodb = {"name": "MongoDB", "children":replicas, "input":[]}
-        return dict(topology=mongodb, databases=self.get_databases()['databases'])
+        mongodb = {"name": "MongoDB", "children": replicas, "input": []}
+        return dict(topology=mongodb,
+                    databases=self.get_databases()['databases'])
 
     def details(self):
         # workflow details based on the
         # current topology, number of VMs etc
         def recurseflow(item):
             if isinstance(item, task.Task):
-                taskdetails = {'name':item._name.split("_")[0], 'type':'Task'}
+                taskdetails = {'name': item._name.split("_")[0],
+                               'type': 'Task'}
                 taskdetails['input'] = []
                 if len(item._name.split('_')) == 2:
                     nodename = item._name.split("_")[1]
@@ -1036,10 +1101,12 @@ class MongoDBWorkflow(workflow.Workflow):
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             compute_service.get_servers(cntx, search_opts=search_opts)
         self.find_first_alive_node()
-        vmtasks.CreateVMSnapshotDBEntries(self._store['context'], self._store['instances'], self._store['snapshot'])
-        result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
-
-        #workloadmgr --os-auth-url http://$KEYSTONE_AUTH_HOST:5000/v2.0 --os-tenant-name admin --os-username admin --os-password $ADMIN_PASSWORD workload-type-create --metadata HostUsername=string --metadata HostPassword=password --metadata HostSSHPort=string --metadata DBHost=string --metadata DBPort=string --metadata DBUser=string --metadata DBPassword=password --metadata RunAsRoot=boolean --metadata capabilities='discover:topology' --display-name "MongoDB" --display-description "MongoDB workload description" --is-public True
+        vmtasks.CreateVMSnapshotDBEntries(self._store['context'],
+                                          self._store['instances'],
+                                          self._store['snapshot'])
+        engines.run(self._flow, engine_conf='parallel',
+                    backend={'connection': self._store['connection']},
+                    store=self._store)
 
 """
 #test code
@@ -1053,14 +1120,15 @@ store = {
     #'snapshot': snapshot,                   # snapshot dictionary
 
     # Instanceids will to be discovered automatically
-    'host': 'mongodb1',              # one of the nodes of mongodb cluster
-    'port': 27017,                   # listening port of mongos service
-    'username': 'ubuntu',            # mongodb admin user
-    'password': 'ubuntu',            # mongodb admin password
-    'hostusername': 'ubuntu',            # username on the host for ssh operations
-    'hostpassword': '',              # username on the host for ssh operations
-    'sshport' : 22,                  # ssh port that defaults to 22
-    'usesudo' : True,                # use sudo when shutdown and restart of mongod instances
+    'host': 'mongodb1',        # one of the nodes of mongodb cluster
+    'port': 27017,             # listening port of mongos service
+    'username': 'ubuntu',      # mongodb admin user
+    'password': 'ubuntu',      # mongodb admin password
+    'hostusername': 'ubuntu',  # username on the host for ssh operations
+    'hostpassword': '',        # username on the host for ssh operations
+    'sshport' : 22,            # ssh port that defaults to 22
+    'usesudo' : True,          # use sudo when shutdown and
+                               # restart of mongod instances
 }
 
 c = nova.novaclient(None, production=True, admin=True);
@@ -1074,7 +1142,10 @@ print json.dumps(mwf.details())
 print json.dumps(mwf.discover())
 print json.dumps(mwf.topology())
 
-result = engines.load(mwf._flow, engine_conf='parallel', backend={'connection':'mysql://root:project1@10.6.255.110/workloadmgr?charset=utf8'}, store=store)
+result = engines.load(mwf._flow, engine_conf='parallel',
+backend={'connection':'mysql://root:project1@10.6.255.110/'
+         'workloadmgr?charset=utf8'},
+store=store)
 
 print mwf.execute()
 """

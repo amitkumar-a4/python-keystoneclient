@@ -179,7 +179,7 @@ def ref_to_obj(ref):
     """
     if not isinstance(ref, basestring):
         raise TypeError('References must be strings')
-    if not ':' in ref:
+    if ':' not in ref:
         raise ValueError('Invalid reference')
 
     modulename, rest = ref.split(':', 1)
@@ -219,12 +219,12 @@ def to_unicode(string, encoding='ascii'):
 
 
 if sys.version_info < (3, 0):  # pragma: nocover
-    iteritems = lambda d: d.iteritems()
-    itervalues = lambda d: d.itervalues()
+    iteritems = lambda d: d.iteritems()  # nopep8
+    itervalues = lambda d: d.itervalues()  # nopep8
     xrange = xrange
     basestring = basestring
 else:  # pragma: nocover
-    iteritems = lambda d: d.items()
-    itervalues = lambda d: d.values()
+    iteritems = lambda d: d.items()  # nopep8
+    itervalues = lambda d: d.values()  # nopep8
     xrange = range
     basestring = str

@@ -8,6 +8,7 @@ import webob.exc
 
 from workloadmgr.api import wsgi
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import utils
 from workloadmgr import wsgi as base_wsgi
 

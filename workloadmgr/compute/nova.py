@@ -24,7 +24,6 @@ from functools import wraps
 from oslo.config import cfg
 
 from novaclient import exceptions as nova_exception
-from novaclient import service_catalog
 from novaclient import client
 from novaclient import extension as nova_extension
 from novaclient.v1_1 import client as nova_client
@@ -61,11 +60,13 @@ nova_opts = [
                default='admin',
                help='tenant name for connecting to nova in admin context'),
     cfg.StrOpt('nova_production_endpoint_template',
-               default= 'http://localhost:8774/v2/%(project_id)s',
-               help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
+               default='http://localhost:8774/v2/%(project_id)s',
+               help='nova production endpoint \
+                    e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_tvault_endpoint_template',
-               default= 'http://localhost:8774/v2/%(project_id)s',
-               help='nova tvault endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
+               default='http://localhost:8774/v2/%(project_id)s',
+               help='nova tvault endpoint \
+                    e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_production_region_name',
                default=None,
                help='region name for connecting to nova in admin context'),
@@ -90,6 +91,8 @@ CONF.register_opts(nova_opts)
 LOG = logging.getLogger(__name__)
 
 novalock = Lock()
+
+
 def synchronized(lock):
     '''Synchronization decorator.'''
     def wrap(f):
@@ -101,6 +104,7 @@ def synchronized(lock):
                 lock.release()
         return new_function
     return wrap
+
 
 def _discover_extensions(version):
     extensions = []
@@ -114,6 +118,7 @@ def _discover_extensions(version):
 
     return extensions
 
+
 def _discover_via_python_path():
     for (module_loader, name, _ispkg) in pkgutil.iter_modules():
         if name.endswith('_python_novaclient_ext'):
@@ -126,6 +131,7 @@ def _discover_via_python_path():
                 name = module.extension_name
 
             yield name, module
+
 
 def _discover_via_contrib_path(version):
     module_path = os.path.dirname(os.path.abspath(__file__))
@@ -141,6 +147,7 @@ def _discover_via_contrib_path(version):
 
         module = imp.load_source(name, ext_path)
         yield name, module
+
 
 def _discover_via_entry_points():
     for ep in pkg_resources.iter_entry_points('novaclient.extension'):
@@ -280,7 +287,7 @@ def novaclient(context, production=True, refresh_token=False, extensions = None)
                                    project_id=context.project_id,
                                    auth_url=url,
                                    insecure=CONF.nova_api_insecure,
-                                   extensions = extensions,
+                                   extensions=extensions,
                                    timeout=CONF.nova_url_timeout)
 
             # noauth extracts user_id:tenant_id from auth_token
@@ -289,7 +296,9 @@ def novaclient(context, production=True, refresh_token=False, extensions = None)
 
     return novaclient
 
-def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_template):
+
+def novaclient2(auth_url, username, password, tenant_name,
+                nova_endpoint_template):
     httpclient = client.HTTPClient(
         user=username,
         password=password,
@@ -302,13 +311,14 @@ def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_templat
         auth_system=CONF.nova_auth_system,
         insecure=CONF.nova_api_insecure)
     httpclient.authenticate()
-    url = nova_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
+    url = nova_endpoint_template.replace(
+        '%(project_id)s', httpclient.tenant_id)
     c = nova_client.Client(username,
                            password,
                            project_id=httpclient.tenant_id,
                            auth_url=url,
                            insecure=CONF.nova_api_insecure,
-                           extensions = None,
+                           extensions=None,
                            timeout=CONF.nova_url_timeout)
     LOG.debug(_('Novaclient connection created using URL: %s') % url)
     c.client.auth_token = httpclient.auth_token
@@ -361,7 +371,7 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
 class API(base.Base):
     """API for interacting with the volume manager."""
 
-    def __init__(self, production = True):
+    def __init__(self, production=True):
         self._production = production
 
     @synchronized(novalock)
@@ -599,12 +609,12 @@ class API(base.Base):
         try:
             client = novaclient(context, self._production)
             return client.servers.delete(server=server)
-        except nova_exception.Unauthorized as unauth_ex:
+        except nova_exception.Unauthorized:
             client = novaclient(context, self._production, admin=True)
             return client.servers.delete(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception
+            # TODO(gbasava): Handle the exception
             return
 
     @synchronized(novalock)
@@ -618,12 +628,12 @@ class API(base.Base):
         try:
             client = novaclient(context, self._production)
             return client.servers.force_delete(server=server)
-        except nova_exception.Unauthorized as unauth_ex:
+        except nova_exception.Unauthorized:
             client = novaclient(context, self._production, admin=True)
             return client.servers.force_delete(server=server)
         except Exception as ex:
             LOG.exception(ex)
-            #TODO(gbasava): Handle the exception
+            # TODO(gbasava): Handle the exception
             return
 
     @synchronized(novalock)
@@ -858,7 +868,7 @@ class API(base.Base):
         """
         Get the IP address information
 
-        :param IP4 address: 
+        :param IP4 address:
         """
         client = kwargs['client']
         return client.fixed_ips.get(ip)

@@ -11,6 +11,7 @@ import webob
 from workloadmgr import exception
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import utils
 from workloadmgr import wsgi
 
@@ -67,8 +68,8 @@ class Request(webob.Request):
             if not content_type:
                 content_type = self.accept.best_match(SUPPORTED_CONTENT_TYPES)
 
-            self.environ['workloadmgr.best_content_type'] = (content_type or
-                                                        'application/json')
+            self.environ['workloadmgr.best_content_type'] = \
+                (content_type or 'application/json')
 
         return self.environ['workloadmgr.best_content_type']
 
@@ -256,7 +257,7 @@ class XMLDictSerializer(DictSerializer):
         self._add_xmlns(node, has_atom)
         return node.toxml('UTF-8')
 
-    #NOTE (ameade): the has_atom should be removed after all of the
+    # NOTE (ameade): the has_atom should be removed after all of the
     # xml serializers and view builders have been updated to the current
     # spec that required all responses include the xmlns:atom, the has_atom
     # flag is to prevent current tests from breaking
@@ -271,12 +272,10 @@ class XMLDictSerializer(DictSerializer):
         result = doc.createElement(nodename)
 
         # Set the xml namespace if one is specified
-        # TODO(justinsb): We could also use prefixes on the keys
         xmlns = metadata.get('xmlns', None)
         if xmlns:
             result.setAttribute('xmlns', xmlns)
 
-        #TODO(bcwaldon): accomplish this without a type-check
         if isinstance(data, list):
             collections = metadata.get('list_collections', {})
             if nodename in collections:
@@ -295,7 +294,6 @@ class XMLDictSerializer(DictSerializer):
             for item in data:
                 node = self._to_xml_node(doc, metadata, singular, item)
                 result.appendChild(node)
-        #TODO(bcwaldon): accomplish this without a type-check
         elif isinstance(data, dict):
             collections = metadata.get('dict_collections', {})
             if nodename in collections:

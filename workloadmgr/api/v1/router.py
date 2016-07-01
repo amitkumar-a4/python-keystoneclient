@@ -37,95 +37,93 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='show')
 
         mapper.redirect("", "/")
-        ###################################################################################################
-        self.resources['workload_types'] = workloadtypes.create_resource(ext_mgr)
+        self.resources['workload_types'] = \
+            workloadtypes.create_resource(ext_mgr)
         self.resources['tasks'] = tasks.create_resource(ext_mgr)
-        #detail list of workload_types
+        # detail list of workload_types
         mapper.resource("workload_types_1", "workload_types",
                         controller=self.resources['workload_types'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
-        
-               
-        #get the list of workload_types
+
+        # get the list of workload_types
         mapper.connect("workload_types_2",
                        "/{project_id}/workload_types",
                        controller=self.resources['workload_types'],
                        action='index',
-                       conditions={"method": ['GET']}) 
-        
-        #get the detail list of workload_types
+                       conditions={"method": ['GET']})
+
+        # get the detail list of workload_types
         mapper.connect("workload_types_3",
                        "/{project_id}/workload_types/detail",
                        controller=self.resources['workload_types'],
                        action='detail',
-                       conditions={"method": ['GET']})  
-        
-        #get the specified workload_type
+                       conditions={"method": ['GET']})
+
+        # get the specified workload_type
         mapper.connect("workload_types_4",
                        "/{project_id}/workload_types/{id}",
                        controller=self.resources['workload_types'],
                        action='show',
-                       conditions={"method": ['GET']})  
-        
-        #delete a workload_type
+                       conditions={"method": ['GET']})
+
+        # delete a workload_type
         mapper.connect("delete_workload_types",
                        "/{project_id}/workload_types/{id}",
                        controller=self.resources['workload_types'],
                        action='delete',
-                       conditions={"method": ['DELETE']})    
-        
-        #discover workload_type instances
+                       conditions={"method": ['DELETE']})
+
+        # discover workload_type instances
         mapper.connect("workload_types_discover_instances",
                        "/{project_id}/workload_types/{id}/discover_instances",
                        controller=self.resources['workload_types'],
                        action='discover_instances',
                        conditions={"method": ['POST']})
 
-        #discover workload_type instances
+        # discover workload_type instances
         mapper.connect("workload_types_topology",
                        "/{project_id}/workload_types/{id}/topology",
                        controller=self.resources['workload_types'],
                        action='topology',
                        conditions={"method": ['POST']})
-                
-        ###################################################################################################
+
         self.resources['workloads'] = workloads.create_resource()
-        #detail list of workloads
+        # detail list of workloads
         mapper.resource("workloads_1", "workloads",
                         controller=self.resources['workloads'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
-        
-        #get the list of workloads
+
+        # get the list of workloads
         mapper.connect("workloads_2",
                        "/{project_id}/workloads",
                        controller=self.resources['workloads'],
                        action='index',
-                       conditions={"method": ['GET']}) 
-        
-        #get the detail list of workloads
+                       conditions={"method": ['GET']})
+
+        # get the detail list of workloads
         mapper.connect("workloads_3",
                        "/{project_id}/workloads/detail",
                        controller=self.resources['workloads'],
                        action='detail',
-                       conditions={"method": ['GET']})  
+                       conditions={"method": ['GET']})
 
-        #import workloads
+        # import workloads
         mapper.connect("workloads_import_list",
                        "/{project_id}/workloads/get_list/import_workloads",
                        controller=self.resources['workloads'],
                        action='get_import_workloads_list',
                        conditions={"method": ['GET']})
-        
-        #import workloads
+
+        # import workloads
         mapper.connect("workloads_import",
                        "/{project_id}/workloads/import_workloads",
                        controller=self.resources['workloads'],
                        action='import_workloads',
-                       conditions={"method": ['POST']})  
-        
-        #workload settings
+                       conditions={"method": ['POST']})
+
+        # workload settings
         mapper.connect("workloads_settings",
                        "/{project_id}/workloads/settings",
                        controller=self.resources['workloads'],
@@ -141,12 +139,12 @@ class APIRouter(workloadmgr.api.APIRouter):
        
         #Test email configuration
         mapper.connect("test_email",
-                        "/{project_id}/workloads/email/test_email",
-                        controller=self.resources['workloads'],
-                        action='test_email',
-                        conditions={"method": ['GET']})
- 
-        #get workloadmanager nodes
+                       "/{project_id}/workloads/email/test_email",
+                       controller=self.resources['workloads'],
+                       action='test_email',
+                       conditions={"method": ['GET']})
+
+        # get workloadmanager nodes
         mapper.connect("workloads_nodes",
                        "/{project_id}/workloads/metrics/nodes",
                        controller=self.resources['workloads'],
@@ -167,335 +165,340 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='remove_node',
                        conditions={"method": ['DELETE']})
 
-        #remove workloadmanager node
+        # remove workloadmanager node
         mapper.connect("workload_add_node",
                        "/{project_id}/workloads/add_node",
                        controller=self.resources['workloads'],
                        action='add_node',
                        conditions={"method": ['POST']})
 
-        #get total storage used
+        # get total storage used
         mapper.connect("workloads_storage_usage",
                        "/{project_id}/workloads/metrics/storage_usage",
                        controller=self.resources['workloads'],
                        action='get_storage_usage',
-                       conditions={"method": ['GET']})  
-        
-        #get recent activities
+                       conditions={"method": ['GET']})
+
+        # get recent activities
         mapper.connect("workloads_recentactivities",
                        "/{project_id}/workloads/metrics/recentactivities",
                        controller=self.resources['workloads'],
                        action='get_recentactivities',
                        conditions={"method": ['GET']})
-        
-        #get recent activities
+
+        # get recent activities
         mapper.connect("workloads_auditlog",
                        "/{project_id}/workloads/audit/auditlog",
                        controller=self.resources['workloads'],
                        action='get_auditlog',
-                       conditions={"method": ['GET']})                    
-        
-        #get the specified workload
+                       conditions={"method": ['GET']})
+
+        # get the specified workload
         mapper.connect("workloads_4",
                        "/{project_id}/workloads/{id}",
                        controller=self.resources['workloads'],
                        action='show',
-                       conditions={"method": ['GET']})        
-        #import workloads
+                       conditions={"method": ['GET']})
+        # import workloads
         mapper.connect("workloads_import",
                        "/{project_id}/workloads/import_workloads",
                        controller=self.resources['workloads'],
                        action='import_workloads',
-                       conditions={"method": ['POST']})         
-        
-        #take a snapshot of the workload
+                       conditions={"method": ['POST']})
+
+        # take a snapshot of the workload
         mapper.connect("workload_snapshot",
                        "/{project_id}/workloads/{id}",
                        controller=self.resources['workloads'],
                        action='snapshot',
                        conditions={"method": ['POST']})
 
-        #pause and resume workload
+        # pause and resume workload
         mapper.connect("workloads_pause",
                        "/{project_id}/workloads/{id}/pause",
                        controller=self.resources['workloads'],
                        action='pause',
                        conditions={"method": ['POST']})
-        
+
         mapper.connect("workloads_resume",
                        "/{project_id}/workloads/{id}/resume",
                        controller=self.resources['workloads'],
                        action='resume',
                        conditions={"method": ['POST']})
-                   
+
         mapper.connect("workloads_update",
                        "/{project_id}/workloads/{id}",
                        controller=self.resources['workloads'],
                        action='update',
                        conditions={"method": ['PUT']})
-        
-        #get the workflow of a workload
+
+        # get the workflow of a workload
         mapper.connect("workloads_workflow",
                        "/{project_id}/workloads/{id}/workflow",
                        controller=self.resources['workloads'],
                        action='get_workflow',
-                       conditions={"method": ['GET']})   
-        
-        #get the topology of a workload
+                       conditions={"method": ['GET']})
+
+        # get the topology of a workload
         mapper.connect("workloads_topology",
                        "/{project_id}/workloads/{id}/topology",
                        controller=self.resources['workloads'],
                        action='get_topology',
                        conditions={"method": ['GET']})
-        
-        #unlock workload
+
+        # unlock workload
         mapper.connect("workloads_unlock",
                        "/{project_id}/workloads/{id}/unlock",
                        controller=self.resources['workloads'],
                        action='unlock',
-                       conditions={"method": ['POST']})         
+                       conditions={"method": ['POST']})
 
-        #reset workload
+        # reset workload
         mapper.connect("workloads_reset",
                        "/{project_id}/workloads/{id}/reset",
                        controller=self.resources['workloads'],
                        action='reset',
-                       conditions={"method": ['POST']})         
+                       conditions={"method": ['POST']})
 
-        #discover workload instances
+        # discover workload instances
         mapper.connect("workloads_discover_instances",
                        "/{project_id}/workloads/{id}/discover_instances",
                        controller=self.resources['workloads'],
                        action='discover_instances',
                        conditions={"method": ['POST']})
 
-        
-        ###################################################################################################        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)
-        #detail list of snapshots
+        # detail list of snapshots
         mapper.resource("snapshots_1", "snapshots",
                         controller=self.resources['snapshots'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
-        
-               
-        #get the list of workload snapshots
+
+        # get the list of workload snapshots
         mapper.connect("snapshots_2",
                        "/{project_id}/workloads/{workload_id}/snapshots",
                        controller=self.resources['snapshots'],
                        action='index',
-                       conditions={"method": ['GET']}) 
-        
-        #get the detail list of workload snapshots
+                       conditions={"method": ['GET']})
+
+        # get the detail list of workload snapshots
         mapper.connect("snapshots_3",
-                       "/{project_id}/workloads/{workload_id}/snapshots/detail",
+                       "/{project_id}/workloads/{workload_id}/"
+                       "snapshots/detail",
                        controller=self.resources['snapshots'],
                        action='detail',
-                       conditions={"method": ['GET']})  
-        
-        #get the specified snapshot
+                       conditions={"method": ['GET']})
+
+        # get the specified snapshot
         mapper.connect("snapshot_4",
                        "/{project_id}/workloads/{workload_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='show',
-                       conditions={"method": ['GET']}) 
-        
-        #restore a snapshot
+                       conditions={"method": ['GET']})
+
+        # restore a snapshot
         mapper.connect("restore_snapshot_1",
                        "/{project_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='restore',
-                       conditions={"method": ['POST']}) 
-        
-        #restore a snapshot
+                       conditions={"method": ['POST']})
+
+        # restore a snapshot
         mapper.connect("restore_snapshot_2",
                        "/{project_id}/workloads/{workload_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='restore',
-                       conditions={"method": ['POST']})     
+                       conditions={"method": ['POST']})
 
-        #delete a snapshot
+        # delete a snapshot
         mapper.connect("delete_snapshot",
                        "/{project_id}/workloads/{workload_id}/snapshots/{id}",
                        controller=self.resources['snapshots'],
                        action='delete',
-                       conditions={"method": ['DELETE']})     
+                       conditions={"method": ['DELETE']})
 
-        #cancel snapshot
+        # cancel snapshot
         mapper.connect("cancel_snapshot",
                        "/{project_id}/snapshots/{id}/cancel",
                        controller=self.resources['snapshots'],
                        action='snapshot_cancel',
                        conditions={"method": ['GET']})
 
-        #mount a snapshot
+        # mount a snapshot
         mapper.connect("mount_snapshot_1",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/mount",
+                       "/{project_id}/workloads/{workload_id}/"
+                       "snapshots/{id}/mount",
                        controller=self.resources['snapshots'],
                        action='mount',
-                       conditions={"method": ['POST']}) 
-        
+                       conditions={"method": ['POST']})
+
         mapper.connect("mount_snapshot_2",
                        "/{project_id}/snapshots/{id}/mount",
                        controller=self.resources['snapshots'],
                        action='mount',
-                       conditions={"method": ['POST']})            
-        
-        #dismount a snapshot
+                       conditions={"method": ['POST']})
+
+        # dismount a snapshot
         mapper.connect("dismount_snapshot1",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/dismount",
+                       "/{project_id}/workloads/{workload_id}/"
+                       "snapshots/{id}/dismount",
                        controller=self.resources['snapshots'],
                        action='dismount',
-                       conditions={"method": ['POST']}) 
-        
+                       conditions={"method": ['POST']})
+
         mapper.connect("dismount_snapshot2",
                        "/{project_id}/snapshots/{id}/dismount",
                        controller=self.resources['snapshots'],
                        action='dismount',
-                       conditions={"method": ['POST']})                     
+                       conditions={"method": ['POST']})
 
-        #list mounted snapshots
+        # list mounted snapshots
         mapper.connect("mounted_snapshots_list",
-                       "/{project_id}/workloads/{workload_id}/snapshots/mounted/list",
+                       "/{project_id}/workloads/{workload_id}/"
+                       "snapshots/mounted/list",
                        controller=self.resources['snapshots'],
                        action='mounted_list',
                        conditions={"method": ['GET']})
 
-        #list mounted snapshots
+        # list mounted snapshots
         mapper.connect("mounted_snapshots_list",
                        "/{project_id}/snapshots/mounted/list",
                        controller=self.resources['snapshots'],
                        action='mounted_list',
                        conditions={"method": ['GET']})
 
-
-        ###################################################################################################
         self.resources['restores'] = restores.create_resource(ext_mgr)
-        #detail list of restores
+        # detail list of restores
         mapper.resource("restores_1", "restores",
                         controller=self.resources['restores'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
-        
-               
-        #get the list of workload snapshot restores
+
+        # get the list of workload snapshot restores
         mapper.connect("restores_2",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/restores",
                        controller=self.resources['restores'],
                        action='index',
-                       conditions={"method": ['GET']}) 
-        
-        #get the detail list of workload snapshot restores
+                       conditions={"method": ['GET']})
+
+        # get the detail list of workload snapshot restores
         mapper.connect("restores_3",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/detail",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/restores/detail",
                        controller=self.resources['restores'],
                        action='detail',
-                       conditions={"method": ['GET']})  
-        
-        #get the specified restore
+                       conditions={"method": ['GET']})
+
+        # get the specified restore
         mapper.connect("restore_4",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/restores/{id}",
                        controller=self.resources['restores'],
                        action='show',
                        conditions={"method": ['GET']})
-        
-        #restore a snapshot
+
+        # restore a snapshot
         mapper.connect("restore_5",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/restores",
+                       "/{project_id}/workloads/{workload_id}/"
+                       "snapshots/{id}/restores",
                        controller=self.resources['snapshots'],
                        action='restore',
-                       conditions={"method": ['POST']})  
-        
-        #delete a restore
+                       conditions={"method": ['POST']})
+
+        # delete a restore
         mapper.connect("delete_restore",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/restores/{id}",
                        controller=self.resources['restores'],
                        action='delete',
-                       conditions={"method": ['DELETE']})         
-        
-        #cancel a restore
+                       conditions={"method": ['DELETE']})
+
+        # cancel a restore
         mapper.connect("cancel_restore",
                        "/{project_id}/restores/{id}/cancel",
                        controller=self.resources['restores'],
                        action='restore_cancel',
                        conditions={"method": ['GET']})
-                
-        ###################################################################################################
+
         self.resources['testbubbles'] = testbubbles.create_resource(ext_mgr)
-        #detail list of testbubbles
+        # detail list of testbubbles
         mapper.resource("testbubbles_1", "testbubbles",
                         controller=self.resources['testbubbles'],
                         collection={'detail': 'GET'},
                         member={'action': 'POST'})
-        
-               
-        #get the list of workload snapshot testbubbles
+
+        # get the list of workload snapshot testbubbles
         mapper.connect("testbubbles_2",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/testbubbles",
                        controller=self.resources['testbubbles'],
                        action='index',
-                       conditions={"method": ['GET']}) 
-        
-        #get the detail list of workload snapshot testbubbles
+                       conditions={"method": ['GET']})
+
+        # get the detail list of workload snapshot testbubbles
         mapper.connect("testbubbles_3",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/detail",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/testbubbles/detail",
                        controller=self.resources['testbubbles'],
                        action='detail',
-                       conditions={"method": ['GET']})  
-        
-        #get the specified testbubble
+                       conditions={"method": ['GET']})
+
+        # get the specified testbubble
         mapper.connect("testbubble_4",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/testbubbles/{id}",
                        controller=self.resources['testbubbles'],
                        action='show',
-                       conditions={"method": ['GET']})  
-        
-        #test restore a snapshot
+                       conditions={"method": ['GET']})
+
+        # test restore a snapshot
         mapper.connect("testbubble_5",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/testbubbles",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{id}/testbubbles",
                        controller=self.resources['snapshots'],
                        action='test_restore',
-                       conditions={"method": ['POST']}) 
-        
-        #delete a testbubble
+                       conditions={"method": ['POST']})
+
+        # delete a testbubble
         mapper.connect("delete_testbubble",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
+                       "/{project_id}/workloads/{workload_id}/snapshots/"
+                       "{snapshot_id}/testbubbles/{id}",
                        controller=self.resources['testbubbles'],
                        action='delete',
-                       conditions={"method": ['DELETE']})         
-        
-        ###################################################################################################
+                       conditions={"method": ['DELETE']})
+
         self.resources['settings'] = settings.create_resource(ext_mgr)
-        
-        #create settings
+
+        # create settings
         mapper.connect("create_settings",
                        "/{project_id}/settings",
                        controller=self.resources['settings'],
                        action='create',
-                       conditions={"method": ['POST']}) 
-        
-        #update settings
+                       conditions={"method": ['POST']})
+
+        # update settings
         mapper.connect("update_settings",
                        "/{project_id}/settings",
                        controller=self.resources['settings'],
                        action='update',
-                       conditions={"method": ['PUT']})                   
+                       conditions={"method": ['PUT']})
 
-        #get the list of settings
+        # get the list of settings
         mapper.connect("get_settings_list",
                        "/{project_id}/settings",
                        controller=self.resources['settings'],
                        action='index',
-                       conditions={"method": ['GET']}) 
-        
-        #get the specified setting
+                       conditions={"method": ['GET']})
+
+        # get the specified setting
         mapper.connect("get_setting",
                        "/{project_id}/settings/{name}",
                        controller=self.resources['settings'],
                        action='show',
                        conditions={"method": ['GET']})
-        
-        #delete a setting
+
+        # delete a setting
         mapper.connect("delete_setting",
                        "/{project_id}/settings/{name}",
                        controller=self.resources['settings'],
@@ -546,4 +549,3 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['tasks'],
                        action='get_tasks',
                        conditions={"method": ['GET']})
-             

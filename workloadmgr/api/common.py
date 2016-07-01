@@ -13,6 +13,7 @@ from workloadmgr.api import wsgi
 from workloadmgr.api import xmlutil
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import utils
 
 

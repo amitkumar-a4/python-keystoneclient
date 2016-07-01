@@ -8,6 +8,7 @@ import os.path
 from lxml import etree
 
 from workloadmgr import utils
+from workloadmgr.openstack.common.gettextutils import _
 
 
 XMLNS_V10 = 'http://docs.rackspacecloud.com/servers/api/v1.0'
@@ -881,7 +882,7 @@ def make_flat_dict(name, selector=None, subselector=None, ns=None):
         tagname = Selector(0)
     else:
         elemname = '{%s}%s' % (ns, name)
-        tagname = lambda obj, do_raise=False: '{%s}%s' % (ns, obj[0])
+        tagname = lambda obj, do_raise=False: '{%s}%s' % (ns, obj[0])  # nopep8
 
     if selector is None:
         selector = name

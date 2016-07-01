@@ -77,17 +77,20 @@ core_opts = [
                     '100=Everything'),
     cfg.StrOpt('api_paste_config',
                default="api-paste.ini",
-               help='File name for the paste.deploy config for workloadmgr-api'),
+               help='File name for the paste.deploy config for \
+                     workloadmgr-api'),
     cfg.StrOpt('pybasedir',
                default=os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                     '../')),
-               help='Directory where the workloadmgr python module is installed'),
+               help='Directory where the workloadmgr python \
+                     module is installed'),
     cfg.StrOpt('bindir',
                default='$pybasedir/bin',
                help='Directory where workloadmgr binaries are installed'),
     cfg.StrOpt('state_path',
                default='$pybasedir',
-               help="Top-level directory for maintaining workloadmgr's state"), ]
+               help="Top-level directory for maintaining workloadmgr's state"),
+    ]
 
 debug_opts = [
 ]
@@ -127,12 +130,12 @@ global_opts = [
                default=1000,
                help='the maximum number of items returned in a single '
                     'response from a collection resource'),
-    #cfg.StrOpt('sqlite_db',
-               #default='workloadmgr.sqlite',
-               #help='the filename to use with sqlite'),
-    #cfg.BoolOpt('sqlite_synchronous',
-                #default=True,
-                #help='If passed, use synchronous mode for sqlite'),
+    # cfg.StrOpt('sqlite_db',
+    # default='workloadmgr.sqlite',
+    # help='the filename to use with sqlite'),
+    # cfg.BoolOpt('sqlite_synchronous',
+    # default=True,
+    # help='If passed, use synchronous mode for sqlite'),
     cfg.IntOpt('sql_idle_timeout',
                default=3600,
                help='timeout before idle sql connections are reaped'),

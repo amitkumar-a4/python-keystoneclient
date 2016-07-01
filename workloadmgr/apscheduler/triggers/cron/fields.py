@@ -5,7 +5,7 @@ fields.
 
 from calendar import monthrange
 
-from workloadmgr.apscheduler.triggers.cron.expressions import *
+from workloadmgr.apscheduler.triggers.cron.expressions import *  # nopep8
 
 __all__ = ('MIN_VALUES', 'MAX_VALUES', 'DEFAULT_VALUES', 'BaseField',
            'WeekField', 'DayOfMonthField', 'DayOfWeekField')

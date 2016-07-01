@@ -1,7 +1,8 @@
-from datetime import date, datetime
+from datetime import datetime
 
-from workloadmgr.apscheduler.triggers.cron.fields import *
-from workloadmgr.apscheduler.util import datetime_ceil, convert_to_datetime, iteritems
+from workloadmgr.apscheduler.triggers.cron.fields import *  # nopep8
+from workloadmgr.apscheduler.util import datetime_ceil
+from workloadmgr.apscheduler.util import convert_to_datetime, iteritems
 
 
 class CronTrigger(object):

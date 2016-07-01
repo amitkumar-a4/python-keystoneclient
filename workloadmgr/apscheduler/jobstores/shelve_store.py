@@ -30,7 +30,7 @@ class ShelveJobStore(JobStore):
         id = None
         while not id:
             id = str(random.randint(1, self.MAX_ID))
-            if not id in self.store:
+            if id not in self.store:
                 return id
 
     def add_job(self, job):
