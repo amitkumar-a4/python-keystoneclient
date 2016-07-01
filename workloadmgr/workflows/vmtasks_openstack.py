@@ -732,9 +732,9 @@ def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
                     network_id = restored_net_resources[nic_data['mac_address']]['network_id']
                     'network-id' in nic_info and nic_info.pop('network-id')
                     'v4-fixed-ip' in nic_info and nic_info.pop('v4-fixed-ip')
-                    nic_info.setdefault('network-id', network_id)
-                    nic_info.setdefault('v4-fixed-ip',
-                           restored_net_resources[nic_data['mac_address']]['fixed_ips'][0]['ip_address'])
+                    #nic_info.setdefault('network-id', network_id)
+                    #nic_info.setdefault('v4-fixed-ip',
+                           #restored_net_resources[nic_data['mac_address']]['fixed_ips'][0]['ip_address'])
                 else:
                     #private network
                     pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'network_id')

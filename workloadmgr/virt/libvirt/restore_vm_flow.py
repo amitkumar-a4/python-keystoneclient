@@ -1416,7 +1416,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         restored_instance_id = result['restored_instance_id']
         compute_service = nova.API(production = (not test))
         restored_instance = compute_service.get_server_by_id(cntx,
-                                         restored_instance_id, admin=True)
+                                         restored_instance_id)
         
         restored_vm_values = {'vm_id': restored_instance_id,
                               'vm_name':  restored_instance.name,    
