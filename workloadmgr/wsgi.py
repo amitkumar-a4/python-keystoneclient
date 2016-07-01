@@ -25,7 +25,6 @@ import webob.exc
 from workloadmgr import exception
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import utils
 
 socket_opts = [
