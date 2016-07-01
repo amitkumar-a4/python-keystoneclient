@@ -13,7 +13,7 @@ import random
 import sys
 import time
 
-import datetime
+import datetime 
 import paramiko
 import uuid
 
@@ -74,45 +74,45 @@ class Workflow(object):
         # Check if any pre snapshot conditions
         if presnapshot is None:
             self._presnapshot = uf.Flow(self.name + "#Presnapshot")
-            self._presnapshot.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))
+            self._presnapshot.add(vmtasks.UnorderedPreSnapshot(self._store['instances']))           
         else:
             self._presnapshot = presnapshot
-
+        
         # These are snapshot metadata workflows
         if snapshotmetadata is None:
             # create a network snapshot
             self._snapshotmetadata = lf.Flow(self.name + "#SnapshotMetadata")
             self._snapshotmetadata.add(vmtasks.SnapshotVMNetworks(self.name + "#SnapshotVMNetworks"))
-
+        
             #snapshot flavors of VMs
             self._snapshotmetadata.add(vmtasks.SnapshotVMFlavors(self.name + "#SnapshotVMFlavors"))
-
+            
             #snapshot security groups of VMs
-            self._snapshotmetadata.add(vmtasks.SnapshotVMSecurityGroups(self.name + "#SnapshotVMSecurityGroups"))
+            self._snapshotmetadata.add(vmtasks.SnapshotVMSecurityGroups(self.name + "#SnapshotVMSecurityGroups"))            
         else:
             self._snapshotmetadata = snapshotmetadata
 
         self._snapshotvms = snapshotvms
-
+        
         # This is the post snapshot workflow
         if postsnapshot is None:
             # calculate the size of the snapshot
             self._postsnapshot = lf.Flow(self.name + "#Postsnapshot")
-            self._postsnapshot.add(vmtasks.LinearSnapshotDataSize(self._store['instances']))
-
+            self._postsnapshot.add(vmtasks.LinearSnapshotDataSize(self._store['instances']))        
+            
             # Now lazily copy the snapshots of VMs to tvault appliance
             self._postsnapshot.add(vmtasks.LinearUploadSnapshot(self._store['instances']))
-
+            
             # block commit any changes back to the snapshot
             self._postsnapshot.add(vmtasks.LinearPostSnapshot(self._store['instances']))
-
+            
             if composite == False:
                 #apply retention policy
                 self._postsnapshot.add(vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))
         else:
             self._postsnapshot = postsnapshot
 
-
+                       
         self._flow = lf.Flow(self.name)
 
         self._flow.add(self._presnapshot, self._snapshotmetadata, self._snapshotvms, self._postsnapshot)

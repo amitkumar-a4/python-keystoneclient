@@ -3,14 +3,14 @@
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
-import cassandraworkflow  # nopep8
-import compositeworkflow  # nopep8
-import hadoopworkflow  # nopep8
-import mongodbflow  # nopep8
-import parallelworkflow  # nopep8
-import restoreworkflow  # nopep8
-import serialworkflow  # nopep8
-import vmtasks  # nopep8
-import vmtasks_openstack  # nopep8
-import vmtasks_vcloud  # nopep8
-import workflow  # nopep8
+import cassandraworkflow
+import compositeworkflow
+import hadoopworkflow
+import mongodbflow
+import parallelworkflow
+import restoreworkflow
+import serialworkflow
+import vmtasks
+import vmtasks_openstack
+import vmtasks_vcloud
+import workflow
