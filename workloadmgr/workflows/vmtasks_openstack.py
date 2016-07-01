@@ -1157,19 +1157,10 @@ def restore_vm_networks(cntx, db, restore):
                 if dst_network_type != 'neutron':
                     instance_id = snapshot_vm.vm_id
                     mac_address = nic_data['mac_address']
-<<<<<<< HEAD
                     nic_options = _get_nic_restore_options(restore_options, instance_id, mac_address)
                     if nic_options and 'network' in nic_options:
                         nic_data['network_id'] = nic_options['network'].get('id', nic_data['network_id'])
                     restored_net_resources.setdefault(nic_data['mac_address'], nic_data)
-=======
-                    nic_options = _get_nic_restore_options(
-                        restore_options, instance_id, mac_address)
-                    if nic_options and 'new_network_id' in nic_options:
-                        nic_data['network_id'] = nic_options['new_network_id']
-                    restored_net_resources.setdefault(
-                        nic_data['mac_address'], nic_data)
->>>>>>> e866dafb7a9542f4b6483fea05ce64d19cc131fa
                     restored_net_resources[nic_data['mac_address']]['production'] = False
                     if restored_net_resources[nic_data['mac_address']]['ip_address'] == \
                        nic_data['ip_address']:
@@ -1329,13 +1320,9 @@ def restore_vm_security_groups(cntx, db, restore):
                 'security_group_type')
             if security_group_type != 'neutron':
                 continue
-<<<<<<< HEAD
             if  security_group_exists(snapshot_vm_resource):
                 restored_security_groups[snapshot_vm_resource.resource_pit_id] = \
                     snapshot_vm_resource.resource_name
-=======
-            if security_group_exists(snapshot_vm_resource):
->>>>>>> e866dafb7a9542f4b6483fea05ce64d19cc131fa
                 continue
 
             name = 'snap_of_' + db.get_metadata_value(
