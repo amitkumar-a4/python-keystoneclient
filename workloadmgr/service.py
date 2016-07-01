@@ -24,7 +24,6 @@ from workloadmgr import flags
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import rpc
-from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import utils
 from workloadmgr import version
 from workloadmgr import wsgi
@@ -238,8 +237,8 @@ class ProcessLauncher(object):
         wrap = ServerWrapper(server, workers)
         self.totalwrap = self.totalwrap + 1
         LOG.info(_('Starting %d workers'), wrap.workers)
-        while (self.running and
-               len(wrap.children) < wrap.workers and not wrap.failed):
+        while (self.running and len(wrap.children) < wrap.workers
+               and not wrap.failed):
             self._start_child(wrap)
 
     def _wait_child(self):
@@ -287,8 +286,8 @@ class ProcessLauncher(object):
                 continue
 
             LOG.info(_('wait wrap.failed %s'), wrap.failed)
-            while (self.running and
-                   len(wrap.children) < wrap.workers and not wrap.failed):
+            while (self.running and len(wrap.children) < wrap.workers
+                   and not wrap.failed):
                 self._start_child(wrap)
 
         if self.sigcaught:
@@ -389,7 +388,7 @@ class Service(object):
         ip_addresses_str = ''
         ip_addresses = utils.get_ip_addresses()
         for ip_address in ip_addresses:
-            ip_addresses_str = ip_addresses_str + ip_address + ';'
+            ip_addresses_str = ip_addresses_str +  ip_address + ';'
         service_ref = db.service_create(context,
                                         {'host': self.host,
                                          'ip_addresses': ip_addresses_str,
@@ -430,7 +429,7 @@ class Service(object):
         if report_interval is None:
             report_interval = FLAGS.report_interval
         if periodic_interval is None:
-            periodic_interval = 60  # FLAGS.periodic_interval
+            periodic_interval = 60 #FLAGS.periodic_interval
         if periodic_fuzzy_delay is None:
             periodic_fuzzy_delay = FLAGS.periodic_fuzzy_delay
         service_obj = cls(host, binary, topic, manager,
@@ -496,9 +495,9 @@ class Service(object):
             ip_addresses_str = ''
             ip_addresses = utils.get_ip_addresses()
             for ip_address in ip_addresses:
-                ip_addresses_str = ip_addresses_str + ip_address + ';'
+               ip_addresses_str = ip_addresses_str +  ip_address + ';'
             state_catalog['ip_addresses'] = ip_addresses_str
-
+               
             db.service_update(ctxt,
                               self.service_id, state_catalog)
 
@@ -604,17 +603,15 @@ def serve(*servers):
 
 def wait():
     LOG.debug(_('Full set of FLAGS:'))
-    """
-    for flag in FLAGS:
-        flag_get = FLAGS.get(flag, None)
-         hide flag contents from log if contains a password
-         should use secret flag when switch over to openstack-common
-        if ("_password" in flag or "_key" in flag or
-                (flag == "sql_connection" and "mysql:" in flag_get)):
-            LOG.debug(_('%(flag)s : FLAG SET ') % locals())
-        else:
-            LOG.debug('%(flag)s : %(flag_get)s' % locals())
-    """
+    #for flag in FLAGS:
+        #flag_get = FLAGS.get(flag, None)
+        # hide flag contents from log if contains a password
+        # should use secret flag when switch over to openstack-common
+        #if ("_password" in flag or "_key" in flag or
+        #        (flag == "sql_connection" and "mysql:" in flag_get)):
+        #    LOG.debug(_('%(flag)s : FLAG SET ') % locals())
+        #else:
+        #    LOG.debug('%(flag)s : %(flag_get)s' % locals())
     try:
         _launcher.wait()
     except KeyboardInterrupt:
