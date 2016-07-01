@@ -6,6 +6,7 @@
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.db.imports import import_workload_2_1_100
 
+
 LOG = logging.getLogger(__name__)
 
 def import_settings(cntx, new_version):
