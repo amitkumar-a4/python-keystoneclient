@@ -82,8 +82,6 @@ nova_opts = [
     cfg.IntOpt('nova_url_timeout',
                default=600,
                help='timeout value for connecting to nova in seconds'),
-
-
 ]
 
 CONF = cfg.CONF
@@ -254,7 +252,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
         if refresh_token:
             if production == True:
                 url = CONF.nova_production_endpoint_template.replace('%(project_id)s', context.tenant_id)
-                url = url.replace("v2.1", "v2")
+                url = url.replace("/v2.1/", "/v2/")
                 novaclient = nova_client.Client(CONF.nova_admin_username,
                                        CONF.nova_admin_password,
                                        project_id=context.tenant_id,
@@ -275,7 +273,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
         else:
             if production == True:
                 url = CONF.nova_production_endpoint_template % context.to_dict()
-                url = url.replace("v2.1", "v2")
+                url = url.replace("/v2.1/", "/v2/")
             else:
                 url = CONF.nova_tvault_endpoint_template % context.to_dict()
             LOG.debug(_('Novaclient connection created using URL: %s') % url)

@@ -205,8 +205,7 @@ class SnapshotsController(wsgi.Controller):
         else:
             snapshots = self._view_builder.summary_list(req, snapshots)
         return snapshots
-    
-   
+
     def _restore(self, context, id, workload_id=None, body=None, test=False):
         """Restore an existing snapshot"""
         try:

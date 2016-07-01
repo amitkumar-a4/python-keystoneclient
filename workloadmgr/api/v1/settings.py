@@ -38,7 +38,6 @@ class SettingsController(wsgi.Controller):
         """Create a new setting"""
         try:
             context = req.environ['workloadmgr.context']
-    
             try:
                 settings = body['settings']
             except KeyError:
