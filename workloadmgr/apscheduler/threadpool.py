@@ -4,7 +4,7 @@ Please note that this ThreadPool does *not* fully implement the PEP 3148
 ThreadPool!
 """
 
-from threading import Thread, Lock
+from threading import Thread, Lock, currentThread
 from weakref import ref
 import logging
 import atexit

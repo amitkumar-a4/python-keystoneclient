@@ -6,4 +6,4 @@
 DB abstraction for WorkloadMgr
 """
 
-from workloadmgr.db.api import *  # nopep8
+from workloadmgr.db.api import *

@@ -9,7 +9,7 @@ import sqlalchemy
 
 from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.openstack.common.gettextutils import _
+
 
 LOG = logging.getLogger(__name__)
 

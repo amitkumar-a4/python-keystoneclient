@@ -9,12 +9,11 @@ from logging import getLogger
 import os
 import sys
 
-from workloadmgr.apscheduler.util import *  # nopep8
-from workloadmgr.apscheduler.triggers import SimpleTrigger, IntervalTrigger
-from workloadmgr.apscheduler.triggers import CronTrigger, WorkloadMgrTrigger
+from workloadmgr.apscheduler.util import *
+from workloadmgr.apscheduler.triggers import SimpleTrigger, IntervalTrigger, CronTrigger, WorkloadMgrTrigger
 from workloadmgr.apscheduler.jobstores.ram_store import RAMJobStore
 from workloadmgr.apscheduler.job import Job, MaxInstancesReachedError
-from workloadmgr.apscheduler.events import *  # nopep8
+from workloadmgr.apscheduler.events import *
 from workloadmgr.apscheduler.threadpool import ThreadPool
 
 logger = getLogger(__name__)
@@ -98,7 +97,7 @@ class Scheduler(object):
             raise SchedulerAlreadyRunningError
 
         # Create a RAMJobStore as the default if there is no default job store
-        if 'default' not in self._jobstores:
+        if not 'default' in self._jobstores:
             self.add_jobstore(RAMJobStore(), 'default', True)
 
         # Schedule all pending jobs
@@ -347,7 +346,7 @@ class Scheduler(object):
         trigger = IntervalTrigger(interval, start_date)
         return self.add_job(trigger, func, args, kwargs, **options)
 
-    def add_workloadmgr_job(self, func, jobschedule, args=None,
+    def add_workloadmgr_job(self, func, jobschedule, args=None, 
                             kwargs=None, **options):
         """
         Schedules a job to be completed on specified intervals.
@@ -355,8 +354,7 @@ class Scheduler(object):
         :class:`~apscheduler.job.Job` class (see :ref:`job_options`).
 
         :param func: callable to run
-        :param jobschedule: how frequently the snapshot operation
-               need to be scheduled
+        :param jobschedule: how frequently the snapshot operation need to be scheduled
         :param args: list of positional arguments to call func with
         :param kwargs: dict of keyword arguments to call func with
         :param name: name of the job
@@ -369,11 +367,10 @@ class Scheduler(object):
             trigger = WorkloadMgrTrigger(jobschedule)
             return self.add_job(trigger, func, args, kwargs, **options)
         except Exception as ex:
-            # retry for OperationalError: (OperationalError)
-            # (2006, 'MySQL server has gone away')
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')  
             logger.exception(ex)
             trigger = WorkloadMgrTrigger(jobschedule)
-            return self.add_job(trigger, func, args, kwargs, **options)
+            return self.add_job(trigger, func, args, kwargs, **options)            
 
     def add_cron_job(self, func, year=None, month=None, day=None, week=None,
                      day_of_week=None, hour=None, minute=None, second=None,
@@ -461,13 +458,12 @@ class Scheduler(object):
                     self._remove_job(job, alias, jobstore)
                     return
         except Exception as ex:
-            # retry for OperationalError: (OperationalError)
-            # (2006, 'MySQL server has gone away')
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')  
             logger.exception(ex)
             for alias, jobstore in iteritems(self._jobstores):
                 if job in list(jobstore.jobs):
                     self._remove_job(job, alias, jobstore)
-                    return
+                    return        
         finally:
             self._jobstores_lock.release()
 
@@ -622,13 +618,13 @@ class Scheduler(object):
             if next_wakeup_time is not None:
                 wait_seconds = time_difference(next_wakeup_time, now)
                 logger.info('Next wakeup is due at %s (in %f seconds)',
-                            next_wakeup_time, wait_seconds)
+                             next_wakeup_time, wait_seconds)
                 try:
                     self._wakeup.wait(wait_seconds)
                 except IOError:  # Catch errno 514 on some Linux kernels
                     pass
                 except Exception as ex:
-                    logger.exception(ex)
+                    logger.exception(ex)            
                 self._wakeup.clear()
             elif self.standalone:
                 logger.info('No jobs left; shutting down scheduler')
@@ -641,7 +637,7 @@ class Scheduler(object):
                 except IOError:  # Catch errno 514 on some Linux kernels
                     pass
                 except Exception as ex:
-                    logger.exception(ex)
+                    logger.exception(ex)   
                 self._wakeup.clear()
 
         logger.info('Scheduler has been shut down')

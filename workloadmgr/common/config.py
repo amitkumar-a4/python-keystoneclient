@@ -27,6 +27,7 @@ stepping stone.
 
 """
 
+import os
 import socket
 
 from oslo.config import cfg
@@ -52,3 +53,5 @@ def _get_my_ip():
         return addr
     except socket.error:
         return "127.0.0.1"
+
+

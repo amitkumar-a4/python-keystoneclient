@@ -8,8 +8,8 @@ Jobs represent scheduled tasks.
 from threading import Lock
 from datetime import timedelta
 
-from workloadmgr.apscheduler.util import to_unicode, ref_to_obj
-from workloadmgr.apscheduler.util import get_callable_name, obj_to_ref
+from workloadmgr.apscheduler.util import to_unicode, ref_to_obj, get_callable_name,\
+    obj_to_ref
 
 
 class MaxInstancesReachedError(Exception):

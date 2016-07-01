@@ -8,16 +8,20 @@ WSGI middleware for OpenStack API controllers.
 """
 
 import routes
-import paste.urlmap
 
 from workloadmgr.api.middleware import fault
 from workloadmgr.api import wsgi
-from workloadmgr import wsgi as base_wsgi
-from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.openstack.common.gettextutils import _
+from workloadmgr import utils
+from workloadmgr import wsgi as base_wsgi
+
 
 LOG = logging.getLogger(__name__)
+
+import paste.urlmap
+
+from workloadmgr import flags
+
 
 FLAGS = flags.FLAGS
 
@@ -26,7 +30,6 @@ def root_app_factory(loader, global_conf, **local_conf):
     if not FLAGS.enable_v1_api:
         del local_conf['/v1']
     return paste.urlmap.urlmap_factory(loader, global_conf, **local_conf)
-
 
 class APIMapper(routes.Mapper):
     def routematch(self, url=None, environ=None):
@@ -61,9 +64,7 @@ class APIRouter(base_wsgi.Router):
 
     @classmethod
     def factory(cls, global_config, **local_config):
-        """
-        Simple paste factory, :class:`workloadmgr.wsgi.Router` doesn't have
-        """
+        """Simple paste factory, :class:`workloadmgr.wsgi.Router` doesn't have"""
         return cls()
 
     def __init__(self, ext_mgr=None):
@@ -125,7 +126,6 @@ class APIRouter(base_wsgi.Router):
 
 class FaultWrapper(fault.FaultWrapper):
     def __init__(self, application):
-        LOG.warn(_('workloadmgr.api.openstack:FaultWrapper is deprecated. '
-                   'Please use workloadmgr.api.middleware.fault:FaultWrapper '
-                   'instead.'))
+        LOG.warn(_('workloadmgr.api.openstack:FaultWrapper is deprecated. Please '
+                   'use workloadmgr.api.middleware.fault:FaultWrapper instead.'))
         super(FaultWrapper, self).__init__(application)

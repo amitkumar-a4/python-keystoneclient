@@ -26,6 +26,7 @@ VERSIONS = {
             {
                 "rel": "describedby",
                 "type": "application/vnd.sun.wadl+xml",
+                #(anthony) FIXME
                 "href": "http://docs.rackspacecloud.com/"
                         "servers/api/v1.1/application.wadl",
             },
