@@ -217,7 +217,7 @@ def _get_tenant_context(user_id, tenant_id):
     return context
 
 
-def novaclient(context, production=True, refresh_token=False, extensions = None):
+def novaclient(context, production=True, refresh_token=False, extensions=None):
 
     trust = _get_trusts(context.user_id, context.tenant_id)
 
@@ -252,6 +252,7 @@ def novaclient(context, production=True, refresh_token=False, extensions = None)
         if refresh_token:
             if production == True:
                 url = CONF.nova_production_endpoint_template.replace('%(project_id)s', context.tenant_id)
+                url = url.replace("/v2.1/", "/v2/")
                 novaclient = nova_client.Client(CONF.nova_admin_username,
                                        CONF.nova_admin_password,
                                        project_id=context.tenant_id,
@@ -272,6 +273,7 @@ def novaclient(context, production=True, refresh_token=False, extensions = None)
         else:
             if production == True:
                 url = CONF.nova_production_endpoint_template % context.to_dict()
+                url = url.replace("/v2.1/", "/v2/")
             else:
                 url = CONF.nova_tvault_endpoint_template % context.to_dict()
             LOG.debug(_('Novaclient connection created using URL: %s') % url)
@@ -350,6 +352,8 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                 if contego is True:
                     msg = 'Unable to call %s; Please check contego \
                            logs for more details' % func.func_name
+                    if ex.code == 413:
+                       msg = ex.message
                     raise exception.ErrorOccurred(msg)
                 else:
                     raise
@@ -596,16 +600,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
 
-        try:
-            client = novaclient(context, self._production)
-            return client.servers.delete(server=server)
-        except nova_exception.Unauthorized as unauth_ex:
-            client = novaclient(context, self._production, admin=True)
-            return client.servers.delete(server=server)
-        except Exception as ex:
-            LOG.exception(ex)
-            #TODO(gbasava): Handle the exception
-            return
+        client = kwargs['client']
+        return client.servers.delete(server=server)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
@@ -615,16 +611,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
 
-        try:
-            client = novaclient(context, self._production)
-            return client.servers.force_delete(server=server)
-        except nova_exception.Unauthorized as unauth_ex:
-            client = novaclient(context, self._production, admin=True)
-            return client.servers.force_delete(server=server)
-        except Exception as ex:
-            LOG.exception(ex)
-            #TODO(gbasava): Handle the exception
-            return
+        client = kwargs['client']
+        return client.servers.force_delete(server=server)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=True)
@@ -839,7 +827,6 @@ class API(base.Base):
             # This is configured to use nova network
             server = client.servers.get(server)
             return server._info['addresses']
-
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
     def get_networks(self, context, **kwargs):

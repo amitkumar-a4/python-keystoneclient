@@ -390,7 +390,7 @@ class LibvirtDriver(driver.ComputeDriver):
             # reboot the file manager server 
             # If the server does not exists, create a server
             fminstance = compute_service.get_server_by_id(cntx, mount_vm_id,
-                                                          admin=True)
+                                                          admin=False)
             if fminstance == None:
                 raise Exception("TrilioVault File Manager does not exists")
 
@@ -399,7 +399,7 @@ class LibvirtDriver(driver.ComputeDriver):
             while True:
                 time.sleep(1)
                 fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
-                                                            admin=True)
+                                                            admin=False)
                 if not fminstance.__dict__['OS-EXT-STS:task_state']:
                     break
                 now = timeutils.utcnow()
@@ -427,7 +427,7 @@ class LibvirtDriver(driver.ComputeDriver):
             # reboot the file manager server 
             # If the server does not exists, create a server
             fminstance = compute_service.get_server_by_id(cntx, mount_vm_id,
-                                                            admin=True)
+                                                            admin=False)
             if fminstance == None:
                 LOG.warning("TrilioVault File Manager does not exists")
             else:
@@ -437,7 +437,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 while True:
                     time.sleep(1)
                     fminstance = compute_service.get_server_by_id(cntx, fminstance.id,
-                                                            admin=True)
+                                                            admin=False)
                     if not fminstance.__dict__['OS-EXT-STS:task_state']:
                         break
                     now = timeutils.utcnow()
@@ -944,7 +944,7 @@ class LibvirtDriver(driver.ComputeDriver):
         vms = db.restored_vms_get(cntx, restore['id'])
         compute_service = nova.API(production=True)
         for vm in vms:
-            instance = compute_service.get_server_by_id(cntx, vm.vm_id, admin=True)
+            instance = compute_service.get_server_by_id(cntx, vm.vm_id, admin=False)
             compute_service.force_delete(cntx, instance)
             db.restored_vm_update( cntx, vm.vm_id, restore['id'], {'status': 'deleted'})
 

@@ -15,8 +15,6 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 
 
-LOG = logging.getLogger(__name__)
-
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
     if upgrade == False:
@@ -58,7 +56,6 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
     else:
         tenantcontext = cntx
 
-    
     workload_values = _adjust_values(tenantcontext, new_version, workload_values, upgrade)
     if workload_values['status'] == 'locked':
         workload_values['status'] = 'available'

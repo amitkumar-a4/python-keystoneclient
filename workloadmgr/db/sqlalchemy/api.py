@@ -989,7 +989,7 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     result = model_query(   context, models.Snapshots.host, func.count(models.Snapshots.host), **kwargs).\
                             filter(and_(~models.Snapshots.status.in_(['available','error','deleted','cancelled'])),models.Snapshots.host != '').\
                             group_by(models.Snapshots.host).\
-                            all()
+                            all() 
     return result
 
 @require_context
