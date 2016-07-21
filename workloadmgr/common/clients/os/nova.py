@@ -61,6 +61,7 @@ class NovaClientPlugin(client_plugin.ClientPlugin):
         management_url = self.url_for(service_type=self.COMPUTE,
                                       endpoint_type=endpoint_type)
 
+        management_url = management_url.replace("/v2.1/", "/v2/")
         computeshell = novashell.OpenStackComputeShell()
         extensions = computeshell._discover_extensions(NOVACLIENT_VERSION)
 
