@@ -32,8 +32,10 @@ from beaker.middleware import SessionMiddleware
 from cork import Cork
 import logging
 
-import keystoneclient
 import keystoneclient.v2_0.client as ksclient
+from keystoneauth1.identity.generic import password
+from keystoneauth1 import session
+from keystoneclient import client
 import workloadmgrclient
 import workloadmgrclient.v1.client as wlmclient
 from workloadmgr.compute import nova
@@ -458,16 +460,39 @@ def _authenticate_with_swift():
                 except SwiftError as e:
                     raise
 
+def _get_session(admin_url=True):
+    auth_url = config_data['keystone_admin_url']
+    if admin_url == False:
+       auth_url = config_data['keystone_public_url']
+
+    if config_data['keystone_auth_version'] == 3:
+       auth = password.Password(auth_url=auth_url,
+                                    username=config_data['admin_username'],
+                                    password=config_data['admin_password'],
+                                    project_name=config_data['admin_tenant_name'],
+                                    user_domain_id='default',
+                                    project_domain_id='default',
+                                    )
+    else:
+         auth = password.Password(auth_url=auth_url,
+                                    username=config_data['admin_username'],
+                                    password=config_data['admin_password'],
+                                    project_name=config_data['admin_tenant_name'],
+                                    )
+    sess = session.Session(auth=auth)
+    return sess
+
 def _authenticate_with_keystone():
     # Authenticate with Keystone
     #test admin url
-    try:
-            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
-                                       username=config_data['admin_username'],
-                                       password=config_data['admin_password'],
-                                       tenant_name=config_data['admin_tenant_name'],
-                                       insecure=True)
-            tenants = keystone.tenants.list()
+    try:    
+            sess = _get_session() 
+            keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+            if keystone.version == 'v3':
+               tenants = keystone.projects.list()
+            else:
+                 tenants = keystone.tenants.list()
+
     except Exception as e:
            raise Exception( "KeystoneError:Unable to connect to keystone Admin URL "+e.message  )
                      
@@ -488,20 +513,17 @@ def _authenticate_with_keystone():
 
     #test public url
     try:
-        keystone = ksclient.Client(auth_url=config_data['keystone_public_url'],
-                                   username=config_data['admin_username'],
-                                   password=config_data['admin_password'],
-                                   insecure=True)
-        tenants = keystone.tenants.list()
+        sess = _get_session(admin_url=False)
+        keystone = client.Client(session=sess, auth_url=config_data['keystone_public_url'], insecure=True)
+        if keystone.version == 'v3':
+            tenants = keystone.projects.list()
+        else:
+             tenants = keystone.tenants.list()
     except Exception as e:      
             raise Exception("KeystoneError:Unable to connect to keystone Public URL "+e.message  )
          
-
-    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
-                               username=config_data['admin_username'],
-                               password=config_data['admin_password'],
-                               tenant_name=config_data['admin_tenant_name'],
-                               insecure=True)
+    sess = _get_session()
+    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
 
     configure_mysql()
     configure_rabbitmq()
@@ -512,9 +534,16 @@ def _authenticate_with_keystone():
     configure_horizon()
 
     #image
-    kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL',
+    if keystone.version == 'v3':
+       image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
+                                                  region=config_data['region_name'], interface='public').url
+    else:
+         image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
+                                                    region=config_data['region_name']).publicurl
+
+    """kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL',
               'region_name': config_data['region_name'],}
-    image_public_url = keystone.service_catalog.url_for(**kwargs)
+    image_public_url = keystone.service_catalog.url_for(**kwargs)"""
     parse_result = urlparse(image_public_url)
     config_data['glance_production_host'] = parse_result.hostname
     config_data['glance_production_port'] = parse_result.port
@@ -522,9 +551,15 @@ def _authenticate_with_keystone():
     
     #network
     try:
-        kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL',
+        if keystone.version == 'v3':
+           network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
+                                                        region=config_data['region_name'], interface='public').url
+        else:
+             network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
+                                                          region=config_data['region_name']).publicurl
+        """kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL',
                   'region_name': config_data['region_name'],}
-        network_public_url = keystone.service_catalog.url_for(**kwargs)
+        network_public_url = keystone.service_catalog.url_for(**kwargs)"""
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
         config_data['neutron_production_url'] = "unavailable"
@@ -534,9 +569,15 @@ def _authenticate_with_keystone():
     config_data['neutron_admin_password'] = config_data['admin_password']
     
     #compute       
-    kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL',
+    if keystone.version == 'v3':
+       compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
+                                                    region=config_data['region_name'], interface='public').url
+    else:
+         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
+                                                      region=config_data['region_name']).publicurl
+    """kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL',
               'region_name': config_data['region_name'],}
-    compute_public_url = keystone.service_catalog.url_for(**kwargs)
+    compute_public_url = keystone.service_catalog.url_for(**kwargs)"""
     config_data['nova_production_endpoint_template']  =  compute_public_url.replace(
                                                             compute_public_url.split("/")[-1], 
                                                             '%(project_id)s')  
@@ -547,9 +588,15 @@ def _authenticate_with_keystone():
     
     try:
         #volume
-        kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL',
+        if keystone.version == 'v3':
+           volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id, 
+                                                       region=config_data['region_name'], interface='public').url
+        else:
+             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id, 
+                                                         region=config_data['region_name']).publicurl
+        """kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL',
                   'region_name': config_data['region_name'],}
-        volume_public_url = keystone.service_catalog.url_for(**kwargs)
+        volume_public_url = keystone.service_catalog.url_for(**kwargs)"""
         config_data['cinder_production_endpoint_template']  =  volume_public_url.replace(
                                                                 volume_public_url.split("/")[-1], 
                                                                 '%(project_id)s')
@@ -559,16 +606,21 @@ def _authenticate_with_keystone():
          
     try:        
         #object
-        kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL',
+        if keystone.version == 'v3':
+           object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
+                                                       region=config_data['region_name'], interface='public').url
+        else:
+             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
+                                                         region=config_data['region_name']).publicurl
+        """kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL',
                   'region_name': config_data['region_name'],}
-        object_public_url = keystone.service_catalog.url_for(**kwargs)
+        object_public_url = keystone.service_catalog.url_for(**kwargs)"""
         config_data['vault_swift_url']  =  object_public_url.replace(
                                                                 object_public_url.split("/")[-1], 
                                                                 'AUTH_') 
     except Exception as exception:
         #swift is not configured
         config_data['vault_swift_url']  =  ''
-    
     
     #workloadmanager
     if  config_data['nodetype'] == 'controller':
@@ -577,8 +629,14 @@ def _authenticate_with_keystone():
         config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
     else:
-        kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-        wlm_public_url = keystone.service_catalog.url_for(**kwargs)
+        if keystone.version == 'v3':
+           wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
+                                                    region=config_data['region_name'], interface='public').url
+        else:
+             wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
+                                                      region=config_data['region_name']).publicurl
+        """kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
+        wlm_public_url = keystone.service_catalog.url_for(**kwargs)"""
         parse_result = urlparse(wlm_public_url)
         
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
@@ -594,21 +652,24 @@ def _register_service():
         #nothing to do
         return {'status':'Success'}
     
-    keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'], 
-                               username=config_data['admin_username'], 
-                               password=config_data['admin_password'], 
-                               tenant_name=config_data['admin_tenant_name'],
-                               insecure=True)
-    
+   
+    sess = _get_session()
+    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+ 
     if config_data['configuration_type'] == 'openstack':
         #create user
         try:
             wlm_user = None
             users = keystone.users.list()
             for user in users:
-                if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
-                    wlm_user = user
-                    break
+                if keystone.version == 'v3':
+                   if user.name == config_data['workloadmgr_user']:
+                      wlm_user = user
+                      break
+                else:
+                     if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
+                        wlm_user = user
+                        break 
                 
             admin_role = None
             roles = keystone.roles.list()
@@ -631,18 +692,27 @@ def _register_service():
                 config_data['trustee_role'] = rolenames.pop(0)
 
             if wlm_user == None:
-                wlm_user = keystone.users.create(config_data['workloadmgr_user'],
+                if keystone.version == 'v3':
+                   wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
+                                                    password=config_data['workloadmgr_user_password'],
+                                                    email='workloadmgr@triliodata.com',
+                                                    domain='default',
+                                                    default_project=config_data['service_tenant_id'],
+                                                    enabled=True)
+                   keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
+                                        project=config_data['service_tenant_id'])
+                else:
+                     wlm_user = keystone.users.create(config_data['workloadmgr_user'],
                                                  config_data['workloadmgr_user_password'],
                                                  'workloadmgr@triliodata.com',
                                                  tenant_id=config_data['service_tenant_id'],
                                                  enabled=True)
-                keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+                     keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
 
         except Exception as exception:
             bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
             raise exception        
         
-
     #delete orphan wlm services
     services = keystone.services.list()
     endpoints = keystone.endpoints.list()
@@ -652,10 +722,24 @@ def _register_service():
                 if endpoint.service_id == service.id and endpoint.region == config_data['region_name']:
                     keystone.services.delete(service.id)
     #create service and endpoint
-    wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads',
+    if keystone.version == 'v3':
+       wlm_service = keystone.services.create(name='TrilioVaultWLM',
+                                              type='workloads',
+                                              description='Trilio Vault Workload Manager Service',
+                                              enabled=True)
+    else:
+         wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads',
                                            'Trilio Vault Workload Manager Service')
+
     wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
-    keystone.endpoints.create(config_data['region_name'],
+    if keystone.version == 'v3':
+       keystone.endpoints.create(region=config_data['region_name'],
+                                 service=wlm_service.id,
+                                 url=wlm_url,
+                                 interface='public',
+                                 enabled=True)
+    else:
+         keystone.endpoints.create(config_data['region_name'],
                               wlm_service.id, wlm_url, wlm_url, wlm_url)
         
     return {'status':'Success'}
@@ -2408,6 +2492,11 @@ def configure_openstack():
         
         config_data['keystone_admin_url'] = config_inputs['keystone-admin-url'].strip()
         config_data['keystone_public_url'] = config_inputs['keystone-public-url'].strip()
+        
+        config_data['keystone_auth_version'] = 2
+        if 'v3' in config_data['keystone_admin_url']:
+           config_data['keystone_auth_version'] = 3
+
         config_data['admin_username'] = config_inputs['admin-username'].strip()
         config_data['admin_password'] = config_inputs['admin-password']
         config_data['admin_tenant_name'] = config_inputs['admin-tenant-name'].strip()

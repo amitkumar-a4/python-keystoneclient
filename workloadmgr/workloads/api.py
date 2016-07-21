@@ -1966,7 +1966,6 @@ class API(base.Base):
             tenant_id=context.project_id,
             roles=[role_name],
             is_admin=False)
-
         clients.initialise()
         keystoneclient = clients.Clients(cntx).client("keystone")
         trust_context = keystoneclient.create_trust_context()
