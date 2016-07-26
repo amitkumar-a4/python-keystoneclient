@@ -451,7 +451,6 @@ class API(base.Base):
 
         servers = None
         client = kwargs['client']
-        import pdb;pdb.set_trace()
         servers = client.servers.list(True, search_opts)
 
         return servers
