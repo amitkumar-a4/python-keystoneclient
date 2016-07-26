@@ -92,18 +92,21 @@ def _get_auth_token():
     return httpclient.auth_token
 
 
-def _get_client(token=None, production= True):
+def _get_client(token=None, production= True, cntx=None):
     if not token and CONF.neutron_auth_strategy:
         token = _get_auth_token()
     if production == True:
         neutron_url = CONF.neutron_production_url
     else:
         neutron_url = CONF.neutron_tvault_url
+    if cntx.user_domain_id is None:
+       user_domain_id = 'default'
     params = {
         'endpoint_url': neutron_url,
         'timeout': CONF.neutron_url_timeout,
         'insecure': CONF.neutron_api_insecure,
         'auth_url': CONF.neutron_admin_auth_url,
+        'domain_name': user_domain_id,
     }
     if token:
         params['token'] = token
@@ -117,7 +120,7 @@ def get_client(context, refresh_token=False, production=True):
         token = None
     else:
         token = context.auth_token
-    return _get_client(token=token, production=production)
+    return _get_client(token=token, production=production, cntx=context)
     
 
 def exception_handler(ignore_exception=False, refresh_token=True):

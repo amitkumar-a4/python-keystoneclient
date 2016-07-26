@@ -69,7 +69,7 @@ def _snapshot_create_callback(*args, **kwargs):
     workload_id = kwargs['workload_id']
     user_id = kwargs['user_id']
     project_id = kwargs['project_id']
-    tenantcontext = nova._get_tenant_context(user_id, project_id)
+    tenantcontext = nova._get_tenant_context(user_id, project_id, kwargs['user_domain_id'], kwargs['project_domain_id'])
     
     workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
@@ -531,7 +531,9 @@ class API(base.Base):
                                                     jobstore='jobscheduler_store', 
                                                     kwargs={'workload_id':workload.id,  
                                                             'user_id': workload.user_id, 
-                                                            'project_id':workload.project_id})
+                                                            'project_id':workload.project_id,
+                                                            'user_domain_id':context.user_domain_id, 
+                                                            'project_domain_id':context.project_domain_id})
 
     @autolog.log_method(logger=Logger)
     def workload_modify(self, context, workload_id, workload):
@@ -1143,7 +1145,6 @@ class API(base.Base):
         Create a trust if one is not already established
         TODO(Murali): Turn this into a decorator
         """
-
         try:
             if not self.trust_list(context):
                 self.trust_create(context, vault.CONF.trustee_role)

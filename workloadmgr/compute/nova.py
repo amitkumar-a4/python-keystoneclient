@@ -173,10 +173,10 @@ def _get_trusts(user_id, tenant_id):
     return trust
 
 
-def _get_tenant_context(user_id, tenant_id):
-
+def _get_tenant_context(user_id, tenant_id, user_domain_id=None, project_domain_id=None):
+    if user_domain_id is None:
+       user_domain_id = 'default'
     trust = _get_trusts(user_id, tenant_id)
-
     if len(trust):
         trust_id = trust[0].value
         context = wlm_context.RequestContext(
@@ -185,7 +185,7 @@ def _get_tenant_context(user_id, tenant_id):
             trust_id=trust_id,
             tenant_id=tenant_id,
             trustor_user_id=user_id,
-            user_domain_id='default',
+            user_domain_id=user_domain_id,
             is_admin=False)
 
         clients.initialise()
@@ -194,7 +194,7 @@ def _get_tenant_context(user_id, tenant_id):
         context.auth_token = kclient.auth_token
         context.user_id = user_id
     else:
-        try:
+         try:
             httpclient = client.HTTPClient(
                 user=CONF.nova_admin_username,
                 password=CONF.nova_admin_password,
@@ -203,6 +203,7 @@ def _get_tenant_context(user_id, tenant_id):
                 endpoint_type='adminURL',
                 region_name=CONF.nova_production_region_name,
                 auth_url=CONF.nova_admin_auth_url,
+                domain_name=user_domain_id,
                 timeout=CONF.nova_url_timeout,
                 auth_system=CONF.nova_auth_system,
                 insecure=CONF.nova_api_insecure)
@@ -210,7 +211,7 @@ def _get_tenant_context(user_id, tenant_id):
             context = wlm_context.RequestContext(
                 user_id=user_id, project_id=tenant_id,
                 is_admin=True, auth_token=httpclient.auth_token)
-        except Exception:
+         except Exception:
             with excutils.save_and_reraise_exception():
                 LOG.exception(_("_get_auth_token() failed"))
 
@@ -220,6 +221,8 @@ def _get_tenant_context(user_id, tenant_id):
 def novaclient(context, production=True, refresh_token=False, extensions=None):
 
     trust = _get_trusts(context.user_id, context.tenant_id)
+    if context.user_domain_id is None:
+       user_domain_id = 'default'
 
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
@@ -232,7 +235,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                 trust_id=trust_id,
                 tenant_id=context.project_id,
                 trustor_user_id=context.user_id,
-                user_domain_id='default',
+                user_domain_id=context.user_domain_id,
                 is_admin=False)
         else:
             context = wlm_context.RequestContext(
@@ -240,7 +243,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                 project_id=context.project_id,
                 auth_token=context.auth_token,
                 trust_id=trust_id,
-                user_domain_id='default',
+                user_domain_id=context.user_domain_id,
                 is_admin=False)
 
         clients.initialise()
@@ -257,6 +260,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                                        CONF.nova_admin_password,
                                        project_id=context.tenant_id,
                                        auth_url=url,
+                                       domain_name=user_domain_id,
                                        insecure=CONF.nova_api_insecure,
                                        extensions = extensions,
                                        timeout=CONF.nova_url_timeout)
@@ -266,6 +270,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                                        CONF.nova_admin_password,
                                        project_id=context.tenant_id,
                                        auth_url=url,
+                                       domain_name=user_domain_id,
                                        insecure=CONF.nova_api_insecure,
                                        extensions = extensions,
                                        timeout=CONF.nova_url_timeout)
@@ -281,6 +286,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                                    context.auth_token,
                                    project_id=context.project_id,
                                    auth_url=url,
+                                   domain_name=user_domain_id,
                                    insecure=CONF.nova_api_insecure,
                                    extensions = extensions,
                                    timeout=CONF.nova_url_timeout)
@@ -445,6 +451,7 @@ class API(base.Base):
 
         servers = None
         client = kwargs['client']
+        import pdb;pdb.set_trace()
         servers = client.servers.list(True, search_opts)
 
         return servers

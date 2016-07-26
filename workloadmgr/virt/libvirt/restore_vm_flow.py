@@ -267,7 +267,7 @@ class UploadImageToGlance(task.Task):
         # refresh the token
         user_id = self.cntx.user_id
         project_id = self.cntx.tenant_id
-        self.cntx = nova._get_tenant_context(user_id, project_id)
+        self.cntx = nova._get_tenant_context(user_id, project_id, self.cntx.user_domain_id, self.cntx.project_domain_id)
         
         # Add hw_qemu_guest_agent information to image metadata if available
         status_hw_qemu_guest_agent = db.get_metadata_value(snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
@@ -313,7 +313,7 @@ class UploadImageToGlance(task.Task):
         try:
             user_id = self.cntx.user_id
             project_id = self.cntx.tenant_id
-            self.cntx = nova._get_tenant_context(user_id, project_id)
+            self.cntx = nova._get_tenant_context(user_id, project_id, self.cntx.user_domain_id, self.cntx.project_domain_id)
             self.image_service.delete(self.cntx, self.image_id)
         except:
             pass
@@ -382,7 +382,7 @@ class RestoreVolumeFromImage(task.Task):
                 # recreate the token here
                 user_id = self.cntx.user_id
                 project_id = self.cntx.tenant_id
-                self.cntx = nova._get_tenant_context(user_id, project_id)
+                self.cntx = nova._get_tenant_context(user_id, project_id, self.cntx.user_domain_id, self.cntx.project_domain_id)
 
         self.image_service.delete(self.cntx, image_id)
         if restored_volume['status'].lower() == 'error':
@@ -737,7 +737,7 @@ class RestoreInstanceFromImage(task.Task):
         # refresh the token
         user_id = self.cntx.user_id
         project_id = self.cntx.tenant_id
-        self.cntx = nova._get_tenant_context(user_id, project_id)
+        self.cntx = nova._get_tenant_context(user_id, project_id, self.cntx.user_domain_id, self.cntx.project_domain_id)
 
         restored_compute_image = compute_service.get_image(self.cntx, image_id)
         LOG.debug('Creating Instance ' + restored_instance_name) 
@@ -821,7 +821,7 @@ class AdjustSG(task.Task):
             # refresh the token
             user_id = self.cntx.user_id
             project_id = self.cntx.tenant_id
-            self.cntx = nova._get_tenant_context(user_id, project_id)
+            self.cntx = nova._get_tenant_context(user_id, project_id, self.cntx.user_domain_id, self.cntx.project_domain_id)
         
             self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
             sec_groups = compute_service.list_security_group(self.cntx, restored_instance_id)
@@ -869,7 +869,7 @@ class AttachVolume(task.Task):
         # refresh the token
         user_id = self.cntx.user_id
         project_id = self.cntx.tenant_id
-        self.cntx = nova._get_tenant_context(user_id, project_id)
+        self.cntx = nova._get_tenant_context(user_id, project_id, self.cntx.user_domain_id, self.cntx.project_domain_id)
         
         self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
         self.volume_service = volume_service = cinder.API()
@@ -941,7 +941,7 @@ class CopyBackupImageToVolume(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         user_id = cntx.user_id
         project_id = cntx.tenant_id
-        cntx = nova._get_tenant_context(user_id, project_id)
+        cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
         vast_params = {'volume_id': volume_id, 'volume_type': volume_type,
                        'image_id': image_id, 'image_type' : image_type,
                        'backup_image_file_path': restored_file_path,
@@ -1010,7 +1010,7 @@ class CopyBackupImageToVolume(task.Task):
                 # recreate the token here
                 user_id = cntx.user_id
                 project_id = cntx.tenant_id
-                cntx = nova._get_tenant_context(user_id, project_id)
+                cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex
@@ -1306,7 +1306,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     user_id = cntx.user_id
     project_id = cntx.tenant_id
 
-    cntx = nova._get_tenant_context(user_id, project_id)
+    cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
     context_dict = dict([('%s' % key, value)
                           for (key, value) in cntx.to_dict().iteritems()])            

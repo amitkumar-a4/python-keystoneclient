@@ -544,7 +544,7 @@ class LibvirtDriver(driver.ComputeDriver):
                LOG.exception(ex)
                user_id = cntx.user
                project_id = cntx.tenant
-               cntx = nova._get_tenant_context(user_id, project_id)
+               cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
         except Exception as ex:
                LOG.exception(ex)
                raise ex
@@ -601,7 +601,7 @@ class LibvirtDriver(driver.ComputeDriver):
                      LOG.exception(ex)
                      user_id = cntx.user
                      project_id = cntx.tenant
-                     cntx = nova._get_tenant_context(user_id, project_id)
+                     cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
               except Exception as ex:
                      LOG.exception(ex)
                      raise ex
@@ -632,7 +632,7 @@ class LibvirtDriver(driver.ComputeDriver):
                LOG.exception(ex)
                user_id = cntx.user
                project_id = cntx.tenant
-               cntx = nova._get_tenant_context(user_id, project_id)
+               cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
         except Exception as ex:
                LOG.exception(ex)
                raise ex
@@ -741,7 +741,7 @@ class LibvirtDriver(driver.ComputeDriver):
         project_id = cntx.tenant_id
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
-            cntx = nova._get_tenant_context(user_id, project_id)
+            cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
             
             snapshot_vm_resource_metadata =  {'disk_info': json.dumps(disk_info)}
             if disk_info['dev'] == 'vda' and nova_instance.image and len(nova_instance.image) > 0:
@@ -983,7 +983,7 @@ class LibvirtDriver(driver.ComputeDriver):
                       snapshot_data_ex, failed=False):
         user_id = cntx.user_id
         project_id = cntx.tenant_id
-        cntx = nova._get_tenant_context(user_id, project_id)
+        cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
         snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'],
                                         'snapshot_vm_id': instance['vm_id']}

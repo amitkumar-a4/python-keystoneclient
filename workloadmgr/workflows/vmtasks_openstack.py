@@ -86,7 +86,7 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         # tasks during upload and post snapshot processing
         user_id = cntx.user_id
         project_id = cntx.tenant_id
-        cntx = nova._get_tenant_context(user_id, project_id)
+        cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
         def _snapshot_neutron_networks(instance):
             interfaces = compute_service.get_interfaces(cntx,
@@ -692,7 +692,7 @@ def restore_vm_flavor(cntx, db, instance, restore):
 
     user_id = cntx.user_id
     project_id = cntx.tenant_id
-    cntx = nova._get_tenant_context(user_id, project_id)
+    cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
     restore_obj = db.restore_update(
         cntx, restore['id'],
@@ -773,7 +773,7 @@ def restore_keypairs(cntx, db, instances):
 
     user_id = cntx.user_id
     project_id = cntx.tenant_id
-    cntx = nova._get_tenant_context(user_id, project_id)
+    cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
     compute_service = nova.API(production=True)
     keypairs = [kp.name for kp in compute_service.get_keypairs(cntx)]
@@ -1124,7 +1124,7 @@ def restore_vm_networks(cntx, db, restore):
 
     user_id = cntx.user_id
     project_id = cntx.tenant_id
-    cntx = nova._get_tenant_context(user_id, project_id)
+    cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
     restore_obj = db.restore_update(
         cntx, restore['id'],
@@ -1305,7 +1305,7 @@ def restore_vm_security_groups(cntx, db, restore):
     # refresh token
     user_id = cntx.user_id
     project_id = cntx.tenant_id
-    cntx = nova._get_tenant_context(user_id, project_id)
+    cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
 
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
@@ -1400,7 +1400,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     # call with new context
     user_id = cntx.user_id
     project_id = cntx.tenant_id
-    cntx = nova._get_tenant_context(user_id, project_id)
+    cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
     return virtdriver.restore_vm( cntx, db, instance, restore,
                                   restored_net_resources,
                                   restored_security_groups,

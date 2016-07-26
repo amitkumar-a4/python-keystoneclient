@@ -470,8 +470,8 @@ def _get_session(admin_url=True):
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
                                     project_name=config_data['admin_tenant_name'],
-                                    user_domain_id='default',
-                                    project_domain_id='default',
+                                    user_domain_id=config_data['domain_name'],
+                                    project_domain_id=config_data['domain_name'],
                                     )
     else:
          auth = password.Password(auth_url=auth_url,
@@ -541,9 +541,6 @@ def _authenticate_with_keystone():
          image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
                                                     region=config_data['region_name']).publicurl
 
-    """kwargs = {'service_type': 'image', 'endpoint_type': 'publicURL',
-              'region_name': config_data['region_name'],}
-    image_public_url = keystone.service_catalog.url_for(**kwargs)"""
     parse_result = urlparse(image_public_url)
     config_data['glance_production_host'] = parse_result.hostname
     config_data['glance_production_port'] = parse_result.port
@@ -557,9 +554,6 @@ def _authenticate_with_keystone():
         else:
              network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
                                                           region=config_data['region_name']).publicurl
-        """kwargs = {'service_type': 'network', 'endpoint_type': 'publicURL',
-                  'region_name': config_data['region_name'],}
-        network_public_url = keystone.service_catalog.url_for(**kwargs)"""
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
         config_data['neutron_production_url'] = "unavailable"
@@ -575,9 +569,6 @@ def _authenticate_with_keystone():
     else:
          compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
                                                       region=config_data['region_name']).publicurl
-    """kwargs = {'service_type': 'compute', 'endpoint_type': 'publicURL',
-              'region_name': config_data['region_name'],}
-    compute_public_url = keystone.service_catalog.url_for(**kwargs)"""
     config_data['nova_production_endpoint_template']  =  compute_public_url.replace(
                                                             compute_public_url.split("/")[-1], 
                                                             '%(project_id)s')  
@@ -594,9 +585,6 @@ def _authenticate_with_keystone():
         else:
              volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id, 
                                                          region=config_data['region_name']).publicurl
-        """kwargs = {'service_type': 'volume', 'endpoint_type': 'publicURL',
-                  'region_name': config_data['region_name'],}
-        volume_public_url = keystone.service_catalog.url_for(**kwargs)"""
         config_data['cinder_production_endpoint_template']  =  volume_public_url.replace(
                                                                 volume_public_url.split("/")[-1], 
                                                                 '%(project_id)s')
@@ -612,9 +600,6 @@ def _authenticate_with_keystone():
         else:
              object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
                                                          region=config_data['region_name']).publicurl
-        """kwargs = {'service_type': 'object-store', 'endpoint_type': 'publicURL',
-                  'region_name': config_data['region_name'],}
-        object_public_url = keystone.service_catalog.url_for(**kwargs)"""
         config_data['vault_swift_url']  =  object_public_url.replace(
                                                                 object_public_url.split("/")[-1], 
                                                                 'AUTH_') 
@@ -635,8 +620,6 @@ def _authenticate_with_keystone():
         else:
              wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
                                                       region=config_data['region_name']).publicurl
-        """kwargs = {'service_type': 'workloads', 'endpoint_type': 'publicURL', 'region_name': config_data['region_name'],}
-        wlm_public_url = keystone.service_catalog.url_for(**kwargs)"""
         parse_result = urlparse(wlm_public_url)
         
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
@@ -696,7 +679,7 @@ def _register_service():
                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
                                                     password=config_data['workloadmgr_user_password'],
                                                     email='workloadmgr@triliodata.com',
-                                                    domain='default',
+                                                    domain=config_data['domain_name'],
                                                     default_project=config_data['service_tenant_id'],
                                                     enabled=True)
                    keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
@@ -2501,6 +2484,7 @@ def configure_openstack():
         config_data['admin_password'] = config_inputs['admin-password']
         config_data['admin_tenant_name'] = config_inputs['admin-tenant-name'].strip()
         config_data['region_name'] = config_inputs['region-name'].strip()
+        config_data['domain_name'] = config_inputs['domain-name'].strip()
         config_data['guest_name'] = config_inputs['guest-name'].strip()
         
         parse_result = urlparse(config_data['keystone_admin_url'])
