@@ -60,7 +60,9 @@ class ThreadPool(object):
             self._threads_lock.release()
 
     def _add_thread(self, core):
-        threadname = "Thread-"+str(self.num_threads)
+        threadname = list(set("Thread-%d" % index \
+                          for index in range(self.max_threads)) - \
+                          set(self._threads))[0]
         t = Thread(target=self._run_jobs, args=(threadname, core,))
         t.setDaemon(True)
         t.start()
@@ -90,7 +92,7 @@ class ThreadPool(object):
 
         self._threads_lock.acquire()
         try:
-            print name, self._threads
+            assert name in self._threads
             self._threads.remove(name)
         finally:
             self._threads_lock.release()
