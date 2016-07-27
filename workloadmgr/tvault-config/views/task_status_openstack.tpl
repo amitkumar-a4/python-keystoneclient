@@ -196,7 +196,7 @@ function taskfunction()
 		                          {
 			 						return redirectToConf(xmlhttp);	
 		                          }
-                                         //ntp configure code
+		                          document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
 		                    });
 		                 });
 		              });
@@ -261,13 +261,6 @@ $( document ).ready(function() {
                 Starting tVault service</li>
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
-    %#if 'ntp_enabled' in locals() and ntp_enabled == 'on':
-        <li id="ntp_setup" class="list-group-item"><span class="glyphicon"></span>
-        NTP setup</li>
-    %#else:
-        <li id="ntp_setup" class="list-group-item" style="display:None"><span class="glyphicon"></span>
-        NTP setup</li>
-    %#end 
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>
