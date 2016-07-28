@@ -81,6 +81,10 @@
     	<input name="region-name" {{'value=' + region_name if defined('region_name') else ''}} type="text" required="" placeholder="RegionOne" class="form-control">
     </div><br>   
     <div class="input-group">
+        <label class="input-group-addon">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" required="" placeholder="default" class="form-control">
+    </div><br>
+    <div class="input-group">
         <label class="input-group-addon">Hostname&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
         <input name="guest-name" {{'value=' + guest_name if defined('guest_name') else ''}} type="text" required="" placeholder="Hostname" class="form-control">
     </div><br> 

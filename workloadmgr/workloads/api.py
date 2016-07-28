@@ -69,7 +69,7 @@ def _snapshot_create_callback(*args, **kwargs):
     workload_id = kwargs['workload_id']
     user_id = kwargs['user_id']
     project_id = kwargs['project_id']
-    tenantcontext = nova._get_tenant_context(user_id, project_id)
+    tenantcontext = nova._get_tenant_context(**kwargs)
     
     workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
@@ -526,12 +526,25 @@ class API(base.Base):
     def workload_add_scheduler_job(self, jobschedule, workload):
         if jobschedule and len(jobschedule): 
             if 'enabled' in jobschedule and jobschedule['enabled']:                                       
+                if hasattr(context, 'user_domain_id'):
+                   if context.user_domain_id is None:
+                      user_domain_id = 'default'
+                   else:
+                        user_domain_id = context.user_domain_id
+                elif hasattr(context, 'user_domain'):
+                     if context.user_domain is None:
+                        user_domain_id = 'default'
+                     else:
+                          user_domain_id = context.user_domain
+                else:
+                     user_domain_id = 'default'
                 self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
                                                     jobstore='jobscheduler_store', 
                                                     kwargs={'workload_id':workload.id,  
                                                             'user_id': workload.user_id, 
-                                                            'project_id':workload.project_id})
+                                                            'project_id':workload.project_id,
+                                                            'user_domain_id':user_domain_id})
 
     @autolog.log_method(logger=Logger)
     def workload_modify(self, context, workload_id, workload):
@@ -1143,7 +1156,6 @@ class API(base.Base):
         Create a trust if one is not already established
         TODO(Murali): Turn this into a decorator
         """
-
         try:
             if not self.trust_list(context):
                 self.trust_create(context, vault.CONF.trustee_role)
@@ -1966,7 +1978,6 @@ class API(base.Base):
             tenant_id=context.project_id,
             roles=[role_name],
             is_admin=False)
-
         clients.initialise()
         keystoneclient = clients.Clients(cntx).client("keystone")
         trust_context = keystoneclient.create_trust_context()
