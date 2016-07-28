@@ -399,7 +399,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Take a snapshot of the workload
         """
-        
         try:
             try:
                 import gc
@@ -407,8 +406,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)  
                 
-            context = nova._get_tenant_context(context.user_id,
-                                               context.project_id)
+            context = nova._get_tenant_context(context)
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
                                                 {'host': self.host,
@@ -724,8 +722,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
 
-            context = nova._get_tenant_context(context.user_id,
-                                               context.project_id)
+            context = nova._get_tenant_context(context)
 
             restore_user_selected_value = 'Selective Restore'
             vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            

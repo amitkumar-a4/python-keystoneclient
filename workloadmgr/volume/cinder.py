@@ -105,6 +105,19 @@ def cinderclient(context, refresh_token=False):
 
     trust = _get_trusts(context.user_id, context.tenant_id)
 
+    if hasattr(context, 'user_domain_id'):
+       if context.user_domain_id is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = context.user_domain_id
+    elif hasattr(context, 'user_domain'):
+       if context.user_domain is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = context.user_domain
+    else:
+         user_domain_id = 'default'
+
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
         trust_id = trust[0].value
@@ -116,7 +129,7 @@ def cinderclient(context, refresh_token=False):
                 trust_id=trust_id,
                 tenant_id=context.project_id,
                 trustor_user_id=context.user_id,
-                user_domain_id='default',
+                user_domain_id=user_domain_id,
                 is_admin=False)
         else:
             context = wlm_context.RequestContext(
@@ -124,7 +137,7 @@ def cinderclient(context, refresh_token=False):
                 project_id=context.project_id,
                 auth_token=context.auth_token,
                 trust_id=trust_id,
-                user_domain_id='default',
+                user_domain_id=user_domain_id,
                 is_admin=False)
 
         clients.initialise()
@@ -136,6 +149,7 @@ def cinderclient(context, refresh_token=False):
                                  context.auth_token,
                                  project_id=context.project_id,
                                  auth_url=url,
+                                 domain_name=user_domain_id,
                                  insecure=CONF.cinder_api_insecure,
                                  retries=CONF.cinder_http_retries)
         # noauth extracts user_id:project_id from auth_token

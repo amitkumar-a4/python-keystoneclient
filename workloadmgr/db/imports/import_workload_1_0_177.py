@@ -52,7 +52,7 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
     db = WorkloadMgrDB().db
     workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
     if upgrade == True:
-        tenantcontext = nova._get_tenant_context(workload_values['user_id'], workload_values['project_id'])
+        tenantcontext = nova._get_tenant_context(workload_values)
     else:
         tenantcontext = cntx
 
