@@ -2187,41 +2187,20 @@ def persist_config():
     return {'status':'Success'}    
 
 def ntp_setup():    
-    try: 
+    try:
         ntps = config_data['ntp_servers']
-        ntp_str = ""
-        count = 0
-        for ntp in ntps.split(','):
-            if count > 5:
-               break
-            ntp_str += "server "+ntp.strip()+" \n"        
-
+        reachable_ntps = []
+        for ntp in ntps.strip(",").split(","):
+            if os.system("ping -c 1 " + ntp.strip()) == 0: 
+                command = ['sudo', 'ntpdate', '-s', ntp.strip()]
+                subprocess.call(command, shell=False)
+                reachable_ntps.append(ntp)
         
-        current_time = time.time()
-        delay = current_time + 300
-        status = 0
-        while delay > current_time:
-              if os.system('ping -c 1 8.8.8.8') == 0:
-                 for ntp in ntps.split(','):
-                     if os.system("ping -c 1 " + ntp.strip()) == 0: 
-                        if count > 5:
-                           break;
-                        if status == 0:
-                           command = ['sudo', 'ntpdate', '-s', ntp.strip()]
-                           subprocess.call(command, shell=False)
-                           status = 1
-                        count = count + 1
-                 break;
-              else:
-                   error_msg = "Network connection unavailabe to update time instantly"
-        
-        if status == 0:
+        if len(reachable_ntps) == 0:
            error_msg = "NTP servers unavailable to update time instantly  Enter valid servers "
 
-        if count > 5:
+        if len(reachable_ntps) > 5:
            errro_msg = "Maximum 5 servers allowed  Suppressed rest "
-
-        
 
         if 'error_msg' in vars():
            raise Exception(error_msg)
@@ -2236,10 +2215,10 @@ def ntp_setup():
                else:
                     if line.find('fallback') != -1 and detect == 1:
                         detect = 2
-                        new_contents += ntp_str
+                        new_contents += "\n".join(["server %s" % ntp for ntp in reachable_ntps[0:5]])
                     elif detect == 1:
                         detect = 3
-                        new_contents += ntp_str
+                        new_contents += "\n".join(["server %s" % ntp for ntp in reachable_ntps[0:5]])
 
                     new_contents += line+"\n"
 
