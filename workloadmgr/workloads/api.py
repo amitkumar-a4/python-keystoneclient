@@ -143,6 +143,30 @@ def _snapshot_create_callback(*args, **kwargs):
         pass
     LOG.info(_("_snapshot_create_callback Exit"))
 
+
+def create_trust(func):
+   def trust_create_wrapper(*args, **kwargs):
+       # Clean up trust if the role is changed
+       try:
+           context = args[1]
+           trusts = args[0].trust_list(context)
+           for t in trusts:
+               for meta in t.metadata:
+                   if meta.key == "role_name":
+                       if meta.value != vault.CONF.trustee_role:
+                           args[0].trust_delete(context, t.name)
+
+           # create new trust if the trust is not created
+           if not args[0].trust_list(context):
+               args[0].trust_create(context, vault.CONF.trustee_role)
+       except Exception as ex:
+           LOG.exception(ex)
+           LOG.error(_("trust is not enabled. Falling back to old mechanism"))
+
+       return func(*args, **kwargs)
+   return trust_create_wrapper
+
+
 class API(base.Base):
     """API for interacting with the Workload Manager."""
 
@@ -408,21 +432,10 @@ class API(base.Base):
         return workloads        
     
     @autolog.log_method(logger=Logger)
+    @create_trust
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
-
-        """
-        Create a trust if one is not already established
-        """
-        
-        try:
-            if not self.trust_list(context):
-                self.trust_create(context, vault.CONF.trustee_role)
-        except Exception as ex:
-            LOG.exception(ex)
-            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
-
         """
         Make the RPC call to create a workload.
         """
@@ -1138,18 +1151,8 @@ class API(base.Base):
         AUDITLOG.log(context,'Workload \'' + display_name + '\' Unlock Submitted', workload)
 
     @autolog.log_method(logger=Logger)
+    @create_trust
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
-        """
-        Create a trust if one is not already established
-        TODO(Murali): Turn this into a decorator
-        """
-
-        try:
-            if not self.trust_list(context):
-                self.trust_create(context, vault.CONF.trustee_role)
-        except Exception as ex:
-            LOG.exception(ex)
-            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
 
         """
         Make the RPC call to snapshot a workload.
@@ -1409,18 +1412,8 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
+    @create_trust
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
-        """
-        Create a trust if one is not already established
-        TODO(Murali): Turn this into a decorator
-        """
-
-        try:
-            if not self.trust_list(context):
-                self.trust_create(context, vault.CONF.trustee_role)
-        except Exception as ex:
-            LOG.exception(ex)
-            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
 
         """
         Make the RPC call to restore a snapshot.
@@ -1979,6 +1972,7 @@ class API(base.Base):
                    u'user_id': context.user_id,
                    u'is_public': False,
                    u'is_hidden': True,
+                   u'metadata': {'role_name': role_name},
                    u'type': "trust_id",}
         created_settings = []
         try:
@@ -2010,7 +2004,7 @@ class API(base.Base):
         except Exception as ex:
             pass
 
-        self.db.setting_delete(context,name)
+        self.db.setting_delete(context, name)
 
 
     @autolog.log_method(logger=Logger)
