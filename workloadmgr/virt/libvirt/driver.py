@@ -542,9 +542,7 @@ class LibvirtDriver(driver.ComputeDriver):
             status = func(*args)
         except nova_unauthorized as ex:
                LOG.exception(ex)
-               user_id = cntx.user
-               project_id = cntx.tenant
-               cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
+               cntx = nova._get_tenant_context(cntx)
         except Exception as ex:
                LOG.exception(ex)
                raise ex
@@ -599,9 +597,7 @@ class LibvirtDriver(driver.ComputeDriver):
                             return True
               except nova_unauthorized as ex:
                      LOG.exception(ex)
-                     user_id = cntx.user
-                     project_id = cntx.tenant
-                     cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
+                     cntx = nova._get_tenant_context(cntx)
               except Exception as ex:
                      LOG.exception(ex)
                      raise ex
@@ -630,9 +626,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                  {'metadata': progress_tracker_metadata})
         except nova_unauthorized as ex:
                LOG.exception(ex)
-               user_id = cntx.user
-               project_id = cntx.tenant
-               cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
+               cntx = nova._get_tenant_context(cntx)
         except Exception as ex:
                LOG.exception(ex)
                raise ex
@@ -737,11 +731,9 @@ class LibvirtDriver(driver.ComputeDriver):
             cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
         
         
-        user_id = cntx.user_id
-        project_id = cntx.tenant_id
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
-            cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
+            cntx = nova._get_tenant_context(cntx)
             
             snapshot_vm_resource_metadata =  {'disk_info': json.dumps(disk_info)}
             if disk_info['dev'] == 'vda' and nova_instance.image and len(nova_instance.image) > 0:
@@ -981,9 +973,7 @@ class LibvirtDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
     def vast_finalize(self, cntx, compute_service, instance, snapshot,
                       snapshot_data_ex, failed=False):
-        user_id = cntx.user_id
-        project_id = cntx.tenant_id
-        cntx = nova._get_tenant_context(user_id, project_id, cntx.user_domain_id, cntx.project_domain_id)
+        cntx = nova._get_tenant_context(cntx)
 
         snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'],
                                         'snapshot_vm_id': instance['vm_id']}

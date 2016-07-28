@@ -99,8 +99,20 @@ def _get_client(token=None, production= True, cntx=None):
         neutron_url = CONF.neutron_production_url
     else:
         neutron_url = CONF.neutron_tvault_url
-    if cntx.user_domain_id is None:
-       user_domain_id = 'default'
+
+    if hasattr(cntx, 'user_domain_id'):
+       if cntx.user_domain_id is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = cntx.user_domain_id
+    elif hasattr(cntx, 'user_domain'):
+       if cntx.user_domain is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = cntx.user_domain
+    else:
+         user_domain_id = 'default'
+
     params = {
         'endpoint_url': neutron_url,
         'timeout': CONF.neutron_url_timeout,

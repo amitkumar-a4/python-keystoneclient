@@ -104,8 +104,19 @@ def cinderclient(context, refresh_token=False):
     LOG.debug(_('Cinderclient connection created using URL: %s') % url)
 
     trust = _get_trusts(context.user_id, context.tenant_id)
-    if context.user_domain_id is None:
-       user_domain_id = 'default'
+
+    if hasattr(context, 'user_domain_id'):
+       if context.user_domain_id is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = context.user_domain_id
+    elif hasattr(context, 'user_domain'):
+       if context.user_domain is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = context.user_domain
+    else:
+         user_domain_id = 'default'
 
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):

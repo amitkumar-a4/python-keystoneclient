@@ -173,9 +173,40 @@ def _get_trusts(user_id, tenant_id):
     return trust
 
 
-def _get_tenant_context(user_id, tenant_id, user_domain_id=None, project_domain_id=None):
-    if user_domain_id is None:
-       user_domain_id = 'default'
+def _get_tenant_context(context):
+    if type(context) is dict:
+       user_id = context['user_id']
+       tenant_id = context['project_id']
+       if 'user_domain_id' in context:
+          user_domain_id = context['user_domain_id']
+       else:
+            user_domain_id = 'default'
+    else:   
+         if hasattr(context, 'user_id'):
+            user_id = context.user_id
+         elif hasattr(context, 'user'):
+              user_id = context.user
+
+         if hasattr(context, 'tenant_id'):
+            tenant_id = context.tenant_id
+         elif hasattr(context, 'project_id'):
+              tenant_id = context.project_id
+         elif hasattr(context, 'tenant'):
+              tenant_id = context.tenant
+
+         if hasattr(context, 'user_domain_id'):
+            if context.user_domain_id is None:
+               user_domain_id = 'default'
+            else:
+                 user_domain_id = context.user_domain_id
+         elif hasattr(context, 'user_domain'):
+              if context.user_domain is None:
+                 user_domain_id = 'default'
+              else:
+                   user_domain_id = context.user_domain
+         else:
+              user_domain_id = 'default'
+
     trust = _get_trusts(user_id, tenant_id)
     if len(trust):
         trust_id = trust[0].value
@@ -219,10 +250,19 @@ def _get_tenant_context(user_id, tenant_id, user_domain_id=None, project_domain_
 
 
 def novaclient(context, production=True, refresh_token=False, extensions=None):
-
     trust = _get_trusts(context.user_id, context.tenant_id)
-    if context.user_domain_id is None:
-       user_domain_id = 'default'
+    if hasattr(context, 'user_domain_id'):
+       if context.user_domain_id is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = context.user_domain_id
+    elif hasattr(context, 'user_domain'):
+       if context.user_domain is None:
+          user_domain_id = 'default'
+       else:
+            user_domain_id = context.user_domain
+    else:
+         user_domain_id = 'default'
 
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
@@ -235,7 +275,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                 trust_id=trust_id,
                 tenant_id=context.project_id,
                 trustor_user_id=context.user_id,
-                user_domain_id=context.user_domain_id,
+                user_domain_id=user_domain_id,
                 is_admin=False)
         else:
             context = wlm_context.RequestContext(
@@ -243,7 +283,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                 project_id=context.project_id,
                 auth_token=context.auth_token,
                 trust_id=trust_id,
-                user_domain_id=context.user_domain_id,
+                user_domain_id=user_domain_id,
                 is_admin=False)
 
         clients.initialise()
