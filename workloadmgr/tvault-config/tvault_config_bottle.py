@@ -2190,7 +2190,7 @@ def ntp_setup():
     try:
         ntps = config_data['ntp_servers']
         reachable_ntps = []
-        for ntp in ntps.strip(",").split(",")[0:5]:
+        for ntp in ntps.strip(",").split(","):
             if os.system("ping -c 1 " + ntp.strip()) == 0: 
                 command = ['sudo', 'ntpdate', '-s', ntp.strip()]
                 subprocess.call(command, shell=False)
@@ -2215,10 +2215,10 @@ def ntp_setup():
                else:
                     if line.find('fallback') != -1 and detect == 1:
                         detect = 2
-                        new_contents += "\n".join(reachable_ntps[0:5])
+                        new_contents += "\n".join(["server %s" % ntp for ntp in reachable_ntps[0:5]])
                     elif detect == 1:
                         detect = 3
-                        new_contents += "\n".join(reachable_ntps[0:5])
+                        new_contents += "\n".join(["server %s" % ntp for ntp in reachable_ntps[0:5]])
 
                     new_contents += line+"\n"
 
