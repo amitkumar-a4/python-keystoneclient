@@ -909,6 +909,7 @@ class API(base.Base):
     def get_storage_usage(self, context):
         total_capacity, total_utilization = vault.get_total_capacity(context)
         storage_usage = {'storage_type': vault.CONF.vault_storage_type,
+                         'nfs_share(s)': [vault.CONF.vault_storage_nfs_export,],
                          'total': 0,
                          'full': 0,
                          'incremental': 0,
