@@ -2463,7 +2463,10 @@ def configure_openstack():
         config_data['admin_password'] = config_inputs['admin-password']
         config_data['admin_tenant_name'] = config_inputs['admin-tenant-name'].strip()
         config_data['region_name'] = config_inputs['region-name'].strip()
-        config_data['domain_name'] = config_inputs['domain-name'].strip()
+        if 'domain-name' in config_inputs:
+           config_data['domain_name'] = config_inputs['domain-name'].strip()
+        else:
+             config_data['domain_name'] = 'default'
         config_data['guest_name'] = config_inputs['guest-name'].strip()
         
         parse_result = urlparse(config_data['keystone_admin_url'])

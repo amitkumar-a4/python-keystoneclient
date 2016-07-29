@@ -1319,7 +1319,7 @@ class API(base.Base):
                                'ip_address': nic_data['ip_address'],}
                         nic['network'] = {'id': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_id'),
                                           'name': self.db.get_metadata_value(vm_nic_snapshot.metadata, 'network_name'),
-                                          'cidr':nic_data['cidr'],
+                                          'cidr':nic_data.get('cidr', None),
                                           'network_type':nic_data['network_type']}
                         
                         pit_id = _get_pit_resource_id(vm_nic_snapshot.metadata, 'subnet_id')                        

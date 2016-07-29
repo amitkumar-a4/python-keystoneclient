@@ -10,9 +10,23 @@
 <script src="js/jquery-1.11.0.min.js"></script>
 <!-- Latest compiled and minified JavaScript -->
 <script src="js/bootstrap.min.js"></script>
+<script type="text/javascript">
+function setRequired(val) {
+    if(val.includes('v3')) {
+       $('[name="domain-name"]').attr("required", "true");
+    }
+    else {
+         $('[name="domain-name"]').removeAttr('required')
+    }
+}
+function findForm() {
+  setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
+  setRequired($("#configure_openstack input[name='keystone-public-url']").val())
+}
+</script>
 </head>
 
-<body>
+<body onload="findForm()">
 <meta content="text/html; charset=utf-8" http-equiv="content-type">
 <nav class="navbar navbar-default" role="navigation">
   <div class="container-fluid">
@@ -43,7 +57,7 @@
  		</div>
   % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
-  <form role="form" class="form-configure" action="/configure_openstack" method="post">
+  <form role="form" id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
 	%if 'nodetype' in locals() and nodetype == 'additional':
 		<input name = "nodetype" type="radio"  value="controller" >  Controller Node&nbsp;&nbsp;
 		<input name = "nodetype" type="radio"  value="additional" checked>   Additional Node <br> <br>		
@@ -58,11 +72,11 @@
     </div><br>
     <div class="input-group">    
     	<label class="input-group-addon">Keystone Admin Url</label>
-    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
+    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur="setRequired(this.value)" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Keystone Public Url</label>
-    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur="setRequired(this.value)" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
@@ -82,7 +96,7 @@
     </div><br>   
     <div class="input-group">
         <label class="input-group-addon">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" required="" placeholder="default" class="form-control">
+        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control">
     </div><br>
     <div class="input-group">
         <label class="input-group-addon">Hostname&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
