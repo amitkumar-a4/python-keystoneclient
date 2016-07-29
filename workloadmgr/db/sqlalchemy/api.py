@@ -2820,7 +2820,7 @@ def _set_metadata_for_setting(context, setting_ref, metadata,
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'settings_key': setting_ref.key,
+        metadata_values = {'settings_name': setting_ref.name,
                            'settings_project_id' : setting_ref.project_id,
                            'key': key,
                            'value': value}
@@ -2962,6 +2962,7 @@ def setting_delete(context, setting_name):
     setting = _setting_get(context, setting_name, session = session)
     for metadata_ref in setting.metadata:
         metadata_ref.purge(session=session)
+    session.refresh(setting)
     setting.purge(session=session)
      
 

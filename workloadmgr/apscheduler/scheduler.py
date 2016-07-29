@@ -57,7 +57,7 @@ class Scheduler(object):
 
         # Set general options
         config = combine_opts(gconfig, 'apscheduler.', options)
-        self.misfire_grace_time = int(config.pop('misfire_grace_time', 1))
+        self.misfire_grace_time = int(config.pop('misfire_grace_time', 30))
         self.coalesce = asbool(config.pop('coalesce', True))
         self.daemonic = asbool(config.pop('daemonic', True))
         self.standalone = asbool(config.pop('standalone', False))
@@ -591,7 +591,6 @@ class Scheduler(object):
                             jobstore.update_job(job)
                         else:
                             self._remove_job(job, alias, jobstore)
-
                     if not next_wakeup_time:
                         next_wakeup_time = job.next_run_time
                     elif job.next_run_time:
