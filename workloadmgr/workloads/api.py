@@ -349,7 +349,10 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_show(self, context, workload_id):
-        workload = self.db.workload_get(context, workload_id, project_only='yes')
+        kwargs = {}
+        if context.is_admin is False:
+            kwargs['project_only'] = 'yes'
+        workload = self.db.workload_get(context, workload_id, **kwargs)
         workload_dict = dict(workload.iteritems())
 
         workload_dict['storage_usage'] = {'usage': 0, 
