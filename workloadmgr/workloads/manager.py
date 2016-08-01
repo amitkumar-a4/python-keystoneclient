@@ -1296,18 +1296,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 object.display_description = str()
 
             for inst in snapshotvms:
-                size_kb = inst.size / 1024
+                size_converted = utils.sizeof_fmt(inst.size)
                 vms_html += """\
                             <tr style="height: 20px">
                             <td style="padding-left: 5px; font-size:12px; color:black; border: 1px solid #999;">
                             """+inst.vm_name+"""
                             </td><td style="padding-left: 5px; font-size:12px; color:black; border: 1px solid #999; ">
-                            """+str(size_kb)+""" Kb or """+str(inst.size)+""" bytes </td></tr>
+                            """+str(size_converted)+"""  or """+str(inst.size)+""" bytes </td></tr>
                             """
             
             if type == 'snapshot':
                 subject = workload.display_name + ' Snapshot finished successfully'
-                size_snap_kb = object.size / 1024
+                size_snap_converted = utils.sizeof_fmt(object.size)
 
                 minutes = object.time_taken / 60
                 seconds = object.time_taken % 60
@@ -1320,11 +1320,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('workload_type.display_name',workload_type.display_name)
                 html = html.replace('object.display_name',object.display_name)
                 html = html.replace('object.snapshot_type',object.snapshot_type)
-                html = html.replace('size_snap_kb',str(size_snap_kb))
+                html = html.replace('size_snap_kb',str(size_snap_converted))
                 html = html.replace('object.size',str(object.size))
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
+                html = html.replace('object.created_at',object.created_at)
                 html = html.replace('vms_html',vms_html)
 
                 
@@ -1335,7 +1336,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     html = html.replace('workload.display_name',workload.display_name)
                     html = html.replace('workload_type.display_name',workload_type.display_name)
                     html = html.replace('object.display_name',object.display_name)
-                    html = html.replace('size_snap_kb',str(size_snap_kb))
+                    html = html.replace('size_snap_kb',str(size_snap_converted))
                     html = html.replace('object.size',str(object.size))
                     html = html.replace('object.error_msg',object.error_msg)
                     html = html.replace('object.host',object.host)
@@ -1346,7 +1347,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif type == 'restore':
                 subject = workload.display_name + ' Restored successfully'
 
-                size_snap_kb = object.size / 1024
+                size_snap_converted = utils.sizeof_fmt(object.size)
                 minutes = object.time_taken / 60
                 seconds = object.time_taken % 60
                 time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
@@ -1357,11 +1358,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('workload_type.display_name',workload_type.display_name)
                 html = html.replace('object.display_name',object.display_name)
                 #html = html.replace('object.restore_type',object.restore_type)
-                html = html.replace('size_snap_kb',str(size_snap_kb))
+                html = html.replace('size_snap_kb',str(size_snap_converted))
                 html = html.replace('object.size',str(object.size))
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
+                html = html.replace('object.created_at',object.created_at)
                 html = html.replace('vms_html',vms_html)
                 
                 if object.status == 'error':
@@ -1371,7 +1373,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     html = html.replace('workload.display_name',workload.display_name)
                     html = html.replace('workload_type.display_name',workload_type.display_name)
                     html = html.replace('object.display_name',object.display_name)
-                    html = html.replace('size_snap_kb',str(size_snap_kb))
+                    html = html.replace('size_snap_kb',str(size_snap_converted))
                     html = html.replace('object.size',str(object.size))
                     html = html.replace('object.error_msg',object.error_msg)
                     html = html.replace('object.host',object.host)
