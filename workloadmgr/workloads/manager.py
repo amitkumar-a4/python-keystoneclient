@@ -1347,7 +1347,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif type == 'restore':
                 subject = workload.display_name + ' Restored successfully'
 
-                size_snap_kb = utils.sizeof_fmt(object.size)
+                size_snap_converted = utils.sizeof_fmt(object.size)
                 minutes = object.time_taken / 60
                 seconds = object.time_taken % 60
                 time_unit = str(minutes)+' Minutes and '+str(seconds)+' Seconds'
