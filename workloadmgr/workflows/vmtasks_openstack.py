@@ -12,6 +12,7 @@ specific flows
 import uuid
 import time
 import cPickle as pickle
+import json
 from netaddr import IPNetwork, IPAddress
 import threading
 import datetime
@@ -102,20 +103,18 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 nic.setdefault('network_type', 'neutron')
         
                 port_data = network_service.get_port(cntx, interface.port_id)
-                # TODO(giri): We may not need ports
-                # utils.append_unique(ports, port_data['port'])
-                # nic.setdefault('port_id', interface.port_id)
+                nic.setdefault('port_data', json.dumps(port_data))
 
                 subnets_data = network_service.get_subnets_from_port(
                     cntx, port_data['port'])
                 # TODO(giri): we will support only one fixedip per interface
-                # for now
-                if subnets_data['subnets'][0]:
-                    utils.append_unique(subnets, subnets_data['subnets'][0])
-                    nic.setdefault('subnet_id',
-                                   subnets_data['subnets'][0]['id'])
-                    nic.setdefault('subnet_name',
-                                   subnets_data['subnets'][0]['name'])
+                # choose ipv4 subnet
+                for subnet in subnets_data['subnets']:
+                    if subnet['ip_version'] == 4:
+                        utils.append_unique(subnets, subnet)
+                        nic.setdefault('subnet_id', subnet['id'])
+                        nic.setdefault('subnet_name', subnet['name'])
+                        break
 
                 network = network_service.get_network(
                     cntx,
@@ -987,14 +986,16 @@ def restore_vm_networks(cntx, db, restore):
                                 return port
             return None
 
-        def _create_port(name, ip_address, network_id,
-                         subnet_id):
+        def _create_port(name, network_id, subnet_id, ip_address=None):
 
             params = {'name': name,
-                      'fixed_ips': [{'ip_address': ip_address,
-                                     'subnet_id': subnet_id}],
                       'network_id': network_id,
                       'tenant_id': cntx.tenant_id}
+            if ip_address:
+                params['fixed_ips'] = [{'ip_address': ip_address,
+                                        'subnet_id': subnet_id}]
+            else:
+                params['fixed_ips'] = [{'subnet_id': subnet_id}]
 
             new_port = network_service.create_port(cntx, **params)
 
@@ -1005,8 +1006,7 @@ def restore_vm_networks(cntx, db, restore):
                                            'resource_name':  new_port['name'],
                                            'metadata': {},
                                            'status': 'available'}
-            db.restored_vm_resource_create(
-                cntx, restored_vm_resource_values)
+            db.restored_vm_resource_create( cntx, restored_vm_resource_values)
             return new_port
 
         networks_mapping = []
@@ -1092,26 +1092,15 @@ def restore_vm_networks(cntx, db, restore):
                                     ip_address))
             else:
                 try:
-                    return _create_port(port_name, ip_address,
-                                        network_id, subnet_id)
+                    return _create_port(port_name, network_id, subnet_id,
+                                        ip_address=ip_address)
                 except Exception as ex:
                     LOG.exception(ex)
 
         else:
             # Choose free IP address
             subnet = network_service.get_subnet(cntx, subnet_id)
-            for ip in IPNetwork(subnet['subnet']['cidr']):
-                if ip < IPAddress(
-                   subnet['subnet']['allocation_pools'][0]['start']) or \
-                   ip == IPAddress(subnet['subnet']['gateway_ip']):
-                    continue
-
-                new_ip_address = str(ip)
-                try:
-                    return _create_port(port_name, new_ip_address,
-                                        network_id, subnet_id)
-                except Exception as ex:
-                    LOG.exception(ex)
+            return _create_port(port_name, network_id, subnet_id)
 
         raise Exception("Could not find the network that matches the restore \
                         options")
@@ -1146,6 +1135,8 @@ def restore_vm_networks(cntx, db, restore):
                 vm_nic_snapshot = db.vm_network_resource_snap_get(
                     cntx, snapshot_vm_resource.id)
                 nic_data = pickle.loads(str(vm_nic_snapshot.pickle))
+                if 'port_data' in nic_data:
+                    nic_data['port_data'] = json.loads(nic_data['port_data'])
                 if dst_network_type != 'neutron':
                     instance_id = snapshot_vm.vm_id
                     mac_address = nic_data['mac_address']
