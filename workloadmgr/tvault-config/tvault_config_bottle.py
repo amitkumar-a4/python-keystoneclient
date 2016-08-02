@@ -535,13 +535,14 @@ def _authenticate_with_keystone():
 
     #image
     if keystone.version == 'v3':
-       image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                  region=config_data['region_name'], interface='public').url
+        image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
+                                                   region=config_data['region_name'], interface='public').url
     else:
-         image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                    region=config_data['region_name']).publicurl
+        image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
+                                                   region=config_data['region_name']).publicurl
 
     parse_result = urlparse(image_public_url)
+    config_data['glance_production_api_servers'] = image_public_url
     config_data['glance_production_host'] = parse_result.hostname
     config_data['glance_production_port'] = parse_result.port
     
@@ -2004,6 +2005,7 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_host = ', 'glance_production_host = ' + config_data['glance_production_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_port = ', 'glance_production_port = ' + str(config_data['glance_production_port']))
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_api_servers = ', 'glance_production_api_servers = ' + str(config_data['glance_production_api_servers']))
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_auth_url = ', 'neutron_admin_auth_url = ' + config_data['neutron_admin_auth_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_production_url = ', 'neutron_production_url = ' + config_data['neutron_production_url'])
