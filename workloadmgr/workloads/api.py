@@ -69,7 +69,7 @@ def _snapshot_create_callback(*args, **kwargs):
     workload_id = kwargs['workload_id']
     user_id = kwargs['user_id']
     project_id = kwargs['project_id']
-    tenantcontext = nova._get_tenant_context(**kwargs)
+    tenantcontext = nova._get_tenant_context(kwargs)
     
     workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
