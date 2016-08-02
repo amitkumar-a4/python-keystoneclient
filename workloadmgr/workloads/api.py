@@ -910,9 +910,39 @@ class API(base.Base):
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
-        total_capacity, total_utilization = vault.get_total_capacity(context)
+        def nfs_status(nfsshare):
+            status = "Offline"
+            try:
+                nfsserver = nfsshare.split(":")[0]
+                rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
+
+                for i in rpcinfo[0].split("\n")[1:]:
+                    if len(i.split()) and i.split()[3] == 'nfs':
+                        status = "Online"
+                        break
+            except Exception as ex:
+                LOG.exception(ex)
+                pass
+            
+            return status 
+
+        nfsshare = vault.CONF.vault_storage_nfs_export
+        nfsstatus = nfs_status(nfsshare)
+        if nfsstatus == "Online":
+            total_capacity, total_utilization = vault.get_total_capacity(context)
+        else:
+            total_capacity = -1
+            total_utilization = -1
+
         storage_usage = {'storage_type': vault.CONF.vault_storage_type,
-                         'nfs_share(s)': [vault.CONF.vault_storage_nfs_export,],
+                         'nfs_share(s)': [
+                                          { 
+                                            "nfsshare": nfsshare,
+                                            "status":  nfsstatus,
+                                            "capacity": total_capacity,
+                                            "utilization": total_utilization,
+                                          },
+                                         ],
                          'total': 0,
                          'full': 0,
                          'incremental': 0,
