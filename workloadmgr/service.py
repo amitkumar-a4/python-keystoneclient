@@ -389,13 +389,19 @@ class Service(object):
         ip_addresses = utils.get_ip_addresses()
         for ip_address in ip_addresses:
             ip_addresses_str = ip_addresses_str +  ip_address + ';'
-        service_ref = db.service_create(context,
+        try:
+             service_ref = db.service_create(context,
                                         {'host': self.host,
                                          'ip_addresses': ip_addresses_str,
                                          'binary': self.binary,
                                          'topic': self.topic,
                                          'report_count': 0,
                                          'availability_zone': zone})
+        except Exception as ex:
+               service_ref = db.service_get_by_args(ctxt,
+                                                 self.host,
+                                                 self.binary)
+               
         self.service_id = service_ref['id']
 
     def __getattr__(self, key):

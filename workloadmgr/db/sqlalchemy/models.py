@@ -106,6 +106,7 @@ class Service(BASE, WorkloadsBase):
     """Represents a running service on a host."""
 
     __tablename__ = 'services'
+    __table_args__ = (UniqueConstraint('host', 'topic', 'binary'), {})
     id = Column(Integer, primary_key=True)
     host = Column(String(255))  # , ForeignKey('hosts.id'))
     ip_addresses = Column(String(255))
