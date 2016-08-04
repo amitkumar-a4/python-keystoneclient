@@ -1796,7 +1796,7 @@ def configure_host():
             subprocess.check_call(command, shell=False)
             raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
             
-        if config_data['ntp_enabled'] != 'off':
+        if config_data['ntp_enabled'] != 'off' and config_data['ntp_enabled'] != 'False':
             ntp_setup()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
