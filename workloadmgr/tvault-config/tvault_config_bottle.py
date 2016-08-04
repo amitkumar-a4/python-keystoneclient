@@ -2349,11 +2349,10 @@ def configure_vmware():
 
         if 'ntp-enabled' in config_inputs:
             config_data['ntp_enabled'] = config_inputs['ntp-enabled']
+            config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
+            config_data['timezone'] = config_inputs['timezone']
         else:
             config_data['ntp_enabled'] = 'off'
-        
-        config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
-        config_data['timezone'] = config_inputs['timezone']
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
         
