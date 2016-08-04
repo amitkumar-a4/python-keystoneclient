@@ -110,10 +110,10 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 # TODO(giri): we will support only one fixedip per interface
                 # choose ipv4 subnet
                 for subnet in subnets_data['subnets']:
+                    utils.append_unique(subnets, subnet)
+                    nic.setdefault('subnet_id', subnet['id'])
+                    nic.setdefault('subnet_name', subnet['name'])
                     if subnet['ip_version'] == 4:
-                        utils.append_unique(subnets, subnet)
-                        nic.setdefault('subnet_id', subnet['id'])
-                        nic.setdefault('subnet_name', subnet['name'])
                         break
 
                 network = network_service.get_network(
