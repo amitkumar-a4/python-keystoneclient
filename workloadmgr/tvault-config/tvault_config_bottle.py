@@ -1796,7 +1796,7 @@ def configure_host():
             subprocess.check_call(command, shell=False)
             raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
             
-        if config_data['ntp_enabled'] != 'off':
+        if config_data['ntp_enabled'] != 'off' and config_data['ntp_enabled'] != 'False':
             ntp_setup()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -2349,11 +2349,10 @@ def configure_vmware():
 
         if 'ntp-enabled' in config_inputs:
             config_data['ntp_enabled'] = config_inputs['ntp-enabled']
+            config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
+            config_data['timezone'] = config_inputs['timezone']
         else:
             config_data['ntp_enabled'] = 'off'
-        
-        config_data['ntp_servers'] = config_inputs['ntp-servers'].replace(" ","")
-        config_data['timezone'] = config_inputs['timezone']
         
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export']
         
