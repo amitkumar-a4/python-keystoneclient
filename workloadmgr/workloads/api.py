@@ -1576,8 +1576,6 @@ class API(base.Base):
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
             server = compute_service.get_server_by_id(context, mount_vm_id)
-            if server.config_drive != 'True':
-                raise Exception("Recovery manager instance needs to be created with Configuration Drive")
             (image_service, image_id) = glance.get_remote_image_service(context, server.image['id'])
             metadata = image_service.show(context, server.image['id'])
             error_msg = "Recovery manager instance needs to be created with glance image property 'hw_qemu_guest_agent=yes'"
