@@ -302,6 +302,8 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def workload_get(self, context, workload_id):
+        if context.is_admin is False:
+            kwargs['project_only'] = 'yes'
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
         
@@ -309,7 +311,7 @@ class API(base.Base):
                                           'full': {'snap_count': 0, 'usage': 0}, 
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                           }
-        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes', project_only='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
@@ -360,7 +362,7 @@ class API(base.Base):
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                          }
        
-        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes', project_only='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs):
             if workload_snapshot is None:
                msg = _("Not found any snapshots or operation not allowed")
                wlm_exceptions.ErrorOccurred(reason=msg)
