@@ -879,6 +879,42 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+    def license_create(self, req, body):
+        """Create a new license. Clobbers old license"""
+        try:
+            context = req.environ['workloadmgr.context']
+
+            license_text = body['license']
+            license = self.workload_api.license_create(context, license_text)
+            return {'license' : license}
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def license_list(self, req):
+        """Returns license."""
+        try:
+            context = req.environ['workloadmgr.context']
+            license = self.workload_api.license_list(context)
+            return {'license' : license}
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))  
+
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
 
