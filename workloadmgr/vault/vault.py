@@ -97,6 +97,9 @@ wlm_vault_opts = [
     cfg.StrOpt('trustee_role',
                default='Member',
                help='Role that trustee will impersonate'),                                                         
+    cfg.StrOpt('triliovault_public_key',
+               default='/etc/workloadmgr/triliovault.pub',
+               help='Location where snapshots will be stored'),
                                                                             
 ]
 
