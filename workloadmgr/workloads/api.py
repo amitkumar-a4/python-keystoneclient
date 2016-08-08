@@ -6,20 +6,25 @@
 """
 Handles all requests relating to the  workloadmgr service.
 """
-import socket
+import base64
 import cPickle as pickle
-import json
 import importlib
+import json
+import socket
+import threading
+import time
 import uuid
+import zlib
+
+from M2Crypto import DSA
 
 from eventlet import greenthread
 
 from datetime import datetime
 from datetime import timedelta
-import time
+from hashlib import sha1
 from distutils import version
 from sqlalchemy import create_engine
-import threading
 
 from oslo_config import cfg
 
@@ -302,6 +307,9 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def workload_get(self, context, workload_id):
+        kwargs = {}
+        if context.is_admin is False:
+            kwargs['project_only'] = 'yes'
         workload = self.db.workload_get(context, workload_id)
         workload_dict = dict(workload.iteritems())
         
@@ -309,7 +317,7 @@ class API(base.Base):
                                           'full': {'snap_count': 0, 'usage': 0}, 
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                           }
-        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes', project_only='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs):
             if workload_snapshot.data_deleted == False:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = workload_dict['storage_usage']['incremental']['snap_count'] + 1
@@ -360,7 +368,7 @@ class API(base.Base):
                                           'incremental': {'snap_count': 0, 'usage': 0}
                                          }
        
-        for workload_snapshot in self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id, read_deleted='yes', project_only='yes'):
+        for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs):
             if workload_snapshot is None:
                msg = _("Not found any snapshots or operation not allowed")
                wlm_exceptions.ErrorOccurred(reason=msg)
@@ -1576,8 +1584,6 @@ class API(base.Base):
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
             server = compute_service.get_server_by_id(context, mount_vm_id)
-            if server.config_drive != 'True':
-                raise Exception("Recovery manager instance needs to be created with Configuration Drive")
             (image_service, image_id) = glance.get_remote_image_service(context, server.image['id'])
             metadata = image_service.show(context, server.image['id'])
             error_msg = "Recovery manager instance needs to be created with glance image property 'hw_qemu_guest_agent=yes'"
@@ -2072,3 +2078,71 @@ class API(base.Base):
             LOG.exception(ex)
 
         return None
+
+    @autolog.log_method(logger=Logger)
+    def license_create(self, context, license_text):
+
+        def parse_license_text(licensetext,
+                               public_key=vault.CONF.triliovault_public_key):
+            dsa = DSA.load_pub_key(public_key)
+            if not dsa.check_key():
+                raise wlm_exception.InternalError(
+                    "Invalid TrilioVault public key ",
+                    "Cannot validate license")
+
+            if not "License Key" in licensetext:
+                raise wlm_exception.InvalidLicense(
+                    message="Cannot find License Key in license key")
+
+            licensekey = licensetext[licensetext.find("License Key") + len("License Key"):].lstrip().rstrip()
+            license_pair_base64 = licensekey[0:licensekey.find('X02')]
+            license_pair = base64.b64decode(license_pair_base64)
+            ord_len = license_pair.find('\r')
+            license_text_len = ord(license_pair[0:ord_len].decode('UTF-32BE'))
+            license_text = license_pair[9:-47]
+            license_signature = license_pair[-47:]
+            if dsa.verify_asn1(sha1(license_pair[4:-47]).digest(), license_signature):
+                properties_text = zlib.decompress(license_text)
+                license = {}
+                for line in properties_text.split('\n'):
+                    if len(line.split("=")) != 2:
+                        continue
+                    license[line.split("=")[0].strip()] = line.split("=")[1].lstrip().rstrip()
+
+                return license
+            else:
+                raise wlm_exception.InvalidLicense(
+                    message="Cannot verify the license signature")
+
+        # create trust
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        license_json = json.dumps(parse_license_text(license_text))
+        setting = {u'category': "license",
+                   u'name': "license-%s" % str(uuid.uuid4()),
+                   u'description': u'TrilioVault License Key',
+                   u'value': license_json,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "license_key",}
+        created_license = []
+        try:
+            created_license.append(self.db.setting_create(context, setting))
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return created_license 
+
+    @autolog.log_method(logger=Logger)
+    def license_list(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        settings =  self.db.setting_get_all(context)
+
+        license = [t for t in settings if t.type == "license_key"]
+        return license

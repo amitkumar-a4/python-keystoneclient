@@ -177,7 +177,6 @@ class InvalidInput(Invalid):
     message = _("Invalid input received") + ": %(reason)s"
 
 
-
 class InvalidVolume(Invalid):
     message = _("Invalid volume") + ": %(reason)s"
 
@@ -497,3 +496,9 @@ class VaultStorageNotFound(NotFound):
 
 class TaskNotFound(NotFound):
     message = _("Task %(task_id)s could not be found.")
+
+class InvalidLicense(Invalid):
+    pass
+
+class InternalError(Invalid):
+    pass
