@@ -99,6 +99,18 @@ function findForm() {
         <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control">
     </div><br>
     <div class="input-group">
+         <label class="input-group-addon">Trustee Role&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <select name="trustee-role" id="trustee-role" class="form-control">
+                    %for role in roles:
+                         %if role==trustee_role:
+                             <option value="{{role}}" selected>{{role}}</option>
+                         %else:
+                              <option value="{{role}}">{{role}}</option>
+                         %end
+                    %end
+                    </select>
+    </div><br>
+    <div class="input-group">
         <label class="input-group-addon">Hostname&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
         <input name="guest-name" {{'value=' + guest_name if defined('guest_name') else ''}} type="text" required="" placeholder="Hostname" class="form-control">
     </div><br> 

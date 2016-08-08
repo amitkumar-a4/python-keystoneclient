@@ -666,14 +666,16 @@ def _register_service():
             rolenames = [role.name for role in roles \
                          if role.name not in ['ResellerAdmin', 'service',
                                               'admin', 'services']]
-            if '_member_' in rolenames:
-                config_data['trustee_role'] = '_member_'
-            elif 'Member' in rolenames:
-                config_data['trustee_role'] = 'Member'
-            elif 'member' in rolenames:
-                config_data['trustee_role'] = 'member'
-            else:
-                config_data['trustee_role'] = rolenames.pop(0)
+
+            if config_data['trustee_role'] is None:
+               if '_member_' in rolenames: 
+                  config_data['trustee_role'] = '_member_'
+               elif 'Member' in rolenames:
+                    config_data['trustee_role'] = 'Member'
+               elif 'member' in rolenames:
+                    config_data['trustee_role'] = 'member'
+               else:
+                    config_data['trustee_role'] = rolenames.pop(0)
 
             if wlm_user == None:
                 if keystone.version == 'v3':
@@ -1654,6 +1656,10 @@ def configure_form_openstack():
     timezone = get_localzone().zone
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
+    roles = ['_member_','Member','member']
+    config_data['roles'] = roles
+    if 'trustee_role' not in config_data:
+       config_data['trustee_role'] = ''
     config_data['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return config_data
 
@@ -2468,6 +2474,11 @@ def configure_openstack():
            config_data['domain_name'] = config_inputs['domain-name'].strip()
         else:
              config_data['domain_name'] = 'default'
+
+        if 'trustee-role' in config_inputs:
+            config_data['trustee_role'] = config_inputs['trustee-role'].strip()
+        else:
+             config_data['trustee_role'] = None
         config_data['guest_name'] = config_inputs['guest-name'].strip()
         
         parse_result = urlparse(config_data['keystone_admin_url'])
