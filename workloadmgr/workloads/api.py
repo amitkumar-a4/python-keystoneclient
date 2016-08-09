@@ -2094,24 +2094,29 @@ class API(base.Base):
                 raise wlm_exception.InvalidLicense(
                     message="Cannot find License Key in license key")
 
-            licensekey = licensetext[licensetext.find("License Key") + len("License Key"):].lstrip().rstrip()
-            license_pair_base64 = licensekey[0:licensekey.find('X02')]
-            license_pair = base64.b64decode(license_pair_base64)
-            ord_len = license_pair.find('\r')
-            license_text_len = ord(license_pair[0:ord_len].decode('UTF-32BE'))
-            license_text = license_pair[9:-47]
-            license_signature = license_pair[-47:]
-            if dsa.verify_asn1(sha1(license_pair[4:-47]).digest(), license_signature):
-                properties_text = zlib.decompress(license_text)
-                license = {}
-                for line in properties_text.split('\n'):
-                    if len(line.split("=")) != 2:
-                        continue
-                    license[line.split("=")[0].strip()] = line.split("=")[1].lstrip().rstrip()
+            try:
+                licensekey = licensetext[licensetext.find("License Key") + len("License Key"):].lstrip().rstrip()
+                license_pair_base64 = licensekey[0:licensekey.find('X02')]
+                license_pair = base64.b64decode(license_pair_base64)
+                ord_len = license_pair.find('\r')
+                license_text_len = ord(license_pair[0:ord_len].decode('UTF-32BE'))
+                license_text = license_pair[ord_len:license_text_len+ord_len]
+                license_signature = license_pair[ord_len+license_text_len:]
 
-                return license
-            else:
-                raise wlm_exception.InvalidLicense(
+                if dsa.verify_asn1(sha1(license_text).digest(), license_signature):
+                    properties_text = zlib.decompress(license_text[5:])
+                    license = {}
+                    for line in properties_text.split('\n'):
+                        if len(line.split("=")) != 2:
+                            continue
+                        license[line.split("=")[0].strip()] = line.split("=")[1].lstrip().rstrip()
+
+                    return license
+                else:
+                    raise wlm_exceptions.InvalidLicense(
+                        message="Cannot verify the license signature")
+            except:
+                raise wlm_exceptions.InvalidLicense(
                     message="Cannot verify the license signature")
 
         # create trust
