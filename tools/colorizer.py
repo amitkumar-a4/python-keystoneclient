@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # Copyright (c) 2014 TrilioData, Inc.
-# All Rights Reserved.
 
 """Display a subunit stream through a colorized unittest test runner."""
 
@@ -9,13 +8,13 @@ import subunit
 import sys
 import unittest
 
-import six
 import testtools
 
 
 class _AnsiColorizer(object):
-    """
-    A colorizer is an object that loosely wraps around a stream, allowing
+    """ANSI colorizer that wraps a stream object.
+
+    colorizer is an object that loosely wraps around a stream, allowing
     callers to write text to the stream in a particular color.
 
     Colorizer classes must implement C{supported()} and C{write(text, color)}.
@@ -27,9 +26,12 @@ class _AnsiColorizer(object):
         self.stream = stream
 
     def supported(cls, stream=sys.stdout):
-        """
+        """Check if platform is supported.
+
         A class method that returns True if the current platform supports
-        coloring terminal output using this method. Returns False otherwise.
+        coloring terminal output using this method.
+
+        Returns False otherwise.
         """
         if not stream.isatty():
             return False  # auto color only on TTYs
@@ -50,8 +52,7 @@ class _AnsiColorizer(object):
     supported = classmethod(supported)
 
     def write(self, text, color):
-        """
-        Write the given text to the stream in the given color.
+        """Write the given text to the stream in the given color.
 
         @param text: Text to be written to the stream.
 
@@ -62,9 +63,7 @@ class _AnsiColorizer(object):
 
 
 class _Win32Colorizer(object):
-    """
-    See _AnsiColorizer docstring.
-    """
+    """See _AnsiColorizer docstring."""
     def __init__(self, stream):
         import win32console
         red, green, blue, bold = (win32console.FOREGROUND_RED,
@@ -73,7 +72,7 @@ class _Win32Colorizer(object):
                                   win32console.FOREGROUND_INTENSITY)
         self.stream = stream
         self.screenBuffer = win32console.GetStdHandle(
-                win32console.STD_OUT_HANDLE)
+            win32console.STD_OUT_HANDLE)
         self._colors = {
             'normal': red | green | blue,
             'red': red | bold,
@@ -83,7 +82,7 @@ class _Win32Colorizer(object):
             'magenta': red | blue | bold,
             'cyan': green | blue | bold,
             'white': red | green | blue | bold
-            }
+        }
 
     def supported(cls, stream=sys.stdout):
         try:
@@ -112,9 +111,7 @@ class _Win32Colorizer(object):
 
 
 class _NullColorizer(object):
-    """
-    See _AnsiColorizer docstring.
-    """
+    """See _AnsiColorizer docstring."""
     def __init__(self, stream):
         self.stream = stream
 
@@ -240,7 +237,7 @@ class WorkloadMgrTestResult(testtools.TestResult):
         self.stopTestRun()
 
     def stopTestRun(self):
-        for cls in list(six.iterkeys(self.results)):
+        for cls in list(self.results):
             self.writeTestCase(cls)
         self.stream.writeln()
         self.writeSlowTests()

@@ -1,3 +1,4 @@
+'''
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 Trilio Data, Inc
@@ -935,3 +936,5 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
            
             vmtasks.UploadSnapshotDBEntry(self.context, 
                      db.snapshot_get(self.context, self.store['snapshot']['id']))
+'''
+

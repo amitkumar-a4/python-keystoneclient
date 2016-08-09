@@ -46,7 +46,7 @@ from workloadmgr.openstack.common.db.sqlalchemy import session
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import service
-from workloadmgr.tests import conf_fixture
+from workloadmgr.tests.unit import conf_fixture
 
 
 test_opts = [
