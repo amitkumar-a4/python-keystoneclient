@@ -59,6 +59,8 @@ TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
 TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
 WLM_USER = 'nova'
+SSL_INSECURE = True
+SSL_VERIFY = False
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -479,7 +481,7 @@ def _get_session(admin_url=True):
                                     password=config_data['admin_password'],
                                     project_name=config_data['admin_tenant_name'],
                                     )
-    sess = session.Session(auth=auth)
+    sess = session.Session(auth=auth, verify=SSL_VERIFY)
     return sess
 
 def _authenticate_with_keystone():
@@ -487,7 +489,7 @@ def _authenticate_with_keystone():
     #test admin url
     try:    
             sess = _get_session() 
-            keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+            keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
             if keystone.version == 'v3':
                tenants = keystone.projects.list()
             else:
@@ -514,7 +516,7 @@ def _authenticate_with_keystone():
     #test public url
     try:
         sess = _get_session(admin_url=False)
-        keystone = client.Client(session=sess, auth_url=config_data['keystone_public_url'], insecure=True)
+        keystone = client.Client(session=sess, auth_url=config_data['keystone_public_url'], insecure=SSL_INSECURE)
         if keystone.version == 'v3':
             tenants = keystone.projects.list()
         else:
@@ -523,7 +525,7 @@ def _authenticate_with_keystone():
             raise Exception("KeystoneError:Unable to connect to keystone Public URL "+e.message  )
          
     sess = _get_session()
-    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
 
     configure_mysql()
     configure_rabbitmq()
@@ -638,7 +640,7 @@ def _register_service():
     
    
     sess = _get_session()
-    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
  
     if config_data['configuration_type'] == 'openstack':
         #create user
@@ -739,7 +741,7 @@ def _register_workloadtypes():
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
                                tenant_id=config_data['admin_tenant_id'],
-                               insecure=True,
+                               insecure=SSL_INSECURE,
                                )
         workload_types = wlm.workload_types.list()
         
@@ -2082,6 +2084,9 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
                      'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
                      starts_with=True)        
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'domain_name = ',
+                     'domain_name = ' + config_data.get('domain_name', 'default'),
+                     starts_with=True)
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
