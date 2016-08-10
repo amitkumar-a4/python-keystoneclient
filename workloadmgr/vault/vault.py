@@ -39,9 +39,9 @@ from os import environ, walk, _exit as os_exit
 from threading import Thread
 from functools import wraps
 
-from keystoneauth1.identity import v2
+from keystoneauth1.identity.generic import password as passMod
 from keystoneauth1 import session
-from keystoneclient.v2_0 import client as keystone_v2
+from keystoneclient import client
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -100,7 +100,9 @@ wlm_vault_opts = [
     cfg.StrOpt('triliovault_public_key',
                default='/etc/workloadmgr/triliovault.pub',
                help='Location where snapshots will be stored'),
-                                                                            
+    cfg.StrOpt('domain_name',
+               default='default',
+               help='triliovault user domain name'),
 ]
 
 CONF = cfg.CONF
@@ -155,10 +157,23 @@ def get_user_to_get_email_address(context):
            tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
            context.project_id = project_id
     auth_url=CONF.keystone_endpoint_url
-    auth = v2.Password(username=username, password=password,
-    tenant_name=tenant_name, auth_url=auth_url)
-    sess = session.Session(auth=auth)
-    keystone_client = keystone_v2.Client(session=sess)
+    domain_name=CONF.get('domain_name')
+    if auth_url.find('v3') != -1:
+       auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    project_name=tenant_name,
+                                    user_domain_id=domain_name,
+                                    project_domain_id=domain_name,
+                                    )
+    else:
+         auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    project_name=tenant_name,
+                                    )
+    sess = session.Session(auth=auth, verify=False)
+    keystone_client = client.Client(session=sess, auth_url=auth_url, insecure=True)
     user = keystone_client.users.get(context.user_id)
     return user
 
