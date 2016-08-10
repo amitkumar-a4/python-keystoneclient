@@ -2085,7 +2085,7 @@ def configure_service():
                      'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
                      starts_with=True)        
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'domain_name = ',
-                     'domain_name = ' + config_data.get('domain_name', 'default'),
+                     'domain_name = ' + config_data.get('domain_name'),
                      starts_with=True)
 
         #configure api-paste

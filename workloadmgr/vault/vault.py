@@ -102,7 +102,7 @@ wlm_vault_opts = [
                help='Location where snapshots will be stored'),
     cfg.StrOpt('domain_name',
                default='default',
-               help='Location where snapshots will be stored'),
+               help='triliovault user domain name'),
 ]
 
 CONF = cfg.CONF
