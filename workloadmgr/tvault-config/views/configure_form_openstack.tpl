@@ -6,6 +6,7 @@
 
 <!-- Optional theme -->
 <link rel="stylesheet" href="css/bootstrap-theme.min.css">
+<link rel="stylesheet" href="css/font-awesome.min.css">
 
 <script src="js/jquery-1.11.0.min.js"></script>
 <!-- Latest compiled and minified JavaScript -->
@@ -59,43 +60,46 @@ function findForm() {
   <div style="margin-left:auto; margin-right:auto; padding:20px">
   <form role="form" id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
 	%if 'nodetype' in locals() and nodetype == 'additional':
-		<input name = "nodetype" type="radio"  value="controller" >  Controller Node&nbsp;&nbsp;
-		<input name = "nodetype" type="radio"  value="additional" checked>   Additional Node <br> <br>		
+		<input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node&nbsp;&nbsp;
+		<input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br> <br>		
 	%else:
-		<input name = "nodetype" type="radio"  value="controller" checked>  Controller Node&nbsp;&nbsp;
-		<input name = "nodetype" type="radio"  value="additional" >   Additional Node <br> <br>		
+		<input name = "nodetype" type="radio"  value="controller" checked onclick='$("#panel4")[0].hidden=false'>  Controller Node&nbsp;&nbsp;
+		<input name = "nodetype" type="radio"  value="additional" onclick='$("#panel4")[0].hidden=true'>   Additional Node <br> <br>		
 	%end  
 		   
     <div class="input-group">
-    	<label class="input-group-addon">Floating IP Address	</label>
-    	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control"><br>
-    </div><br>
-    <div class="input-group">    
-    	<label class="input-group-addon">Keystone Admin Url</label>
-    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur="setRequired(this.value)" type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control"><br>
-    </div><br>
-    <div class="input-group">
-    	<label class="input-group-addon">Keystone Public Url</label>
-    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur="setRequired(this.value)" type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control"><br>
+    	<label class="input-group-addon">Floating IP Address	<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
+    	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control" onblur='validate_floatingip(this)'>
+    <br> </div><br>
+    <div class="input-group" aria-describedby="adminurl_helpblock">
+    	<label class="input-group-addon">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:20px"></i></label>
+    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control">
+        <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span><br>
     </div><br>
     <div class="input-group">
-    	<label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<label class="input-group-addon">Keystone Public Url<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
+    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
+        <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span><br>
+        <br>
+    </div><br>
+    <div class="input-group">
+    	<label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
     	<input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> <br>
     </div><br>
     <div class="input-group">
-    	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="admin-password" type="password" required="" placeholder="" class="form-control"> <br>
+    	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<input name="admin-password" type="password" required="" placeholder="" class="form-control" onblur='$("#password-spinner")[0].classList.remove("hidden")'> <br>
     </div><br>
     	<div class="input-group">
-    	<label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-    	<input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control">
+    	<label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
+    	<input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur='validate_keystone_credentials(this)'>
     </div><br>
     <div class="input-group">
-    	<label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+    	<label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
     	<input name="region-name" {{'value=' + region_name if defined('region_name') else ''}} type="text" required="" placeholder="RegionOne" class="form-control">
     </div><br>   
     <div class="input-group">
-        <label class="input-group-addon">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+        <label class="input-group-addon">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
         <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control">
     </div><br>
     <div class="input-group">
@@ -115,7 +119,7 @@ function findForm() {
         <input name="guest-name" {{'value=' + guest_name if defined('guest_name') else ''}} type="text" required="" placeholder="Hostname" class="form-control">
     </div><br> 
 	<div class="input-group" >
-		<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+		<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 		<input name="name-server" {{'value=' + name_server if (defined('name_server') and len(name_server)) else ''}} type="text" placeholder="192.168.2.1" class="form-control">
 		
 		<label class="input-group-addon">Domain Search Order</label>
@@ -142,7 +146,7 @@ function findForm() {
 	        </div>
 	        <br />
 			<div class="input-group" >                                        
-				<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+				<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 				<input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
 			</div>
 	        <br />
@@ -175,9 +179,33 @@ function findForm() {
 		<div id="collapseThree" class="panel-collapse collapse in">
 		  <div class="panel-body">
 			<div class="input-group" >
-		        <label class="input-group-addon">NFS Export&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-				<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" />
+		        <label class="input-group-addon">NFS Export&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
+			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" onblur='validate_nfsshare(this)'/>
 			</div>
+		  </div>
+		</div>
+	  </div>
+	</div>
+
+	<div class="panel-group" id="accordion">
+	  <div class="panel panel-default" id="panel4">
+		<div class="panel-heading">
+		  <h4 class="panel-title">
+			<a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour">
+			  Import Workloads
+			</a>
+		  </h4>
+		</div>
+		<div id="collapseFour" class="panel-collapse collapse in">
+		  <div class="panel-body">
+	              <div class="input-group">
+			%if 'workloads_import' in locals() and workloads_import == 'on':
+				<input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+			%else:
+				<input name="workloads-import" id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+			%end
+	              </div>
+	              <br />
 		  </div>
 		</div>
 	  </div>
@@ -227,6 +255,96 @@ $('#ntp-servers').removeAttr('required');
 }
 });
 });
+
+function validate_floatingip(inputelement) {
+    url = "validate_floatingip?floatingip="+$('[name="floating-ipaddress"]')[0].value
+    $.ajax({url: url,
+            beforeSend: function() {
+             spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+             $(spinelement[0]).removeClass("hidden")
+            },
+            complete: function(result) {
+             spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+             $(spinelement[0]).addClass("hidden")
+            },
+            error: function(result) {
+             $($(inputelement).parent()[0]).addClass("has-error")
+             $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+            },
+            success: function(result) {
+             $($(inputelement).parent()[0]).addClass("has-success")
+            }
+    });
+}
+function validate_keystone_url(url, inputelement) {
+    $.ajax({url: url,
+            beforeSend: function() {
+             spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+             $(spinelement[0]).removeClass("hidden")
+            },
+            complete: function(result) {
+             spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+             $(spinelement[0]).addClass("hidden")
+            },
+            error: function(result) {
+             $($(inputelement).parent()[0]).addClass("has-error")
+             $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+            },
+            success: function(result) {
+             $($(inputelement).parent()[0]).addClass("has-success")
+            }
+    });
+}
+
+function validate_keystone_credentials(inputelement) {
+    public_url = $('[name="keystone-public-url"]')[0].value
+    admin_url = $('[name="keystone-admin-url"]')[0].value
+    project_name = $('[name="admin-tenant-name"]')[0].value
+    username = $('[name="admin-username"]')[0].value
+    password = $('[name="admin-password"]')[0].value
+    $.ajax({
+        url: "validate_keystone_credentials?public_url="+public_url+"&admin_url="+
+             admin_url+"&project_name="+project_name+"&username="+username+"&password="+password,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+        }
+    });
+}
+
+function validate_nfsshare(inputelement) {
+    nfsshare = $('[name="storage-nfs-export"]')[0].value
+    $.ajax({
+        url: "validate_nfs_share?nfsshare="+nfsshare,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+        }
+    });
+}
+
 </script>
 </body>
 </html>
