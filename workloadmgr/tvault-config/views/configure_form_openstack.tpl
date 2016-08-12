@@ -61,49 +61,49 @@ function findForm() {
   <form role="form" id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
 	%if 'nodetype' in locals() and nodetype == 'additional':
 		<input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node&nbsp;&nbsp;
-		<input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br> <br>		
+		<input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
 	%else:
 		<input name = "nodetype" type="radio"  value="controller" checked onclick='$("#panel4")[0].hidden=false'>  Controller Node&nbsp;&nbsp;
-		<input name = "nodetype" type="radio"  value="additional" onclick='$("#panel4")[0].hidden=true'>   Additional Node <br> <br>		
+		<input name = "nodetype" type="radio"  value="additional" onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
 	%end  
 		   
-    <div class="input-group">
-    	<label class="input-group-addon">Floating IP Address	<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
-    	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control" onblur='validate_floatingip(this)'>
-    <br> </div><br>
-    <div class="input-group" aria-describedby="adminurl_helpblock">
-    	<label class="input-group-addon">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:20px"></i></label>
-    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control">
-        <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span><br>
-    </div><br>
-    <div class="input-group">
-    	<label class="input-group-addon">Keystone Public Url<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
+    <div class="form-group">
+    	<label class="control-label">Floating IP Address	<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
+    	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control">
+    </div>
+    <div class="form-group">
+    	<label class="control-label">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:20px"></i></label>
+    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
+        <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+    </div>
+    <div class="form-group">
+    	<label class="control-label">Keystone Public Url<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
     	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
-        <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span><br>
-        <br>
-    </div><br>
-    <div class="input-group">
-    	<label class="input-group-addon">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-    	<input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> <br>
-    </div><br>
-    <div class="input-group">
-    	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-    	<input name="admin-password" type="password" required="" placeholder="" class="form-control"> <br>
-    </div><br>
-    	<div class="input-group">
-    	<label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
-    	<input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur='validate_keystone_credentials(this)'>
-    </div><br>
-    <div class="input-group">
-    	<label class="input-group-addon">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+        <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+    </div>
+    <div class="form-group">
+    	<label class="control-label">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> 
+    </div>
+    <div class="form-group">
+    	<label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<input name="admin-password" type="password" required="" placeholder="" class="form-control">
+    </div>
+    	<div class="form-group">
+    	<label class="control-label">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
+    	<input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur='validate_keystone_credentials(this)'  aria-describedby="cred_helpblock">
+        <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+    </div>
+    <div class="form-group">
+    	<label class="control-label">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
     	<input name="region-name" {{'value=' + region_name if defined('region_name') else ''}} type="text" required="" placeholder="RegionOne" class="form-control">
-    </div><br>   
-    <div class="input-group">
-        <label class="input-group-addon">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    </div>
+    <div class="form-group">
+        <label class="control-label">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
         <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control">
-    </div><br>
-    <div class="input-group">
-         <label class="input-group-addon">Trustee Role&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    </div>
+    <div class="form-group">
+         <label class="control-label">Trustee Role&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                     <select name="trustee-role" id="trustee-role" class="form-control">
                     %for role in roles:
                          %if role==trustee_role:
@@ -113,46 +113,42 @@ function findForm() {
                          %end
                     %end
                     </select>
-    </div><br>
-    <div class="input-group">
-        <label class="input-group-addon">Hostname&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    </div>
+    <div class="form-group">
+        <label class="control-label">Hostname&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
         <input name="guest-name" {{'value=' + guest_name if defined('guest_name') else ''}} type="text" required="" placeholder="Hostname" class="form-control">
-    </div><br> 
-	<div class="input-group" >
-		<label class="input-group-addon">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-		<input name="name-server" {{'value=' + name_server if (defined('name_server') and len(name_server)) else ''}} type="text" placeholder="192.168.2.1" class="form-control">
-		
-		<label class="input-group-addon">Domain Search Order</label>
-		<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
-	</div><br>   	      
-
-	<div class="panel-group" id="accordion" >
+    </div>
+    <div class="form-group" >
+	<label class="control-label">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+	<input name="name-server" {{'value=' + name_server if (defined('name_server') and len(name_server)) else ''}} type="text" placeholder="192.168.2.1" class="form-control">
+    </div>
+    <div class="form-group" >
+	<label class="control-label">Domain Search Order</label>
+	<input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
+     </div>
+     <div class="panel-group" id="accordion" >
 	  <div class="panel panel-default" id="panel9">
 	    <div class="panel-heading">
 	      <h4 class="panel-title">
-	        <a data-toggle="collapse" data-target="#collapseNine" href="#collapseNine">
-	          NTP
-	        </a>
+	        <a data-toggle="collapse" data-target="#collapseNine" href="#collapseNine"> NTP </a>
 	      </h4>
 	    </div>
 	    <div id="collapseNine" class="panel-collapse collapse in">
 	      <div class="panel-body">
-	        <div class="input-group">
-				%if 'ntp_enabled' in locals() and ntp_enabled == 'on':
-					<input name="ntp-enabled" checked id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px;">(List ntp servers separated by comma) </span>
-				%else:
-					<input name="ntp-enabled" id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px">(List ntp servers separated by comma) </span>
-				%end    		
+	        <div class="form-group">
+			%if 'ntp_enabled' in locals() and ntp_enabled == 'on':
+				<input name="ntp-enabled" checked id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px;">(List ntp servers separated by comma) </span>
+			%else:
+				<input name="ntp-enabled" id="ntp-enabled" type="checkbox"> NTP <span style="font-size:11px">(List ntp servers separated by comma) </span>
+			%end    		
 	        </div>
-	        <br />
-			<div class="input-group" >                                        
-				<label class="input-group-addon">NTP servers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-				<input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
-			</div>
-	        <br />
-	        <div class="input-group">
-	         <label class="input-group-addon">Timezone&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-	            <select name="timezone" id="timezone" class="form-control">
+		<div class="form-group" >                                        
+			<label class="control-label">NTP servers</label>
+			<input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
+		</div>
+	        <div class="form-group">
+	         <label class="control-label">Timezone</label>
+	         <select name="timezone" id="timezone" class="form-control">
 	            %for tz in timezones:
 					%if tz==timezone:
 						<option value="{{tz}}" selected>{{tz}}</option>
@@ -160,7 +156,7 @@ function findForm() {
 						<option value="{{tz}}">{{tz}}</option>
 					%end
 				%end
-	            </select>
+	         </select>
 	        </div>
 	      </div>
 	    </div>
@@ -178,9 +174,10 @@ function findForm() {
 		</div>
 		<div id="collapseThree" class="panel-collapse collapse in">
 		  <div class="panel-body">
-			<div class="input-group" >
-		        <label class="input-group-addon">NFS Export&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
-			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" onblur='validate_nfsshare(this)'/>
+			<div class="form-group" >
+		        <label class="control-label">NFS Export&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
+			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" onblur='validate_nfsshare(this)'  aria-describedby="nfs_helpblock">
+                        <span id="nfs_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
 			</div>
 		  </div>
 		</div>
@@ -191,14 +188,12 @@ function findForm() {
 	  <div class="panel panel-default" id="panel4">
 		<div class="panel-heading">
 		  <h4 class="panel-title">
-			<a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour">
-			  Import Workloads
-			</a>
+			<a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
 		  </h4>
 		</div>
 		<div id="collapseFour" class="panel-collapse collapse in">
 		  <div class="panel-body">
-	              <div class="input-group">
+	              <div class="form-group">
 			%if 'workloads_import' in locals() and workloads_import == 'on':
 				<input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
 			%else:
@@ -223,12 +218,12 @@ function findForm() {
 		</div>
 		<div id="collapseFive" class="panel-collapse">
 		  <div class="panel-body">
-			<div class="input-group">
-				<label class="input-group-addon">URL Template&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+			<div class="form-group">
+				<label class="control-label">URL Template&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 				<input name="swift-url-template" {{'value=' + swift_url_template if (defined('swift_url_template') and len(swift_url_template)) else ''}} type="text" placeholder="http://swifthost:8080/v1/AUTH_%(project_id)s" class="form-control"><br>
 			</div><br>
-			<div class="input-group">
-				<label class="input-group-addon">Container Prefix&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+			<div class="form-group">
+				<label class="control-label">Container Prefix&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 				<input name="swift-container-prefix" type="text" {{'value=' + swift_container_prefix if (defined('swift_container_prefix') and len(swift_container_prefix)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
 			</div><br>  			
 		  </div>
@@ -256,28 +251,6 @@ $('#ntp-servers').removeAttr('required');
 });
 });
 
-function validate_floatingip(inputelement) {
-    url = "validate_floatingip?floatingip="+$('[name="floating-ipaddress"]')[0].value
-    $.ajax({url: url,
-            beforeSend: function() {
-             spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-             $(spinelement[0]).removeClass("hidden")
-             $($(inputelement).parent()[0]).removeClass("has-error")
-             $($(inputelement).parent()[0]).removeClass("has-success")
-            },
-            complete: function(result) {
-             spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-             $(spinelement[0]).addClass("hidden")
-            },
-            error: function(result) {
-             $($(inputelement).parent()[0]).addClass("has-error")
-             $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
-            },
-            success: function(result) {
-             $($(inputelement).parent()[0]).addClass("has-success")
-            }
-    });
-}
 function validate_keystone_url(url, inputelement) {
     $.ajax({url: url,
             beforeSend: function() {
@@ -292,7 +265,8 @@ function validate_keystone_url(url, inputelement) {
             },
             error: function(result) {
              $($(inputelement).parent()[0]).addClass("has-error")
-             $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+             $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+             $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
             },
             success: function(result) {
              $($(inputelement).parent()[0]).addClass("has-success")
@@ -321,7 +295,8 @@ function validate_keystone_credentials(inputelement) {
         },
         error: function(result) {
            $($(inputelement).parent()[0]).addClass("has-error")
-           $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
         },
         success: function(result) {
            $($(inputelement).parent()[0]).addClass("has-success")
@@ -350,7 +325,8 @@ function validate_nfsshare(inputelement) {
         },
         error: function(result) {
            $($(inputelement).parent()[0]).addClass("has-error")
-           $($($(inputelement).parent()[0]).find("span")[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
         },
         success: function(result) {
            $($(inputelement).parent()[0]).addClass("has-success")
