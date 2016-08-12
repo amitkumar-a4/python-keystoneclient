@@ -196,7 +196,25 @@ function taskfunction()
 		                          {
 			 						return redirectToConf(xmlhttp);	
 		                          }
-		                          document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
+                                          if (document.getElementById("workloads_import") != null) {
+		                             loadXMLDoc("workloads_import",function() {
+		   	   	                        document.getElementById("workloads_import").children[0].classList.add("glyphicon-refresh");
+		      	                        if (xmlhttp.readyState != 4) return;
+		      	                        document.getElementById("workloads_import").children[0].classList.remove("glyphicon-refresh");
+		                                if (xmlhttp.readyState==4 && xmlhttp.status==200)
+		                                {
+		                                   document.getElementById("workloads_import").classList.add("list-group-item-success");
+		                                   document.getElementById("workloads_import").children[0].classList.add("glyphicon-ok");
+		                                }
+		                                else
+		                                {
+			 				return redirectToConf(xmlhttp);	
+		                                }
+		                                document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
+		                             });
+                                          } else {
+		                             document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
+                                          }
 		                    });
 		                 });
 		              });
@@ -261,6 +279,10 @@ $( document ).ready(function() {
                 Starting tVault service</li>
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
+    %if 'workloads_import' in locals() and locals()['workloads_import'] is True:
+    <li id="workloads_import" class="list-group-item"><span class="glyphicon"></span>
+                Import Workloads from Backup Media</li>
+    %end
     <li id="final_status" class="list-group-item"><span class="glyphicon"></span>
                 Final Status</li>
   </ul>
