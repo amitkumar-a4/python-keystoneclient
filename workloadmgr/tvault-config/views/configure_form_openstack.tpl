@@ -88,7 +88,7 @@ function findForm() {
     </div><br>
     <div class="input-group">
     	<label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-    	<input name="admin-password" type="password" required="" placeholder="" class="form-control" onblur='$("#password-spinner")[0].classList.remove("hidden")'> <br>
+    	<input name="admin-password" type="password" required="" placeholder="" class="form-control"> <br>
     </div><br>
     	<div class="input-group">
     	<label class="input-group-addon">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
@@ -262,6 +262,8 @@ function validate_floatingip(inputelement) {
             beforeSend: function() {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
              $(spinelement[0]).removeClass("hidden")
+             $($(inputelement).parent()[0]).removeClass("has-error")
+             $($(inputelement).parent()[0]).removeClass("has-success")
             },
             complete: function(result) {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
@@ -281,6 +283,8 @@ function validate_keystone_url(url, inputelement) {
             beforeSend: function() {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
              $(spinelement[0]).removeClass("hidden")
+             $($(inputelement).parent()[0]).removeClass("has-error")
+             $($(inputelement).parent()[0]).removeClass("has-success")
             },
             complete: function(result) {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
@@ -308,6 +312,8 @@ function validate_keystone_credentials(inputelement) {
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
         },
         complete: function(result) {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
@@ -319,6 +325,11 @@ function validate_keystone_credentials(inputelement) {
         },
         success: function(result) {
            $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
+           $.each(result.roles, function( index, value ) {
+               options += "<option value="+ value +" selected>"+ value + "</option>"
+           });
+           document.getElementsByName("trustee-role")[0].innerHTML = options
         }
     });
 }
@@ -330,6 +341,8 @@ function validate_nfsshare(inputelement) {
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
         },
         complete: function(result) {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")

@@ -2674,7 +2674,8 @@ def validate_keystone_credentials():
         raise Exception( "KeystoneError:Unable to connect to keystone Admin URL " + e.message  )
 
     # populate roles list
-    return {'status':'Success'}
+    roles = [role.name for role in keystone.roles.list()]
+    return {'status':'Success', 'roles': roles}
 
 
 @bottle.route('/validate_nfs_share')
