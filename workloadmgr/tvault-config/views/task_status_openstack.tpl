@@ -196,7 +196,7 @@ function taskfunction()
 		                          {
 			 						return redirectToConf(xmlhttp);	
 		                          }
-                                          if (document.getElementById("workloads_import") != null) { 
+                                          if (document.getElementById("workloads_import") != null) {
 		                             loadXMLDoc("workloads_import",function() {
 		   	   	                        document.getElementById("workloads_import").children[0].classList.add("glyphicon-refresh");
 		      	                        if (xmlhttp.readyState != 4) return;
@@ -208,11 +208,13 @@ function taskfunction()
 		                                }
 		                                else
 		                                {
-			 						return redirectToConf(xmlhttp);	
+			 				return redirectToConf(xmlhttp);	
 		                                }
+		                                document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
 		                             });
+                                          } else {
+		                             document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
                                           }
-		                          document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
 		                    });
 		                 });
 		              });
