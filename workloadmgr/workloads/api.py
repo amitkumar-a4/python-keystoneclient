@@ -2147,7 +2147,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
 
-        return created_license[0].value
+        return json.loads(created_license[0].value)
 
     @autolog.log_method(logger=Logger)
     def license_list(self, context):
@@ -2158,4 +2158,4 @@ class API(base.Base):
         settings =  self.db.setting_get_all(context)
 
         license = [t for t in settings if t.type == "license_key"]
-        return license[0].value
+        return json.loads(license[0].value)
