@@ -60,10 +60,10 @@ function findForm() {
   <div style="margin-left:auto; margin-right:auto; padding:20px">
   <form role="form" id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
 	%if 'nodetype' in locals() and nodetype == 'additional':
-		<input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node&nbsp;&nbsp;
+		<input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node
 		<input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
 	%else:
-		<input name = "nodetype" type="radio"  value="controller" checked onclick='$("#panel4")[0].hidden=false'>  Controller Node&nbsp;&nbsp;
+		<input name = "nodetype" type="radio"  value="controller" checked onclick='$("#panel4")[0].hidden=false'>  Controller Node
 		<input name = "nodetype" type="radio"  value="additional" onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
 	%end  
 		   
@@ -82,28 +82,28 @@ function findForm() {
         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
-    	<label class="control-label">Administrator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<label class="control-label">Administrator</label>
     	<input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> 
     </div>
     <div class="form-group">
-    	<label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<label class="control-label">Password</label>
     	<input name="admin-password" type="password" required="" placeholder="" class="form-control">
     </div>
     	<div class="form-group">
-    	<label class="control-label">Admin Tenant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
+    	<label class="control-label">Admin Tenant<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
     	<input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur='validate_keystone_credentials(this)'  aria-describedby="cred_helpblock">
         <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
-    	<label class="control-label">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+    	<label class="control-label">Region</label>
     	<input name="region-name" {{'value=' + region_name if defined('region_name') else ''}} type="text" required="" placeholder="RegionOne" class="form-control">
     </div>
     <div class="form-group">
-        <label class="control-label">Domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+        <label class="control-label">Domain ID</label>
         <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control">
     </div>
     <div class="form-group">
-         <label class="control-label">Trustee Role&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+         <label class="control-label">Trustee Role</label>
                     <select name="trustee-role" id="trustee-role" class="form-control">
                     %for role in roles:
                          %if role==trustee_role:
@@ -115,11 +115,11 @@ function findForm() {
                     </select>
     </div>
     <div class="form-group">
-        <label class="control-label">Hostname&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+        <label class="control-label">Hostname</label>
         <input name="guest-name" {{'value=' + guest_name if defined('guest_name') else ''}} type="text" required="" placeholder="Hostname" class="form-control">
     </div>
     <div class="form-group" >
-	<label class="control-label">Name Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+	<label class="control-label">Name Server</label>
 	<input name="name-server" {{'value=' + name_server if (defined('name_server') and len(name_server)) else ''}} type="text" placeholder="192.168.2.1" class="form-control">
     </div>
     <div class="form-group" >
@@ -175,7 +175,7 @@ function findForm() {
 		<div id="collapseThree" class="panel-collapse collapse in">
 		  <div class="panel-body">
 			<div class="form-group" >
-		        <label class="control-label">NFS Export&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
+		        <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
 			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" onblur='validate_nfsshare(this)'  aria-describedby="nfs_helpblock">
                         <span id="nfs_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
 			</div>
@@ -219,11 +219,11 @@ function findForm() {
 		<div id="collapseFive" class="panel-collapse">
 		  <div class="panel-body">
 			<div class="form-group">
-				<label class="control-label">URL Template&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<label class="control-label">URL Template</label>
 				<input name="swift-url-template" {{'value=' + swift_url_template if (defined('swift_url_template') and len(swift_url_template)) else ''}} type="text" placeholder="http://swifthost:8080/v1/AUTH_%(project_id)s" class="form-control"><br>
 			</div><br>
 			<div class="form-group">
-				<label class="control-label">Container Prefix&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+				<label class="control-label">Container Prefix</label>
 				<input name="swift-container-prefix" type="text" {{'value=' + swift_container_prefix if (defined('swift_container_prefix') and len(swift_container_prefix)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
 			</div><br>  			
 		  </div>
