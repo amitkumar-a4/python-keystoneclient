@@ -2673,6 +2673,8 @@ def validate_nfs_share():
         for i in rpcinfo[0].split("\n")[1:]:
             if len(i.split()) and i.split()[3] == 'nfs':
                 return {'status': 'Success'}
+        return bottle.HTTPResponse(status=500,
+            body=str("NFS Daemon not running on the server"))
     except Exception as exception:
         return bottle.HTTPResponse(status=500, body=str(exception))
 
