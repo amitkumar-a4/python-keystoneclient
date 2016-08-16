@@ -53,6 +53,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.workloads import workload_utils
 from workloadmgr import auditlog
 from workloadmgr import autolog
+from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
 
 workload_lock = threading.Lock()
@@ -170,6 +171,30 @@ def create_trust(func):
 
        return func(*args, **kwargs)
    return trust_create_wrapper
+
+
+def wrap_check_policy(func):
+    """Check policy corresponding to the wrapped methods prior to execution
+
+    This decorator requires the first 3 args of the wrapped function
+    to be (self, context, workload)
+    """
+    @functools.wraps(func)
+    def wrapped(self, context, target_obj, *args, **kwargs):
+        check_policy(context, func.__name__, target_obj)
+        return func(self, context, target_obj, *args, **kwargs)
+
+    return wrapped
+
+
+def check_policy(context, action, target_obj=None):
+    target = {
+        'project_id': context.project_id,
+        'user_id': context.user_id,
+    }
+
+    _action = 'workload:%s' % action
+    policy.enforce(context, _action, target)
 
 
 class API(base.Base):

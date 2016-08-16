@@ -7,6 +7,8 @@
 
 """
 
+import glob
+import json
 import os
 import StringIO
 import types
@@ -200,6 +202,68 @@ def get_progress_tracker_path(tracker_metadata):
     else:
         return None      
     
+
+def get_workload_transfers_directory():
+    workload_transfers_directory = ''
+    if CONF.vault_storage_type == 'local' or \
+       CONF.vault_storage_type == 'vault' or \
+       CONF.vault_storage_type == 'nfs' or \
+       CONF.vault_storage_type == 'das':
+        workload_transfers_directory = os.path.join(CONF.vault_data_directory + "/workload_transfers")
+    else:
+        return None
+           
+    fileutils.ensure_tree(workload_transfers_directory)
+    utils.chmod(workload_transfers_directory, '0777')
+    return workload_transfers_directory
+
+
+def get_workload_transfers_path(transfers_metadata):
+    workload_transfers_directory = get_workload_transfers_directory()
+    if workload_transfers_directory:
+        workload_transfers_file_path = os.path.join(workload_transfers_directory + '/' + transfers_metadata['workload_id'])    
+        return workload_transfers_file_path
+    else:
+        return None
+ 
+
+def get_all_workload_transfers():
+    workload_transfers_directory = get_workload_transfers_directory()
+    if workload_transfers_directory:
+        pattern = os.path.join(workload_transfers_directory + '/' + "*")
+        return glob.glob(pattern)
+    else:
+        return None
+
+
+@autolog.log_method(logger=Logger) 
+def transfers_delete(context, transfers_metadata):
+    try:
+        transfer_path  = get_workload_transfers_path(transfers_metadata)
+        if CONF.vault_storage_type == 'local' or \
+           CONF.vault_storage_type == 'vault' or \
+           CONF.vault_storage_type == 'nfs' or \
+           CONF.vault_storage_type == 'das':   
+              if isfile(transfer_path):
+                  os.remove(transfer_path)
+        elif CONF.vault_storage_type == 'swift-i':
+            assert False
+            pass
+        elif CONF.vault_storage_type == 'swift-s':
+            assert False
+            container = get_swift_container(context, workload_metadata)
+            if os.path.isdir(workload_path):
+                shutil.rmtree(workload_path)            
+            swift_delete_folder(context, workload_path, container)
+            swift_delete_container(context, container)
+            swift_delete_container(context, container + '_segments')  
+        elif CONF.vault_storage_type == 's3':
+            assert False
+            pass                      
+    except Exception as ex:
+        LOG.exception(ex)  
+
+
 def get_vault_data_directory():
     vault_data_directory = ''
     if CONF.vault_storage_type == 'local' or \
@@ -326,6 +390,33 @@ def get_swift_container(context, workload_metadata):
         container = ''
     container = container + workload_metadata['workload_name'] + '_' + workload_metadata['workload_id']
     return container
+
+@autolog.log_method(logger=Logger) 
+def _update_workload_ownership_on_media(context, workload_id):
+    try:
+        workload_path  = get_workload_path(workload_metadata)
+        if CONF.vault_storage_type in ('nfs'):
+            def _update_metadata_file(pathname): 
+                with open(pathname, "r") as f:
+                    metadata = json.loads(f.read())
+
+                metadata['user_id'] = context.user_id
+                metadata['project_id'] = context.project_id
+
+                # TODO(Murali): Do it atomically.
+                with open(pathname, "r+") as f:
+                    f.write(json.dumps(metadata))
+
+            for snap in glob.glob(os.path.join(workload_path, "snapshot_*")):
+                _update_metadata_file(os.path.join(pathname, "snapshot_db"))
+
+            _update_metadata_file(os.path.join(workload_path, "workload_db"))
+
+        else:
+            raise exception.MediaNotSupported(media=CONF.vault_storage_type)
+    except Exception as ex:
+        LOG.exception(ex)
+        raise
     
 @autolog.log_method(logger=Logger) 
 def workload_delete(context, workload_metadata):
@@ -382,7 +473,8 @@ def put_object(path, json_data):
 
 @autolog.log_method(logger=Logger)     
 def get_object(path):
-    path = get_vault_data_directory() + '/' + path
+    if not os.path.isabs(path):
+        path = get_vault_data_directory() + '/' + path
     with open(path, 'r') as json_file:
         return json_file.read()
  
