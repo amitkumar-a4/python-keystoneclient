@@ -2086,12 +2086,12 @@ class API(base.Base):
                                public_key=vault.CONF.triliovault_public_key):
             dsa = DSA.load_pub_key(public_key)
             if not dsa.check_key():
-                raise wlm_exception.InternalError(
+                raise wlm_exceptions.InternalError(
                     "Invalid TrilioVault public key ",
                     "Cannot validate license")
 
             if not "License Key" in licensetext:
-                raise wlm_exception.InvalidLicense(
+                raise wlm_exceptions.InvalidLicense(
                     message="Cannot find License Key in license key")
 
             try:
@@ -2135,11 +2135,19 @@ class API(base.Base):
                    u'type': "license_key",}
         created_license = []
         try:
+            settings =  self.db.setting_get_all(context)
             created_license.append(self.db.setting_create(context, setting))
+
+            for setting in settings:
+                if setting.type == "license_key":
+                    try:
+                        self.db.setting_delete(context, setting.name)
+                    except:
+                        pass
         except Exception as ex:
             LOG.exception(ex)
 
-        return created_license 
+        return json.loads(created_license[0].value)
 
     @autolog.log_method(logger=Logger)
     def license_list(self, context):
@@ -2150,4 +2158,4 @@ class API(base.Base):
         settings =  self.db.setting_get_all(context)
 
         license = [t for t in settings if t.type == "license_key"]
-        return license
+        return json.loads(license[0].value)
