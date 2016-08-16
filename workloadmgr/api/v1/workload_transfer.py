@@ -202,6 +202,22 @@ class WorkloadmgrTransferController(wsgi.Controller):
                                        dict(accepted_transfer.iteritems()))
         return transfer
 
+    @wsgi.response(202)
+    def complete(self, req, id):
+        """Complete a new workload transfer."""
+        transfer_id = id
+        LOG.debug('Completing workload transfer %s', transfer_id)
+
+        context = req.environ['workloadmgr.context']
+
+        LOG.info(_LI("Completing transfer %s"), transfer_id,
+                 context=context)
+
+        try:
+            self.transfer_api.complete(context, transfer_id)
+        except exception.InvalidWorkload as error:
+            raise exc.HTTPBadRequest(explanation=error.message)
+
     def delete(self, req, id):
         """Delete a transfer."""
         context = req.environ['workloadmgr.context']

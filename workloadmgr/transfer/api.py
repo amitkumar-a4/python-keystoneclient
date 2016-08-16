@@ -127,7 +127,7 @@ class API(base.Base):
 
         AUDITLOG.log(context, 'Transfer for workload \'' + workload_id + '\' Create  Requested')
         if context.project_id != workload_ref.project_id:
-            raise exception.InvalidWorkload(reason=_("status must be available"))
+            raise exception.InvalidWorkload(reason=_("workload does not belong to the tenant"))
 
         if workload_ref['status'] != "available":
             raise exception.InvalidState(reason=_("Workload is not in 'available' state"))
@@ -223,10 +223,23 @@ class API(base.Base):
         if transfer is None:
             raise exception.TransferNotFound(transfer_id = transfer_id)
 
-    # complete is executed on the cloud that transfer is initiated
-    def abort(self, context, transfer_id):
-        transfer = self.get(context, transfer_id)
+        workload_id = transfer['workload_id']
+        workload_ref = self.db.workload_get(context, workload_id)
+        if workload_ref['status'] != 'transfer-in-progress':
+            msg = _LE("Workload state is expected in 'transfer-in-progress'. "
+                      "The current status is '%s'" % workload_ref['status'])
+            LOG.error(msg)
+            raise exception.InvalidState(reason=msg)
 
-        AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Abort  Requested')
-        if transfer is None:
-            raise exception.TransferNotFound(transfer_id = transfer_id)
+        self.db.workload_update(context, workload_ref.id,
+                                {'status': 'available'})
+
+        # make sure we do some additional checks
+        snapshots = self.db.snapshot_get_all(context, workload_id)
+        for snap in snapshots:
+            self.db.snapshot_delete(context, snap.id)
+
+        for vm in self.db.workload_vms_get(context, workload_id):
+            self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
+        self.db.workload_delete(context, workload_id)
+        vault.transfers_delete(context, transfer)
