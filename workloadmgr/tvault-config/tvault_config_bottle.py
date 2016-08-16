@@ -2582,31 +2582,6 @@ def reinitialize():
     bottle.redirect("/home")
 
 
-@bottle.route('/validate_floatingip')
-@authorize()
-def validate_floatingip():
-    import urllib
-    # Validate floating ip url
-
-    def _ping_floating_ip():
-       import os
-       hostname = floatingip
-       response = os.system("ping -c 1 " + hostname)
-
-       #and then check the response...
-       return response == 0
-
-    floatingip = bottle.request.query['floatingip']
-    if _ping_floating_ip():
-        return {'status':'Success'}
-
-    bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
-    if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
-        raise exception
-    else:
-        return bottle.HTTPResponse(status=500,body="Error")
-
-
 @bottle.route('/validate_keystone_url')
 @authorize()
 def validate_keystone_url():
@@ -2626,7 +2601,7 @@ def validate_keystone_url():
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
            raise exception
         else:
-           return bottle.HTTPResponse(status=500,body="Error")
+           return bottle.HTTPResponse(status=500, body=str(exception))
     time.sleep(1)
 
     return {'status':'Success'}        
@@ -2664,14 +2639,22 @@ def validate_keystone_credentials():
     try:
         sess = _get_keystone_session(public_url)
         keystone = client.Client(session=sess, auth_url=public_url, insecure=True)
-    except Exception as e:      
-        raise Exception("KeystoneError:Unable to connect to keystone Public URL " + e.message  )
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
 
     try:
         sess = _get_keystone_session(admin_url)
         keystone = client.Client(session=sess, auth_url=admin_url, insecure=True)
-    except Exception as e:
-        raise Exception( "KeystoneError:Unable to connect to keystone Admin URL " + e.message  )
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
 
     # populate roles list
     roles = [role.name for role in keystone.roles.list()]
@@ -2681,16 +2664,17 @@ def validate_keystone_credentials():
 @bottle.route('/validate_nfs_share')
 @authorize()
 def validate_nfs_share():
-    from workloadmgr import utils
-    nfsshare = bottle.request.query['nfsshare']
-    nfsserver = nfsshare.split(":")[0]
-    rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
+    try:
+        from workloadmgr import utils
+        nfsshare = bottle.request.query['nfsshare']
+        nfsserver = nfsshare.split(":")[0]
+        rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
 
-    for i in rpcinfo[0].split("\n")[1:]:
-        if len(i.split()) and i.split()[3] == 'nfs':
-            return {'status': 'Success'}
-
-    raise Exception("NFS Share Error: Share is invalid")
+        for i in rpcinfo[0].split("\n")[1:]:
+            if len(i.split()) and i.split()[3] == 'nfs':
+                return {'status': 'Success'}
+    except Exception as exception:
+        return bottle.HTTPResponse(status=500, body=str(exception))
 
 
 def findXmlSection(dom, sectionName):
@@ -2830,7 +2814,6 @@ def main():
         except Exception as ex:
             pass
         
-        time.sleep(10)
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
