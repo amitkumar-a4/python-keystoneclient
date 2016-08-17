@@ -14,6 +14,7 @@ from workloadmgr.vault import vault
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 
+LOG = logging.getLogger(__name__)
 
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version

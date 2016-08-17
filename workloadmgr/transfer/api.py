@@ -77,7 +77,7 @@ class API(base.Base):
 
         AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Delete  Requested')
         workload_ref = self.db.workload_get(context, transfer_rec['workload_id'])
-        if workload_ref['status'] != 'awaiting-transfer':
+        if workload_ref['status'] != 'transfer-in-progress':
             LOG.error(_LE("Workload in unexpected state"))
 
         self.db.workload_update(context, workload_ref.id,
@@ -93,10 +93,7 @@ class API(base.Base):
         for transfer_file in all_transfers:
             tran = json.loads(vault.get_object(transfer_file))
        
-            if context.is_admin and 'all_tenants' in filters:
-                transfers.append(tran)
-            elif context.project_id == tran['project_id']:
-                transfers.append(tran)
+            transfers.append(tran)
 
         return transfers
 
@@ -199,18 +196,16 @@ class API(base.Base):
         try:
             # Transfer ownership of the workload now, must use an elevated
             # context.
-            vault._update_workload_ownership_on_media(context.elevated(),
+            vault._update_workload_ownership_on_media(context,
                                                       workload_id)
 
-            self.delete(context, transfer_id)
-
             # import workload now
-            workloadAPI.import_workloads(context, [workload_id], False)
+            self.workload_api.import_workloads(context, [workload_id], False)
             LOG.info(_LI("Workload %s has been transferred."), workload_id)
         except Exception:
             raise
 
-        workload_ref = {'id': 'Dummy'} #self.db.workload_get(context, workload_id)
+        workload_ref = self.db.workload_get(context, workload_id)
         return {'id': transfer_id,
                 'display_name': transfer['display_name'],
                 'workload_id': workload_ref['id']}

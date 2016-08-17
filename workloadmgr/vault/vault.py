@@ -394,7 +394,7 @@ def get_swift_container(context, workload_metadata):
 @autolog.log_method(logger=Logger) 
 def _update_workload_ownership_on_media(context, workload_id):
     try:
-        workload_path  = get_workload_path(workload_metadata)
+        workload_path  = get_workload_path({'workload_id': workload_id})
         if CONF.vault_storage_type in ('nfs'):
             def _update_metadata_file(pathname): 
                 with open(pathname, "r") as f:
@@ -408,7 +408,7 @@ def _update_workload_ownership_on_media(context, workload_id):
                     f.write(json.dumps(metadata))
 
             for snap in glob.glob(os.path.join(workload_path, "snapshot_*")):
-                _update_metadata_file(os.path.join(pathname, "snapshot_db"))
+                _update_metadata_file(os.path.join(snap, "snapshot_db"))
 
             _update_metadata_file(os.path.join(workload_path, "workload_db"))
 
