@@ -81,7 +81,9 @@ class API(base.Base):
             LOG.error(_LE("Workload in unexpected state"))
 
         self.db.workload_update(context, workload_ref.id,
-                                {'status': 'available'})
+                                {'status': 'available',
+                                 'metadata': {'transfer_id': transfer_id}},
+                                 True)
         vault.transfers_delete(context, transfer_rec)
         self.workload_api.workload_resume(context, workload_ref.id)
 
@@ -158,7 +160,9 @@ class API(base.Base):
                           "for %s"), workload_id)
             raise
 
-        self.db.workload_update(context, workload_id, {'status': 'transfer-in-progress'})
+        self.db.workload_update(context, workload_id,
+                                 {'status': 'transfer-in-progress',
+                                  'metadata': {'transfer_id': transfer_id}})
         self.workload_api.workload_pause(context, workload_id)
 
         return {'id': transfer_rec['id'],
@@ -185,8 +189,9 @@ class API(base.Base):
 
         workload_id = transfer['workload_id']
  
-        # read the workload manager and snapshots record from the nfs share
-        # and change user ids and tenant id
+        # if the workload id exists on this openstack, then the user is
+        # attempting to transfer to a different tenant of the same
+        # cloud. We don't support this usecase at this point
         try:
             workload_ref = self.db.workload_get(context, workload_id)
             raise exception.TransferNotAllowed(workload_id=workload_id)
@@ -194,12 +199,17 @@ class API(base.Base):
             pass
 
         try:
+            # read the workload manager and snapshots record from the nfs share
+            # and change user ids and tenant id
             # Transfer ownership of the workload now, must use an elevated
             # context.
             vault._update_workload_ownership_on_media(context,
                                                       workload_id)
 
             # import workload now
+            # this is point of no return. How do we make sure we either
+            # succeed or fail but won't leave the database in 
+            # half backed state. (TODO)
             self.workload_api.import_workloads(context, [workload_id], False)
             LOG.info(_LI("Workload %s has been transferred."), workload_id)
         except Exception:
