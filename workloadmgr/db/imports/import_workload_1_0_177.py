@@ -34,7 +34,7 @@ def _adjust_values(cntx, new_version, values, upgrade):
 def import_settings(cntx, new_version, upgrade=True):
     try:
         db = WorkloadMgrDB().db
-        settings = json.loads(vault.get_object('/settings_db'))
+        settings = json.loads(vault.get_object('settings_db'))
         for setting_values in settings:
             try:
                 if 'key' in setting_values:

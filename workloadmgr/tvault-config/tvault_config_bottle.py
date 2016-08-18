@@ -697,6 +697,8 @@ def _register_service():
                                                  enabled=True)
                      keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
 
+            config_data['cloud_unique_id'] = wlm_user.id
+
         except Exception as exception:
             bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
             raise exception        
@@ -2032,7 +2034,7 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
-
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-s')

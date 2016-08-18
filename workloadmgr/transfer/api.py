@@ -80,10 +80,20 @@ class API(base.Base):
         if workload_ref['status'] != 'transfer-in-progress':
             LOG.error(_LE("Workload in unexpected state"))
 
+        try:
+            # read the workload manager and snapshots record from the nfs share
+            # and change user ids and tenant id.
+            # This might as well be no nop, but want to make sure transfer is
+            # not aborted in the middle leaving user.id and project.id messup
+            vault._update_workload_ownership_on_media(context,
+                                                      workload_id)
+
+        except Exception as ex:
+            LOG.exception(ex)
+
         self.db.workload_update(context, workload_ref.id,
                                 {'status': 'available',
-                                 'metadata': {'transfer_id': transfer_id}},
-                                 True)
+                                 'metadata': {'transfer_id': ""}})
         vault.transfers_delete(context, transfer_rec)
         self.workload_api.workload_resume(context, workload_ref.id)
 
@@ -162,7 +172,7 @@ class API(base.Base):
 
         self.db.workload_update(context, workload_id,
                                  {'status': 'transfer-in-progress',
-                                  'metadata': {'transfer_id': transfer_id}})
+                                  'metadata': {'transfer_id': transfer_rec['id']}})
         self.workload_api.workload_pause(context, workload_id)
 
         return {'id': transfer_rec['id'],
@@ -237,7 +247,8 @@ class API(base.Base):
             raise exception.InvalidState(reason=msg)
 
         self.db.workload_update(context, workload_ref.id,
-                                {'status': 'available'})
+                                {'status': 'available',
+                                 'metadata': {'transfer_id': ""}})
 
         # make sure we do some additional checks
         snapshots = self.db.snapshot_get_all(context, workload_id)
