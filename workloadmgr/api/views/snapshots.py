@@ -103,6 +103,7 @@ class ViewBuilder(common.ViewBuilder):
         d['time_taken'] = snapshot['time_taken']
         d['pinned'] = snapshot['pinned']
         d['metadata'] = snapshot['metadata']
+        d['restores_info'] = ''
         return {'snapshot': d}      
 
     def _list_view(self, func, request, snapshots):
