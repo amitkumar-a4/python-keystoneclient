@@ -31,8 +31,12 @@ class ViewBuilder(common.ViewBuilder):
         """Generic, non-detailed view of a workload."""
         return {
             'workload': {
+                'project_id': workload.get('project_id'),
+                'user_id': workload.get('user_id'),
+                'created_at': workload.get('created_at'),
                 'id': workload['id'],
                 'name': workload['display_name'],
+                'snapshots_info': '',
                 'description': workload['display_description'],
                 'workload_type_id': workload['workload_type_id'],
                 'status': workload['status'],
