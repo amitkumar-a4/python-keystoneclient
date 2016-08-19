@@ -246,6 +246,18 @@ class API(base.Base):
             LOG.error(msg)
             raise exception.InvalidState(reason=msg)
 
+        # If the workload tenant id is not changed, we will not complete 
+        # the transfer
+        wl_path = vault.get_workload_path({'workload_id': workload_ref.id})
+        wl_json = vault.get_object(os.path.join(wl_path, "workload_db"))
+        wl_rec = json.loads(wl_json) 
+        wl_tenant_id = uuid.UUID(wl_rec.get('project_id', wl_rec.get('tenant_id', None)))
+        if wl_tenant_id == uuid.UUID(context.project_id):
+            msg = _LE("Workload is not transferred. "
+                      "Please abort the transfer instead of complete")
+            LOG.error(msg)
+            raise exception.InvalidState(reason=msg)
+
         self.db.workload_update(context, workload_ref.id,
                                 {'status': 'available',
                                  'metadata': {'transfer_id': ""}})

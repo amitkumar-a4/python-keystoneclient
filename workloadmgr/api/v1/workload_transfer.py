@@ -195,7 +195,9 @@ class WorkloadmgrTransferController(wsgi.Controller):
             accepted_transfer = self.transfer_api.accept(context, transfer_id,
                                                          auth_key)
         except exception.InvalidWorkload as error:
-            raise exc.HTTPBadRequest(explanation=error.message)
+            raise exc.HTTPBadRequest(explanation=str(error))
+        except exception.InvalidState as error:
+            raise exc.HTTPBadRequest(explanation=str(error))
 
         transfer = \
             self._view_builder.summary(req,
@@ -216,7 +218,9 @@ class WorkloadmgrTransferController(wsgi.Controller):
         try:
             self.transfer_api.complete(context, transfer_id)
         except exception.InvalidWorkload as error:
-            raise exc.HTTPBadRequest(explanation=error.message)
+            raise exc.HTTPBadRequest(explanation=str(error))
+        except exception.InvalidState as error:
+            raise exc.HTTPBadRequest(explanation=str(error))
 
     def delete(self, req, id):
         """Delete a transfer."""
