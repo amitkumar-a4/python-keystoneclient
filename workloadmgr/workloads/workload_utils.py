@@ -1,5 +1,10 @@
+import os
+
+from oslo.config import cfg
+
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog
+from workloadmgr import flags
 from workloadmgr import settings
 from workloadmgr.vault import vault
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -7,6 +12,16 @@ from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import exception
 import cPickle as pickle
+
+workloads_manager_opts = [
+    cfg.StrOpt('cloud_unique_id',
+               help='cloud unique id.'),
+]
+
+FLAGS = flags.FLAGS
+FLAGS.register_opts(workloads_manager_opts)
+
+CONF = cfg.CONF
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -24,7 +39,8 @@ def upload_settings_db_entry(cntx):
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
                 kvpair['value'] = '******'
     settings_jason = jsonutils.dumps(settings_db)            
-    path = vault.get_vault_data_directory() + "/settings_db"
+    path = os.path.join(vault.get_vault_data_directory(), CONF.cloud_unique_id)
+    path = os.path.join(path, "settings_db")
     vault.put_object(path, settings_jason)
         
 def upload_workload_db_entry(cntx, workload_id):

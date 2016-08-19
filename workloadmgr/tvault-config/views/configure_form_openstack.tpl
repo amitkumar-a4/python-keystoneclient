@@ -256,6 +256,7 @@ function validate_keystone_url(url, inputelement) {
             beforeSend: function() {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
              $(spinelement[0]).removeClass("hidden")
+             $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
              $($(inputelement).parent()[0]).removeClass("has-error")
              $($(inputelement).parent()[0]).removeClass("has-success")
             },
@@ -286,6 +287,7 @@ function validate_keystone_credentials(inputelement) {
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
            $($(inputelement).parent()[0]).removeClass("has-error")
            $($(inputelement).parent()[0]).removeClass("has-success")
         },
@@ -316,6 +318,7 @@ function validate_nfsshare(inputelement) {
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
            $($(inputelement).parent()[0]).removeClass("has-error")
            $($(inputelement).parent()[0]).removeClass("has-success")
         },

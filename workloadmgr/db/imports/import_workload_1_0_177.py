@@ -14,6 +14,7 @@ from workloadmgr.vault import vault
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.compute import nova
 
+LOG = logging.getLogger(__name__)
 
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
@@ -33,7 +34,7 @@ def _adjust_values(cntx, new_version, values, upgrade):
 def import_settings(cntx, new_version, upgrade=True):
     try:
         db = WorkloadMgrDB().db
-        settings = json.loads(vault.get_object('/settings_db'))
+        settings = json.loads(vault.get_object('settings_db'))
         for setting_values in settings:
             try:
                 if 'key' in setting_values:

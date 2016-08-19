@@ -160,10 +160,11 @@ class AuthorizationFailure(WorkloadMgrException):
 class MissingCredentialError(WorkloadMgrException):
     msg_fmt = _("Missing required credential: %(required)s")
 
-
 class InvalidSnapshot(Invalid):
     message = _("Invalid snapshot") + ": %(reason)s"
 
+class InvalidWorkload(Invalid):
+    message = _("Invalid snapshot") + ": %(reason)s"
 
 class InvalidRequest(Invalid):
     message = _("The request is invalid.")
@@ -502,3 +503,12 @@ class InvalidLicense(Invalid):
 
 class InternalError(Invalid):
     pass
+
+class TransferNotFound(NotFound):
+    message = _("Transfer %(transfer_id)s could not be found.")
+
+class TransferNotAllowed(Invalid):
+    message = _("Transfer %(workload_id)s is not allowed within the same cloud.")
+
+class MediaNotSupported(Invalid):
+    message = _("Transfer %(media)s is not allowed within the same cloud.")
