@@ -50,7 +50,6 @@ CONF.register_opts(workload_transfer_opts)
 LOG = logging.getLogger(__name__)
 AUDITLOG = auditlog.getAuditLogger()
 
-
 class API(base.Base):
     """API for interacting workload transfers."""
 
@@ -149,6 +148,7 @@ class API(base.Base):
         # TODO: Transfer expiry needs to be implemented.
         transfer_rec = {
                         'id': str(uuid.uuid4()),
+                        'status': "transfer-pending",
                         'workload_id': workload_id,
                         'user_id': context.user_id,
                         'project_id': context.project_id,
@@ -225,16 +225,24 @@ class API(base.Base):
         except Exception:
             raise
 
-        workload_ref = self.db.workload_get(context, workload_id)
+        try:
+            workload_ref = self.db.workload_get(context, workload_id)
+            transfer_rec_path = vault.get_workload_transfers_path(transfer)
+            transfer['status'] = "transfer-completed"
+            vault.put_object(transfer_rec_path, json.dumps(transfer))
+        except Exception:
+            LOG.error(_LE("Failed to create transfer record "
+                          "for %s"), workload_id)
         return {'id': transfer_id,
                 'display_name': transfer['display_name'],
                 'workload_id': workload_ref['id']}
 
     # complete is executed on the cloud that transfer is initiated
     def complete(self, context, transfer_id):
+        AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Complete  Requested')
+
         transfer = self.get(context, transfer_id)
 
-        AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Complete  Requested')
         if transfer is None:
             raise exception.TransferNotFound(transfer_id = transfer_id)
 
@@ -253,6 +261,12 @@ class API(base.Base):
         wl_rec = json.loads(wl_json) 
         wl_tenant_id = uuid.UUID(wl_rec.get('project_id', wl_rec.get('tenant_id', None)))
         if wl_tenant_id == uuid.UUID(context.project_id):
+            msg = _LE("Workload is not transferred. "
+                      "Please abort the transfer instead of complete")
+            LOG.error(msg)
+            raise exception.InvalidState(reason=msg)
+
+        if transfer['status'] != "transfer-completed":
             msg = _LE("Workload is not transferred. "
                       "Please abort the transfer instead of complete")
             LOG.error(msg)
