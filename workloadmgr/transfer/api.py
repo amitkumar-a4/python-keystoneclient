@@ -50,6 +50,13 @@ CONF.register_opts(workload_transfer_opts)
 LOG = logging.getLogger(__name__)
 AUDITLOG = auditlog.getAuditLogger()
 
+def wrap_create_trust(func):
+   def trust_create_wrapper(*args, **kwargs):
+       args = (args[0].workload_api,) + (args[1:])
+       return func(*args, **kwargs)
+
+   return trust_create_wrapper
+
 class API(base.Base):
     """API for interacting workload transfers."""
 
@@ -181,12 +188,18 @@ class API(base.Base):
                 'auth_key': auth_key,
                 'created_at': transfer_rec['created_at']}
 
+    @wrap_create_trust
     @workload_api.create_trust
+    def _create_trust(self, context, transfer_id, auth_key):
+        pass
+
+
     def accept(self, context, transfer_id, auth_key):
         """Accept a workload that has been offered for transfer."""
         # We must use an elevated context to see the workload that is still
         # owned by the donor.
         workload_api.check_policy(context, 'accept_transfer')
+        self._create_trust(context, transfer_id, auth_key)
         transfer = self.get(context, transfer_id)
 
         AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Accept  Requested')
