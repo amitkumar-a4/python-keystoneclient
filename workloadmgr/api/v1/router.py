@@ -19,6 +19,7 @@ from workloadmgr.api.v1 import workloadtypes
 from workloadmgr.api.v1 import settings
 from workloadmgr.api.v1 import trusts
 from workloadmgr.api.v1 import tasks
+from workloadmgr.api.v1 import workload_transfer as transfers
 
 LOG = logging.getLogger(__name__)
 
@@ -544,6 +545,56 @@ class APIRouter(workloadmgr.api.APIRouter):
         mapper.connect("delete_trusts",
                        "/{project_id}/trusts/{name}",
                        controller=self.resources['trusts'],
+                       action='delete',
+                       conditions={"method": ['DELETE']}) 
+
+        ###################################################################################################
+        self.resources['transfers'] = transfers.create_resource(ext_mgr)
+        
+        #create settings
+        mapper.connect("create_transfer",
+                       "/{project_id}/transfers",
+                       controller=self.resources['transfers'],
+                       action='create',
+                       conditions={"method": ['POST']}) 
+
+        #create settings
+        mapper.connect("accept_transfer",
+                       "/{project_id}/transfers/{id}/accept",
+                       controller=self.resources['transfers'],
+                       action='accept',
+                       conditions={"method": ['POST']}) 
+
+        mapper.connect("complete_transfer",
+                       "/{project_id}/transfers/{id}/complete",
+                       controller=self.resources['transfers'],
+                       action='complete',
+                       conditions={"method": ['POST']}) 
+
+        mapper.connect("abort_transfer",
+                       "/{project_id}/transfers/{id}/abort",
+                       controller=self.resources['transfers'],
+                       action='abort',
+                       conditions={"method": ['POST']}) 
+        
+        #get the list of settings
+        mapper.connect("get_transfers_list",
+                       "/{project_id}/transfers",
+                       controller=self.resources['transfers'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+        
+        #get the specified setting
+        mapper.connect("get_transfers",
+                       "/{project_id}/transfers/{id}",
+                       controller=self.resources['transfers'],
+                       action='show',
+                       conditions={"method": ['GET']})
+        
+        #delete a setting
+        mapper.connect("delete_transfers",
+                       "/{project_id}/transfers/{id}",
+                       controller=self.resources['transfers'],
                        action='delete',
                        conditions={"method": ['DELETE']}) 
 

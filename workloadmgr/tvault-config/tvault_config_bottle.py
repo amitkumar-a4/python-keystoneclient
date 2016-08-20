@@ -698,6 +698,8 @@ def _register_service():
                                                  enabled=True)
                      keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
 
+            config_data['cloud_unique_id'] = wlm_user.id
+
         except Exception as exception:
             bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
             raise exception        
@@ -845,7 +847,7 @@ def _register_workloadtypes():
 
 def _workloads_import():
     if config_data['nodetype'] == 'controller':
-        if config_data['import_workloads'] == 'on':
+        if config_data['workloads_import'] is True:
             wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 
@@ -2035,7 +2037,7 @@ def configure_service():
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
-
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-s')
@@ -2442,8 +2444,8 @@ def configure_vmware():
         config_data['workloadmgr_user'] = config_data['vcenter_username']
         config_data['workloadmgr_user_password'] = config_data['vcenter_password']
         
-        if 'import-workloads' in config_inputs:
-            config_data['import_workloads'] = config_inputs['import-workloads']
+        if 'workloads-import' in config_inputs:
+            config_data['workloads_import'] = config_inputs['workloads-import']
         else:
             config_data['import_workloads'] = 'off'
         bottle.redirect("/task_status_vmware")
@@ -2523,6 +2525,7 @@ def configure_openstack():
         config_data['swift_tenantname'] = ''
         config_data['swift_container_prefix'] = '' #config_inputs['swift-container-prefix'].strip()        
         config_data['swift_url_template'] = '' #config_inputs['swift-url-template'].strip()
+        config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         
         bottle.redirect("/task_status_openstack")
     except Exception as exception:
@@ -2589,11 +2592,109 @@ def reinitialize():
 
     bottle.redirect("/home")
 
-    
+
+@bottle.route('/validate_keystone_url')
+@authorize()
+def validate_keystone_url():
+    import urllib
+    # Validate keystone url
+    for i in range(0,1):
+        try:
+            urllib.urlopen(bottle.request.query['url']).read()
+            time.sleep(1)
+            return {'status':'Success'}            
+        except Exception as exception:
+            pass    
+    try:
+        urllib.urlopen(bottle.request.query['url']).read()
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+    time.sleep(1)
+
+    return {'status':'Success'}        
+
+
+@bottle.route('/validate_keystone_credentials')
+@authorize()
+def validate_keystone_credentials():
+
+    def _get_keystone_session(auth_url, domain_id='default'):
+        if 'v3' in auth_url:
+            auth = password.Password(auth_url=auth_url,
+                                    username=admin_username,
+                                    password=admin_password,
+                                    project_name=project_name,
+                                    user_domain_id=domain_id,
+                                    project_domain_id=domain_id
+                                    )
+        else:
+            auth = password.Password(auth_url=auth_url,
+                                    username=admin_username,
+                                    password=admin_password,
+                                    project_name=project_name
+                                    )
+        sess = session.Session(auth=auth)
+        return sess
+
+    admin_username = bottle.request.query['username']
+    admin_password = bottle.request.query['password']
+    project_name = bottle.request.query['project_name']
+    admin_url = bottle.request.query['admin_url']
+    public_url = bottle.request.query['public_url']
+
+    #test public url
+    try:
+        sess = _get_keystone_session(public_url)
+        keystone = client.Client(session=sess, auth_url=public_url, insecure=True)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
+    try:
+        sess = _get_keystone_session(admin_url)
+        keystone = client.Client(session=sess, auth_url=admin_url, insecure=True)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
+    # populate roles list
+    roles = [role.name for role in keystone.roles.list()]
+    return {'status':'Success', 'roles': roles}
+
+
+@bottle.route('/validate_nfs_share')
+@authorize()
+def validate_nfs_share():
+    try:
+        from workloadmgr import utils
+        nfsshare = bottle.request.query['nfsshare']
+        nfsserver = nfsshare.split(":")[0]
+        rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
+
+        for i in rpcinfo[0].split("\n")[1:]:
+            if len(i.split()) and i.split()[3] == 'nfs':
+                return {'status': 'Success'}
+        return bottle.HTTPResponse(status=500,
+            body=str("NFS Daemon not running on the server"))
+    except Exception as exception:
+        return bottle.HTTPResponse(status=500, body=str(exception))
+
+
 def findXmlSection(dom, sectionName):
     sections = dom.getElementsByTagName(sectionName)
     return sections[0]
  
+
 def getPropertyMap(ovfEnv):
     dom = parseString(ovfEnv)
     section = findXmlSection(dom, "PropertySection")
@@ -2604,6 +2705,7 @@ def getPropertyMap(ovfEnv):
         propertyMap[key] = value
     dom.unlink()
     return propertyMap    
+
 
 def set_network_interfaces(propertyMap):
     
@@ -2725,7 +2827,6 @@ def main():
         except Exception as ex:
             pass
         
-        time.sleep(10)
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 

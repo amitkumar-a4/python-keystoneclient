@@ -106,7 +106,7 @@ class PrepareBackupImage(task.Task):
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
-            restore_file_path = image_info.backing_file
+            restore_file_path = image_info.image
             image_overlay_file_path = vm_disk_resource_snap.vault_path
             image_virtual_size = image_info.virtual_size
         else:
