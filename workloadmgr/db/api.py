@@ -164,8 +164,14 @@ def workload_vms_get(context, workload_id, **kwargs):
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     return IMPL.workload_vm_get_by_id(context, vm_id, **kwargs)
 
+def workload_vm_get(context, id):
+    return IMPL.workload_vm_get(context, id)
+
 def workload_vms_delete(context, vm_id, workload_id):
     return IMPL.workload_vms_delete(context, vm_id, workload_id)
+
+def workload_vms_update(context, id, values, purge_metadata=False):
+    return IMPL.workload_vms_update(context, id, values, purge_metadata)
 
 def snapshot_mark_incomplete_as_error(context, host):
     return IMPL.snapshot_mark_incomplete_as_error(context, host)
