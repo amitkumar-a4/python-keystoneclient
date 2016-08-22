@@ -1881,7 +1881,7 @@ def _vm_network_resource_snap_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata, session):
+def _vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata, session):
     
     metadata = values.pop('metadata', {})
     
@@ -1901,7 +1901,7 @@ def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_i
 @require_context
 def vm_network_resource_snap_create(context, values):
     session = get_session()
-    return _vm_network_resource_snap_update(context, values, None, False, session)
+    return _vm_network_resource_snap_update(context, None, values, False, session)
 
 @require_context
 def vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata = False):
@@ -3204,8 +3204,3 @@ def purge_workload(context, id):
 
     except Exception as ex:
         LOG.exception(ex)
-        
-    
-        
-            
-        

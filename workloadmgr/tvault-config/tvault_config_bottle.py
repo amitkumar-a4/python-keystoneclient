@@ -471,9 +471,9 @@ def _get_session(admin_url=True):
        auth = password.Password(auth_url=auth_url,
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
-                                    project_name=config_data['admin_tenant_name'],
+                                    #project_name=config_data['admin_tenant_name'],
                                     user_domain_id=config_data['domain_name'],
-                                    project_domain_id=config_data['domain_name'],
+                                    domain_id=config_data['domain_name'],
                                     )
     else:
          auth = password.Password(auth_url=auth_url,
@@ -503,6 +503,7 @@ def _authenticate_with_keystone():
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
             config_data['service_tenant_name'] = tenant.name
+            config_data['service_tenant_domain_id'] = tenant.domain_id
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
             
@@ -743,6 +744,7 @@ def _register_workloadtypes():
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
                                tenant_id=config_data['admin_tenant_id'],
+                               domain_name=config_data['domain_name'],
                                insecure=SSL_INSECURE,
                                )
         workload_types = wlm.workload_types.list()
@@ -849,7 +851,8 @@ def _workloads_import():
             wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 
-                                   tenant_id=config_data['admin_tenant_id'])            
+                                   tenant_id=config_data['admin_tenant_id'],
+                                   domain_name=config_data['domain_name'])            
             wlm.workloads.importworkloads()
 
     return {'status':'Success'}
@@ -2088,6 +2091,12 @@ def configure_service():
                      starts_with=True)        
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'domain_name = ',
                      'domain_name = ' + config_data.get('domain_name'),
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'user_domain_id = ',
+                     'user_domain_id = ' + config_data['domain_name'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_domain_id = ',
+                     'project_domain_id = ' + config_data['service_tenant_domain_id'],
                      starts_with=True)
 
         #configure api-paste
