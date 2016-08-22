@@ -2622,14 +2622,14 @@ def validate_keystone_url():
 @authorize()
 def validate_keystone_credentials():
 
-    def _get_keystone_session(auth_url, domain_id='default'):
+    def _get_keystone_session(auth_url):
         if 'v3' in auth_url:
             auth = password.Password(auth_url=auth_url,
                                     username=admin_username,
                                     password=admin_password,
-                                    project_name=project_name,
+                                    #project_name=project_name,
                                     user_domain_id=domain_id,
-                                    project_domain_id=domain_id
+                                    domain_id=domain_id
                                     )
         else:
             auth = password.Password(auth_url=auth_url,
@@ -2645,6 +2645,7 @@ def validate_keystone_credentials():
     project_name = bottle.request.query['project_name']
     admin_url = bottle.request.query['admin_url']
     public_url = bottle.request.query['public_url']
+    domain_id = bottle.request.query['domain_id']
 
     #test public url
     try:

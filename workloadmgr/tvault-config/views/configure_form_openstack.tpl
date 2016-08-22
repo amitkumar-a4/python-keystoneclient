@@ -12,8 +12,10 @@
 <!-- Latest compiled and minified JavaScript -->
 <script src="js/bootstrap.min.js"></script>
 <script type="text/javascript">
+IsV3 = false
 function setRequired(val) {
     if(val.includes('v3')) {
+       IsV3 = true
        $('[name="domain-name"]').attr("required", "true");
     }
     else {
@@ -100,7 +102,8 @@ function findForm() {
     </div>
     <div class="form-group">
         <label class="control-label">Domain ID</label>
-        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control">
+        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control" onblur='validate_keystone_credentials(this)'>
+        <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
          <label class="control-label">Trustee Role</label>
@@ -276,14 +279,18 @@ function validate_keystone_url(url, inputelement) {
 }
 
 function validate_keystone_credentials(inputelement) {
+    if(inputelement.name == 'admin-tenant-name' && IsV3 == true)
+       return
+
     public_url = $('[name="keystone-public-url"]')[0].value
     admin_url = $('[name="keystone-admin-url"]')[0].value
     project_name = $('[name="admin-tenant-name"]')[0].value
     username = $('[name="admin-username"]')[0].value
     password = $('[name="admin-password"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
     $.ajax({
         url: "validate_keystone_credentials?public_url="+public_url+"&admin_url="+
-             admin_url+"&project_name="+project_name+"&username="+username+"&password="+password,
+             admin_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id,
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
