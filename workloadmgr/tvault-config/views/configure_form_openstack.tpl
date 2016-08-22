@@ -287,10 +287,10 @@ function validate_keystone_credentials(inputelement) {
     project_name = $('[name="admin-tenant-name"]')[0].value
     username = $('[name="admin-username"]')[0].value
     password = $('[name="admin-password"]')[0].value
-    domain_name = $('[name="domain-name"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
     $.ajax({
         url: "validate_keystone_credentials?public_url="+public_url+"&admin_url="+
-             admin_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_name="+domain_name,
+             admin_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id,
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
