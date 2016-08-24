@@ -1325,7 +1325,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
-                html = html.replace('object.created_at',object.created_at)
+                html = html.replace('object.created_at',str(object.created_at))
                 html = html.replace('vms_html',vms_html)
 
                 
@@ -1363,7 +1363,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
-                html = html.replace('object.created_at',object.created_at)
+                html = html.replace('object.created_at',str(object.created_at))
                 html = html.replace('vms_html',vms_html)
                 
                 if object.status == 'error':
