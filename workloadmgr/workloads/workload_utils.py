@@ -38,11 +38,11 @@ def upload_settings_db_entry(cntx):
         for kvpair in setting.metadata:
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
                 kvpair['value'] = '******'
-    settings_jason = jsonutils.dumps(settings_db)            
-    path = os.path.join(vault.get_vault_data_directory(), CONF.cloud_unique_id)
+    settings_jason = jsonutils.dumps(settings_db)
+    path = os.path.join(vault.get_vault_data_directory(), str(CONF.cloud_unique_id))
     path = os.path.join(path, "settings_db")
     vault.put_object(path, settings_jason)
-        
+
 def upload_workload_db_entry(cntx, workload_id):
     upload_settings_db_entry(cntx)
     
