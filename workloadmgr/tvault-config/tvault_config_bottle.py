@@ -503,7 +503,9 @@ def _authenticate_with_keystone():
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
             config_data['service_tenant_name'] = tenant.name
-            config_data['service_tenant_domain_id'] = tenant.domain_id
+            config_data['service_tenant_domain_id'] = 'default'
+            if hasattr(tenant, 'domain_id'):
+               config_data['service_tenant_domain_id'] = tenant.domain_id
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
             
@@ -2106,6 +2108,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_tenant_name = ', 'admin_tenant_name = ' + config_data['service_tenant_name'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'user_domain_id = ', 'user_domain_id = ' + config_data['domain_name'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:
