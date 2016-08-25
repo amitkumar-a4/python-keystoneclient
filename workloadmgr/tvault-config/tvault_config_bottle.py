@@ -2108,7 +2108,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_tenant_name = ', 'admin_tenant_name = ' + config_data['service_tenant_name'])
-        replace_line('/etc/workloadmgr/api-paste.ini', 'user_domain_id = ', 'user_domain_id = ' + config_data['domain_name'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user_domain_id = ', 'admin_user_domain_id = ' + config_data['domain_name'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:
