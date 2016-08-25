@@ -164,9 +164,8 @@ def get_user_to_get_email_address(context):
        auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
-                                    project_name=tenant_name,
                                     user_domain_id=domain_name,
-                                    project_domain_id=domain_name,
+                                    domain_id=domain_name,
                                     )
     else:
          auth = passMod.Password(auth_url=auth_url,

@@ -129,7 +129,7 @@ def cinderclient(context, refresh_token=False):
                 trust_id=trust_id,
                 tenant_id=context.project_id,
                 trustor_user_id=context.user_id,
-                user_domain_id=user_domain_id,
+                user_domain_id=CONF.domain_name,
                 is_admin=False)
         else:
             context = wlm_context.RequestContext(

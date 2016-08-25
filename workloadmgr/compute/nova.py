@@ -216,7 +216,7 @@ def _get_tenant_context(context):
             trust_id=trust_id,
             tenant_id=tenant_id,
             trustor_user_id=user_id,
-            user_domain_id=user_domain_id,
+            user_domain_id=CONF.domain_name,
             is_admin=False)
 
         clients.initialise()
@@ -275,7 +275,7 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
                 trust_id=trust_id,
                 tenant_id=context.project_id,
                 trustor_user_id=context.user_id,
-                user_domain_id=user_domain_id,
+                user_domain_id=CONF.domain_name,
                 is_admin=False)
         else:
             context = wlm_context.RequestContext(
