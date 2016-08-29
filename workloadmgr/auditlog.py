@@ -19,6 +19,9 @@ auditlog_opts = [
     cfg.StrOpt('keystone_endpoint_url',
                default='http://localhost:35357/v2.0',
                help='keystone endpoint url for connecting to keystone'),                                   
+    cfg.StrOpt('audit_log_file',
+               default='auditlog.log',
+               help='file name to store all audit log entries')
 ]
 
 LOG = logging.getLogger(__name__)
@@ -28,7 +31,12 @@ CONF.register_opts(auditlog_opts)
 _auditloggers = {}
 lock = threading.Lock()
 
-def getAuditLogger(name='auditlog', version='unknown', filepath='/var/triliovault/auditlogs/auditlog.log'):
+def getAuditLogger(name='auditlog', version='unknown', filepath=None):
+ 
+    if filepath is None:
+        filepath = os.path.join(CONF.vault_data_directory, CONF.cloud_unique_id)
+        filepath = os.path.join(filepath, CONF.audit_log_file)
+    
     if name not in _auditloggers:
         _auditloggers[name] = AuditLog(name, version, filepath)
     
@@ -76,45 +84,57 @@ class AuditLog(object):
             lock.release()
             
     def get_records(self, time_in_minutes, time_from, time_to):
-        records = []
-        head, tail = os.path.split(self._filepath)
-        fileutils.ensure_tree(head)        
-        
-        if time_in_minutes:
-            now = timeutils.utcnow()
-            with open(self._filepath) as auditlogfile: 
-                for line in auditlogfile:
-                    values = line.split(",") 
-                    record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
-                    epoch = time.mktime(record_time.timetuple())
-                    offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
-                    # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
-                    if (now - record_time) < timedelta(minutes=time_in_minutes):
-                        record = {'Timestamp' : local_time,
-                                  'UserName': values[1],
-                                  'UserId': values[2],
-                                  'ObjectName': values[3],
-                                  'ObjectId': values[4],
-                                  'Details':values[5],
-                                  }
-                        records.append(record)
-        else:
-            with open(self._filepath) as auditlogfile: 
-                for line in auditlogfile:
-                    values = line.split(",")
-                    record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
-                    epoch = time.mktime(record_time.timetuple())
-                    offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                    local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
-                    # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
-                    if record_time >= time_from and record_time <= time_to:
-                        record = {'Timestamp' : local_time,
-                                  'UserName': values[1],
-                                  'UserId': values[2],
-                                  'ObjectName': values[3],
-                                  'ObjectId': values[4],
-                                  'Details':values[5],
-                                  }
-                        records.append(record)           
+        def _get_records_from_audit_file(filename=None):
+            records = []
+
+            filename = filename or self._filepath
+
+            head, tail = os.path.split(filename)
+            fileutils.ensure_tree(head)        
+
+            if not os.path.exists(filename):
+                return records
+
+            if time_in_minutes:
+                now = timeutils.utcnow()
+                with open(filename) as auditlogfile: 
+                    for line in auditlogfile:
+                        values = line.split(",") 
+                        record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
+                        epoch = time.mktime(record_time.timetuple())
+                        offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
+                        local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
+                        # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
+                        if (now - record_time) < timedelta(minutes=time_in_minutes):
+                            record = {'Timestamp' : local_time,
+                                      'UserName': values[1],
+                                      'UserId': values[2],
+                                      'ObjectName': values[3],
+                                      'ObjectId': values[4],
+                                      'Details':values[5],
+                                      }
+                            records.append(record)
+            else:
+                with open(filename) as auditlogfile: 
+                    for line in auditlogfile:
+                        values = line.split(",")
+                        record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
+                        epoch = time.mktime(record_time.timetuple())
+                        offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
+                        local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
+                        # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
+                        if record_time >= time_from and record_time <= time_to:
+                            record = {'Timestamp' : local_time,
+                                      'UserName': values[1],
+                                      'UserId': values[2],
+                                      'ObjectName': values[3],
+                                      'ObjectId': values[4],
+                                      'Details':values[5],
+                                      }
+                            records.append(record)           
+            return records
+     
+        records = _get_records_from_audit_file()
+        # for backward compatilibity
+        records += _get_records_from_audit_file('/var/triliovault/auditlogs/auditlog.log')
         return records
