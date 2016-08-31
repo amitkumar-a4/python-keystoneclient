@@ -2645,7 +2645,7 @@ def validate_keystone_credentials():
                                     password=admin_password,
                                     project_name=project_name
                                     )
-        sess = session.Session(auth=auth)
+        sess = Session.Session(auth=auth, verify=SSL_VERIFY)
         return sess
 
     admin_username = bottle.request.query['username']
@@ -2658,7 +2658,7 @@ def validate_keystone_credentials():
     #test public url
     try:
         sess = _get_keystone_session(public_url)
-        keystone = client.Client(session=sess, auth_url=public_url, insecure=True)
+        keystone = client.Client(session=sess, auth_url=public_url, insecure=SSL_INSECURE)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2668,7 +2668,7 @@ def validate_keystone_credentials():
 
     try:
         sess = _get_keystone_session(admin_url)
-        keystone = client.Client(session=sess, auth_url=admin_url, insecure=True)
+        keystone = client.Client(session=sess, auth_url=admin_url, insecure=SSL_INSECURE)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2677,7 +2677,14 @@ def validate_keystone_credentials():
            return bottle.HTTPResponse(status=500, body=str(exception))
 
     # populate roles list
-    roles = [role.name for role in keystone.roles.list()]
+    try:
+        roles = [role.name for role in keystone.roles.list()]
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
     return {'status':'Success', 'roles': roles}
 
 
