@@ -104,6 +104,9 @@ wlm_vault_opts = [
                help='Location where snapshots will be stored'),
     cfg.StrOpt('domain_name',
                default='default',
+               help='cloud-admin user domain id'),
+    cfg.StrOpt('triliovault_user_domain_id',
+               default='default',
                help='triliovault user domain name'),
 ]
 
@@ -159,7 +162,7 @@ def get_user_to_get_email_address(context):
            tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
            context.project_id = project_id
     auth_url=CONF.keystone_endpoint_url
-    domain_name=CONF.get('domain_name')
+    domain_name=CONF.get('triliovault_user_domain_id')
     if auth_url.find('v3') != -1:
        auth = passMod.Password(auth_url=auth_url,
                                     username=username,
