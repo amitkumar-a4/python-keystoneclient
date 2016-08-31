@@ -648,11 +648,11 @@ def _register_service():
     if config_data['configuration_type'] == 'openstack':
         #create user
         try:
+            config_data['triliovault_user_domain_id'] = 'default'
             wlm_user = None
             users = keystone.users.list()
             for user in users:
                 if user.name == 'compute':
-                   config_data['triliovault_user_domain_id'] = 'default'
                    if hasattr(user, 'domain_id'):
                       config_data['triliovault_user_domain_id'] = user.domain_id
                 if keystone.version == 'v3':
