@@ -2645,7 +2645,7 @@ def validate_keystone_credentials():
                                     password=admin_password,
                                     project_name=project_name
                                     )
-        sess = Session.Session(auth=auth, verify=SSL_VERIFY)
+        sess = session.Session(auth=auth, verify=SSL_VERIFY)
         return sess
 
     admin_username = bottle.request.query['username']
@@ -2685,6 +2685,7 @@ def validate_keystone_credentials():
            raise exception
         else:
            return bottle.HTTPResponse(status=500, body=str(exception))
+
     return {'status':'Success', 'roles': roles}
 
 
