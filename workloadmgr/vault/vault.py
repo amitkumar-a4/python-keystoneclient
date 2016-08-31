@@ -162,13 +162,16 @@ def get_user_to_get_email_address(context):
            tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
            context.project_id = project_id
     auth_url=CONF.keystone_endpoint_url
-    domain_name=CONF.get('triliovault_user_domain_id')
+    if username == 'triliovault':
+       domain_id=CONF.get('triliovault_user_domain_id')
+    else:
+        domain_id=CONF.get('domain_name')
     if auth_url.find('v3') != -1:
        auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
-                                    user_domain_id=domain_name,
-                                    domain_id=domain_name,
+                                    user_domain_id=domain_id,
+                                    domain_id=domain_id,
                                     )
     else:
          auth = passMod.Password(auth_url=auth_url,
