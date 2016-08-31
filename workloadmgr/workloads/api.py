@@ -1636,14 +1636,9 @@ class API(base.Base):
                       mounted_vm_id = self.db.get_metadata_value(snapshot_one.metadata, 'mount_vm_id')
                       if mounted_vm_id is not None:
                          if mount_vm_id == mounted_vm_id:
-                            #msg = _('Invalid as snapshot already mounted with id:%s'%snapshot_one.id)
-                            error_dict = {}
-                            error_info = []
-                            error_info.append('Mounted_found')
-                            error_info.append(snapshot_one.id)
-                            error_dict['urls'] = error_info
-                            return error_dict
-
+                             msg = _('snapshot %s already mounted with id:%s' % (snapshot_one.id, mount_vm_id))
+                             raise wlm_exceptions.InvalidParameterValue(err=msg)
+                      
 
             snapshot_display_name = snapshot['display_name']
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
@@ -1655,11 +1650,13 @@ class API(base.Base):
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
-            mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id, mount_vm_id)
+
+            self.db.snapshot_update(context, snapshot_id, 
+                                    { 'status': 'mounting' })
+            self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id, mount_vm_id)
                         
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' +
                          'Snapshot \'' + snapshot_display_name + '\' Mount Submitted', snapshot)
-            return mounturl
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
