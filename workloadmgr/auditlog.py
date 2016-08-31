@@ -21,7 +21,10 @@ auditlog_opts = [
                help='keystone endpoint url for connecting to keystone'),                                   
     cfg.StrOpt('audit_log_file',
                default='auditlog.log',
-               help='file name to store all audit log entries')
+               help='file name to store all audit log entries'),
+    cfg.StrOpt('legacy_audit_log_file',
+               default='/var/triliovault/auditlogs/auditlog.log',
+               help='Legacy audit log file path to store all audit log entries'),
 ]
 
 LOG = logging.getLogger(__name__)
@@ -136,5 +139,5 @@ class AuditLog(object):
      
         records = _get_records_from_audit_file()
         # for backward compatilibity
-        records += _get_records_from_audit_file('/var/triliovault/auditlogs/auditlog.log')
+        records += _get_records_from_audit_file(CONF.legacy_audit_log_file)
         return records
