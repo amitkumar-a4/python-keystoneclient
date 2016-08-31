@@ -66,87 +66,80 @@ AUDITLOG = auditlog.getAuditLogger()
 
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
-    arg_str = autolog.format_args(args, kwargs)
-    LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
+    try:
+        arg_str = autolog.format_args(args, kwargs)
+        LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
     
-    from workloadmgr.workloads import API
-    workloadmgrapi = API()
+        from workloadmgr.workloads import API
+        workloadmgrapi = API()
  
-    workload_id = kwargs['workload_id']
-    user_id = kwargs['user_id']
-    project_id = kwargs['project_id']
-    tenantcontext = nova._get_tenant_context(kwargs)
+        workload_id = kwargs['workload_id']
+        user_id = kwargs['user_id']
+        project_id = kwargs['project_id']
+        tenantcontext = nova._get_tenant_context(kwargs)
     
-    workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
-
-    #TODO: Make sure workload is in a created state
-    if workload['status'] == 'error':
-        LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
-        LOG.info(_("_snapshot_create_callback Exit"))
-        return
-
-    # wait for 5 minutes until the workload changes state to available
-    count = 0
-    while True:
-        if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
-            break
-        time.sleep(30)
-        count += 1
         workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
-    # if workload hasn't changed the status to available
-    if workload['status'] != 'available':
-        LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
-        LOG.info(_("_snapshot_create_callback Exit"))
-        return
+        #TODO: Make sure workload is in a created state
+        if workload['status'] == 'error':
+            LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
+            LOG.info(_("_snapshot_create_callback Exit"))
+            return
 
-    # determine if the workload need to be full snapshot or incremental
-    # the last full snapshot
-    # if the last full snapshot is over policy based number of days, do a full backup
-    snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
-                                                                       project_id, workload_id)
-    jobscheduler = workload['jobschedule']
-
-    # 
-    # if fullbackup_interval is -1, never take full backups
-    # if fullbackup_interval is 0, always take full backups
-    # if fullbackup_interval is +ve follow the interval
-    #
-    jobscheduler['fullbackup_interval'] = \
-                   'fullbackup_interval' in jobscheduler and \
-                   jobscheduler['fullbackup_interval'] or "-1"
-
-    if int(jobscheduler['fullbackup_interval']) == 0:
-        snapshot_type = "full"
-    elif int(jobscheduler['fullbackup_interval']) < 0:
-        snapshot_type = "incremental"
-    elif int(jobscheduler['fullbackup_interval']) > 0:
-        # check full backup policy here
-        num_of_incr_in_current_chain = 0
-        for snap in snapshots:
-            if snap.snapshot_type == 'full':
-                break;
-            else:
-                num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
-                
-        if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
-           snapshot_type = "full"
-
-        if snapshots.__len__ == 0:
-           snapshot_type = 'full'
-
-    try:
-        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
-
-        # Wait for snapshot to complete
+        # wait for 5 minutes until the workload changes state to available
+        count = 0
         while True:
-            snapshot_details = workloadmgrapi.snapshot_get(tenantcontext, snapshot['id'])
-            if snapshot_details['status'].lower() == "available" or snapshot_details['status'].lower() == "error":
+            if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
                 break
             time.sleep(30)
+            count += 1
+            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+
+        # if workload hasn't changed the status to available
+        if workload['status'] != 'available':
+            LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
+            LOG.info(_("_snapshot_create_callback Exit"))
+            return
+
+        # determine if the workload need to be full snapshot or incremental
+        # the last full snapshot
+        # if the last full snapshot is over policy based number of days, do a full backup
+        snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
+                                                                           project_id, workload_id)
+        jobscheduler = workload['jobschedule']
+
+        # 
+        # if fullbackup_interval is -1, never take full backups
+        # if fullbackup_interval is 0, always take full backups
+        # if fullbackup_interval is +ve follow the interval
+        #
+        jobscheduler['fullbackup_interval'] = \
+                       'fullbackup_interval' in jobscheduler and \
+                       jobscheduler['fullbackup_interval'] or "-1"
+
+        if int(jobscheduler['fullbackup_interval']) == 0:
+            snapshot_type = "full"
+        elif int(jobscheduler['fullbackup_interval']) < 0:
+            snapshot_type = "incremental"
+        elif int(jobscheduler['fullbackup_interval']) > 0:
+            # check full backup policy here
+            num_of_incr_in_current_chain = 0
+            for snap in snapshots:
+                if snap.snapshot_type == 'full':
+                    break;
+                else:
+                    num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
+                
+            if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+               snapshot_type = "full"
+
+            if snapshots.__len__ == 0:
+               snapshot_type = 'full'
+
+        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
     except Exception as ex:
         LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
-        pass
+
     LOG.info(_("_snapshot_create_callback Exit"))
 
 
