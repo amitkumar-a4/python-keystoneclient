@@ -5,6 +5,7 @@
 
 import socket
 import json
+import uuid
 from operator import itemgetter
 import cPickle as pickle
 
@@ -13,7 +14,8 @@ from workloadmgr import workloads as workloadAPI
 from workloadmgr.vault import vault
 from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
-from workloadmgr.compute import nova
+from workloadmgr.common import context as wlm_context
+from workloadmgr.common import clients
 
 LOG = logging.getLogger(__name__)
 
@@ -47,6 +49,21 @@ def import_settings(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
+
+def project_id_exists(context, project_id):
+    clients.initialise()
+    client_plugin = clients.Clients(context)
+    kclient = client_plugin.client("keystone")
+
+    # TODO: Optimize it without reading project list os many times
+    kclient.client_plugin = kclient
+    for prj in kclient.client.projects.list():
+        if uuid.UUID(prj.id) == uuid.UUID(project_id):
+            return True
+
+    return False
+
+
 def import_workload(cntx, workload_url, new_version, upgrade=True):
     """ Import workload and snapshot records from vault 
     Versions Supported: 1.0.177
@@ -54,7 +71,20 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
     db = WorkloadMgrDB().db
     workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
     if upgrade == True:
-        tenantcontext = nova._get_tenant_context(workload_values)
+        # make sure that cntx is admin
+        # make sure tenant id exists on this openstack
+        # create context object from tenant id and user id
+        tenant_id = workload_values.get('tenant_id', None)
+        tenant_id = workload_values.get('project_id', tenant_id)
+        if project_id_exists(cntx, tenant_id):
+            tenantcontext = wlm_context.RequestContext(
+                                user_id=workload_values['user_id'],
+                                project_id=tenant_id,
+                                tenant_id=tenant_id)
+        else:
+            raise exception.InvalidRequest(
+                "Workload %s tenant %s does not belong to this cloud" %
+                (workload_values['id'], tenant_id))
     else:
         tenantcontext = cntx
 
@@ -166,5 +196,6 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
 
         except Exception as ex:
             LOG.exception(ex)
-            db.snapshot_update(tenantcontext,snapshot.id,{'status': 'error'})
+            db.snapshot_update(tenantcontext,snapshot.id, {'status': 'import-error'})
+
     return workload

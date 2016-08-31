@@ -164,7 +164,7 @@ class InvalidSnapshot(Invalid):
     message = _("Invalid snapshot") + ": %(reason)s"
 
 class InvalidWorkload(Invalid):
-    message = _("Invalid snapshot") + ": %(reason)s"
+    message = _("Invalid workload") + ": %(reason)s"
 
 class InvalidRequest(Invalid):
     message = _("The request is invalid.")
