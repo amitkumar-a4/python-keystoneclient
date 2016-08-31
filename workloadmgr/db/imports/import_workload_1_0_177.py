@@ -82,7 +82,6 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
                                 project_id=tenant_id,
                                 tenant_id=tenant_id)
         else:
-            import pdb;pdb.set_trace()
             raise exception.InvalidRequest(
                 "Workload %s tenant %s does not belong to this cloud" %
                 (workload_values['id'], tenant_id))
