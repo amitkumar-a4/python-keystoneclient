@@ -147,13 +147,10 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                     snapshot_id, mount_vm_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
-        mountpoints = self.call(ctxt,
-                              self.make_msg('snapshot_mount',
+        self.cast(ctxt, self.make_msg('snapshot_mount',
                                       snapshot_id=snapshot_id,
                                       mount_vm_id=mount_vm_id),
-                              topic=topic,
-                              timeout=600)
-        return mountpoints
+                   topic=topic)
     
     @autolog.log_method(logger=Logger)     
     def snapshot_dismount(self, ctxt, host, snapshot_id):
