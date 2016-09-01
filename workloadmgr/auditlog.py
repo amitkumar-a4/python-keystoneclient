@@ -87,6 +87,7 @@ class AuditLog(object):
             lock.release()
             
     def get_records(self, time_in_minutes, time_from, time_to):
+
         def _get_records_from_audit_file(filename=None):
             records = []
 
@@ -98,7 +99,7 @@ class AuditLog(object):
             if not os.path.exists(filename):
                 return records
 
-            if time_in_minutes:
+            def _next_record():
                 now = timeutils.utcnow()
                 with open(filename) as auditlogfile: 
                     for line in auditlogfile:
@@ -107,8 +108,15 @@ class AuditLog(object):
                         epoch = time.mktime(record_time.timetuple())
                         offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
                         local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
-                        # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
-                        if (now - record_time) < timedelta(minutes=time_in_minutes):
+                        fetch = False
+                        if time_in_minutes:
+                            if (now - record_time) < timedelta(minutes=time_in_minutes):
+                                fetch = True
+                        else:
+                            if record_time >= time_from and record_time <= time_to:
+                                fetch = True
+
+                        if fetch is True:
                             record = {'Timestamp' : local_time,
                                       'UserName': values[1],
                                       'UserId': values[2],
@@ -116,27 +124,15 @@ class AuditLog(object):
                                       'ObjectId': values[4],
                                       'Details':values[5],
                                       }
-                            records.append(record)
-            else:
-                with open(filename) as auditlogfile: 
-                    for line in auditlogfile:
-                        values = line.split(",")
-                        record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
-                        epoch = time.mktime(record_time.timetuple())
-                        offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                        local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
-                        # LOG.info(_('values[0]= %s || local_time = %s '), values[0], local_time)
-                        if record_time >= time_from and record_time <= time_to:
-                            record = {'Timestamp' : local_time,
-                                      'UserName': values[1],
-                                      'UserId': values[2],
-                                      'ObjectName': values[3],
-                                      'ObjectId': values[4],
-                                      'Details':values[5],
-                                      }
-                            records.append(record)           
+                            yield record
+                        else:
+                            continue
+
+            for rec in _next_record():
+                records.append(rec)
+
             return records
-     
+
         records = _get_records_from_audit_file()
         # for backward compatilibity
         records += _get_records_from_audit_file(CONF.legacy_audit_log_file)
