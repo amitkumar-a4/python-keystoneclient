@@ -50,15 +50,22 @@ class TasksController(wsgi.Controller):
 
     def get_tasks(self, req):
         try:
+            var = None
             context = req.environ['workloadmgr.context']
             if ('QUERY_STRING' in req.environ):
                 qs=parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
-                time_in_minutes = var.get('time_in_minutes',[None])[0]
-                status = var.get('status',[None])[0]
-                page = var.get('page',[None])[0]
-                size = var.get('size',[None])[0]
-            tasks = self.workload_api.tasks_get(context, status=status, page=page, size=size, time_in_minutes=time_in_minutes)
+
+            #function to get values from query string if it's available
+            #else it will assign None
+            get_value =  lambda value: var.get(value,[None])[0] if var else None
+
+            time_in_minutes = get_value(value = 'time_in_minutes')
+            status =  get_value(value = 'status')
+            page =  get_value(value = 'page')
+            size =  get_value(value = 'size')
+            tasks = self.workload_api.tasks_get(context, status=status, page=page,\
+                         size=size, time_in_minutes=time_in_minutes)
             return self._view_builder.detail_list(req, tasks)
         except exception.TaskNotFound as error:
             LOG.exception(error)
