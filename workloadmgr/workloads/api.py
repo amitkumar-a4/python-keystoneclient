@@ -166,6 +166,17 @@ def create_trust(func):
    return trust_create_wrapper
 
 
+def upload_settings(func):
+   def upload_settings_wrapper(*args, **kwargs):
+       # Clean up trust if the role is changed
+       context = args[1]
+
+       ret_val = func(*args, **kwargs)
+       workload_utils.upload_settings_db_entry(context)
+       return ret_val
+   return upload_settings_wrapper
+
+
 def wrap_check_policy(func):
     """Check policy corresponding to the wrapped methods prior to execution
 
@@ -221,12 +232,15 @@ class API(base.Base):
         if not hasattr(self, "_jobstore"):
             self._jobstore = SQLAlchemyJobStore(engine=self._engine)
 
+        super(API, self).__init__(db_driver)
+
         if not hasattr(self, "_scheduler"):
             self._scheduler = Scheduler()
             self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
-            self._scheduler.start()
 
-            super(API, self).__init__(db_driver)
+            context = wlm_context.get_admin_context()
+            self.workload_ensure_global_job_scheduler(context)
+
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
@@ -1224,6 +1238,87 @@ class API(base.Base):
         AUDITLOG.log(context,'Workload \'' + display_name + '\' Unlock Submitted', workload)
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
+    def workload_disable_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        setting = {u'category': "job_scheduler",
+                   u'name': "global-job-scheduler",
+                   u'description': "Controls job scheduler status",
+                   u'value': False,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "job-scheduler-setting",}
+
+        try:
+            try:
+                self.db.setting_get(context, setting['name'])
+                self.db.setting_update(context, setting['name'], setting)
+            except wlm_exceptions.SettingNotFound:
+                self.db.setting_create(context, setting)
+
+            if self._scheduler.running is True:
+                self._scheduler.shutdown()
+        except Exception as ex:
+            LOG.exception(ex)
+            raise Exception("Cannot disable job scheduler globally")
+
+    @autolog.log_method(logger=Logger)
+    @upload_settings
+    def workload_enable_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        setting = {u'category': "job_scheduler",
+                   u'name': "global-job-scheduler",
+                   u'description': "Controls job scheduler status",
+                   u'value': True,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "job-scheduler-setting",}
+
+        try:
+            try:
+                self.db.setting_get(context, setting['name'])
+                self.db.setting_update(context, setting['name'], setting)
+            except wlm_exceptions.SettingNotFound:
+                self.db.setting_create(context, setting)
+
+            if self._scheduler.running is False:
+                self._scheduler.start()
+        except Exception as ex:
+            LOG.exception(ex)
+            raise Exception("Cannot enable job scheduler globally")
+
+    @autolog.log_method(logger=Logger)
+    def workload_get_global_job_scheduler(self, context):
+        return self._scheduler.running
+
+    @autolog.log_method(logger=Logger)
+    def workload_ensure_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        try:
+            global_scheduler = [sch for sch in self.db.setting_get_all(context) if sch['name'] == 'global-job-scheduler']
+            if len(global_scheduler) == 0 or global_scheduler[0]['value'] == '1':
+                self._scheduler.start()
+            else:
+                self._scheduler.shutdown()
+        except wlm_exceptions.SettingNotFound:
+            self._scheduler.start()
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
 
@@ -1955,6 +2050,7 @@ class API(base.Base):
    
   
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def settings_create(self, context, settings):
         created_settings = []
         try:
@@ -1965,6 +2061,7 @@ class API(base.Base):
         return created_settings 
     
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def settings_update(self, context, settings):
         updated_settings = []
         try:
@@ -1975,6 +2072,7 @@ class API(base.Base):
         return updated_settings
     
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def setting_delete(self, context, name):
         self.db.setting_delete(context,name)
                 
@@ -2024,6 +2122,7 @@ class API(base.Base):
 
       
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def trust_create(self, context, role_name):
 
         # create trust
@@ -2057,6 +2156,7 @@ class API(base.Base):
 
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def trust_delete(self, context, name):
 
         trust = self.db.setting_get(context, name)
@@ -2101,6 +2201,7 @@ class API(base.Base):
         return None
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def license_create(self, context, license_text):
 
         def parse_license_text(licensetext,
