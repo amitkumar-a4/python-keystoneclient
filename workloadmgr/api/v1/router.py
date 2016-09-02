@@ -20,6 +20,7 @@ from workloadmgr.api.v1 import settings
 from workloadmgr.api.v1 import trusts
 from workloadmgr.api.v1 import tasks
 from workloadmgr.api.v1 import workload_transfer as transfers
+from workloadmgr.api.v1 import global_job_scheduler
 
 LOG = logging.getLogger(__name__)
 
@@ -549,6 +550,30 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['DELETE']}) 
 
         ###################################################################################################
+        self.resources['global_job_scheduler'] = global_job_scheduler.create_resource(ext_mgr)
+
+        #enable global job scheduler
+        mapper.connect("enable_global_job_scheduler",
+                       "/{project_id}/global_job_scheduler/enable",
+                       controller=self.resources['global_job_scheduler'],
+                       action='enable',
+                       conditions={"method": ['POST']}) 
+
+        #get global job scheduler status
+        mapper.connect("get_global_job_scheduler_status",
+                       "/{project_id}/global_job_scheduler",
+                       controller=self.resources['global_job_scheduler'],
+                       action='index',
+                       conditions={"method": ['GET']}) 
+
+        #disable global job scheduler
+        mapper.connect("disable_global_job_scheduler",
+                       "/{project_id}/global_job_scheduler/disable",
+                       controller=self.resources['global_job_scheduler'],
+                       action='disable',
+                       conditions={"method": ['POST']}) 
+
+        ###################################################################################################
         self.resources['transfers'] = transfers.create_resource(ext_mgr)
         
         #create settings
@@ -611,4 +636,3 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['tasks'],
                        action='get_tasks',
                        conditions={"method": ['GET']})
-             
