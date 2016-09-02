@@ -1244,10 +1244,11 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
-        if self._scheduler.running is True:
-            self._scheduler.shutdown()
-        else:
+        if self._scheduler.running is False:
+            # scheduler is already stopped. Nothing to do
             return
+
+        self._scheduler.shutdown()
 
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
@@ -1277,10 +1278,11 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
-        if self._scheduler.running is False:
-            self._scheduler.start()
-        else:
+        if self._scheduler.running is True:
+            # scheduler is already running. Nothing to do
             return
+
+        self._scheduler.start()
 
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
