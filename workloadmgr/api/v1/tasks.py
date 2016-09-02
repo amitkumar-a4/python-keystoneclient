@@ -53,7 +53,6 @@ class TasksController(wsgi.Controller):
             var = None
             context = req.environ['workloadmgr.context']
             if ('QUERY_STRING' in req.environ):
-                qs=parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
 
             #function to get values from query string if it's available
