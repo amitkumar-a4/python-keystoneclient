@@ -1170,7 +1170,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             virtdriver.snapshot_dismount(context, snapshot, None, mount_vm_id)
             self.db.snapshot_update(context, snapshot_id,
                          {'status': 'available', 'metadata': {}})
-            # Add metadata to recovery manager vm
+            # Delete metadata to recovery manager vm
             try:
                 compute_service = nova.API(production=True)
                 compute_service.delete_meta(context, mount_vm_id,
