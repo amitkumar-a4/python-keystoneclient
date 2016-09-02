@@ -80,7 +80,7 @@ function findForm() {
     </div>
     <div class="form-group">
     	<label class="control-label">Keystone Public Url<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
-    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
+    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
@@ -253,6 +253,20 @@ $('#ntp-servers').removeAttr('required');
 }
 });
 });
+
+function validate_url_versions() {
+   if ($( "input[name='keystone-admin-url']" )[0].value.split('v')[1] !=
+       $( "input[name='keystone-public-url']" )[0].value.split('v')[1]) {
+       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).removeClass("hidden")
+       $($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0].innerHTML = "Keystone URL versions don't match"
+       $($($("input[name='keystone-public-url']")[0]).parent()).addClass("has-error")
+       return false
+   } else {
+       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).addClass("hidden")
+       $($($("input[name='keystone-public-url']")[0]).parent()).removeClass("has-error")
+   }
+   return true
+}
 
 function validate_keystone_url(url, inputelement) {
     $.ajax({url: url,
