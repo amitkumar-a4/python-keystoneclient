@@ -1089,6 +1089,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                               'urls': json.dumps(urls)
                                            }
                                         })
+                # Add metadata to recovery manager vm
+                try:
+                    compute_service = nova.API(production=True)
+                    compute_service.set_meta_item(context, mount_vm_id,
+                                     "mounted_snapshot_id", snapshot['id'])
+                except:
+                    pass
                 return {"urls": urls}
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
@@ -1163,6 +1170,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             virtdriver.snapshot_dismount(context, snapshot, None, mount_vm_id)
             self.db.snapshot_update(context, snapshot_id,
                          {'status': 'available', 'metadata': {}})
+            # Add metadata to recovery manager vm
+            try:
+                compute_service = nova.API(production=True)
+                compute_service.delete_meta(context, mount_vm_id,
+                                     ["mounted_snapshot_id"])
+            except:
+                pass
         elif workload.source_platform == 'vmware': 
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')        
             devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
