@@ -648,17 +648,19 @@ def _register_service():
     if config_data['configuration_type'] == 'openstack':
         #create user
         try:
+            config_data['triliovault_user_domain_id'] = 'default'
             wlm_user = None
             users = keystone.users.list()
             for user in users:
+                if user.name == 'compute':
+                   if hasattr(user, 'domain_id'):
+                      config_data['triliovault_user_domain_id'] = user.domain_id
                 if keystone.version == 'v3':
                    if user.name == config_data['workloadmgr_user']:
                       wlm_user = user
-                      break
                 else:
                      if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
                         wlm_user = user
-                        break 
                 
             admin_role = None
             roles = keystone.roles.list()
@@ -687,7 +689,7 @@ def _register_service():
                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
                                                     password=config_data['workloadmgr_user_password'],
                                                     email='workloadmgr@triliodata.com',
-                                                    domain=config_data['domain_name'],
+                                                    domain=config_data['triliovault_user_domain_id'],
                                                     default_project=config_data['service_tenant_id'],
                                                     enabled=True)
                    keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
@@ -2094,8 +2096,11 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'domain_name = ',
                      'domain_name = ' + config_data.get('domain_name'),
                      starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'triliovault_user_domain_id = ',
+                     'triliovault_user_domain_id = ' + config_data['triliovault_user_domain_id'],
+                     starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'user_domain_id = ',
-                     'user_domain_id = ' + config_data['domain_name'],
+                     'user_domain_id = ' + config_data['triliovault_user_domain_id'],
                      starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_domain_id = ',
                      'project_domain_id = ' + config_data['service_tenant_domain_id'],
@@ -2108,7 +2113,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_tenant_name = ', 'admin_tenant_name = ' + config_data['service_tenant_name'])
-        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user_domain_id = ', 'admin_user_domain_id = ' + config_data['domain_name'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user_domain_id = ', 'admin_user_domain_id = ' + config_data['triliovault_user_domain_id'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:
@@ -2640,7 +2645,7 @@ def validate_keystone_credentials():
                                     password=admin_password,
                                     project_name=project_name
                                     )
-        sess = session.Session(auth=auth)
+        sess = session.Session(auth=auth, verify=SSL_VERIFY)
         return sess
 
     admin_username = bottle.request.query['username']
@@ -2653,7 +2658,7 @@ def validate_keystone_credentials():
     #test public url
     try:
         sess = _get_keystone_session(public_url)
-        keystone = client.Client(session=sess, auth_url=public_url, insecure=True)
+        keystone = client.Client(session=sess, auth_url=public_url, insecure=SSL_INSECURE)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2663,7 +2668,7 @@ def validate_keystone_credentials():
 
     try:
         sess = _get_keystone_session(admin_url)
-        keystone = client.Client(session=sess, auth_url=admin_url, insecure=True)
+        keystone = client.Client(session=sess, auth_url=admin_url, insecure=SSL_INSECURE)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2672,7 +2677,15 @@ def validate_keystone_credentials():
            return bottle.HTTPResponse(status=500, body=str(exception))
 
     # populate roles list
-    roles = [role.name for role in keystone.roles.list()]
+    try:
+        roles = [role.name for role in keystone.roles.list()]
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
     return {'status':'Success', 'roles': roles}
 
 

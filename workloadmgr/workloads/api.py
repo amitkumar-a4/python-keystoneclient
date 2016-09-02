@@ -66,87 +66,80 @@ AUDITLOG = auditlog.getAuditLogger()
 
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
-    arg_str = autolog.format_args(args, kwargs)
-    LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
+    try:
+        arg_str = autolog.format_args(args, kwargs)
+        LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
     
-    from workloadmgr.workloads import API
-    workloadmgrapi = API()
+        from workloadmgr.workloads import API
+        workloadmgrapi = API()
  
-    workload_id = kwargs['workload_id']
-    user_id = kwargs['user_id']
-    project_id = kwargs['project_id']
-    tenantcontext = nova._get_tenant_context(kwargs)
+        workload_id = kwargs['workload_id']
+        user_id = kwargs['user_id']
+        project_id = kwargs['project_id']
+        tenantcontext = nova._get_tenant_context(kwargs)
     
-    workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
-
-    #TODO: Make sure workload is in a created state
-    if workload['status'] == 'error':
-        LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
-        LOG.info(_("_snapshot_create_callback Exit"))
-        return
-
-    # wait for 5 minutes until the workload changes state to available
-    count = 0
-    while True:
-        if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
-            break
-        time.sleep(30)
-        count += 1
         workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
-    # if workload hasn't changed the status to available
-    if workload['status'] != 'available':
-        LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
-        LOG.info(_("_snapshot_create_callback Exit"))
-        return
+        #TODO: Make sure workload is in a created state
+        if workload['status'] == 'error':
+            LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
+            LOG.info(_("_snapshot_create_callback Exit"))
+            return
 
-    # determine if the workload need to be full snapshot or incremental
-    # the last full snapshot
-    # if the last full snapshot is over policy based number of days, do a full backup
-    snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
-                                                                       project_id, workload_id)
-    jobscheduler = workload['jobschedule']
-
-    # 
-    # if fullbackup_interval is -1, never take full backups
-    # if fullbackup_interval is 0, always take full backups
-    # if fullbackup_interval is +ve follow the interval
-    #
-    jobscheduler['fullbackup_interval'] = \
-                   'fullbackup_interval' in jobscheduler and \
-                   jobscheduler['fullbackup_interval'] or "-1"
-
-    if int(jobscheduler['fullbackup_interval']) == 0:
-        snapshot_type = "full"
-    elif int(jobscheduler['fullbackup_interval']) < 0:
-        snapshot_type = "incremental"
-    elif int(jobscheduler['fullbackup_interval']) > 0:
-        # check full backup policy here
-        num_of_incr_in_current_chain = 0
-        for snap in snapshots:
-            if snap.snapshot_type == 'full':
-                break;
-            else:
-                num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
-                
-        if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
-           snapshot_type = "full"
-
-        if snapshots.__len__ == 0:
-           snapshot_type = 'full'
-
-    try:
-        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
-
-        # Wait for snapshot to complete
+        # wait for 5 minutes until the workload changes state to available
+        count = 0
         while True:
-            snapshot_details = workloadmgrapi.snapshot_get(tenantcontext, snapshot['id'])
-            if snapshot_details['status'].lower() == "available" or snapshot_details['status'].lower() == "error":
+            if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
                 break
             time.sleep(30)
+            count += 1
+            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+
+        # if workload hasn't changed the status to available
+        if workload['status'] != 'available':
+            LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
+            LOG.info(_("_snapshot_create_callback Exit"))
+            return
+
+        # determine if the workload need to be full snapshot or incremental
+        # the last full snapshot
+        # if the last full snapshot is over policy based number of days, do a full backup
+        snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
+                                                                           project_id, workload_id)
+        jobscheduler = workload['jobschedule']
+
+        # 
+        # if fullbackup_interval is -1, never take full backups
+        # if fullbackup_interval is 0, always take full backups
+        # if fullbackup_interval is +ve follow the interval
+        #
+        jobscheduler['fullbackup_interval'] = \
+                       'fullbackup_interval' in jobscheduler and \
+                       jobscheduler['fullbackup_interval'] or "-1"
+
+        if int(jobscheduler['fullbackup_interval']) == 0:
+            snapshot_type = "full"
+        elif int(jobscheduler['fullbackup_interval']) < 0:
+            snapshot_type = "incremental"
+        elif int(jobscheduler['fullbackup_interval']) > 0:
+            # check full backup policy here
+            num_of_incr_in_current_chain = 0
+            for snap in snapshots:
+                if snap.snapshot_type == 'full':
+                    break;
+                else:
+                    num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
+                
+            if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+               snapshot_type = "full"
+
+            if snapshots.__len__ == 0:
+               snapshot_type = 'full'
+
+        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
     except Exception as ex:
         LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
-        pass
+
     LOG.info(_("_snapshot_create_callback Exit"))
 
 
@@ -171,6 +164,17 @@ def create_trust(func):
 
        return func(*args, **kwargs)
    return trust_create_wrapper
+
+
+def upload_settings(func):
+   def upload_settings_wrapper(*args, **kwargs):
+       # Clean up trust if the role is changed
+       context = args[1]
+
+       ret_val = func(*args, **kwargs)
+       workload_utils.upload_settings_db_entry(context)
+       return ret_val
+   return upload_settings_wrapper
 
 
 def wrap_check_policy(func):
@@ -228,12 +232,15 @@ class API(base.Base):
         if not hasattr(self, "_jobstore"):
             self._jobstore = SQLAlchemyJobStore(engine=self._engine)
 
+        super(API, self).__init__(db_driver)
+
         if not hasattr(self, "_scheduler"):
             self._scheduler = Scheduler()
             self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
-            self._scheduler.start()
 
-            super(API, self).__init__(db_driver)
+            context = wlm_context.get_admin_context()
+            self.workload_ensure_global_job_scheduler(context)
+
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
@@ -1231,6 +1238,94 @@ class API(base.Base):
         AUDITLOG.log(context,'Workload \'' + display_name + '\' Unlock Submitted', workload)
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
+    def workload_disable_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        if self._scheduler.running is False:
+            # scheduler is already stopped. Nothing to do
+            return
+
+        self._scheduler.shutdown()
+
+        setting = {u'category': "job_scheduler",
+                   u'name': "global-job-scheduler",
+                   u'description': "Controls job scheduler status",
+                   u'value': False,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "job-scheduler-setting",}
+
+        try:
+            try:
+                self.db.setting_get(context, setting['name'])
+                self.db.setting_update(context, setting['name'], setting)
+            except wlm_exceptions.SettingNotFound:
+                self.db.setting_create(context, setting)
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise Exception("Cannot disable job scheduler globally")
+
+    @autolog.log_method(logger=Logger)
+    @upload_settings
+    def workload_enable_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        if self._scheduler.running is True:
+            # scheduler is already running. Nothing to do
+            return
+
+        self._scheduler.start()
+
+        setting = {u'category': "job_scheduler",
+                   u'name': "global-job-scheduler",
+                   u'description': "Controls job scheduler status",
+                   u'value': True,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "job-scheduler-setting",}
+        try:
+            try:
+                self.db.setting_get(context, setting['name'])
+                self.db.setting_update(context, setting['name'], setting)
+            except wlm_exceptions.SettingNotFound:
+                self.db.setting_create(context, setting)
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise Exception("Cannot enable job scheduler globally")
+
+    @autolog.log_method(logger=Logger)
+    def workload_get_global_job_scheduler(self, context):
+        return self._scheduler.running
+
+    @autolog.log_method(logger=Logger)
+    def workload_ensure_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        try:
+            global_scheduler = [sch for sch in self.db.setting_get_all(context) if sch['name'] == 'global-job-scheduler']
+            if len(global_scheduler) == 0 or global_scheduler[0]['value'] == '1':
+                self._scheduler.start()
+            else:
+                self._scheduler.shutdown()
+        except wlm_exceptions.SettingNotFound:
+            self._scheduler.start()
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
 
@@ -1962,6 +2057,7 @@ class API(base.Base):
    
   
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def settings_create(self, context, settings):
         created_settings = []
         try:
@@ -1972,6 +2068,7 @@ class API(base.Base):
         return created_settings 
     
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def settings_update(self, context, settings):
         updated_settings = []
         try:
@@ -1982,6 +2079,7 @@ class API(base.Base):
         return updated_settings
     
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def setting_delete(self, context, name):
         self.db.setting_delete(context,name)
                 
@@ -2031,6 +2129,7 @@ class API(base.Base):
 
       
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def trust_create(self, context, role_name):
 
         # create trust
@@ -2064,6 +2163,7 @@ class API(base.Base):
 
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def trust_delete(self, context, name):
 
         trust = self.db.setting_get(context, name)
@@ -2108,6 +2208,7 @@ class API(base.Base):
         return None
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def license_create(self, context, license_text):
 
         def parse_license_text(licensetext,

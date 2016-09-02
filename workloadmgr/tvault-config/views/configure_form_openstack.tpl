@@ -282,6 +282,9 @@ function validate_keystone_credentials(inputelement) {
     if(inputelement.name == 'admin-tenant-name' && IsV3 == true)
        return
 
+    if(inputelement.name == 'domain-name' && IsV3 == false)
+       return
+
     public_url = $('[name="keystone-public-url"]')[0].value
     admin_url = $('[name="keystone-admin-url"]')[0].value
     project_name = $('[name="admin-tenant-name"]')[0].value
