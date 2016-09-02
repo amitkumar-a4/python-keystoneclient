@@ -1244,6 +1244,11 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
+        if self._scheduler.running is True:
+            self._scheduler.shutdown()
+        else:
+            return
+
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
                    u'description': "Controls job scheduler status",
@@ -1261,8 +1266,6 @@ class API(base.Base):
             except wlm_exceptions.SettingNotFound:
                 self.db.setting_create(context, setting)
 
-            if self._scheduler.running is True:
-                self._scheduler.shutdown()
         except Exception as ex:
             LOG.exception(ex)
             raise Exception("Cannot disable job scheduler globally")
@@ -1274,6 +1277,11 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
+        if self._scheduler.running is False:
+            self._scheduler.start()
+        else:
+            return
+
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
                    u'description': "Controls job scheduler status",
@@ -1283,7 +1291,6 @@ class API(base.Base):
                    u'is_hidden': True,
                    u'metadata': {},
                    u'type': "job-scheduler-setting",}
-
         try:
             try:
                 self.db.setting_get(context, setting['name'])
@@ -1291,8 +1298,6 @@ class API(base.Base):
             except wlm_exceptions.SettingNotFound:
                 self.db.setting_create(context, setting)
 
-            if self._scheduler.running is False:
-                self._scheduler.start()
         except Exception as ex:
             LOG.exception(ex)
             raise Exception("Cannot enable job scheduler globally")
