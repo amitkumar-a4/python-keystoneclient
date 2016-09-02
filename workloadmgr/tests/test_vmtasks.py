@@ -1,8 +1,8 @@
-'''
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 Trilio Data, Inc
 # All Rights Reserved.
+
 import __builtin__
 import contextlib
 import datetime
@@ -28,7 +28,8 @@ from workloadmgr import exception
 from workloadmgr import test
 from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common.rpc import amqp
-#from workloadmgr.compute import nova
+
+from workloadmgr.compute import nova
 from workloadmgr.tests import utils as tests_utils
 
 from workloadmgr.workloads.api import API
@@ -63,5 +64,3 @@ class BaseWorkloadTypeVMTasksTestCase(test.TestCase):
         self.assertEqual(len(workloads), 3)
         snapshots = self.db.snapshot_get_all_by_project(self.context, "9ad87da6ea0e4eacb2aaa85cbac31a21")
         self.assertEqual(len(snapshots), 4)
-'''
-

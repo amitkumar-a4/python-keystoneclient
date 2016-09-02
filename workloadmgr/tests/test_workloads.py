@@ -1,4 +1,3 @@
-'''
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 Trilio Data, Inc
@@ -22,8 +21,7 @@ from workloadmgr import exception
 from workloadmgr import test
 from workloadmgr.tests import utils as tests_utils
 from workloadmgr.openstack.common import importutils
-#from workloadmgr.workloads.api import API
-from workloadmgr.workloads.api import *
+from workloadmgr.workloads.api import API
 
 CONF = cfg.CONF
 
@@ -83,5 +81,3 @@ class BaseWorkloadTestCase(test.TestCase):
                           self.context, 'test_workload',
                           'this is a test_workload', "invalid_type",
                           'openstack', [], {}, {})
-'''
-

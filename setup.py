@@ -11,6 +11,7 @@ from workloadmgr.openstack.common import setup as common_setup
 requires = common_setup.parse_requirements()
 depend_links = common_setup.parse_dependency_links()
 project = 'workloadmgr'
+
 filters = [
     "AvailabilityZoneFilter = "
     "workloadmgr.openstack.common.scheduler.filters."

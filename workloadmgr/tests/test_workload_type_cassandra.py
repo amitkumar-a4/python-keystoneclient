@@ -1,4 +1,3 @@
-'''
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 Trilio Data, Inc
@@ -616,5 +615,3 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
                                      self.store['SSHPort'],
                                      self.store['Username'],
                                      self.store['Password'])
-'''
-
