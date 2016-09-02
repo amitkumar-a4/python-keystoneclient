@@ -711,6 +711,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Restore VMs and all its LUNs from a snapshot
         """
         restore_type = 'restore'
+        restore_user_selected_value = 'Selective Restore'
         try:
             try:
                 import gc
@@ -724,7 +725,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             context = nova._get_tenant_context(context)
 
-            restore_user_selected_value = 'Selective Restore'
             vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
 
             target_platform = 'vmware'
