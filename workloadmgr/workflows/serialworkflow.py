@@ -62,14 +62,15 @@ def get_vms(cntx, workload_id):
         vm_hypervisor = None
        
         vm = {
-              'vm_id' : vm_instance.id,
-              'vm_name' : vm_instance.name,
-              'vm_metadata' : vm_instance.metadata,
-              'vm_flavor_id' : vm_instance.flavor['id'],
+              'vm_id': vm_instance.id,
+              'vm_name': vm_instance.name,
+              'vm_metadata': vm_instance.metadata,
+              'vm_flavor_id': vm_instance.flavor['id'],
               'hostname': vm_instance.name,
-              'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
-              'hypervisor_hostname' : None,
-              'hypervisor_type' :  "QEMU"
+              'vm_power_state': vm_instance.__dict__.get('OS-EXT-STS:power_state', None),
+              'hypervisor_hostname': None,
+              'hypervisor_type':  "QEMU",
+              'availability_zone': vm_instance.__dict__.get('OS-EXT-AZ:availability_zone', None)
              }
 
         if vm_instance.key_name and not vm_instance.key_name in keypairs:
