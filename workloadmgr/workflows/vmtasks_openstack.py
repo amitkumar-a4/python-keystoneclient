@@ -1376,6 +1376,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                                           instance['vm_id'],
                                                           'openstack')
 
+    if instance_options.get('availability_zone', None) is None:
+        instance_options['availability_zone'] = restore_options.get('zone', None)
     virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
 
     # call with new context

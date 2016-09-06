@@ -86,13 +86,13 @@
                         </div>                    
                     </li>
                
-                    <li>Horizon Dashboard on Appliance
+                    <!--li>Horizon Dashboard on Appliance
                         <br>
                         <br>
                         <div class="well">
                         	<script>document.write('<a href="http://' + window.location.host + ':3001" target="_blank"> http://floating-ipaddress-of-tvault-vm:3001 </a>')</script>
                         </div>
-                    </li>
+                    </li-->
 
                     <!-- Enable deb and rpm packages later on 
                     <li>Horizon Dashboard Plugin</li>
