@@ -23,6 +23,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 import uuid
 
 from oslo_config import cfg
@@ -288,6 +289,15 @@ class API(base.Base):
         self.db.workload_update(context, workload_ref.id,
                                 {'status': 'available',
                                  'metadata': {'transfer_id': ""}})
+
+        self.workload_api.workload_reset(context, workload_id)
+        workload_ref = self.db.workload_get(context, workload_id)
+        # We should have a timeout
+        count = 10
+        while workload_ref.status == "resetting" and count:
+            time.sleep(3)
+            count -= 1
+            workload_ref = self.db.workload_get(context, workload_id)
 
         # make sure we do some additional checks
         snapshots = self.db.snapshot_get_all(context, workload_id)
