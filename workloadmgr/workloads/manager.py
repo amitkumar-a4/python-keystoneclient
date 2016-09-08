@@ -478,7 +478,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if not 'root_partition_type' in inst:
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
-                                           {'metadata':{'root_partition_type':inst['root_partition_type']}})
+                                           {'metadata':{'root_partition_type': inst['root_partition_type'],
+                                                        'availability_zone': inst['availability_zone']}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}
@@ -647,11 +648,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
-        if options['type'] == "openstack":
-            return options
-
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
+
+        if options['type'] == "openstack":
+            options['openstack']['instances'] = [] 
+            for inst in snapshotvms:
+                optionsinst = {
+                           'name': inst.vm_name, 'id':inst.vm_id,
+                           'availability_zone': self.db.get_metadata_value(inst.metadata,
+                                                'availability_zone'),
+                          }
+                options['openstack']['instances'].append(optionsinst)
+            return options
+
         options['vmware']['instances'] = [] 
         for inst in snapshotvms:
             optionsinst = {

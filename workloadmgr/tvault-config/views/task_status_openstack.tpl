@@ -210,10 +210,10 @@ function taskfunction()
 		                                {
 			 				return redirectToConf(xmlhttp);	
 		                                }
-		                                document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
+		                                document.getElementById("final_status").innerHTML = ntp_note+'<b>Congratulations !!!. Configuration successfully completed. Install tvault-contego and horizon plugin to complete TrilioVault installation </a> </b>';
 		                             });
                                           } else {
-		                             document.getElementById("final_status").innerHTML = ntp_note+'<b>Configuration Completed. Click here to access <a href="http://' + window.location.host + ':3001" target="_blank"> Horizon Dashboard </a> </b>';
+		                             document.getElementById("final_status").innerHTML = ntp_note+'<b>Congratulations !!!. Configuration successfully completed. Install tvault-contego and horizon plugin to complete TrilioVault installation </a> </b>';
                                           }
 		                    });
 		                 });
