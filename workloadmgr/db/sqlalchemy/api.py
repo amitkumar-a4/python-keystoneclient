@@ -562,11 +562,27 @@ def workload_get_all(context, **kwargs):
             if not is_admin_context(context):
                 return workload_get_all_by_project(context, context.project_id)
             else:
-                return model_query( context, models.Workloads, **kwargs).\
+                if 'dashboard_item' in kwargs and \
+                        kwargs.get('dashboard_item') ==  'storage':
+                    return model_query(context,
+                            (models.Workloads.id).label('workload_id'),
+                            (models.Workloads.display_name).label('workload_name'),
+                            (models.Workloads.created_at).label('created_at'),
+                            (models.Snapshots.snapshot_type).label('snapshots_type'),
+                            func.count(models.Snapshots.snapshot_type).label('snapshots_count'),
+                            func.sum(models.Snapshots.size).label('snapshots_size'),
+                        **kwargs). \
+                        filter_by(deleted = 0). \
+                        outerjoin(models.Snapshots,
+                                  models.Workloads.id == models.Snapshots.workload_id). \
+                        group_by(models.Snapshots.workload_id,
+                                 models.Snapshots.snapshot_type). \
+                        order_by(models.Workloads.created_at.desc()).all()
+                else:
+                    return model_query( context, models.Workloads, **kwargs).\
                                     options(sa_orm.joinedload(models.Workloads.metadata)).\
                                     filter_by(project_id=context.project_id).\
                                     order_by(models.Workloads.created_at.desc()).all()
-
 
 @require_admin_context
 def workload_get_all_by_host(context, host):

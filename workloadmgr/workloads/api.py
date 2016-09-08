@@ -26,6 +26,8 @@ from hashlib import sha1
 from distutils import version
 from sqlalchemy import create_engine
 
+from operator import itemgetter, attrgetter
+
 from oslo_config import cfg
 
 from workloadmgr.common import clients
@@ -976,95 +978,150 @@ class API(base.Base):
 
         storage_usage = {'storage_type': vault.CONF.vault_storage_type,
                          'nfs_share(s)': [
-                                          { 
-                                            "nfsshare": nfsshare,
-                                            "status":  nfsstatus,
-                                            "capacity": utils.sizeof_fmt(total_capacity),
-                                            "utilization": utils.sizeof_fmt(total_utilization),
-                                          },
-                                         ],
+                          {
+                            "nfsshare": nfsshare,
+                            "status":  nfsstatus,
+                            "capacity": utils.sizeof_fmt(total_capacity),
+                            "utilization": utils.sizeof_fmt(total_utilization),
+                          },
+                         ],
                          'total': 0,
                          'full': 0,
                          'incremental': 0,
                          'total_capacity': total_capacity,
                          'total_utilization': total_utilization,
-                         'total_capacity_humanized': utils.sizeof_fmt(total_capacity),
-                         'total_utilization_humanized': utils.sizeof_fmt(total_utilization),
-                         'available_capacity_humanized': utils.sizeof_fmt(float(total_capacity) - float(total_utilization)),
-                         'total_utilization_percent': round(((float(total_utilization)/float(total_capacity)) * 100), 2 ),
-        }
+                         'total_capacity_humanized':
+                             utils.sizeof_fmt(total_capacity),
+                         'total_utilization_humanized' :
+                             utils.sizeof_fmt(total_utilization),
+                         'available_capacity_humanized':
+                             utils.sizeof_fmt(float(total_capacity)
+                                              - float(total_utilization)),
+                         'total_utilization_percent'   :
+                             round(((float(total_utilization)
+                                     / float(total_capacity)) * 100), 2),
+                         }
 
-        workloads_storage_data = []
-        workloads_snaps_data = []
-        total_full_snap_count = 0
-        total_incre_snap_count = 0
         try:
-            for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
-                full_snap_count = 0;
-                incre_snap_count = 0;
-                full_snap_usage = 0;
-                incre_snap_usage = 0;
-                for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes', project_only='yes'):
-                    if workload_snapshot.data_deleted == False:
-                        if workload_snapshot.snapshot_type == 'incremental':
-                            incre_snap_count = incre_snap_count + 1
-                            incre_snap_usage = incre_snap_usage + workload_snapshot.size
-                            storage_usage['incremental'] = storage_usage['incremental'] + workload_snapshot.size
-                        else:
-                            full_snap_count = full_snap_count + 1
-                            full_snap_usage = full_snap_usage + workload_snapshot.size
-                            storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
+            workloads_list = {}
+            for workload in self.db.workload_get_all(context,
+                                                read_deleted='yes',
+                                                project_only='yes',
+                                                dashboard_item='storage'):
+                workload_data = {}
+                workload_id = str(workload.workload_id)
+                if workload_id in workloads_list:
+                    workload_data = workloads_list.get(workload_id)
+
+                workload_data['workload_id'] = workload_id
+                workload_data['workload_name'] = str(workload.workload_name)
+                workload_data['created_at'] = str(workload.created_at)
+                if workload.snapshots_type != None and \
+                                workload.snapshots_type == 'incremental':
+                    workload_data['incre_snap_count'] = workload.snapshots_count
+                    workload_data['incre_snap_size'] = workload.snapshots_size
+                elif workload.snapshots_type != None and \
+                     workload.snapshots_type == 'full':
+                    workload_data['full_snap_count'] = workload.snapshots_count
+                    workload_data['full_snap_size'] = workload.snapshots_size
+                elif workload.snapshots_type == None:
+                    workload_data['incre_snap_count'] = 0
+                    workload_data['full_snap_count'] = 0
+                    workload_data['incre_snap_size'] = 0
+                    workload_data['full_snap_size'] = 0
+
+                workloads_list[workload_id] = workload_data
+
+            workloads_list = sorted(workloads_list.values(),
+                               key=itemgetter('created_at'),
+                               reverse=True)
+
+            workloads_storage_data = []
+            workloads_snaps_data = []
+            total_full_snap_count = 0
+            total_incre_snap_count = 0
+            total_full_snap_size = 0
+            total_incre_snap_size = 0
+            for workload in workloads_list:
+                workload_name = str(workload['workload_name'])
+                full_snap_size = str(workload['full_snap_size']
+                                     if 'full_snap_size' in workload else 0)
+                incre_snap_size = str(workload['incre_snap_size']
+                                      if 'incre_snap_size' in workload else 0)
+                full_snap_count = str(workload['full_snap_count']
+                                      if 'full_snap_count' in workload else 0)
+                incre_snap_count = str(workload['incre_snap_count']
+                                       if 'incre_snap_count' in workload else 0)
 
                 # Prepare data for storage utilization per workload - start
                 workload_storage_stats = {}
-                workload_storage_stats['name'] = str(workload.display_name)
-                workload_storage_stats['full'] = str(full_snap_usage)
-                workload_storage_stats['full_label'] = utils.sizeof_fmt(float(full_snap_usage))
-                workload_storage_stats['incremental'] = str(incre_snap_usage)
-                workload_storage_stats['incr_label'] = utils.sizeof_fmt(float(incre_snap_usage))
+                workload_storage_stats['name'] = workload_name
+                workload_storage_stats['full'] = full_snap_size
+                workload_storage_stats['full_label'] = \
+                    utils.sizeof_fmt(float(full_snap_size))
+                workload_storage_stats['incremental'] = incre_snap_size
+                workload_storage_stats['incr_label'] = \
+                    utils.sizeof_fmt(float(incre_snap_size))
                 workloads_storage_data.append(workload_storage_stats)
                 # Prepare data for storage utilization per workload - end
 
                 # Prepare data for snapshots count per workload - start
                 workload_snap_counts = {}
-                workload_snap_counts['name'] = str(workload.display_name)
-                workload_snap_counts['full'] = str(full_snap_count)
-                workload_snap_counts['full_label'] = str(full_snap_count)
-                workload_snap_counts['incremental'] = str(incre_snap_count)
-                workload_snap_counts['incr_label'] = str(incre_snap_count)
+                workload_snap_counts['name'] = workload_name
+                workload_snap_counts['full'] = full_snap_count
+                workload_snap_counts['full_label'] = full_snap_count
+                workload_snap_counts['incremental'] = incre_snap_count
+                workload_snap_counts['incr_label'] = incre_snap_count
                 workloads_snaps_data.append(workload_snap_counts)
                 # Prepare data for snapshots count per workload - end
 
-                # Count total snapshots for all workloads - start
-                total_full_snap_count = total_full_snap_count + full_snap_count
-                total_incre_snap_count = total_incre_snap_count + incre_snap_count
-                # Count total snapshots for all workloads - end
+                # Calculate total usage and count of snapshots for all workloads - start
+                total_full_snap_count = \
+                    total_full_snap_count + int(full_snap_count)
+                total_incre_snap_count = \
+                    total_incre_snap_count + int(incre_snap_count)
+                total_full_snap_size = \
+                    total_full_snap_size + float(full_snap_size)
+                total_incre_snap_size = \
+                    total_incre_snap_size + float(incre_snap_size)
+                # Calculate total usage and count of snapshots for all workloads - end
 
             storage_usage['workloads_storage_usage'] = workloads_storage_data
             storage_usage['workloads_snaps_usage'] = workloads_snaps_data
 
             # Total snapshots count and Calculating percent of full snapshots on total count - start
-            storage_usage['full_total_count'] = total_full_snap_count
-            storage_usage['incr_total_count'] = total_incre_snap_count
+            storage_usage['full_total_count'] = str(total_full_snap_count)
+            storage_usage['incr_total_count'] = str(total_incre_snap_count)
 
             full_total_count_percent = 0
             if (total_full_snap_count + total_incre_snap_count) > 0:
-                full_total_count_percent = round(((float(total_full_snap_count) / float((total_full_snap_count + total_incre_snap_count))) * 100), 2)
-            storage_usage['full_total_count_percent'] = full_total_count_percent
+                full_total_count_percent = \
+                    round(((float(total_full_snap_count)
+                            / float((total_full_snap_count
+                                    + total_incre_snap_count))) * 100), 2)
+            storage_usage['full_total_count_percent'] = \
+                str(full_total_count_percent)
             # Total snapshots count and Calculating percent of full snapshots on total count - end
 
             # Total usage of storage of all workloads - start
-            storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
+            storage_usage['full'] = total_full_snap_size
+            storage_usage['incremental'] = total_incre_snap_size
+            storage_usage['total'] = total_full_snap_size + total_incre_snap_size
             # Total usage of storage of all workloads - end
 
             # Calculate utilization of full snaps and incremental snaps - start
             if float(storage_usage['total']) > 0:
-                storage_usage['full_snaps_utilization'] = round(((float(storage_usage['full']) / float(storage_usage['total'])) * 100), 2)
-                storage_usage['incremental_snaps_utilization'] = round(((float(storage_usage['incremental']) / float(storage_usage['total'])) * 100), 2)
+                storage_usage['full_snaps_utilization'] = \
+                    round(((float(total_full_snap_size)
+                            / float(storage_usage['total'])) * 100), 2)
+                storage_usage['incremental_snaps_utilization'] = \
+                    round(((float(total_incre_snap_size)
+                            / float(storage_usage['total'])) * 100), 2)
             else:
-                storage_usage['full_snaps_utilization'] = 0
-                storage_usage['incremental_snaps_utilization'] = 0
+                storage_usage['full_snaps_utilization'] = '0'
+                storage_usage['incremental_snaps_utilization'] = '0'
             # Calculate utilization of full snaps and incremental snaps - end
+
         except Exception as ex:
             LOG.exception(ex)
 
