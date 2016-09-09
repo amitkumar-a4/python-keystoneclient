@@ -1133,136 +1133,146 @@ class API(base.Base):
         now = timeutils.utcnow()
         time_offset = datetime.now() - datetime.utcnow()
         try:
-            for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
+            for workload in self.db.workload_get_all(
+                        context,
+                        read_deleted = 'yes',
+                        project_only = 'yes',
+                        dashboard_item = 'activities',
+                        time_in_minutes = time_in_minutes
+                    ):
+                recentactivity = { 'activity_type'       :'',
+                                   'activity_time'       :'',
+                                   'activity_description':'',
+                                   'activity_result'     :workload.status,
+                                   'object_type'         :'workload',
+                                   'object_name'         :workload.display_name,
+                                   'object_id'           :workload.id,
+                                   'object_user_id'      :workload.user_id,
+                                   'object_project_id'   :workload.project_id,
+                                }
+                description_suffix = \
+                    "(Workload: '%s' - '%s')" % \
+                        (workload.display_name,
+                        (workload.created_at + time_offset).
+                                            strftime("%m/%d/%Y %I:%M %p"))
                 if workload.deleted:
-                    if now - workload.deleted_at < timedelta(minutes=time_in_minutes):
-                        activity_description = 'Workload ' + workload.display_name + ' deleted'
-                        recentactivity = {'activity_type': 'delete',
-                                          'activity_time': workload.deleted_at,
-                                          'activity_result': workload.status,
-                                          'activity_description': activity_description,
-                                          'object_type': 'workload',
-                                          'object_name': workload.display_name,
-                                          'object_id': workload.id,
-                                          }
-                        recentactivites.append(recentactivity)
-                        continue
-                elif now - workload.created_at < timedelta(minutes=time_in_minutes):
+                    recentactivity['activity_type'] = 'delete'
+                    recentactivity['activity_time'] = workload.deleted_at
+                    recentactivity['activity_description'] = \
+                                "Workload deleted. " + description_suffix
+                else:
+                    recentactivity['activity_type'] = 'create'
+                    recentactivity['activity_time'] = workload.created_at
                     if workload.status == 'error':
-                        activity_description = 'Workload ' + workload.display_name + ' failed'
+                        recentactivity['activity_description'] = \
+                                "Workload failed. " + description_suffix
                     else:
-                        activity_description = 'Workload ' + workload.display_name + ' created'
-                    recentactivity = {'activity_type': 'create',
-                                      'activity_time': workload.created_at,
-                                      'activity_result': workload.status,
-                                      'activity_description': activity_description,
-                                      'object_type': 'workload',
-                                      'object_name': workload.display_name,
-                                      'object_id': workload.id,
-                                      }
-                    recentactivites.append(recentactivity)
-                    continue
-            
-            for snapshot in self.db.snapshot_get_all(context, read_deleted='yes', project_only='yes'):
-                if snapshot.deleted:
-                    if now - snapshot.deleted_at < timedelta(minutes=time_in_minutes):
-                        workload = self.db.workload_get(context, snapshot.workload_id)
-                        activity_description =  "Snapshot '%s' of Workload '%s' deleted" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)
-                        recentactivity = {'activity_type': 'delete',
-                                          'activity_time': snapshot.deleted_at,
-                                          'activity_result': snapshot.status,
-                                          'activity_description': activity_description,
-                                          'object_type': 'snapshot',
-                                          'object_name': snapshot.display_name,
-                                          'object_id': snapshot.id,
-                                          }
-                        recentactivites.append(recentactivity)
-                        continue
-                elif now - snapshot.created_at < timedelta(minutes=time_in_minutes):
-                    workload = self.db.workload_get(context, snapshot.workload_id)
-                    activity_type = 'create'
-                    if snapshot.status == 'error':
-                        activity_description =  "Snapshot '%s' of Workload '%s' failed" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)                     
-                    elif snapshot.status == 'available':
-                        activity_description =  "Snapshot '%s' of Workload '%s' created" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name) 
-                    elif snapshot.status == 'cancelled':
-                        activity_type = 'cancel'
-                        activity_description =  "Snapshot '%s' of Workload '%s' cancelled" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name) 
-                    else:
-                        activity_description =  "Snapshot '%s' of Workload '%s' is in progress" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)                                                                  
-                    recentactivity = {'activity_type': activity_type,
-                                      'activity_time': snapshot.created_at,
-                                      'activity_result': snapshot.status,
-                                      'activity_description': activity_description,
-                                      'object_type': 'snapshot',
-                                      'object_name': snapshot.display_name,
-                                      'object_id': snapshot.id,
-                                      }
-                    recentactivites.append(recentactivity)
-                    continue
+                        recentactivity['activity_description'] = \
+                                "Workload created. " + description_suffix
+                recentactivites.append(recentactivity)
 
-            for restore in self.db.restore_get_all(context, read_deleted='yes', project_only='yes'):
-                if restore.deleted:
-                    if now - restore.deleted_at < timedelta(minutes=time_in_minutes):
-                        snapshot = self.db.snapshot_get(context, restore.snapshot_id)
-                        workload = self.db.workload_get(context, snapshot.workload_id)
-                        
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' deleted" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)                  
-                        recentactivity = {'activity_type': 'delete',
-                                         'activity_time': restore.deleted_at,
-                                         'activity_result': restore.status,
-                                         'activity_description': activity_description,
-                                         'object_type': 'restore',
-                                         'object_name': restore.display_name,
-                                         'object_id': restore.id,
-                                         }
-                        recentactivites.append(recentactivity)
-                        continue
-                elif now - restore.created_at < timedelta(minutes=time_in_minutes):
-                    snapshot = self.db.snapshot_get(context, restore.snapshot_id)
-                    workload = self.db.workload_get(context, snapshot.workload_id)
-                    activity_type = 'create'
-                    if restore.status == 'error':
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)      
-                    elif restore.status == 'available':
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)   
-                    elif restore.status == 'cancelled':
-                        activity_type = 'cancel'
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' cancelled" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)   
+            for snapshot in self.db.snapshot_get_all(
+                                    context,
+                                    read_deleted='yes',
+                                    project_only='yes',
+                                    dashboard_item = 'activities',
+                                    time_in_minutes = time_in_minutes):
+                recentactivity = { 'activity_type'       :'',
+                                   'activity_time'       :'',
+                                   'activity_description':'',
+                                   'activity_result'     :snapshot.status,
+                                   'object_type'         :'snapshot',
+                                   'object_name'         :snapshot.display_name,
+                                   'object_id'           :snapshot.id,
+                                   'object_user_id'      :snapshot.user_id,
+                                   'object_project_id'   :snapshot.project_id,
+                               }
+                description_suffix = \
+                    "(Snapshot: '%s' - '%s', Workload: '%s' - '%s')" % \
+                        (snapshot.display_name,
+                         (snapshot.created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p"),
+                         snapshot.workload_name,
+                         (snapshot.workload_created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p") )
+                if snapshot.deleted:
+                    recentactivity['activity_type'] = 'delete'
+                    recentactivity['activity_time'] = snapshot.deleted_at
+                    recentactivity['activity_description'] = \
+                                "Snapshot deleted. " + description_suffix
+                else:
+                    recentactivity['activity_type'] = 'create'
+                    recentactivity['activity_time'] = snapshot.created_at
+                    if snapshot.status == 'error':
+                        recentactivity['activity_description'] = \
+                                "Snapshot failed. " + description_suffix
+                    elif snapshot.status == 'available':
+                        recentactivity['activity_description'] = \
+                                "Snapshot created. " + description_suffix
+                    elif snapshot.status == 'cancelled':
+                        recentactivity['activity_type'] = 'cancel'
+                        recentactivity['activity_description'] = \
+                                "Snapshot cancelled. " + description_suffix
                     else:
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' is in progress" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)   
-                          
-                    recentactivity = {'activity_type': activity_type,
-                                      'activity_time': restore.created_at,
-                                      'activity_result': restore.status,
-                                      'activity_description': activity_description,
-                                      'object_type': 'restore',
-                                      'object_name': restore.display_name,
-                                      'object_id': restore.id,
-                                      }
-                    recentactivites.append(recentactivity)
-                    continue
-                
+                        recentactivity['activity_description'] = \
+                                "Snapshot is in progress. " + description_suffix
+                recentactivites.append(recentactivity)
+
+            for restore in self.db.restore_get_all(
+                                context,
+                                read_deleted = 'yes',
+                                project_only = 'yes',
+                                dashboard_item = 'activities',
+                                time_in_minutes = time_in_minutes):
+                recentactivity = { 'activity_type'       :'',
+                                   'activity_time'       :'',
+                                   'activity_description':'',
+                                   'activity_result'     :restore.status,
+                                   'object_type'         :'restore',
+                                   'object_name'         :restore.display_name,
+                                   'object_id'           :restore.id,
+                                   'object_user_id'      :restore.user_id,
+                                   'object_project_id'   :restore.project_id,
+                                   }
+                description_suffix = \
+                    "(Restore: '%s' - '%s', Snapshot: '%s' - '%s', Workload: '%s' - '%s')" % \
+                        (restore.display_name,
+                         (restore.created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p"),
+                         restore.snapshot_name,
+                         (restore.snapshot_created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p"),
+                         restore.workload_name,
+                         (restore.workload_created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p") )
+                if restore.deleted:
+                    recentactivity['activity_type'] = 'delete'
+                    recentactivity['activity_time'] = snapshot.deleted_at
+                    recentactivity['activity_description'] = \
+                                "Restore deleted. "  + description_suffix
+                else:
+                    recentactivity['activity_type'] = 'create'
+                    recentactivity['activity_time'] = restore.created_at
+                    if restore.status == 'error':
+                        recentactivity['activity_description'] = \
+                                "Restore failed. " + description_suffix
+                    elif restore.status == 'available':
+                        recentactivity['activity_description'] = \
+                                "Restore completed. " + description_suffix
+                    elif restore.status == 'cancelled':
+                        recentactivity['activity_type'] = 'cancel'
+                        recentactivity['activity_description'] = \
+                                "Restore Cancelled. " + description_suffix
+                    else:
+                        recentactivity['activity_description'] = \
+                                "Restore is in progress. " + description_suffix
+                recentactivites.append(recentactivity)
+
+            recentactivites = sorted(recentactivites,
+                                    key = itemgetter('activity_time'),
+                                    reverse = True)
+
+
                 
         except Exception as ex:
             LOG.exception(ex)
