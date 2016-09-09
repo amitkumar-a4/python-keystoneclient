@@ -595,7 +595,8 @@ def workload_get_all(context, **kwargs):
                                 models.Workloads.user_id,
                                 models.Workloads.project_id,
                                 **kwargs). \
-                            filter(models.Workloads.created_at > func.adddate(func.now(), time_delta) ). \
+                            filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
+                                       models.Workloads.deleted_at > func.adddate(func.now(), time_delta))). \
                             order_by(models.Workloads.created_at.desc()).all()
                 else:
                     return model_query( context, models.Workloads, **kwargs).\
@@ -1055,7 +1056,8 @@ def snapshot_get_all(context, workload_id=None, **kwargs):
                        (models.Workloads.display_name).label('workload_name'),
                        (models.Workloads.created_at).label('workload_created_at'),
                        **kwargs). \
-                    filter(models.Snapshots.created_at > func.adddate(func.now(), time_delta)). \
+                    filter(or_(models.Snapshots.created_at > func.adddate(func.now(), time_delta),
+                               models.Snapshots.deleted_at > func.adddate(func.now(), time_delta),)). \
                     outerjoin(models.Workloads,
                               models.Snapshots.workload_id == models.Workloads.id). \
                     order_by(models.Snapshots.created_at.desc()).all()
@@ -2339,7 +2341,8 @@ def restore_get_all(context, snapshot_id=None, **kwargs):
                         (models.Workloads.display_name).label('workload_name'),
                         (models.Workloads.created_at).label('workload_created_at'),
                         **kwargs). \
-                    filter(models.Restores.created_at > func.adddate(func.now(), time_delta)). \
+                    filter(or_(models.Restores.created_at > func.adddate(func.now(), time_delta),
+                               models.Restores.deleted_at > func.adddate(func.now(), time_delta))). \
                     outerjoin(models.Snapshots,
                             models.Restores.snapshot_id == models.Snapshots.id). \
                     outerjoin(models.Workloads,
