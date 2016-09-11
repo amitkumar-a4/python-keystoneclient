@@ -488,9 +488,12 @@ class API(base.Base):
             AUDITLOG.log(context,'Workload \'' + name + '\' Create Requested', None)
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
-
+            instance_ids = map(lambda x: x.id, instances_with_name)
             #TODO(giri): optimize this lookup
             for instance in instances:
+                #Check whether given instance id exist or not.
+                if not instance_ids or instance['instance-id'] not in instance_ids:
+                   raise wlm_exceptions.InstanceNotFound(instance_id=instance['instance-id'])
                 for instance_with_name in instances_with_name:
                     if instance_with_name.tenant_id != context.project_id:
                         msg = _('Invalid instance as '+instance_with_name.name+' is not associated with your current tenant')
@@ -684,7 +687,7 @@ class API(base.Base):
                 vm = self.db.workload_vms_create(context, values)
                 compute_service.set_meta_item(context, vm.vm_id, 'workload_id', workload_id)
                 compute_service.set_meta_item(context, vm.vm_id,
-                                        'workload_name', workload['name'])
+                                        'workload_name', workloadobj['display_name'] )
 
         workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
 
