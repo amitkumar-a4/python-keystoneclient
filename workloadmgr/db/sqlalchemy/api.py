@@ -562,11 +562,47 @@ def workload_get_all(context, **kwargs):
             if not is_admin_context(context):
                 return workload_get_all_by_project(context, context.project_id)
             else:
-                return model_query( context, models.Workloads, **kwargs).\
+                if 'dashboard_item' in kwargs:
+                    if kwargs.get('dashboard_item') ==  'storage':
+                        return \
+                            model_query(context,
+                                (models.Workloads.id).label('workload_id'),
+                                (models.Workloads.display_name).label('workload_name'),
+                                (models.Workloads.created_at).label('created_at'),
+                                (models.Snapshots.snapshot_type).label('snapshots_type'),
+                                func.count(models.Snapshots.snapshot_type).label('snapshots_count'),
+                                func.sum(models.Snapshots.size).label('snapshots_size'),
+                                **kwargs). \
+                            filter_by(deleted = 0). \
+                            outerjoin(models.Snapshots,
+                                      models.Workloads.id == models.Snapshots.workload_id). \
+                            group_by(models.Snapshots.workload_id,
+                                     models.Snapshots.snapshot_type). \
+                            order_by(models.Workloads.created_at.desc()).all()
+                    elif kwargs.get('dashboard_item') ==  'activities':
+                        if 'time_in_minutes' in kwargs:
+                            time_in_minutes = int(kwargs.get('time_in_minutes'))
+                        else:
+                            time_in_minutes = 0
+                        time_delta = ((time_in_minutes / 60) / 24) * -1
+                        return model_query( context,
+                                models.Workloads.id,
+                                models.Workloads.deleted,
+                                models.Workloads.deleted_at,
+                                models.Workloads.display_name,
+                                models.Workloads.status,
+                                models.Workloads.created_at,
+                                models.Workloads.user_id,
+                                models.Workloads.project_id,
+                                **kwargs). \
+                            filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
+                                       models.Workloads.deleted_at > func.adddate(func.now(), time_delta))). \
+                            order_by(models.Workloads.created_at.desc()).all()
+                else:
+                    return model_query( context, models.Workloads, **kwargs).\
                                     options(sa_orm.joinedload(models.Workloads.metadata)).\
                                     filter_by(project_id=context.project_id).\
                                     order_by(models.Workloads.created_at.desc()).all()
-
 
 @require_admin_context
 def workload_get_all_by_host(context, host):
@@ -1000,7 +1036,33 @@ def snapshot_get_all(context, workload_id=None, **kwargs):
         else:
             return snapshot_get_all_by_project(context, context.project_id, **kwargs)
     if workload_id == None:
-        return model_query(context, models.Snapshots, **kwargs).\
+        if 'dashboard_item' in kwargs:
+            if kwargs.get('dashboard_item') == 'activities':
+                if 'time_in_minutes' in kwargs:
+                    time_in_minutes = int(kwargs.get('time_in_minutes'))
+                else:
+                    time_in_minutes = 0
+                time_delta = ((time_in_minutes / 60) / 24) * -1
+                result = \
+                    model_query(context,
+                       models.Snapshots.id,
+                       models.Snapshots.deleted,
+                       models.Snapshots.deleted_at,
+                       models.Snapshots.display_name,
+                       models.Snapshots.status,
+                       models.Snapshots.created_at,
+                       models.Snapshots.user_id,
+                       models.Snapshots.project_id,
+                       (models.Workloads.display_name).label('workload_name'),
+                       (models.Workloads.created_at).label('workload_created_at'),
+                       **kwargs). \
+                    filter(or_(models.Snapshots.created_at > func.adddate(func.now(), time_delta),
+                               models.Snapshots.deleted_at > func.adddate(func.now(), time_delta),)). \
+                    outerjoin(models.Workloads,
+                              models.Snapshots.workload_id == models.Workloads.id). \
+                    order_by(models.Snapshots.created_at.desc()).all()
+        else:
+            return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             order_by(models.Snapshots.created_at.desc()).all()        
     else:
@@ -1881,7 +1943,7 @@ def _vm_network_resource_snap_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata, session):
+def _vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata, session):
     
     metadata = values.pop('metadata', {})
     
@@ -1901,7 +1963,7 @@ def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_i
 @require_context
 def vm_network_resource_snap_create(context, values):
     session = get_session()
-    return _vm_network_resource_snap_update(context, values, None, False, session)
+    return _vm_network_resource_snap_update(context, None, values, False, session)
 
 @require_context
 def vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata = False):
@@ -2257,7 +2319,38 @@ def restore_get_all(context, snapshot_id=None, **kwargs):
             return restore_get_all_by_project(context, context.project_id, **kwargs)
         
     if snapshot_id == None:
-        return model_query(context, models.Restores, **kwargs).\
+        if 'dashboard_item' in kwargs:
+            if kwargs.get('dashboard_item') == 'activities':
+                if 'time_in_minutes' in kwargs:
+                    time_in_minutes = int(kwargs.get('time_in_minutes'))
+                else:
+                    time_in_minutes = 0
+                time_delta = ((time_in_minutes / 60) / 24) * -1
+                result = \
+                    model_query(context,
+                        models.Restores.id,
+                        models.Restores.deleted,
+                        models.Restores.deleted_at,
+                        models.Restores.display_name,
+                        models.Restores.status,
+                        models.Restores.created_at,
+                        models.Restores.user_id,
+                        models.Restores.project_id,
+                        (models.Snapshots.display_name).label('snapshot_name'),
+                        (models.Snapshots.created_at).label('snapshot_created_at'),
+                        (models.Workloads.display_name).label('workload_name'),
+                        (models.Workloads.created_at).label('workload_created_at'),
+                        **kwargs). \
+                    filter(or_(models.Restores.created_at > func.adddate(func.now(), time_delta),
+                               models.Restores.deleted_at > func.adddate(func.now(), time_delta))). \
+                    outerjoin(models.Snapshots,
+                            models.Restores.snapshot_id == models.Snapshots.id). \
+                    outerjoin(models.Workloads,
+                            models.Snapshots.workload_id == models.Workloads.id). \
+                    order_by(models.Restores.created_at.desc()).all()
+                return result
+        else:
+            return model_query(context, models.Restores, **kwargs).\
                             options(sa_orm.joinedload(models.Restores.metadata)).\
                             order_by(models.Restores.created_at.desc()).all()        
     else:
@@ -3204,8 +3297,3 @@ def purge_workload(context, id):
 
     except Exception as ex:
         LOG.exception(ex)
-        
-    
-        
-            
-        

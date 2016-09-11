@@ -77,9 +77,22 @@ def get_new_volume_type(instance_options, volume_id, volume_type):
         volume_type = None
     return volume_type
 
-def is_supported_backend(volume_type):
 
-        return True
+def is_supported_backend(volume_type):
+    return True
+
+
+def get_availability_zone(instance_options):
+    if instance_options and 'availability_zone' in instance_options:
+        availability_zone = instance_options['availability_zone']
+    else:   
+        if CONF.default_production_availability_zone == 'None':
+            availability_zone = None
+        else:
+            availability_zone = CONF.default_production_availability_zone
+
+    return availability_zone
+
 
 class PrepareBackupImage(task.Task):
     """
@@ -106,7 +119,7 @@ class PrepareBackupImage(task.Task):
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
-            restore_file_path = image_info.backing_file
+            restore_file_path = image_info.image
             image_overlay_file_path = vm_disk_resource_snap.vault_path
             image_virtual_size = image_info.virtual_size
         else:
@@ -319,9 +332,10 @@ class RestoreVolumeFromImage(task.Task):
        Restore volume from glance image
     """
 
-    def execute(self, context, vmid, restore_id, vm_resource_id,
-                volume_type, image_id, image_virtual_size):
+    def execute(self, context, vmid, restore_id, instance_options,
+                vm_resource_id, volume_type, image_id, image_virtual_size):
         return self.execute_with_log(context, vmid, restore_id,
+                                     instance_options,
                                      vm_resource_id, volume_type,
                                      image_id, image_virtual_size)
 
@@ -329,7 +343,7 @@ class RestoreVolumeFromImage(task.Task):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreVolumeFromImage.execute')
-    def execute_with_log(self, context, vmid, restore_id,
+    def execute_with_log(self, context, vmid, restore_id, instance_options,
                          vm_resource_id, volume_type, 
                          image_id, image_virtual_size):
 
@@ -352,10 +366,12 @@ class RestoreVolumeFromImage(task.Task):
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
 
+        availability_zone = get_availability_zone(instance_options)
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
                                                 volume_description,
-                                                image_id=image_id, volume_type=volume_type)
+                                                image_id=image_id, volume_type=volume_type,
+                                                availability_zone=availability_zone)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -399,16 +415,18 @@ class RestoreNFSVolume(task.Task):
        Restore cinder nfs volume from qcow2
     """
 
-    def execute(self, context, restore_id, volume_type, vm_resource_id, restored_file_path):
-        return self.execute_with_log(context, restore_id, volume_type,  
+    def execute(self, context, restore_id, instance_options,
+                volume_type, vm_resource_id, restored_file_path):
+        return self.execute_with_log(context, restore_id, instance_options,
+                                     volume_type,  
                                      vm_resource_id, restored_file_path)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreNFSVolume.execute')
-    def execute_with_log(self, context, restore_id, volume_type,
-                         vm_resource_id, restored_file_path):
+    def execute_with_log(self, context, restore_id, instance_options,
+                         volume_type, vm_resource_id, restored_file_path):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -426,12 +444,14 @@ class RestoreNFSVolume(task.Task):
         progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
+        availability_zone = get_availability_zone(instance_options)
         
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type)
+                                                     volume_type = volume_type,
+                                                     availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -530,16 +550,17 @@ class RestoreSANVolume(task.Task):
        SAN volumes including iscsi and fc channel volumes
     """
 
-    def execute(self, context, restore_id, volume_type,
+    def execute(self, context, restore_id, instance_options, volume_type,
                 vm_resource_id, restored_file_path):
-        return self.execute_with_log(context, restore_id, volume_type,  
+        return self.execute_with_log(context, restore_id, instance_options,
+                                     volume_type,  
                                      vm_resource_id, restored_file_path)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreSANVolume.execute')
-    def execute_with_log(self, context, restore_id, volume_type,
+    def execute_with_log(self, context, restore_id, instance_options, volume_type,
                          vm_resource_id, restored_file_path):
 
         self.db = db = WorkloadMgrDB().db
@@ -559,11 +580,13 @@ class RestoreSANVolume(task.Task):
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
 
+        availability_zone = get_availability_zone(instance_options)
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type)
+                                                     volume_type = volume_type,
+                                                     availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -632,17 +655,8 @@ class RestoreInstanceFromVolume(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })        
-        
-        if instance_options and 'availability_zone' in instance_options:
-            availability_zone = instance_options['availability_zone']
-        else:   
-            if restore_type == 'test':   
-                availability_zone = CONF.default_tvault_availability_zone
-            else:
-                if CONF.default_production_availability_zone == 'None':
-                    availability_zone = None
-                else:
-                    availability_zone = CONF.default_production_availability_zone
+
+        availability_zone = get_availability_zone(instance_options)
     
         restored_security_group_ids = []
         for pit_id, restored_security_group_id in restored_security_groups.iteritems():
@@ -737,17 +751,8 @@ class RestoreInstanceFromImage(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })  
-                
-        if instance_options and 'availability_zone' in instance_options:
-            availability_zone = instance_options['availability_zone']
-        else:   
-            if restore_type == 'test':   
-                availability_zone = CONF.default_tvault_availability_zone
-            else:
-                if CONF.default_production_availability_zone == 'None':
-                    availability_zone = None
-                else:
-                    availability_zone = CONF.default_production_availability_zone
+
+        availability_zone = get_availability_zone(instance_options)
     
         restored_security_group_ids = []
         for pit_id, restored_security_group_id in restored_security_groups.iteritems():

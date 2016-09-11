@@ -55,14 +55,15 @@ def get_vms(cntx, workload_id):
         if vm_instance == None:
             raise exception.ErrorOccurred(_("Unable to find Virtual Machine '%s' in the inventory") % vm.vm_name)
                 
-                   
         vm = {'vm_id' : vm_instance.id,
               'vm_name' : vm_instance.name,
               'vm_metadata' : vm_instance.metadata,              
               'vm_flavor_id' : vm_instance.flavor['id'],
               'hostname': vm_instance.name,
-              'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
+              'vm_power_state': vm_instance.__dict__.get('OS-EXT-STS:power_state',
+                                                         vm_instance.__dict__.get('status', None)),
               'hypervisor_hostname' : None,
+              'availability_zone': vm_instance.__dict__.get('OS-EXT-AZ:availability_zone', None),
               'hypervisor_type' :  "QEMU"}
 
         if vm_instance.key_name and not vm_instance.key_name in keypairs:

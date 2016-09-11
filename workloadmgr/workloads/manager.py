@@ -478,7 +478,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if not 'root_partition_type' in inst:
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
-                                           {'metadata':{'root_partition_type':inst['root_partition_type']}})
+                                           {'metadata':{'root_partition_type': inst['root_partition_type'],
+                                                        'availability_zone': inst['availability_zone']}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}
@@ -647,11 +648,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
-        if options['type'] == "openstack":
-            return options
-
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
+
+        if options['type'] == "openstack":
+            options['openstack']['instances'] = [] 
+            for inst in snapshotvms:
+                optionsinst = {
+                           'name': inst.vm_name, 'id':inst.vm_id,
+                           'availability_zone': self.db.get_metadata_value(inst.metadata,
+                                                'availability_zone'),
+                          }
+                options['openstack']['instances'].append(optionsinst)
+            return options
+
         options['vmware']['instances'] = [] 
         for inst in snapshotvms:
             optionsinst = {
@@ -711,6 +721,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Restore VMs and all its LUNs from a snapshot
         """
         restore_type = 'restore'
+        restore_user_selected_value = 'Selective Restore'
         try:
             try:
                 import gc
@@ -724,7 +735,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             context = nova._get_tenant_context(context)
 
-            restore_user_selected_value = 'Selective Restore'
             vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
 
             target_platform = 'vmware'
@@ -1089,6 +1099,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                               'urls': json.dumps(urls)
                                            }
                                         })
+                # Add metadata to recovery manager vm
+                try:
+                    compute_service = nova.API(production=True)
+                    compute_service.set_meta_item(context, mount_vm_id,
+                                     "mounted_snapshot_id", snapshot['id'])
+                except:
+                    pass
                 return {"urls": urls}
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
@@ -1163,6 +1180,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             virtdriver.snapshot_dismount(context, snapshot, None, mount_vm_id)
             self.db.snapshot_update(context, snapshot_id,
                          {'status': 'available', 'metadata': {}})
+            # Delete metadata to recovery manager vm
+            try:
+                compute_service = nova.API(production=True)
+                compute_service.delete_meta(context, mount_vm_id,
+                                     ["mounted_snapshot_id"])
+            except:
+                pass
         elif workload.source_platform == 'vmware': 
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')        
             devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
@@ -1325,7 +1349,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
-                html = html.replace('object.created_at',object.created_at)
+                html = html.replace('object.created_at',str(object.created_at))
                 html = html.replace('vms_html',vms_html)
 
                 
@@ -1363,7 +1387,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
-                html = html.replace('object.created_at',object.created_at)
+                html = html.replace('object.created_at',str(object.created_at))
                 html = html.replace('vms_html',vms_html)
                 
                 if object.status == 'error':

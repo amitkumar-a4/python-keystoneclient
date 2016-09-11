@@ -62,19 +62,35 @@ class WorkloadMgrKeystoneContext(base_wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=base_wsgi.Request)
     def __call__(self, req):
+
         user_id = req.headers.get('X_USER')
         user_id = req.headers.get('X_USER_ID', user_id)
         if user_id is None:
             LOG.debug("Neither X_USER_ID nor X_USER found in request")
             return webob.exc.HTTPUnauthorized()
+
+        user_name = req.headers.get('X-User-Name')
+        project_name = req.headers.get('X-Project-Name', None)
+        project_name = tenant_name = req.headers.get('X-Tenant', project_name)
+
+        # This is the new header since Keystone went to ID/Name
+        project_id = req.headers.get('X_TENANT_ID', None)
+        project_id = req.headers.get('X_PROJECT_ID', project_id)
+	if project_id is None:
+	    LOG.debug("Neither X_TENANT_ID nor X_USER found in request")
+	    return webob.exc.HTTPUnauthorized()
+
+        project_domain_id = req.headers.get('X-Project-Domain-Id', None)
+        project_domain_name = req.headers.get('X-Project-Domain-Name', None)
+
+        user_domain_id = req.headers.get('X-User-Domain-Id', None)
+        user_domain_name = req.headers.get('X-User-Domain-Name', None)
+
+        domain_name = req.headers.get('X-Domain-Name', None)
+        domain_id = req.headers.get('X-Domain-Id', None)
+
         # get the roles
         roles = [r.strip() for r in req.headers.get('X_ROLE', '').split(',')]
-        if 'X_TENANT_ID' in req.headers:
-            # This is the new header since Keystone went to ID/Name
-            project_id = req.headers['X_TENANT_ID']
-        else:
-            # This is for legacy compatibility
-            project_id = req.headers['X_TENANT']
 
         # Get the auth token
         auth_token = req.headers.get('X_AUTH_TOKEN',
@@ -84,8 +100,18 @@ class WorkloadMgrKeystoneContext(base_wsgi.Middleware):
         remote_address = req.remote_addr
         if FLAGS.use_forwarded_for:
             remote_address = req.headers.get('X-Forwarded-For', remote_address)
+
         ctx = context.RequestContext(user_id=user_id,
+                                     username=user_name,
                                      project_id=project_id,
+                                     tenant_id=project_id,
+                                     tenant=project_name,
+                                     user_domain_id=user_domain_id,
+                                     project_domain_id=project_domain_id,
+                                     user_domain_name=user_domain_name,
+                                     project_domain_name=project_domain_name,
+                                     domain_name=domain_name,
+                                     domain_id=domain_id,
                                      roles=roles,
                                      auth_token=auth_token,
                                      remote_address=remote_address)

@@ -26,6 +26,8 @@ from hashlib import sha1
 from distutils import version
 from sqlalchemy import create_engine
 
+from operator import itemgetter, attrgetter
+
 from oslo_config import cfg
 
 from workloadmgr.common import clients
@@ -53,6 +55,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.workloads import workload_utils
 from workloadmgr import auditlog
 from workloadmgr import autolog
+from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
 
 workload_lock = threading.Lock()
@@ -65,87 +68,80 @@ AUDITLOG = auditlog.getAuditLogger()
 
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
-    arg_str = autolog.format_args(args, kwargs)
-    LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
+    try:
+        arg_str = autolog.format_args(args, kwargs)
+        LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
     
-    from workloadmgr.workloads import API
-    workloadmgrapi = API()
+        from workloadmgr.workloads import API
+        workloadmgrapi = API()
  
-    workload_id = kwargs['workload_id']
-    user_id = kwargs['user_id']
-    project_id = kwargs['project_id']
-    tenantcontext = nova._get_tenant_context(kwargs)
+        workload_id = kwargs['workload_id']
+        user_id = kwargs['user_id']
+        project_id = kwargs['project_id']
+        tenantcontext = nova._get_tenant_context(kwargs)
     
-    workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
-
-    #TODO: Make sure workload is in a created state
-    if workload['status'] == 'error':
-        LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
-        LOG.info(_("_snapshot_create_callback Exit"))
-        return
-
-    # wait for 5 minutes until the workload changes state to available
-    count = 0
-    while True:
-        if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
-            break
-        time.sleep(30)
-        count += 1
         workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
-    # if workload hasn't changed the status to available
-    if workload['status'] != 'available':
-        LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
-        LOG.info(_("_snapshot_create_callback Exit"))
-        return
+        #TODO: Make sure workload is in a created state
+        if workload['status'] == 'error':
+            LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
+            LOG.info(_("_snapshot_create_callback Exit"))
+            return
 
-    # determine if the workload need to be full snapshot or incremental
-    # the last full snapshot
-    # if the last full snapshot is over policy based number of days, do a full backup
-    snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
-                                                                       project_id, workload_id)
-    jobscheduler = workload['jobschedule']
-
-    # 
-    # if fullbackup_interval is -1, never take full backups
-    # if fullbackup_interval is 0, always take full backups
-    # if fullbackup_interval is +ve follow the interval
-    #
-    jobscheduler['fullbackup_interval'] = \
-                   'fullbackup_interval' in jobscheduler and \
-                   jobscheduler['fullbackup_interval'] or "-1"
-
-    if int(jobscheduler['fullbackup_interval']) == 0:
-        snapshot_type = "full"
-    elif int(jobscheduler['fullbackup_interval']) < 0:
-        snapshot_type = "incremental"
-    elif int(jobscheduler['fullbackup_interval']) > 0:
-        # check full backup policy here
-        num_of_incr_in_current_chain = 0
-        for snap in snapshots:
-            if snap.snapshot_type == 'full':
-                break;
-            else:
-                num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
-                
-        if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
-           snapshot_type = "full"
-
-        if snapshots.__len__ == 0:
-           snapshot_type = 'full'
-
-    try:
-        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
-
-        # Wait for snapshot to complete
+        # wait for 5 minutes until the workload changes state to available
+        count = 0
         while True:
-            snapshot_details = workloadmgrapi.snapshot_get(tenantcontext, snapshot['id'])
-            if snapshot_details['status'].lower() == "available" or snapshot_details['status'].lower() == "error":
+            if workload['status'] == "available" or workload['status'] == 'error' or count > 10:
                 break
             time.sleep(30)
+            count += 1
+            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+
+        # if workload hasn't changed the status to available
+        if workload['status'] != 'available':
+            LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
+            LOG.info(_("_snapshot_create_callback Exit"))
+            return
+
+        # determine if the workload need to be full snapshot or incremental
+        # the last full snapshot
+        # if the last full snapshot is over policy based number of days, do a full backup
+        snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
+                                                                           project_id, workload_id)
+        jobscheduler = workload['jobschedule']
+
+        # 
+        # if fullbackup_interval is -1, never take full backups
+        # if fullbackup_interval is 0, always take full backups
+        # if fullbackup_interval is +ve follow the interval
+        #
+        jobscheduler['fullbackup_interval'] = \
+                       'fullbackup_interval' in jobscheduler and \
+                       jobscheduler['fullbackup_interval'] or "-1"
+
+        if int(jobscheduler['fullbackup_interval']) == 0:
+            snapshot_type = "full"
+        elif int(jobscheduler['fullbackup_interval']) < 0:
+            snapshot_type = "incremental"
+        elif int(jobscheduler['fullbackup_interval']) > 0:
+            # check full backup policy here
+            num_of_incr_in_current_chain = 0
+            for snap in snapshots:
+                if snap.snapshot_type == 'full':
+                    break;
+                else:
+                    num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
+                
+            if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+               snapshot_type = "full"
+
+            if snapshots.__len__ == 0:
+               snapshot_type = 'full'
+
+        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
     except Exception as ex:
         LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
-        pass
+
     LOG.info(_("_snapshot_create_callback Exit"))
 
 
@@ -170,6 +166,41 @@ def create_trust(func):
 
        return func(*args, **kwargs)
    return trust_create_wrapper
+
+
+def upload_settings(func):
+   def upload_settings_wrapper(*args, **kwargs):
+       # Clean up trust if the role is changed
+       context = args[1]
+
+       ret_val = func(*args, **kwargs)
+       workload_utils.upload_settings_db_entry(context)
+       return ret_val
+   return upload_settings_wrapper
+
+
+def wrap_check_policy(func):
+    """Check policy corresponding to the wrapped methods prior to execution
+
+    This decorator requires the first 3 args of the wrapped function
+    to be (self, context, workload)
+    """
+    @functools.wraps(func)
+    def wrapped(self, context, target_obj, *args, **kwargs):
+        check_policy(context, func.__name__, target_obj)
+        return func(self, context, target_obj, *args, **kwargs)
+
+    return wrapped
+
+
+def check_policy(context, action, target_obj=None):
+    target = {
+        'project_id': context.project_id,
+        'user_id': context.user_id,
+    }
+
+    _action = 'workload:%s' % action
+    policy.enforce(context, _action, target)
 
 
 class API(base.Base):
@@ -203,12 +234,15 @@ class API(base.Base):
         if not hasattr(self, "_jobstore"):
             self._jobstore = SQLAlchemyJobStore(engine=self._engine)
 
+        super(API, self).__init__(db_driver)
+
         if not hasattr(self, "_scheduler"):
             self._scheduler = Scheduler()
             self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
-            self._scheduler.start()
 
-            super(API, self).__init__(db_driver)
+            context = wlm_context.get_admin_context()
+            self.workload_ensure_global_job_scheduler(context)
+
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
@@ -944,29 +978,153 @@ class API(base.Base):
 
         storage_usage = {'storage_type': vault.CONF.vault_storage_type,
                          'nfs_share(s)': [
-                                          { 
-                                            "nfsshare": nfsshare,
-                                            "status":  nfsstatus,
-                                            "capacity": total_capacity,
-                                            "utilization": total_utilization,
-                                          },
-                                         ],
+                          {
+                            "nfsshare": nfsshare,
+                            "status":  nfsstatus,
+                            "capacity": utils.sizeof_fmt(total_capacity),
+                            "utilization": utils.sizeof_fmt(total_utilization),
+                          },
+                         ],
                          'total': 0,
                          'full': 0,
                          'incremental': 0,
                          'total_capacity': total_capacity,
-                         'total_utilization': total_utilization }
+                         'total_utilization': total_utilization,
+                         'total_capacity_humanized':
+                             utils.sizeof_fmt(total_capacity),
+                         'total_utilization_humanized' :
+                             utils.sizeof_fmt(total_utilization),
+                         'available_capacity_humanized':
+                             utils.sizeof_fmt(float(total_capacity)
+                                              - float(total_utilization)),
+                         'total_utilization_percent'   :
+                             round(((float(total_utilization)
+                                     / float(total_capacity)) * 100), 2),
+                         }
+
         try:
-            for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
-                for workload_snapshot in self.db.snapshot_get_all_by_workload(context, workload.id, read_deleted='yes', project_only='yes'):
-                    if workload_snapshot.data_deleted == False:
-                        if workload_snapshot.snapshot_type == 'incremental':
-                            storage_usage['incremental'] = storage_usage['incremental'] + workload_snapshot.size
-                        else:
-                            storage_usage['full'] = storage_usage['full'] + workload_snapshot.size
-            storage_usage['total'] =  storage_usage['full'] + storage_usage['incremental']
+            workloads_list = {}
+            for workload in self.db.workload_get_all(context,
+                                                read_deleted='yes',
+                                                project_only='yes',
+                                                dashboard_item='storage'):
+                workload_data = {}
+                workload_id = str(workload.workload_id)
+                if workload_id in workloads_list:
+                    workload_data = workloads_list.get(workload_id)
+
+                workload_data['workload_id'] = workload_id
+                workload_data['workload_name'] = str(workload.workload_name)
+                workload_data['created_at'] = str(workload.created_at)
+                if workload.snapshots_type != None and \
+                                workload.snapshots_type == 'incremental':
+                    workload_data['incre_snap_count'] = workload.snapshots_count
+                    workload_data['incre_snap_size'] = workload.snapshots_size
+                elif workload.snapshots_type != None and \
+                     workload.snapshots_type == 'full':
+                    workload_data['full_snap_count'] = workload.snapshots_count
+                    workload_data['full_snap_size'] = workload.snapshots_size
+                elif workload.snapshots_type == None:
+                    workload_data['incre_snap_count'] = 0
+                    workload_data['full_snap_count'] = 0
+                    workload_data['incre_snap_size'] = 0
+                    workload_data['full_snap_size'] = 0
+
+                workloads_list[workload_id] = workload_data
+
+            workloads_list = sorted(workloads_list.values(),
+                               key=itemgetter('created_at'),
+                               reverse=True)
+
+            workloads_storage_data = []
+            workloads_snaps_data = []
+            total_full_snap_count = 0
+            total_incre_snap_count = 0
+            total_full_snap_size = 0
+            total_incre_snap_size = 0
+            for workload in workloads_list:
+                workload_name = str(workload['workload_name'])
+                full_snap_size = str(workload['full_snap_size']
+                                     if 'full_snap_size' in workload else 0)
+                incre_snap_size = str(workload['incre_snap_size']
+                                      if 'incre_snap_size' in workload else 0)
+                full_snap_count = str(workload['full_snap_count']
+                                      if 'full_snap_count' in workload else 0)
+                incre_snap_count = str(workload['incre_snap_count']
+                                       if 'incre_snap_count' in workload else 0)
+
+                # Prepare data for storage utilization per workload - start
+                workload_storage_stats = {}
+                workload_storage_stats['name'] = workload_name
+                workload_storage_stats['full'] = full_snap_size
+                workload_storage_stats['full_label'] = \
+                    utils.sizeof_fmt(float(full_snap_size))
+                workload_storage_stats['incremental'] = incre_snap_size
+                workload_storage_stats['incr_label'] = \
+                    utils.sizeof_fmt(float(incre_snap_size))
+                workloads_storage_data.append(workload_storage_stats)
+                # Prepare data for storage utilization per workload - end
+
+                # Prepare data for snapshots count per workload - start
+                workload_snap_counts = {}
+                workload_snap_counts['name'] = workload_name
+                workload_snap_counts['full'] = full_snap_count
+                workload_snap_counts['full_label'] = full_snap_count
+                workload_snap_counts['incremental'] = incre_snap_count
+                workload_snap_counts['incr_label'] = incre_snap_count
+                workloads_snaps_data.append(workload_snap_counts)
+                # Prepare data for snapshots count per workload - end
+
+                # Calculate total usage and count of snapshots for all workloads - start
+                total_full_snap_count = \
+                    total_full_snap_count + int(full_snap_count)
+                total_incre_snap_count = \
+                    total_incre_snap_count + int(incre_snap_count)
+                total_full_snap_size = \
+                    total_full_snap_size + float(full_snap_size)
+                total_incre_snap_size = \
+                    total_incre_snap_size + float(incre_snap_size)
+                # Calculate total usage and count of snapshots for all workloads - end
+
+            storage_usage['workloads_storage_usage'] = workloads_storage_data
+            storage_usage['workloads_snaps_usage'] = workloads_snaps_data
+
+            # Total snapshots count and Calculating percent of full snapshots on total count - start
+            storage_usage['full_total_count'] = str(total_full_snap_count)
+            storage_usage['incr_total_count'] = str(total_incre_snap_count)
+
+            full_total_count_percent = 0
+            if (total_full_snap_count + total_incre_snap_count) > 0:
+                full_total_count_percent = \
+                    round(((float(total_full_snap_count)
+                            / float((total_full_snap_count
+                                    + total_incre_snap_count))) * 100), 2)
+            storage_usage['full_total_count_percent'] = \
+                str(full_total_count_percent)
+            # Total snapshots count and Calculating percent of full snapshots on total count - end
+
+            # Total usage of storage of all workloads - start
+            storage_usage['full'] = total_full_snap_size
+            storage_usage['incremental'] = total_incre_snap_size
+            storage_usage['total'] = total_full_snap_size + total_incre_snap_size
+            # Total usage of storage of all workloads - end
+
+            # Calculate utilization of full snaps and incremental snaps - start
+            if float(storage_usage['total']) > 0:
+                storage_usage['full_snaps_utilization'] = \
+                    round(((float(total_full_snap_size)
+                            / float(storage_usage['total'])) * 100), 2)
+                storage_usage['incremental_snaps_utilization'] = \
+                    round(((float(total_incre_snap_size)
+                            / float(storage_usage['total'])) * 100), 2)
+            else:
+                storage_usage['full_snaps_utilization'] = '0'
+                storage_usage['incremental_snaps_utilization'] = '0'
+            # Calculate utilization of full snaps and incremental snaps - end
+
         except Exception as ex:
             LOG.exception(ex)
+
         return storage_usage
     
     @autolog.log_method(logger=Logger)
@@ -975,136 +1133,146 @@ class API(base.Base):
         now = timeutils.utcnow()
         time_offset = datetime.now() - datetime.utcnow()
         try:
-            for workload in self.db.workload_get_all(context, read_deleted='yes', project_only='yes'):
+            for workload in self.db.workload_get_all(
+                        context,
+                        read_deleted = 'yes',
+                        project_only = 'yes',
+                        dashboard_item = 'activities',
+                        time_in_minutes = time_in_minutes
+                    ):
+                recentactivity = { 'activity_type'       :'',
+                                   'activity_time'       :'',
+                                   'activity_description':'',
+                                   'activity_result'     :workload.status,
+                                   'object_type'         :'workload',
+                                   'object_name'         :workload.display_name,
+                                   'object_id'           :workload.id,
+                                   'object_user_id'      :workload.user_id,
+                                   'object_project_id'   :workload.project_id,
+                                }
+                description_suffix = \
+                    "(Workload: '%s' - '%s')" % \
+                        (workload.display_name,
+                        (workload.created_at + time_offset).
+                                            strftime("%m/%d/%Y %I:%M %p"))
                 if workload.deleted:
-                    if now - workload.deleted_at < timedelta(minutes=time_in_minutes):
-                        activity_description = 'Workload ' + workload.display_name + ' deleted'
-                        recentactivity = {'activity_type': 'delete',
-                                          'activity_time': workload.deleted_at,
-                                          'activity_result': workload.status,
-                                          'activity_description': activity_description,
-                                          'object_type': 'workload',
-                                          'object_name': workload.display_name,
-                                          'object_id': workload.id,
-                                          }
-                        recentactivites.append(recentactivity)
-                        continue
-                elif now - workload.created_at < timedelta(minutes=time_in_minutes):
+                    recentactivity['activity_type'] = 'delete'
+                    recentactivity['activity_time'] = workload.deleted_at
+                    recentactivity['activity_description'] = \
+                                "Workload deleted. " + description_suffix
+                else:
+                    recentactivity['activity_type'] = 'create'
+                    recentactivity['activity_time'] = workload.created_at
                     if workload.status == 'error':
-                        activity_description = 'Workload ' + workload.display_name + ' failed'
+                        recentactivity['activity_description'] = \
+                                "Workload failed. " + description_suffix
                     else:
-                        activity_description = 'Workload ' + workload.display_name + ' created'
-                    recentactivity = {'activity_type': 'create',
-                                      'activity_time': workload.created_at,
-                                      'activity_result': workload.status,
-                                      'activity_description': activity_description,
-                                      'object_type': 'workload',
-                                      'object_name': workload.display_name,
-                                      'object_id': workload.id,
-                                      }
-                    recentactivites.append(recentactivity)
-                    continue
-            
-            for snapshot in self.db.snapshot_get_all(context, read_deleted='yes', project_only='yes'):
-                if snapshot.deleted:
-                    if now - snapshot.deleted_at < timedelta(minutes=time_in_minutes):
-                        workload = self.db.workload_get(context, snapshot.workload_id)
-                        activity_description =  "Snapshot '%s' of Workload '%s' deleted" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)
-                        recentactivity = {'activity_type': 'delete',
-                                          'activity_time': snapshot.deleted_at,
-                                          'activity_result': snapshot.status,
-                                          'activity_description': activity_description,
-                                          'object_type': 'snapshot',
-                                          'object_name': snapshot.display_name,
-                                          'object_id': snapshot.id,
-                                          }
-                        recentactivites.append(recentactivity)
-                        continue
-                elif now - snapshot.created_at < timedelta(minutes=time_in_minutes):
-                    workload = self.db.workload_get(context, snapshot.workload_id)
-                    activity_type = 'create'
-                    if snapshot.status == 'error':
-                        activity_description =  "Snapshot '%s' of Workload '%s' failed" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)                     
-                    elif snapshot.status == 'available':
-                        activity_description =  "Snapshot '%s' of Workload '%s' created" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name) 
-                    elif snapshot.status == 'cancelled':
-                        activity_type = 'cancel'
-                        activity_description =  "Snapshot '%s' of Workload '%s' cancelled" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name) 
-                    else:
-                        activity_description =  "Snapshot '%s' of Workload '%s' is in progress" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)                                                                  
-                    recentactivity = {'activity_type': activity_type,
-                                      'activity_time': snapshot.created_at,
-                                      'activity_result': snapshot.status,
-                                      'activity_description': activity_description,
-                                      'object_type': 'snapshot',
-                                      'object_name': snapshot.display_name,
-                                      'object_id': snapshot.id,
-                                      }
-                    recentactivites.append(recentactivity)
-                    continue
+                        recentactivity['activity_description'] = \
+                                "Workload created. " + description_suffix
+                recentactivites.append(recentactivity)
 
-            for restore in self.db.restore_get_all(context, read_deleted='yes', project_only='yes'):
-                if restore.deleted:
-                    if now - restore.deleted_at < timedelta(minutes=time_in_minutes):
-                        snapshot = self.db.snapshot_get(context, restore.snapshot_id)
-                        workload = self.db.workload_get(context, snapshot.workload_id)
-                        
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' deleted" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)                  
-                        recentactivity = {'activity_type': 'delete',
-                                         'activity_time': restore.deleted_at,
-                                         'activity_result': restore.status,
-                                         'activity_description': activity_description,
-                                         'object_type': 'restore',
-                                         'object_name': restore.display_name,
-                                         'object_id': restore.id,
-                                         }
-                        recentactivites.append(recentactivity)
-                        continue
-                elif now - restore.created_at < timedelta(minutes=time_in_minutes):
-                    snapshot = self.db.snapshot_get(context, restore.snapshot_id)
-                    workload = self.db.workload_get(context, snapshot.workload_id)
-                    activity_type = 'create'
-                    if restore.status == 'error':
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' failed" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)      
-                    elif restore.status == 'available':
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' completed" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)   
-                    elif restore.status == 'cancelled':
-                        activity_type = 'cancel'
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' cancelled" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)   
+            for snapshot in self.db.snapshot_get_all(
+                                    context,
+                                    read_deleted='yes',
+                                    project_only='yes',
+                                    dashboard_item = 'activities',
+                                    time_in_minutes = time_in_minutes):
+                recentactivity = { 'activity_type'       :'',
+                                   'activity_time'       :'',
+                                   'activity_description':'',
+                                   'activity_result'     :snapshot.status,
+                                   'object_type'         :'snapshot',
+                                   'object_name'         :snapshot.display_name,
+                                   'object_id'           :snapshot.id,
+                                   'object_user_id'      :snapshot.user_id,
+                                   'object_project_id'   :snapshot.project_id,
+                               }
+                description_suffix = \
+                    "(Snapshot: '%s' - '%s', Workload: '%s' - '%s')" % \
+                        (snapshot.display_name,
+                         (snapshot.created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p"),
+                         snapshot.workload_name,
+                         (snapshot.workload_created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p") )
+                if snapshot.deleted:
+                    recentactivity['activity_type'] = 'delete'
+                    recentactivity['activity_time'] = snapshot.deleted_at
+                    recentactivity['activity_description'] = \
+                                "Snapshot deleted. " + description_suffix
+                else:
+                    recentactivity['activity_type'] = 'create'
+                    recentactivity['activity_time'] = snapshot.created_at
+                    if snapshot.status == 'error':
+                        recentactivity['activity_description'] = \
+                                "Snapshot failed. " + description_suffix
+                    elif snapshot.status == 'available':
+                        recentactivity['activity_description'] = \
+                                "Snapshot created. " + description_suffix
+                    elif snapshot.status == 'cancelled':
+                        recentactivity['activity_type'] = 'cancel'
+                        recentactivity['activity_description'] = \
+                                "Snapshot cancelled. " + description_suffix
                     else:
-                        activity_description =  "Restore of Snapshot '%s' of Workload '%s' is in progress" %\
-                                                ((snapshot.created_at + time_offset).strftime("%m/%d/%Y %I:%M %p"), 
-                                                 workload.display_name)   
-                          
-                    recentactivity = {'activity_type': activity_type,
-                                      'activity_time': restore.created_at,
-                                      'activity_result': restore.status,
-                                      'activity_description': activity_description,
-                                      'object_type': 'restore',
-                                      'object_name': restore.display_name,
-                                      'object_id': restore.id,
-                                      }
-                    recentactivites.append(recentactivity)
-                    continue
-                
+                        recentactivity['activity_description'] = \
+                                "Snapshot is in progress. " + description_suffix
+                recentactivites.append(recentactivity)
+
+            for restore in self.db.restore_get_all(
+                                context,
+                                read_deleted = 'yes',
+                                project_only = 'yes',
+                                dashboard_item = 'activities',
+                                time_in_minutes = time_in_minutes):
+                recentactivity = { 'activity_type'       :'',
+                                   'activity_time'       :'',
+                                   'activity_description':'',
+                                   'activity_result'     :restore.status,
+                                   'object_type'         :'restore',
+                                   'object_name'         :restore.display_name,
+                                   'object_id'           :restore.id,
+                                   'object_user_id'      :restore.user_id,
+                                   'object_project_id'   :restore.project_id,
+                                   }
+                description_suffix = \
+                    "(Restore: '%s' - '%s', Snapshot: '%s' - '%s', Workload: '%s' - '%s')" % \
+                        (restore.display_name,
+                         (restore.created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p"),
+                         restore.snapshot_name,
+                         (restore.snapshot_created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p"),
+                         restore.workload_name,
+                         (restore.workload_created_at + time_offset). \
+                                            strftime("%m/%d/%Y %I:%M %p") )
+                if restore.deleted:
+                    recentactivity['activity_type'] = 'delete'
+                    recentactivity['activity_time'] = snapshot.deleted_at
+                    recentactivity['activity_description'] = \
+                                "Restore deleted. "  + description_suffix
+                else:
+                    recentactivity['activity_type'] = 'create'
+                    recentactivity['activity_time'] = restore.created_at
+                    if restore.status == 'error':
+                        recentactivity['activity_description'] = \
+                                "Restore failed. " + description_suffix
+                    elif restore.status == 'available':
+                        recentactivity['activity_description'] = \
+                                "Restore completed. " + description_suffix
+                    elif restore.status == 'cancelled':
+                        recentactivity['activity_type'] = 'cancel'
+                        recentactivity['activity_description'] = \
+                                "Restore Cancelled. " + description_suffix
+                    else:
+                        recentactivity['activity_description'] = \
+                                "Restore is in progress. " + description_suffix
+                recentactivites.append(recentactivity)
+
+            recentactivites = sorted(recentactivites,
+                                    key = itemgetter('activity_time'),
+                                    reverse = True)
+
+
                 
         except Exception as ex:
             LOG.exception(ex)
@@ -1204,6 +1372,94 @@ class API(base.Base):
         if not workload['deleted']:
             self.db.workload_update(context, workload_id, {'status': 'available'})         
         AUDITLOG.log(context,'Workload \'' + display_name + '\' Unlock Submitted', workload)
+
+    @autolog.log_method(logger=Logger)
+    @upload_settings
+    def workload_disable_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        if self._scheduler.running is False:
+            # scheduler is already stopped. Nothing to do
+            return
+
+        self._scheduler.shutdown()
+
+        setting = {u'category': "job_scheduler",
+                   u'name': "global-job-scheduler",
+                   u'description': "Controls job scheduler status",
+                   u'value': False,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "job-scheduler-setting",}
+
+        try:
+            try:
+                self.db.setting_get(context, setting['name'])
+                self.db.setting_update(context, setting['name'], setting)
+            except wlm_exceptions.SettingNotFound:
+                self.db.setting_create(context, setting)
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise Exception("Cannot disable job scheduler globally")
+
+    @autolog.log_method(logger=Logger)
+    @upload_settings
+    def workload_enable_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        if self._scheduler.running is True:
+            # scheduler is already running. Nothing to do
+            return
+
+        self._scheduler.start()
+
+        setting = {u'category': "job_scheduler",
+                   u'name': "global-job-scheduler",
+                   u'description': "Controls job scheduler status",
+                   u'value': True,
+                   u'user_id': context.user_id,
+                   u'is_public': False,
+                   u'is_hidden': True,
+                   u'metadata': {},
+                   u'type': "job-scheduler-setting",}
+        try:
+            try:
+                self.db.setting_get(context, setting['name'])
+                self.db.setting_update(context, setting['name'], setting)
+            except wlm_exceptions.SettingNotFound:
+                self.db.setting_create(context, setting)
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise Exception("Cannot enable job scheduler globally")
+
+    @autolog.log_method(logger=Logger)
+    def workload_get_global_job_scheduler(self, context):
+        return self._scheduler.running
+
+    @autolog.log_method(logger=Logger)
+    def workload_ensure_global_job_scheduler(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
+        try:
+            global_scheduler = [sch for sch in self.db.setting_get_all(context) if sch['name'] == 'global-job-scheduler']
+            if len(global_scheduler) == 0 or global_scheduler[0]['value'] == '1':
+                self._scheduler.start()
+            else:
+                self._scheduler.shutdown()
+        except wlm_exceptions.SettingNotFound:
+            self._scheduler.start()
+        except Exception as ex:
+            LOG.exception(ex)
 
     @autolog.log_method(logger=Logger)
     @create_trust
@@ -1584,6 +1840,12 @@ class API(base.Base):
         try:
             snapshot = self.snapshot_get(context, snapshot_id)
             server = compute_service.get_server_by_id(context, mount_vm_id)
+            flavor_id = server.flavor['id']
+            fl=compute_service.get_flavor_by_id(context, flavor_id)
+            if fl.ephemeral:
+                error_msg = "Recovery manager instance cannot have ephemeral disk"
+                raise Exception(error_msg)
+
             (image_service, image_id) = glance.get_remote_image_service(context, server.image['id'])
             metadata = image_service.show(context, server.image['id'])
             error_msg = "Recovery manager instance needs to be created with glance image property 'hw_qemu_guest_agent=yes'"
@@ -1605,14 +1867,9 @@ class API(base.Base):
                       mounted_vm_id = self.db.get_metadata_value(snapshot_one.metadata, 'mount_vm_id')
                       if mounted_vm_id is not None:
                          if mount_vm_id == mounted_vm_id:
-                            #msg = _('Invalid as snapshot already mounted with id:%s'%snapshot_one.id)
-                            error_dict = {}
-                            error_info = []
-                            error_info.append('Mounted_found')
-                            error_info.append(snapshot_one.id)
-                            error_dict['urls'] = error_info
-                            return error_dict
-
+                             msg = _('snapshot %s already mounted with id:%s' % (snapshot_one.id, mount_vm_id))
+                             raise wlm_exceptions.InvalidParameterValue(err=msg)
+                      
 
             snapshot_display_name = snapshot['display_name']
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
@@ -1624,11 +1881,13 @@ class API(base.Base):
             if snapshot['status'] != 'available':
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
-            mounturl = self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id, mount_vm_id)
+
+            self.db.snapshot_update(context, snapshot_id, 
+                                    { 'status': 'mounting' })
+            self.workloads_rpcapi.snapshot_mount(context, workload['host'], snapshot_id, mount_vm_id)
                         
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' ' +
                          'Snapshot \'' + snapshot_display_name + '\' Mount Submitted', snapshot)
-            return mounturl
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
@@ -1934,6 +2193,7 @@ class API(base.Base):
    
   
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def settings_create(self, context, settings):
         created_settings = []
         try:
@@ -1944,6 +2204,7 @@ class API(base.Base):
         return created_settings 
     
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def settings_update(self, context, settings):
         updated_settings = []
         try:
@@ -1954,6 +2215,7 @@ class API(base.Base):
         return updated_settings
     
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def setting_delete(self, context, name):
         self.db.setting_delete(context,name)
                 
@@ -2003,6 +2265,7 @@ class API(base.Base):
 
       
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def trust_create(self, context, role_name):
 
         # create trust
@@ -2036,6 +2299,7 @@ class API(base.Base):
 
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def trust_delete(self, context, name):
 
         trust = self.db.setting_get(context, name)
@@ -2080,18 +2344,19 @@ class API(base.Base):
         return None
 
     @autolog.log_method(logger=Logger)
+    @upload_settings
     def license_create(self, context, license_text):
 
         def parse_license_text(licensetext,
                                public_key=vault.CONF.triliovault_public_key):
             dsa = DSA.load_pub_key(public_key)
             if not dsa.check_key():
-                raise wlm_exception.InternalError(
+                raise wlm_exceptions.InternalError(
                     "Invalid TrilioVault public key ",
                     "Cannot validate license")
 
             if not "License Key" in licensetext:
-                raise wlm_exception.InvalidLicense(
+                raise wlm_exceptions.InvalidLicense(
                     message="Cannot find License Key in license key")
 
             try:
@@ -2135,11 +2400,19 @@ class API(base.Base):
                    u'type': "license_key",}
         created_license = []
         try:
+            settings =  self.db.setting_get_all(context)
             created_license.append(self.db.setting_create(context, setting))
+
+            for setting in settings:
+                if setting.type == "license_key":
+                    try:
+                        self.db.setting_delete(context, setting.name)
+                    except:
+                        pass
         except Exception as ex:
             LOG.exception(ex)
 
-        return created_license 
+        return json.loads(created_license[0].value)
 
     @autolog.log_method(logger=Logger)
     def license_list(self, context):
@@ -2150,4 +2423,4 @@ class API(base.Base):
         settings =  self.db.setting_get_all(context)
 
         license = [t for t in settings if t.type == "license_key"]
-        return license
+        return json.loads(license[0].value)

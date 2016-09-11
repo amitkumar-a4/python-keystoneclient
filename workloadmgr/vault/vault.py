@@ -7,6 +7,8 @@
 
 """
 
+import glob
+import json
 import os
 import StringIO
 import types
@@ -39,9 +41,9 @@ from os import environ, walk, _exit as os_exit
 from threading import Thread
 from functools import wraps
 
-from keystoneauth1.identity import v2
+from keystoneauth1.identity.generic import password as passMod
 from keystoneauth1 import session
-from keystoneclient.v2_0 import client as keystone_v2
+from keystoneclient import client
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -100,7 +102,12 @@ wlm_vault_opts = [
     cfg.StrOpt('triliovault_public_key',
                default='/etc/workloadmgr/triliovault.pub',
                help='Location where snapshots will be stored'),
-                                                                            
+    cfg.StrOpt('domain_name',
+               default='default',
+               help='cloud-admin user domain id'),
+    cfg.StrOpt('triliovault_user_domain_id',
+               default='default',
+               help='triliovault user domain name'),
 ]
 
 CONF = cfg.CONF
@@ -155,10 +162,25 @@ def get_user_to_get_email_address(context):
            tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
            context.project_id = project_id
     auth_url=CONF.keystone_endpoint_url
-    auth = v2.Password(username=username, password=password,
-    tenant_name=tenant_name, auth_url=auth_url)
-    sess = session.Session(auth=auth)
-    keystone_client = keystone_v2.Client(session=sess)
+    if username == 'triliovault':
+       domain_id=CONF.get('triliovault_user_domain_id')
+    else:
+        domain_id=CONF.get('domain_name')
+    if auth_url.find('v3') != -1:
+       auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    user_domain_id=domain_id,
+                                    domain_id=domain_id,
+                                    )
+    else:
+         auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    project_name=tenant_name,
+                                    )
+    sess = session.Session(auth=auth, verify=False)
+    keystone_client = client.Client(session=sess, auth_url=auth_url, insecure=True)
     user = keystone_client.users.get(context.user_id)
     return user
 
@@ -185,6 +207,68 @@ def get_progress_tracker_path(tracker_metadata):
     else:
         return None      
     
+
+def get_workload_transfers_directory():
+    workload_transfers_directory = ''
+    if CONF.vault_storage_type == 'local' or \
+       CONF.vault_storage_type == 'vault' or \
+       CONF.vault_storage_type == 'nfs' or \
+       CONF.vault_storage_type == 'das':
+        workload_transfers_directory = os.path.join(CONF.vault_data_directory + "/workload_transfers")
+    else:
+        return None
+           
+    fileutils.ensure_tree(workload_transfers_directory)
+    utils.chmod(workload_transfers_directory, '0777')
+    return workload_transfers_directory
+
+
+def get_workload_transfers_path(transfers_metadata):
+    workload_transfers_directory = get_workload_transfers_directory()
+    if workload_transfers_directory:
+        workload_transfers_file_path = os.path.join(workload_transfers_directory + '/' + transfers_metadata['workload_id'])    
+        return workload_transfers_file_path
+    else:
+        return None
+ 
+
+def get_all_workload_transfers():
+    workload_transfers_directory = get_workload_transfers_directory()
+    if workload_transfers_directory:
+        pattern = os.path.join(workload_transfers_directory + '/' + "*")
+        return glob.glob(pattern)
+    else:
+        return None
+
+
+@autolog.log_method(logger=Logger) 
+def transfers_delete(context, transfers_metadata):
+    try:
+        transfer_path  = get_workload_transfers_path(transfers_metadata)
+        if CONF.vault_storage_type == 'local' or \
+           CONF.vault_storage_type == 'vault' or \
+           CONF.vault_storage_type == 'nfs' or \
+           CONF.vault_storage_type == 'das':   
+              if isfile(transfer_path):
+                  os.remove(transfer_path)
+        elif CONF.vault_storage_type == 'swift-i':
+            assert False
+            pass
+        elif CONF.vault_storage_type == 'swift-s':
+            assert False
+            container = get_swift_container(context, workload_metadata)
+            if os.path.isdir(workload_path):
+                shutil.rmtree(workload_path)            
+            swift_delete_folder(context, workload_path, container)
+            swift_delete_container(context, container)
+            swift_delete_container(context, container + '_segments')  
+        elif CONF.vault_storage_type == 's3':
+            assert False
+            pass                      
+    except Exception as ex:
+        LOG.exception(ex)  
+
+
 def get_vault_data_directory():
     vault_data_directory = ''
     if CONF.vault_storage_type == 'local' or \
@@ -311,6 +395,33 @@ def get_swift_container(context, workload_metadata):
         container = ''
     container = container + workload_metadata['workload_name'] + '_' + workload_metadata['workload_id']
     return container
+
+@autolog.log_method(logger=Logger) 
+def _update_workload_ownership_on_media(context, workload_id):
+    try:
+        workload_path  = get_workload_path({'workload_id': workload_id})
+        if CONF.vault_storage_type in ('nfs'):
+            def _update_metadata_file(pathname): 
+                with open(pathname, "r") as f:
+                    metadata = json.loads(f.read())
+
+                metadata['user_id'] = context.user_id
+                metadata['project_id'] = context.project_id
+
+                # TODO(Murali): Do it atomically.
+                with open(pathname, "r+") as f:
+                    f.write(json.dumps(metadata))
+
+            for snap in glob.glob(os.path.join(workload_path, "snapshot_*")):
+                _update_metadata_file(os.path.join(snap, "snapshot_db"))
+
+            _update_metadata_file(os.path.join(workload_path, "workload_db"))
+
+        else:
+            raise exception.MediaNotSupported(media=CONF.vault_storage_type)
+    except Exception as ex:
+        LOG.exception(ex)
+        raise
     
 @autolog.log_method(logger=Logger) 
 def workload_delete(context, workload_metadata):
@@ -367,7 +478,8 @@ def put_object(path, json_data):
 
 @autolog.log_method(logger=Logger)     
 def get_object(path):
-    path = get_vault_data_directory() + '/' + path
+    if not os.path.isabs(path):
+        path = get_vault_data_directory() + '/' + path
     with open(path, 'r') as json_file:
         return json_file.read()
  
