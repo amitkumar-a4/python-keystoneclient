@@ -64,10 +64,13 @@ class AuditLog(object):
                 object = {}
             
             user_name = context.user_id
+            project_name = context.project_id
             try:
                 keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
                 user = keystone.users.get(context.user_id)
                 user_name = user.name
+                project = keystone.tenants.get(context.project_id)
+                project_name = project.name
             except Exception as ex:
                 pass
             
@@ -77,7 +80,8 @@ class AuditLog(object):
             if not display_name:
                 display_name = object.get('id', 'NA')
             auditlogmsg = auditlogmsg + ',' +  display_name + ',' + object.get('id', 'NA')  
-            auditlogmsg = auditlogmsg + ',' + message + '\n'
+            auditlogmsg = auditlogmsg + ',' + message
+            auditlogmsg = auditlogmsg + ',' + project_name + ',' + context.project_id + '\n'
 
             head, tail = os.path.split(self._filepath)
             fileutils.ensure_tree(head)
@@ -107,7 +111,7 @@ class AuditLog(object):
                         record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
                         epoch = time.mktime(record_time.timetuple())
                         offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                        local_time = datetime.strftime((record_time + offset), "%m/%d/%Y %I:%M:%S.%f %p") 
+                        local_time = datetime.strftime((record_time + offset), "%I:%M:%S.%f %p - %m/%d/%Y")
                         fetch = False
                         if time_in_minutes:
                             if (now - record_time) < timedelta(minutes=time_in_minutes):
@@ -123,13 +127,18 @@ class AuditLog(object):
                                       'ObjectName': values[3],
                                       'ObjectId': values[4],
                                       'Details':values[5],
+                                      'ProjectName': '',
+                                      'ProjectId': '',
                                       }
+                            if len(values) > 6:
+                                record['ProjectName'] = values[6]
+                                record['ProjectId'] = values[7]
                             yield record
                         else:
                             continue
 
             for rec in _next_record():
-                records.append(rec)
+                records.insert(0, rec)
 
             return records
 

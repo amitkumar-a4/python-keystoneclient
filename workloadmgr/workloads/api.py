@@ -977,7 +977,7 @@ class API(base.Base):
             total_utilization = -1
 
         storage_usage = {'storage_type': vault.CONF.vault_storage_type,
-                         'nfs_share(s)': [
+                         'nfs_shares': [
                           {
                             "nfsshare": nfsshare,
                             "status":  nfsstatus,
@@ -1005,8 +1005,6 @@ class API(base.Base):
         try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,
-                                                read_deleted='yes',
-                                                project_only='yes',
                                                 dashboard_item='storage'):
                 workload_data = {}
                 workload_id = str(workload.workload_id)
@@ -1135,8 +1133,6 @@ class API(base.Base):
         try:
             for workload in self.db.workload_get_all(
                         context,
-                        read_deleted = 'yes',
-                        project_only = 'yes',
                         dashboard_item = 'activities',
                         time_in_minutes = time_in_minutes
                     ):
@@ -1173,8 +1169,6 @@ class API(base.Base):
 
             for snapshot in self.db.snapshot_get_all(
                                     context,
-                                    read_deleted='yes',
-                                    project_only='yes',
                                     dashboard_item = 'activities',
                                     time_in_minutes = time_in_minutes):
                 recentactivity = { 'activity_type'       :'',
@@ -1220,8 +1214,6 @@ class API(base.Base):
 
             for restore in self.db.restore_get_all(
                                 context,
-                                read_deleted = 'yes',
-                                project_only = 'yes',
                                 dashboard_item = 'activities',
                                 time_in_minutes = time_in_minutes):
                 recentactivity = { 'activity_type'       :'',
