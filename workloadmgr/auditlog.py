@@ -62,26 +62,15 @@ class AuditLog(object):
                 message = 'NA'
             if object == None:
                 object = {}
-            
-            user_name = context.user_id
-            project_name = context.project_id
-            try:
-                keystone = keystone_v2.Client(token=context.auth_token, endpoint=CONF.keystone_endpoint_url)
-                user = keystone.users.get(context.user_id)
-                user_name = user.name
-                project = keystone.tenants.get(context.project_id)
-                project_name = project.name
-            except Exception as ex:
-                pass
-            
+
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
-            auditlogmsg = auditlogmsg + ',' + user_name + ',' + context.user_id
+            auditlogmsg = auditlogmsg + ',' + context.user + ',' + context.user_id
             display_name = object.get('display_name', 'NA')
             if not display_name:
                 display_name = object.get('id', 'NA')
             auditlogmsg = auditlogmsg + ',' +  display_name + ',' + object.get('id', 'NA')  
             auditlogmsg = auditlogmsg + ',' + message
-            auditlogmsg = auditlogmsg + ',' + project_name + ',' + context.project_id + '\n'
+            auditlogmsg = auditlogmsg + ',' + context.tenant + ',' + context.project_id + '\n'
 
             head, tail = os.path.split(self._filepath)
             fileutils.ensure_tree(head)

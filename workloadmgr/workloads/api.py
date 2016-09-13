@@ -1133,6 +1133,7 @@ class API(base.Base):
         try:
             for workload in self.db.workload_get_all(
                         context,
+                        read_deleted = 'yes',
                         dashboard_item = 'activities',
                         time_in_minutes = time_in_minutes
                     ):
@@ -1169,6 +1170,7 @@ class API(base.Base):
 
             for snapshot in self.db.snapshot_get_all(
                                     context,
+                                    read_deleted = 'yes',
                                     dashboard_item = 'activities',
                                     time_in_minutes = time_in_minutes):
                 recentactivity = { 'activity_type'       :'',
@@ -1214,6 +1216,7 @@ class API(base.Base):
 
             for restore in self.db.restore_get_all(
                                 context,
+                                read_deleted = 'yes',
                                 dashboard_item = 'activities',
                                 time_in_minutes = time_in_minutes):
                 recentactivity = { 'activity_type'       :'',
@@ -1263,9 +1266,6 @@ class API(base.Base):
             recentactivites = sorted(recentactivites,
                                     key = itemgetter('activity_time'),
                                     reverse = True)
-
-
-                
         except Exception as ex:
             LOG.exception(ex)
         return dict(recentactivites=recentactivites)    
