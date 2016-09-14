@@ -162,11 +162,13 @@ def get_user_to_get_email_address(context):
            tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
            context.project_id = project_id
     auth_url=CONF.keystone_endpoint_url
-    if username == 'triliovault':
-       domain_id=CONF.get('triliovault_user_domain_id')
-    else:
-        domain_id=CONF.get('domain_name')
     if auth_url.find('v3') != -1:
+       username=CONF.get('nova_admin_username')
+       password=CONF.get('nova_admin_password')
+       if username == 'triliovault':
+          domain_id=CONF.get('triliovault_user_domain_id')
+       else:
+            domain_id=CONF.get('domain_name')
        auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
@@ -182,6 +184,8 @@ def get_user_to_get_email_address(context):
     sess = session.Session(auth=auth, verify=False)
     keystone_client = client.Client(session=sess, auth_url=auth_url, insecure=True)
     user = keystone_client.users.get(context.user_id)
+    if not hasattr(user, 'email'):
+       user.email = None
     return user
 
 def get_progress_tracker_directory(tracker_metadata):
