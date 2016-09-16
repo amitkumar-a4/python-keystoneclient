@@ -7,10 +7,12 @@
 <!-- Optional theme -->
 <link rel="stylesheet" href="css/bootstrap-theme.min.css">
 <link rel="stylesheet" href="css/font-awesome.min.css">
+<link rel="stylesheet" href="css/bootstrap-tagsinput.css">
 
 <script src="js/jquery-1.11.0.min.js"></script>
 <!-- Latest compiled and minified JavaScript -->
 <script src="js/bootstrap.min.js"></script>
+<script src="js/bootstrap-tagsinput.min.js"></script>
 <script type="text/javascript">
 IsV3 = false
 function setRequired(val) {
@@ -179,7 +181,7 @@ function findForm() {
 		  <div class="panel-body">
 			<div class="form-group" >
 		        <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
-			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control" onblur='validate_nfsshare(this)'  aria-describedby="nfs_helpblock">
+			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                         <span id="nfs_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
 			</div>
 		  </div>
@@ -335,8 +337,12 @@ function validate_keystone_credentials(inputelement) {
     });
 }
 
-function validate_nfsshare(inputelement) {
-    nfsshare = $('[name="storage-nfs-export"]')[0].value
+$('[name="storage-nfs-export"]').on('itemAdded', function(event) {
+//function validate_nfsshare(inputelement) {
+//}
+    //nfsshare = $('[name="storage-nfs-export"]')[0].value
+    nfsshare = event.item
+    inputelement = this
     $.ajax({
         url: "validate_nfs_share?nfsshare="+nfsshare,
         beforeSend: function() {
@@ -359,7 +365,7 @@ function validate_nfsshare(inputelement) {
            $($(inputelement).parent()[0]).addClass("has-success")
         }
     });
-}
+});
 
 </script>
 </body>

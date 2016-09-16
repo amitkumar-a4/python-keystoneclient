@@ -7,6 +7,7 @@
 
 """
 
+import base64
 import glob
 import json
 import os
@@ -1162,37 +1163,40 @@ def swift_download_metadata_from_object_store(context, container):
                                 raise ex                              
                     
                     
-def get_total_capacity(context):
+def get_total_capacity(context, nfsshare):
     total_capacity = 1
     total_utilization = 1 
+
     try:
         if CONF.vault_storage_type == 'local' or \
            CONF.vault_storage_type == 'vault' or \
            CONF.vault_storage_type == 'nfs' or \
-           CONF.vault_storage_type == 'das':   
-                stdout, stderr = utils.execute('df', get_vault_data_directory())
+           CONF.vault_storage_type == 'das':
+            base64encode = base64.b64encode(nfsshare)
+            mountpath = os.path.join(get_vault_data_directory(), base64encode)
+            stdout, stderr = utils.execute('df', mountpath)
+            if stderr != '':
+                msg = _('Could not execute df command successfully. Error %s'), (stderr)
+                raise exception.ErrorOccurred(reason=msg)
+
+            # Filesystem     1K-blocks      Used Available Use% Mounted on
+            # /dev/sda1      464076568 248065008 192431096  57% /
+
+            fields = stdout.split('\n')[0].split()
+            values = stdout.split('\n')[1].split()
+
+            total_capacity = int(values[1]) * 1024
+            total_utilization = int(values[2]) * 1024
+            try:
+                stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=True)
                 if stderr != '':
-                    msg = _('Could not execute df command successfully. Error %s'), (stderr)
+                    msg = _('Could not execute du command successfully. Error %s'), (stderr)
                     raise exception.ErrorOccurred(reason=msg)
-            
-                # Filesystem     1K-blocks      Used Available Use% Mounted on
-                # /dev/sda1      464076568 248065008 192431096  57% /
-            
-                fields = stdout.split('\n')[0].split()
-                values = stdout.split('\n')[1].split()
-                
-                total_capacity = int(values[1]) * 1024
-                total_utilization = int(values[2]) * 1024
-                try:
-                    stdout, stderr = utils.execute('du', '-shb', get_vault_data_directory(), run_as_root=True)
-                    if stderr != '':
-                        msg = _('Could not execute du command successfully. Error %s'), (stderr)
-                        raise exception.ErrorOccurred(reason=msg)
-                    #196022926557    /var/triliovault
-                    du_values = stdout.split()                
-                    total_utilization = int(du_values[0])
-                except Exception as ex:
-                    LOG.exception(ex)                
+                #196022926557    /var/triliovault
+                du_values = stdout.split()                
+                total_utilization = int(du_values[0])
+            except Exception as ex:
+                LOG.exception(ex)
         elif CONF.vault_storage_type == 'swift-i':
             pass
         elif CONF.vault_storage_type == 'swift-s':
@@ -1210,13 +1214,13 @@ def get_total_capacity(context):
             for val in values:
                 if "Meta Quota-Bytes:" in val:
                     total_capacity = int(val.split(':')[1].strip())                    
-                
+
                 if "Bytes:" in val:
                     if val.split(':')[0].strip() == 'Bytes':
                         total_utilization = int(val.split(':')[1].strip())
- 
+
         elif CONF.vault_storage_type == 's3':
-            pass                          
+            pass
     except Exception as ex:
-        LOG.exception(ex)    
-    return total_capacity,total_utilization                                           
+        LOG.exception(ex)
+    return total_capacity,total_utilization

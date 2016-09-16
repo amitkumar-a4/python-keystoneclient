@@ -140,7 +140,7 @@ def _snapshot_create_callback(*args, **kwargs):
 
         snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
     except Exception as ex:
-        LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
+        LOG.exception(_("Error creating a snapshot for workload %s") % workload_id)
 
     LOG.info(_("_snapshot_create_callback Exit"))
 
@@ -962,7 +962,7 @@ class API(base.Base):
                 rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
 
                 for i in rpcinfo[0].split("\n")[1:]:
-                    if len(i.split()) and i.split()[3] == 'nfs':
+                    if len(i.split()) and i.split()[3] == 'mountd':
                         status = "Online"
                         break
             except Exception as ex:
@@ -971,39 +971,42 @@ class API(base.Base):
             
             return status 
 
-        nfsshare = vault.CONF.vault_storage_nfs_export
-        nfsstatus = nfs_status(nfsshare)
-        if nfsstatus == "Online":
-            total_capacity, total_utilization = vault.get_total_capacity(context)
-        else:
-            total_capacity = -1
-            total_utilization = -1
+        storages_usage = {}
+        for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
+            nfsshare = nfsshare.strip()
+            nfsstatus = nfs_status(nfsshare)
+            if nfsstatus == "Online":
+                total_capacity, total_utilization = vault.get_total_capacity(context, nfsshare)
+            else:
+                total_capacity = -1
+                total_utilization = -1
 
-        storage_usage = {'storage_type': vault.CONF.vault_storage_type,
-                         'nfs_shares': [
-                          {
-                            "nfsshare": nfsshare,
-                            "status":  nfsstatus,
-                            "capacity": utils.sizeof_fmt(total_capacity),
-                            "utilization": utils.sizeof_fmt(total_utilization),
-                          },
-                         ],
-                         'total': 0,
-                         'full': 0,
-                         'incremental': 0,
-                         'total_capacity': total_capacity,
-                         'total_utilization': total_utilization,
-                         'total_capacity_humanized':
-                             utils.sizeof_fmt(total_capacity),
-                         'total_utilization_humanized' :
-                             utils.sizeof_fmt(total_utilization),
-                         'available_capacity_humanized':
-                             utils.sizeof_fmt(float(total_capacity)
-                                              - float(total_utilization)),
-                         'total_utilization_percent'   :
-                             round(((float(total_utilization)
-                                     / float(total_capacity)) * 100), 2),
-                         }
+            storages_usage[nfsshare]  = {'storage_type': vault.CONF.vault_storage_type,
+                                         'nfs_share(s)': [
+                                          {
+                                            "nfsshare": nfsshare,
+                                            "status":  nfsstatus,
+                                            "capacity": utils.sizeof_fmt(total_capacity),
+                                            "utilization": utils.sizeof_fmt(total_utilization),
+                                          },
+                                         ],
+                                         'total': 0,
+                                         'full': 0,
+                                         'incremental': 0,
+                                         'total_capacity': total_capacity,
+                                         'total_utilization': total_utilization,
+                                         'total_capacity_humanized':
+                                             utils.sizeof_fmt(total_capacity),
+                                         'total_utilization_humanized' :
+                                             utils.sizeof_fmt(total_utilization),
+                                         'available_capacity_humanized':
+                                             utils.sizeof_fmt(float(total_capacity)
+                                                              - float(total_utilization)),
+                                         'total_utilization_percent'   :
+                                             round(((float(total_utilization)
+                                                     / float(total_capacity)) * 100), 2),
+                                        }
+             
 
         try:
             workloads_list = {}
@@ -1087,12 +1090,13 @@ class API(base.Base):
                     total_incre_snap_size + float(incre_snap_size)
                 # Calculate total usage and count of snapshots for all workloads - end
 
-            storage_usage['workloads_storage_usage'] = workloads_storage_data
-            storage_usage['workloads_snaps_usage'] = workloads_snaps_data
+            """
+            storages_usage['workloads_storage_usage'] = workloads_storage_data
+            storages_usage['workloads_snaps_usage'] = workloads_snaps_data
 
             # Total snapshots count and Calculating percent of full snapshots on total count - start
-            storage_usage['full_total_count'] = str(total_full_snap_count)
-            storage_usage['incr_total_count'] = str(total_incre_snap_count)
+            storages_usage['full_total_count'] = str(total_full_snap_count)
+            storages_usage['incr_total_count'] = str(total_incre_snap_count)
 
             full_total_count_percent = 0
             if (total_full_snap_count + total_incre_snap_count) > 0:
@@ -1100,33 +1104,34 @@ class API(base.Base):
                     round(((float(total_full_snap_count)
                             / float((total_full_snap_count
                                     + total_incre_snap_count))) * 100), 2)
-            storage_usage['full_total_count_percent'] = \
+            storages_usage['full_total_count_percent'] = \
                 str(full_total_count_percent)
             # Total snapshots count and Calculating percent of full snapshots on total count - end
 
             # Total usage of storage of all workloads - start
-            storage_usage['full'] = total_full_snap_size
-            storage_usage['incremental'] = total_incre_snap_size
-            storage_usage['total'] = total_full_snap_size + total_incre_snap_size
+            storages_usage['full'] = total_full_snap_size
+            storages_usage['incremental'] = total_incre_snap_size
+            storages_usage['total'] = total_full_snap_size + total_incre_snap_size
             # Total usage of storage of all workloads - end
 
             # Calculate utilization of full snaps and incremental snaps - start
-            if float(storage_usage['total']) > 0:
-                storage_usage['full_snaps_utilization'] = \
+            if float(storages_usage['total']) > 0:
+                storages_usage['full_snaps_utilization'] = \
                     round(((float(total_full_snap_size)
                             / float(storage_usage['total'])) * 100), 2)
-                storage_usage['incremental_snaps_utilization'] = \
+                storages_usage['incremental_snaps_utilization'] = \
                     round(((float(total_incre_snap_size)
                             / float(storage_usage['total'])) * 100), 2)
             else:
-                storage_usage['full_snaps_utilization'] = '0'
-                storage_usage['incremental_snaps_utilization'] = '0'
+                storages_usage['full_snaps_utilization'] = '0'
+                storages_usage['incremental_snaps_utilization'] = '0'
             # Calculate utilization of full snaps and incremental snaps - end
+            """
 
         except Exception as ex:
             LOG.exception(ex)
 
-        return storage_usage
+        return {'storage_usage': storages_usage.values()}
     
     @autolog.log_method(logger=Logger)
     def get_recentactivities(self, context, time_in_minutes):
