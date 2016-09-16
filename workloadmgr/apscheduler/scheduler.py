@@ -57,7 +57,7 @@ class Scheduler(object):
 
         # Set general options
         config = combine_opts(gconfig, 'apscheduler.', options)
-        self.misfire_grace_time = int(config.pop('misfire_grace_time', 30))
+        self.misfire_grace_time = int(config.pop('misfire_grace_time', 1800))
         self.coalesce = asbool(config.pop('coalesce', True))
         self.daemonic = asbool(config.pop('daemonic', True))
         self.standalone = asbool(config.pop('standalone', False))
