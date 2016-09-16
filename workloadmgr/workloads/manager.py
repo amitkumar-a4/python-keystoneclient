@@ -54,6 +54,7 @@ from workloadmgr.openstack.common import jsonutils
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
+from workloadmgr.volume import cinder
 from workloadmgr.vault import vault
 from workloadmgr import utils
 
@@ -379,14 +380,47 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })
 
             compute_service = nova.API(production=True)
+            volume_service = cinder.API()
+            workload_backup_media_size = 0
             for vm in vms:
                 compute_service.set_meta_item(context, vm.vm_id,
                                     "workload_id", workload_id)
                 compute_service.set_meta_item(context, vm.vm_id,
                                     "workload_name", workload['display_name'])
 
+                instance = compute_service.get_server_by_id(context, vm.vm_id, admin=False)
+                flavor = compute_service.get_flavor_by_id(context, instance.flavor['id'])
+                workload_backup_media_size += flavor.disk 
+
+                for volume in getattr(instance, 'os-extended-volumes:volumes_attached'):
+                    vol_obj = volume_service.get(context, volume['id'], no_translate=True)
+                    workload_backup_media_size += vol_obj.size
+
+            # calculate approximate size of backup storage needed for this backup job
+            # TODO: Handle number of snapshots by days
+            jobschedule = pickle.loads(str(workload.jobschedule))
+            if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
+                incrs = jobschedule['retention_policy_value']
+            else:
+                jobsperday = int(jobschedule['interval'].split("hr")[0])
+                incrs = jobschedule['retention_policy_value'] * jobsperday
+
+            if jobschedule['fullbackup_interval'] == '-1':
+                fulls = 1
+            else:
+                fulls = incrs/jobschedule['fullbackup_interval']
+                incrs = incrs - fulls
+
+            workload_approx_backup_size = (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
+                                           incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
+
+            workload_metadata = {'workload_approx_backup_size': workload_approx_backup_size,
+                                 'backup_media_target': "None"}
+            self.db.workload_update(context, 
+                                    workload_id, 
+                                    {'metadata': workload_metadata})
             workload_utils.upload_workload_db_entry(context, workload_id)
-            
+
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,

@@ -109,6 +109,12 @@ wlm_vault_opts = [
     cfg.StrOpt('triliovault_user_domain_id',
                default='default',
                help='triliovault user domain name'),
+    cfg.IntOpt('workload_full_backup_factor',
+               default=50,
+               help='The size of full backup compared to actual resource size in percentage'),
+    cfg.IntOpt('workload_incr_backup_factor',
+               default=10,
+               help='The size of incremental backup compared to full backup in percentage'),
 ]
 
 CONF = cfg.CONF
@@ -300,35 +306,60 @@ def commit_supported():
 def get_storage_type():
     return CONF.vault_storage_type
 
+
+def nfs_status(nfsshare):
+    if get_storage_type() != 'nfs':
+        raise exception.MediaNotSupported(media=get_storage_type())
+
+    status = "Offline"
+    try:
+        nfsserver = nfsshare.split(":")[0]
+        rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
+
+        for i in rpcinfo[0].split("\n")[1:]:
+            if len(i.split()) and i.split()[3] == 'mountd':
+                status = "Online"
+                break
+    except Exception as ex:
+        LOG.exception(ex)
+        pass
+            
+    return status 
+
+
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
-    """ mounts storage """
-    try:
-        command = ['sudo', 'umount', CONF.vault_data_directory]
-        subprocess.call(command, shell=False)
-    except Exception as exception:
-        pass
-    
-    try:
-        command = ['sudo', 'umount', CONF.vault_data_directory]
-        subprocess.call(command, shell=False)
-    except Exception as exception:
-        pass           
-    
-    try:
-        command = ['sudo', 'umount', '-l', CONF.vault_data_directory]
-        subprocess.call(command, shell=False)
-    except Exception as exception:
-        pass                
-    
     if CONF.vault_storage_type == 'local':
         pass
     elif CONF.vault_storage_type == 'vault':
         pass  
     elif CONF.vault_storage_type == 'nfs':        
-         command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', CONF.vault_storage_nfs_export, CONF.vault_data_directory]
-         subprocess.check_call(command, shell=False) 
-         
+        for nfsshare in CONF.vault_storage_nfs_export.split(','):
+            """ mounts storage """
+            base64encode = base64.b64encode(nfsshare)
+            mountpath = os.path.join(CONF.vault_data_directory, base64encode)
+            try:
+                command = ['sudo', 'umount', nfsshare]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
+    
+            try:
+                command = ['sudo', 'umount', nfsshare]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass           
+    
+            try:
+                command = ['sudo', 'umount', '-l', nfsshare]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass                
+        
+            if nfs_status(nfsshare) == 'Online':
+                command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', nfsshare, mountpath]
+                subprocess.check_call(command, shell=False) 
+
     else: # das, swift-i, swift-s, s3
         if CONF.vault_storage_das_device != 'none':      
             try:

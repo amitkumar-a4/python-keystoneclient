@@ -955,26 +955,10 @@ class API(base.Base):
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
-        def nfs_status(nfsshare):
-            status = "Offline"
-            try:
-                nfsserver = nfsshare.split(":")[0]
-                rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
-
-                for i in rpcinfo[0].split("\n")[1:]:
-                    if len(i.split()) and i.split()[3] == 'mountd':
-                        status = "Online"
-                        break
-            except Exception as ex:
-                LOG.exception(ex)
-                pass
-            
-            return status 
-
         storages_usage = {}
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
             nfsshare = nfsshare.strip()
-            nfsstatus = nfs_status(nfsshare)
+            nfsstatus = vault.nfs_status(nfsshare)
             if nfsstatus == "Online":
                 total_capacity, total_utilization = vault.get_total_capacity(context, nfsshare)
             else:
