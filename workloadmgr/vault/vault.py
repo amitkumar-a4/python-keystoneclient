@@ -9,6 +9,7 @@
 
 import base64
 import glob
+import pickle
 import json
 import os
 import StringIO
@@ -1255,3 +1256,78 @@ def get_total_capacity(context, nfsshare):
     except Exception as ex:
         LOG.exception(ex)
     return total_capacity,total_utilization
+
+def get_nfs_share_for_workload_by_free_overcommit(context, nfsshares, workload):
+    """
+       workload is a dict with id, name, description and metadata.
+       metadata includes size of the workload and approximate backup storage needed
+       to hold all backups
+    """
+    
+    shares = {}
+    for s in nfsshares:
+        if nfs_status(s) == 'Offline':
+            continue
+        capacity, used = get_total_capacity(context, s)
+        shares[s] = {
+                     'noofworkloads': 0,
+                     'totalcommitted': 0,
+                     'nfsshare': s,
+                     'capacity': capacity,
+                     'used': used
+                    }
+
+    for nfsshare, values in shares.iteritems():
+        base64encode = base64.b64encode(nfsshare)
+        mountpath = os.path.join(CONF.vault_data_directory, base64encode)
+        for w in os.listdir(mountpath):
+            try:
+                if not 'workload_' in w:
+                    continue
+                workload_path = os.path.join(mountpath, w)
+                with open(os.path.join(workload_path, "workload_db"), "r") as f:
+                    wjson = json.load(f)
+                values['noofworkloads'] += 1
+                workload_approx_backup_size = 0
+
+                for meta in wjson['metadata']:
+                    if meta['key'] == 'workload_approx_backup_size':
+                        workload_approx_backup_size = int(meta['value'])
+
+                if workload_approx_backup_size == 0:
+                    workload_backup_media_size = 10 * 1024 * 1024 * 1024 # default value
+                    for result in glob.iglob(os.path.join(workload_path, 'snapshot_*/snapshot_db')): 
+                         with open(result, "r") as snaprecf:
+                             snaprec = json.load(snaprecf)
+                         if snaprec['snapshot_type'] == "full":
+                             workload_backup_media_size = snaprec['size']
+      
+                    jobschedule = pickle.loads(str(wjson['jobschedule']))
+                    if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
+                        incrs = int(jobschedule['retention_policy_value'])
+                    else:
+                        jobsperday = int(jobschedule['interval'].split("hr")[0])
+                        incrs = int(jobschedule['retention_policy_value']) * jobsperday
+
+                    if jobschedule['fullbackup_interval'] == '-1':
+                        fulls = 1
+                    else:
+                        fulls = incrs/int(jobschedule['fullbackup_interval'])
+                        incrs = incrs - fulls
+
+                    workload_approx_backup_size = \
+                            (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
+                             incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
+                    values['totalcommitted'] += workload_approx_backup_size
+                else:
+                    values['totalcommitted'] += workload_approx_backup_size
+            except Exception as ex:
+                LOG.exception(ex) 
+
+    def getKey(item):
+        item['free'] = item['capacity'] - item['totalcommitted']
+        return item['capacity'] - item['totalcommitted']
+
+    sortedlist = sorted(shares.values(), reverse=True, key=getKey)
+
+    return sortedlist[0]['nfsshare']

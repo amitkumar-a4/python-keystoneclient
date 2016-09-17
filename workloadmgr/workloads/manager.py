@@ -368,16 +368,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload = self.db.workload_get(context, workload_id)
             vms = self.db.workload_vms_get(context, workload_id)
 
-            # Create swift container for the workload
-            json_wl = jsonutils.dumps(workload)
-            json_wl_vms = jsonutils.dumps(vms)
-            self.db.workload_update(context, 
-                                    workload_id, 
-                                    {
-                                     'host': self.host,
-                                     'status': 'available',
-                                     'availability_zone': self.az,
-                                    })
 
             compute_service = nova.API(production=True)
             volume_service = cinder.API()
@@ -411,14 +401,29 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 fulls = incrs/jobschedule['fullbackup_interval']
                 incrs = incrs - fulls
 
-            workload_approx_backup_size = (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
-                                           incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
+            workload_approx_backup_size = \
+                (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
+                 incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
 
+            backup_endpoint = \
+                vault.get_nfs_share_for_workload_by_free_overcommit(
+                    context, 
+                    CONF.vault_storage_nfs_export.split(','),
+                    workload)
             workload_metadata = {'workload_approx_backup_size': workload_approx_backup_size,
-                                 'backup_media_target': "None"}
+                                 'backup_media_target': backup_endpoint}
+
+            # Create swift container for the workload
+            json_wl = jsonutils.dumps(workload)
+            json_wl_vms = jsonutils.dumps(vms)
             self.db.workload_update(context, 
                                     workload_id, 
-                                    {'metadata': workload_metadata})
+                                    {
+                                        'host': self.host,
+                                        'status': 'available',
+                                        'availability_zone': self.az,
+                                        'metadata': workload_metadata
+                                    })
             workload_utils.upload_workload_db_entry(context, workload_id)
 
         except Exception as err:
