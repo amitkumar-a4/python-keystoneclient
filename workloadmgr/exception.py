@@ -512,3 +512,9 @@ class TransferNotAllowed(Invalid):
 
 class MediaNotSupported(Invalid):
     message = _("Transfer %(media)s is not allowed within the same cloud.")
+
+class BackupTargetOffline(Invalid):
+    message = _("Backup %(endpoint)s is offline. Cannot be accessed")
+
+class InvalidNFSMountPoint(Invalid):
+    pass
