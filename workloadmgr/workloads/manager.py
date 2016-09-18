@@ -408,7 +408,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             backup_endpoint = \
                 vault.get_nfs_share_for_workload_by_free_overcommit(
                     context, 
-                    CONF.vault_storage_nfs_export.split(','),
                     workload)
             workload_metadata = {'workload_approx_backup_size': workload_approx_backup_size,
                                  'backup_media_target': backup_endpoint}
@@ -453,6 +452,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                   'progress_msg': 'Snapshot of workload is starting',
                                                   'status': 'starting'})
             workload = self.db.workload_get(context, snapshot.workload_id)
+
+            backup_endpoint = self.db.get_metadata_value(workload.metadata,
+                                                         'backup_media_target')
+
+            backup_target = vault.get_backup_target(backup_endpoint)
+
             pause_at_snapshot = CONF.pause_vm_before_snapshot
             for metadata in workload.metadata:
                 for key in metadata:
@@ -534,7 +539,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
             
             # upload the data to object store... this function will check if the object store is configured
-            vault.upload_snapshot_metatdata_to_object_store(context, {'workload_id': workload.id, 'workload_name': workload.display_name, 'snapshot_id': snapshot.id})
+            backup_target.upload_snapshot_metatdata_to_object_store(context,
+                {'workload_id': workload.id,
+                 'workload_name': workload.display_name,
+                 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -605,13 +613,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
         finally:
             try:
-                vault.purge_snapshot_from_staging_area(context, {'workload_id' : workload.id,
-                                                                 'snapshot_id' : snapshot.id})
+                backup_target.purge_snapshot_from_staging_area(context,
+                    {'workload_id' : workload.id,
+                     'snapshot_id' : snapshot.id})
             except Exception as ex:
                 LOG.exception(ex) 
                                            
             try:
-                vault.purge_staging_area(context)
+                backup_target.purge_staging_area(context)
             except Exception as ex:
                 LOG.exception(ex) 
                 
@@ -623,7 +632,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             try:                
                 snapshot = self.db.snapshot_get(context, snapshot_id)
-                if settings.get_settings(context).get('smtp_email_enable') == 'yes' or settings.get_settings(context).get('smtp_email_enable') == '1':
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes' or \
+                   settings.get_settings(context).get('smtp_email_enable') == '1':
                     self.send_email(context,snapshot,'snapshot')
             except Exception as ex:
                 LOG.exception(ex)
@@ -669,11 +679,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
             raise wlm_exceptions.InvalidState(reason=msg)
             
-        LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
-                                                                workload.id,
-                                                                workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete(context, {'workload_id': workload.id,
-                                        'workload_name': workload.display_name,})
+        LOG.info(_('Deleting the data of workload %s %s %s') % 
+                   (workload.display_name, workload.id,
+                    workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
+
+        backup_endpoint = self.db.get_metadata_value(workload.metadata,
+                                                     'backup_media_target')
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        if backup_target is not None:
+            backup_target.workload_delete(context,
+                {'workload_id': workload.id,
+                 'workload_name': workload.display_name,})
         self.workload_reset(context, workload_id)
 
         compute_service = nova.API(production=True)                
@@ -772,9 +789,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
 
+            backup_endpoint = self.db.get_metadata_value(workload.metadata,
+                                                         'backup_media_target')
+
+            backup_target = vault.get_backup_target(backup_endpoint)
+
             context = nova._get_tenant_context(context)
 
-            vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
+            backup_target.purge_workload_from_staging_area(context,
+                {'workload_id': workload.id})            
 
             target_platform = 'vmware'
             if hasattr(restore, 'pickle'):
@@ -1005,12 +1028,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })
         finally:
             try:
-                vault.purge_staging_area(context)
+                backup_target.purge_staging_area(context)
             except Exception as ex:
                 LOG.exception(ex)  
             
             try:
-                vault.purge_restore_from_staging_area(context, {'restore_id': restore_id})
+                backup_target.purge_restore_from_staging_area(context, {'restore_id': restore_id})
             except Exception as ex:
                 LOG.exception(ex)             
             

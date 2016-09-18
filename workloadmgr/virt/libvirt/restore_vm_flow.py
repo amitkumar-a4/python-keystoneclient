@@ -112,18 +112,27 @@ class PrepareBackupImage(task.Task):
 
         restore_obj = db.restore_get(self.cntx, restore_id)
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
+        workload_obj = db.workload_get(self.cntx, snapshot_obj.workload_id)
+
+        backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                'backup_media_target')
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+
         snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
-        image_info = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
+        resource_snap_path = os.path.join(backup_target.mount_path,
+                                          vm_disk_resource_snap.vault_url.strip(os.sep))
+        image_info = qemuimages.qemu_img_info(resource_snap_path)
         
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
             restore_file_path = image_info.image
-            image_overlay_file_path = vm_disk_resource_snap.vault_path
+            image_overlay_file_path = resource_snap_path
             image_virtual_size = image_info.virtual_size
         else:
-            restore_file_path = vm_disk_resource_snap.vault_path
+            restore_file_path = resource_snap_path
             image_overlay_file_path = 'not-applicable'
             image_virtual_size = image_info.virtual_size
 
@@ -1286,6 +1295,13 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     restore_obj = db.restore_get(cntx, restore['id'])
     snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
+    workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+
+    backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                            'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
+
     test = (restore['restore_type'] == 'test')
     
     msg = 'Creating VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id  
@@ -1330,7 +1346,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
             progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
                                          'resource_id' : snapshot_vm_resource.id}
 
-            progress_tracking_file_path = vault.get_progress_tracker_path(progress_tracker_metadata)
+            progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
             if volume_id:
                 volume_type = db.get_metadata_value(
