@@ -88,7 +88,7 @@ class WorkloadMgrException(Exception):
     with the keyword arguments provided to the constructor.
 
     """
-    message = _("Error: %(reason)%s")
+    message = _("Error: %(reason)s")
     code = 500
     headers = {}
     safe = False
@@ -372,7 +372,7 @@ class WorkloadVMNotFound(NotFound):
     message = _("WorkloadVM %(workload_vm_id)s could not be found.")
     
 class SnapshotsOfHostNotFound(NotFound):
-    message = _("Snapshots for host: %(host) could not be found.")
+    message = _("Snapshots for host: %(host)s could not be found.")
 
 
 class SnapshotsNotFound(NotFound):
