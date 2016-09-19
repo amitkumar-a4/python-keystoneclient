@@ -735,7 +735,8 @@ class API(base.Base):
                 if job.kwargs['workload_id'] == workload_id:
                     self._scheduler.unschedule_job(job)
                     break
-    
+   
+            self.db.workload_update(context, workload_id, {'status': 'resetting'}) 
             self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
             AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
