@@ -620,12 +620,16 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service = nova.API(production=True)
         vast_params = {'snapshot_id': snapshot_obj.id,
                        'workload_id': workload_obj.id,
-                       'instance_vm_id': instance['vm_id']}
+                       'instance_vm_id': instance['vm_id'],
+                       'backend_endpoint': backup_endpoint}
 
-        status = self._vast_methods_call_by_function(compute_service.vast_instance, cntx, instance['vm_id'], vast_params)
+        status = self._vast_methods_call_by_function(compute_service.vast_instance,
+                                                     cntx, instance['vm_id'],
+                                                     vast_params)
 
         progress_tracker_metadata = {'snapshot_id': snapshot['id'],
-                                     'resource_id' : instance['vm_id']}
+                                     'resource_id' : instance['vm_id'],
+                                     'backend_endpoint': backup_endpoint}
         self._wait_for_remote_nova_process(cntx, compute_service,
                                            progress_tracker_metadata,
                                            instance['vm_id'],
@@ -866,7 +870,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                                       'snapshot_vm_resource_id': snapshot_vm_resource.id,
                                                       'snapshot_vm_resource_name':  disk_info['dev'],
                                                       'vm_disk_resource_snap_id' : vm_disk_resource_snap_id,
-                                                      'progress_tracking_file_path': progress_tracking_file_path}
+                                                      'progress_tracking_file_path': progress_tracking_file_path,
+                                                      'backend_endpoint': backup_endpoint}
 
                 vault_url = backup_target.get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata)
 
@@ -905,7 +910,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                    calc_size=True)
 
                 snapshot_obj = db.snapshot_update(cntx, snapshot_obj.id,
-                                                  {'progress_msg': 'Uploaded '+ disk_info['dev'] + ' of VM:' + instance['vm_id'],
+                                                  {'progress_msg': 'Uploaded ' + disk_info['dev'] + ' of VM:' + instance['vm_id'],
                                                    'status': 'uploading'})
 
                 # update the entry in the vm_disk_resource_snap table
@@ -1013,7 +1018,8 @@ class LibvirtDriver(driver.ComputeDriver):
         backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                                 'backup_media_target')
         snapshot_data_ex['metadata'] = {'snapshot_id': snapshot['id'],
-                                        'snapshot_vm_id': instance['vm_id']}
+                                        'snapshot_vm_id': instance['vm_id'],
+                                        'backend_endpoint': backup_endpoint}
         snapshot_data_ex['workload_failed'] = failed
 
         while True:
