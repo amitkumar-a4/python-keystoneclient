@@ -370,8 +370,8 @@ class RestoreVolumeFromImage(task.Task):
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
                                                 volume_description,
-                                                image_id=image_id, volume_type=volume_type,
-                                                availability_zone=availability_zone)
+                                                image_id=image_id, volume_type=volume_type)
+                                                #availability_zone=availability_zone)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -450,8 +450,8 @@ class RestoreNFSVolume(task.Task):
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type,
-                                                     availability_zone=availability_zone)
+                                                     volume_type = volume_type)
+                                                     #availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -585,8 +585,8 @@ class RestoreSANVolume(task.Task):
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type,
-                                                     availability_zone=availability_zone)
+                                                     volume_type = volume_type)
+                                                     #availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
