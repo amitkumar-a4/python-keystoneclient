@@ -140,7 +140,7 @@ def _snapshot_create_callback(*args, **kwargs):
 
         snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
     except Exception as ex:
-        LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
+        LOG.exception(_("Error creating a snapshot for workload %s") % workload_id)
 
     LOG.info(_("_snapshot_create_callback Exit"))
 
