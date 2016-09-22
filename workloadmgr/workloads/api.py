@@ -2418,4 +2418,8 @@ class API(base.Base):
         settings =  self.db.setting_get_all(context)
 
         license = [t for t in settings if t.type == "license_key"]
+
+        if len(license) == 0:
+            raise Exception("No licenses added to TrilioVault")
+
         return json.loads(license[0].value)
