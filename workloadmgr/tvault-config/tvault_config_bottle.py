@@ -2087,6 +2087,9 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ',
                      'project_name = ' + config_data['service_tenant_name'],
                      starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_tenant_name = ',
+                     'admin_tenant_name = ' + config_data['service_tenant_name'],
+                     starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' + config_data.get('trustee_role', '_member_'),
                      starts_with=True)
