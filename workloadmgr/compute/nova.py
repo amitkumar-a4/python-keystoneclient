@@ -223,7 +223,9 @@ def _get_tenant_context(context):
         kclient = client_plugin.client("keystone")
         context.auth_token = kclient.auth_token
         context.user_id = user_id
-        context.tenant = context.tenant or CONF.keystone_authtoken.project_name
+        #context.tenant = context.tenant or CONF.keystone_authtoken.project_name
+        if not context.tenant:
+           context.tenant = 'service'
     else:
          try:
             httpclient = client.HTTPClient(
