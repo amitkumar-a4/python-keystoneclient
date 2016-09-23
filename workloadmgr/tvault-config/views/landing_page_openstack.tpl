@@ -48,6 +48,7 @@
                         <br>
                         <div class="well">
                             <b>Download <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a> and run as sudo...</b><br>
+                            <b>Download <a href="/tvault-contego-install.answers">tvault-contego-install.answers</a></b><br>
                         </div>                    
                     </li>
                    
@@ -115,6 +116,16 @@
                         <script>document.write("pip install http://" + window.location.host + ":8081/packages/python-workloadmgrclient-")</script>{{version}}<script>document.write(".tar.gz")</script>
                     </div>
                 </ol>                
+                
+                <h2>Ansible Scripts</h2>
+                <ol>
+                    <div class="well">
+                        <b>Download Ansible Scripts <a href="/tvault-ansible-scripts">tvault-ansible-scripts-{{version}}.tar.gz</a></b><br>
+                         <br>
+                    </div>
+                </ol>
+
+
                 <h2>Support</h2>
                 <ol>
                     <div class="well"><a>support@triliodata.com</a>

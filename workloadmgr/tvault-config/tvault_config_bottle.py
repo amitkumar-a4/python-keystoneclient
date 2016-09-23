@@ -276,6 +276,14 @@ def send_keystone_logs(filename):
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.sh', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)    
 
+@bottle.route('/tvault-contego-install.answers')
+def send_tvault_contego_install():
+    return static_file('tvault-contego-install.answers', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
+
+@bottle.route('/tvault-ansible-scripts')
+def send_ansible_scripts():
+    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='text/plain', download=True)
+
 @bottle.route('/tvault-horizon-plugin-install.sh')
 def send_tvault_horizon_plugin_install():
     return static_file('tvault-horizon-plugin-install.sh', root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)    
