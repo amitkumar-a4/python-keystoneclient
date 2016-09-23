@@ -140,7 +140,7 @@ def _snapshot_create_callback(*args, **kwargs):
 
         snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
     except Exception as ex:
-        LOG.exception(_("Error creating a snapshot for workload %d") % workload_id)
+        LOG.exception(_("Error creating a snapshot for workload %s") % workload_id)
 
     LOG.info(_("_snapshot_create_callback Exit"))
 
@@ -488,9 +488,12 @@ class API(base.Base):
             AUDITLOG.log(context,'Workload \'' + name + '\' Create Requested', None)
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
-
+            instance_ids = map(lambda x: x.id, instances_with_name)
             #TODO(giri): optimize this lookup
             for instance in instances:
+                #Check whether given instance id exist or not.
+                if not instance_ids or instance['instance-id'] not in instance_ids:
+                   raise wlm_exceptions.InstanceNotFound(instance_id=instance['instance-id'])
                 for instance_with_name in instances_with_name:
                     if instance_with_name.tenant_id != context.project_id:
                         msg = _('Invalid instance as '+instance_with_name.name+' is not associated with your current tenant')
@@ -684,7 +687,7 @@ class API(base.Base):
                 vm = self.db.workload_vms_create(context, values)
                 compute_service.set_meta_item(context, vm.vm_id, 'workload_id', workload_id)
                 compute_service.set_meta_item(context, vm.vm_id,
-                                        'workload_name', workload['name'])
+                                        'workload_name', workloadobj['display_name'] )
 
         workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
 
@@ -732,7 +735,7 @@ class API(base.Base):
                 if job.kwargs['workload_id'] == workload_id:
                     self._scheduler.unschedule_job(job)
                     break
-    
+            self.db.workload_update(context, workload_id, {'status': 'deleting'}) 
             self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
             AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
@@ -977,7 +980,7 @@ class API(base.Base):
             total_utilization = -1
 
         storage_usage = {'storage_type': vault.CONF.vault_storage_type,
-                         'nfs_share(s)': [
+                         'nfs_shares': [
                           {
                             "nfsshare": nfsshare,
                             "status":  nfsstatus,
@@ -1005,8 +1008,6 @@ class API(base.Base):
         try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,
-                                                read_deleted='yes',
-                                                project_only='yes',
                                                 dashboard_item='storage'):
                 workload_data = {}
                 workload_id = str(workload.workload_id)
@@ -1136,7 +1137,6 @@ class API(base.Base):
             for workload in self.db.workload_get_all(
                         context,
                         read_deleted = 'yes',
-                        project_only = 'yes',
                         dashboard_item = 'activities',
                         time_in_minutes = time_in_minutes
                     ):
@@ -1173,8 +1173,7 @@ class API(base.Base):
 
             for snapshot in self.db.snapshot_get_all(
                                     context,
-                                    read_deleted='yes',
-                                    project_only='yes',
+                                    read_deleted = 'yes',
                                     dashboard_item = 'activities',
                                     time_in_minutes = time_in_minutes):
                 recentactivity = { 'activity_type'       :'',
@@ -1221,7 +1220,6 @@ class API(base.Base):
             for restore in self.db.restore_get_all(
                                 context,
                                 read_deleted = 'yes',
-                                project_only = 'yes',
                                 dashboard_item = 'activities',
                                 time_in_minutes = time_in_minutes):
                 recentactivity = { 'activity_type'       :'',
@@ -1271,9 +1269,6 @@ class API(base.Base):
             recentactivites = sorted(recentactivites,
                                     key = itemgetter('activity_time'),
                                     reverse = True)
-
-
-                
         except Exception as ex:
             LOG.exception(ex)
         return dict(recentactivites=recentactivites)    
@@ -2423,4 +2418,8 @@ class API(base.Base):
         settings =  self.db.setting_get_all(context)
 
         license = [t for t in settings if t.type == "license_key"]
+
+        if len(license) == 0:
+            raise Exception("No licenses added to TrilioVault")
+
         return json.loads(license[0].value)

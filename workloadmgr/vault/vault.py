@@ -113,6 +113,32 @@ wlm_vault_opts = [
 CONF = cfg.CONF
 CONF.register_opts(wlm_vault_opts)
 
+def ensure_nfs_mounted():
+    '''Make sure NFS share is mounted at CONF.vault_data_directory.'''
+    def wrap(func):
+        def new_function(*args, **kw):
+            if CONF.vault_storage_type != 'nfs':
+                return
+
+            mountpoint = CONF.vault_data_directory
+
+            if not os.path.ismount(mountpoint):
+                raise exception.InvalidNFSMountPoint(
+                    reason="'%s' is not a valid mount point" % mountpoint)
+
+            with open('/proc/mounts','r') as f:
+                mounts = [{line.split()[1]:line.split()[0]}
+                          for line in f.readlines() if line.split()[1] == mountpoint]
+
+            if len(mounts) == 0 or mounts[0].get(mountpoint, None) != CONF.vault_storage_nfs_export:
+                raise exception.InvalidNFSMountPoint(
+                    reason="'%s' is not '%s' mounted" % (mountpoint, CONF.vault_storage_nfs_export))
+
+            return func(*args, **kw)
+
+        return new_function
+    return wrap
+
 def run_async(func):
     """
         run_async(func)
@@ -162,11 +188,13 @@ def get_user_to_get_email_address(context):
            tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
            context.project_id = project_id
     auth_url=CONF.keystone_endpoint_url
-    if username == 'triliovault':
-       domain_id=CONF.get('triliovault_user_domain_id')
-    else:
-        domain_id=CONF.get('domain_name')
     if auth_url.find('v3') != -1:
+       username=CONF.get('nova_admin_username')
+       password=CONF.get('nova_admin_password')
+       if username == 'triliovault':
+          domain_id=CONF.get('triliovault_user_domain_id')
+       else:
+            domain_id=CONF.get('domain_name')
        auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
@@ -182,8 +210,11 @@ def get_user_to_get_email_address(context):
     sess = session.Session(auth=auth, verify=False)
     keystone_client = client.Client(session=sess, auth_url=auth_url, insecure=True)
     user = keystone_client.users.get(context.user_id)
+    if not hasattr(user, 'email'):
+       user.email = None
     return user
 
+@ensure_nfs_mounted()
 def get_progress_tracker_directory(tracker_metadata):
     progress_tracker_directory = ''
     if CONF.vault_storage_type == 'local' or \
@@ -352,7 +383,8 @@ def get_snapshot_vm_resource_path(snapshot_vm_resource_metadata):
     snapshot_vm_resource_path = snapshot_vm_path + '/vm_res_id_%s_%s' % (snapshot_vm_resource_metadata['snapshot_vm_resource_id'], 
                                                                          snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ',''))
     return snapshot_vm_resource_path    
-            
+
+@ensure_nfs_mounted()
 def get_snapshot_vm_disk_resource_path(snapshot_vm_disk_resource_metadata):
     snapshot_vm_resource_path = get_snapshot_vm_resource_path(snapshot_vm_disk_resource_metadata)
     snapshot_vm_disk_resource_path = snapshot_vm_resource_path + '/' + snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id']
