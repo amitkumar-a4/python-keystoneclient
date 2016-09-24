@@ -181,7 +181,7 @@ def get_user_to_get_email_address(context):
     except:
            password=CONF.get('keystone_authtoken').admin_password
     try:
-        tenant_name=CONF.get('keystone_authtoken').project_name
+        tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
     except:
            project_id = context.project_id
            context.project_id = 'Configurator'
