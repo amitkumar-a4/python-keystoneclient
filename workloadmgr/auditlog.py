@@ -64,21 +64,29 @@ class AuditLog(object):
                 object = {}
 
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
-            auditlogmsg = auditlogmsg + ',' + context.user + ',' + context.user_id
+            user = getattr(context, "user", None)
+            tenant = getattr(context, "tenant", None)
+            if user is None:
+                user = "Unknown"
+            if tenant is None:
+                tenant = "Unknown"
+            auditlogmsg = auditlogmsg + ',' + user + ',' + context.user_id
             display_name = object.get('display_name', 'NA')
             if not display_name:
                 display_name = object.get('id', 'NA')
             auditlogmsg = auditlogmsg + ',' +  display_name + ',' + object.get('id', 'NA')  
             auditlogmsg = auditlogmsg + ',' + message
-            auditlogmsg = auditlogmsg + ',' + context.tenant + ',' + context.project_id + '\n'
+            auditlogmsg = auditlogmsg + ',' + tenant + ',' + context.project_id + '\n'
 
             head, tail = os.path.split(self._filepath)
             fileutils.ensure_tree(head)
             with open(self._filepath, 'a') as auditlogfile:   
                 auditlogfile.write(auditlogmsg, *args, **kwargs)
+        except Exception as ex:
+            LOG.exception(ex)
         finally:
             lock.release()
-            
+
     def get_records(self, time_in_minutes, time_from, time_to):
 
         def _get_records_from_audit_file(filename=None):
