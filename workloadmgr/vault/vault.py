@@ -121,6 +121,32 @@ wlm_vault_opts = [
 CONF = cfg.CONF
 CONF.register_opts(wlm_vault_opts)
 
+def ensure_nfs_mounted():
+    '''Make sure NFS share is mounted at CONF.vault_data_directory.'''
+    def wrap(func):
+        def new_function(*args, **kw):
+            if CONF.vault_storage_type != 'nfs':
+                return
+
+            mountpoint = CONF.vault_data_directory
+
+            if not os.path.ismount(mountpoint):
+                raise exception.InvalidNFSMountPoint(
+                    reason="'%s' is not a valid mount point" % mountpoint)
+
+            with open('/proc/mounts','r') as f:
+                mounts = [{line.split()[1]:line.split()[0]}
+                          for line in f.readlines() if line.split()[1] == mountpoint]
+
+            if len(mounts) == 0 or mounts[0].get(mountpoint, None) != CONF.vault_storage_nfs_export:
+                raise exception.InvalidNFSMountPoint(
+                    reason="'%s' is not '%s' mounted" % (mountpoint, CONF.vault_storage_nfs_export))
+
+            return func(*args, **kw)
+
+        return new_function
+    return wrap
+
 def run_async(func):
     """
         run_async(func)
@@ -163,7 +189,7 @@ def get_user_to_get_email_address(context):
     except:
            password=CONF.get('keystone_authtoken').admin_password
     try:
-        tenant_name=CONF.get('keystone_authtoken').project_name
+        tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
     except:
            project_id = context.project_id
            context.project_id = 'Configurator'

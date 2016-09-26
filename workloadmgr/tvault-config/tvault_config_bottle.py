@@ -277,6 +277,14 @@ def send_keystone_logs(filename):
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.sh', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)    
 
+@bottle.route('/tvault-contego-install.answers')
+def send_tvault_contego_install():
+    return static_file('tvault-contego-install.answers', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
+
+@bottle.route('/tvault-ansible-scripts')
+def send_ansible_scripts():
+    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='text/plain', download=True)
+
 @bottle.route('/tvault-horizon-plugin-install.sh')
 def send_tvault_horizon_plugin_install():
     return static_file('tvault-horizon-plugin-install.sh', root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)    
@@ -2112,8 +2120,8 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
                      'auth_uri = ' + config_data['keystone_public_url'],
                      starts_with=True)
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ',
-                     'project_name = ' + config_data['service_tenant_name'],
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_tenant_name = ',
+                     'admin_tenant_name = ' + config_data['service_tenant_name'],
                      starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' + config_data.get('trustee_role', '_member_'),

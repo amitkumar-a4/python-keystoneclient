@@ -735,7 +735,7 @@ class API(base.Base):
                 if job.kwargs['workload_id'] == workload_id:
                     self._scheduler.unschedule_job(job)
                     break
-    
+            self.db.workload_update(context, workload_id, {'status': 'deleting'}) 
             self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
             AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
@@ -2407,4 +2407,8 @@ class API(base.Base):
         settings =  self.db.setting_get_all(context)
 
         license = [t for t in settings if t.type == "license_key"]
+
+        if len(license) == 0:
+            raise Exception("No licenses added to TrilioVault")
+
         return json.loads(license[0].value)
