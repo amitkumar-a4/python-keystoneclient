@@ -171,17 +171,18 @@ def run_async(func):
 
     return async_func
 
-def get_user_to_get_email_address(context):
+
+def get_client(context):
     try:
-        username=CONF.get('keystone_authtoken').username 
+        username=CONF.get('keystone_authtoken').username
     except:
            username=CONF.get('keystone_authtoken').admin_user
     try:
-        password=CONF.get('keystone_authtoken').password 
+        password=CONF.get('keystone_authtoken').password
     except:
            password=CONF.get('keystone_authtoken').admin_password
     try:
-        tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
+        tenant_name=CONF.get('keystone_authtoken').project_name
     except:
            project_id = context.project_id
            context.project_id = 'Configurator'
@@ -208,7 +209,18 @@ def get_user_to_get_email_address(context):
                                     project_name=tenant_name,
                                     )
     sess = session.Session(auth=auth, verify=False)
-    keystone_client = client.Client(session=sess, auth_url=auth_url, insecure=True)
+    return client.Client(session=sess, auth_url=auth_url, insecure=True)
+
+def get_project_list(context):
+    keystone_client = get_client(context)
+    if keystone_client.version == 'v3':
+       projects = keystone_client.projects.list()
+    else:
+         projects = keystone_client.tenants.list()
+    return projects
+
+def get_user_to_get_email_address(context):
+    keystone_client = get_client(context)
     user = keystone_client.users.get(context.user_id)
     if not hasattr(user, 'email'):
        user.email = None
