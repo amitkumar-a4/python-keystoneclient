@@ -174,15 +174,15 @@ def run_async(func):
 
 def get_client(context):
     try:
-        username=CONF.get('keystone_authtoken').username
+        username=CONF.get('keystone_authtoken').username 
     except:
            username=CONF.get('keystone_authtoken').admin_user
     try:
-        password=CONF.get('keystone_authtoken').password
+        password=CONF.get('keystone_authtoken').password 
     except:
            password=CONF.get('keystone_authtoken').admin_password
     try:
-        tenant_name=CONF.get('keystone_authtoken').project_name
+        tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
     except:
            project_id = context.project_id
            context.project_id = 'Configurator'
