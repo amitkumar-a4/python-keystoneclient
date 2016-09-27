@@ -211,10 +211,14 @@ def get_client(context):
     sess = session.Session(auth=auth, verify=False)
     return client.Client(session=sess, auth_url=auth_url, insecure=True)
 
-def get_project_list(context):
+def get_project_list_for_import(context):
     keystone_client = get_client(context)
     if keystone_client.version == 'v3':
-       projects = keystone_client.projects.list()
+       if(context.user == CONF.get('nova_admin_username')):
+           projects = keystone_client.projects.list()
+       else:
+            user = keystone_client.users.get(context.user_id)
+            projects = keystone_client.projects.list(user=user)
     else:
          projects = keystone_client.tenants.list()
     return projects

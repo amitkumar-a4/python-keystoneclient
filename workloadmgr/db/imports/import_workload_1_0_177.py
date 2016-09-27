@@ -57,7 +57,7 @@ def project_id_exists(context, project_id):
 
     # TODO: Optimize it without reading project list os many times
     kclient.client_plugin = kclient"""
-    projects = vault.get_project_list(context)
+    projects = vault.get_project_list_for_import(context)
     for prj in projects: 
         if uuid.UUID(prj.id) == uuid.UUID(project_id):
             return True
