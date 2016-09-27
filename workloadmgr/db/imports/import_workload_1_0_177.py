@@ -51,13 +51,14 @@ def import_settings(cntx, new_version, upgrade=True):
 
 
 def project_id_exists(context, project_id):
-    clients.initialise()
+    """clients.initialise()
     client_plugin = clients.Clients(context)
     kclient = client_plugin.client("keystone")
 
     # TODO: Optimize it without reading project list os many times
-    kclient.client_plugin = kclient
-    for prj in kclient.client.projects.list():
+    kclient.client_plugin = kclient"""
+    projects = vault.get_project_list_for_import(context)
+    for prj in projects: 
         if uuid.UUID(prj.id) == uuid.UUID(project_id):
             return True
 
