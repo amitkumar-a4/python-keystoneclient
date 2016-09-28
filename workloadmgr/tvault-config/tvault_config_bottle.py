@@ -280,9 +280,9 @@ def send_tvault_contego_install():
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.answers', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
 
-@bottle.route('/tvault-ansible-scripts')
+@bottle.route('/tvault-ansible-scripts.tar.gz')
 def send_ansible_scripts():
-    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='text/plain', download=True)
+    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='application/x-gzip', download=True)
 
 @bottle.route('/tvault-horizon-plugin-install.sh')
 def send_tvault_horizon_plugin_install():

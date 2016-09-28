@@ -120,7 +120,7 @@
                 <h2>Ansible Scripts</h2>
                 <ol>
                     <div class="well">
-                        <b>Download Ansible Scripts <a href="/tvault-ansible-scripts">tvault-ansible-scripts-{{version}}.tar.gz</a></b><br>
+                        <b>Download Ansible Scripts <a href="/tvault-ansible-scripts.tar.gz">tvault-ansible-scripts-{{version}}.tar.gz</a></b><br>
                          <br>
                     </div>
                 </ol>
