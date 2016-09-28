@@ -1005,7 +1005,7 @@ class API(base.Base):
                                      / float(total_capacity)) * 100), 2),
                          }
 
-        try:
+        """try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,
                                                 dashboard_item='storage'):
@@ -1124,7 +1124,7 @@ class API(base.Base):
             # Calculate utilization of full snaps and incremental snaps - end
 
         except Exception as ex:
-            LOG.exception(ex)
+            LOG.exception(ex)"""
 
         return storage_usage
     
