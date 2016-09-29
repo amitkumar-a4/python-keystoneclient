@@ -1527,11 +1527,11 @@ def get_ip_addresses():
         config_data = dict(Config._defaults)
         if config_data['config_status'] == 'success':
             tvault_ipaddress = config_data['tvault_ipaddress']
-            floating_ipaddress = config_data['floating_ipaddress']
+            #floating_ipaddress = config_data['floating_ipaddress']
             if tvault_ipaddress not in ip_addresses:
                 ip_addresses.insert(0, str(tvault_ipaddress))
-            if floating_ipaddress not in ip_addresses:
-                ip_addresses.insert(0, str(floating_ipaddress))
+            #if floating_ipaddress not in ip_addresses:
+            #    ip_addresses.insert(0, str(floating_ipaddress))
                  
     except Exception as ex:
         pass
