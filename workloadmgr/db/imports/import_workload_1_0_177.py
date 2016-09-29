@@ -5,6 +5,7 @@
 
 import socket
 import json
+import os
 import uuid
 from operator import itemgetter
 import cPickle as pickle
@@ -34,15 +35,18 @@ def _adjust_values(cntx, new_version, values, upgrade):
      
     return values
 
+
 def import_settings(cntx, new_version, upgrade=True):
     try:
         db = WorkloadMgrDB().db
-        settings = json.loads(vault.get_object('settings_db'))
+        backup_target = vault.get_settings_backup_target()
+        settings = json.loads(backup_target.get_object('settings_db'))
         for setting_values in settings:
             try:
                 if 'key' in setting_values:
                     setting_values['name'] = setting_values['key']
-                setting_values = _adjust_values(cntx, new_version, setting_values, upgrade)
+                setting_values = _adjust_values(cntx, new_version,
+                                                setting_values, upgrade)
                 db.setting_create(cntx, setting_values)  
             except Exception as ex:
                 LOG.exception(ex)                      
@@ -64,12 +68,15 @@ def project_id_exists(context, project_id):
     return False
 
 
-def import_workload(cntx, workload_url, new_version, upgrade=True):
+def import_workload(cntx, workload_url, new_version,
+                    backup_endpoint, upgrade=True):
     """ Import workload and snapshot records from vault 
     Versions Supported: 1.0.177
     """
     db = WorkloadMgrDB().db
-    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
+    backup_target = vault.get_backup_target(backup_endpoint)
+    workload_values = json.loads(backup_target.get_object(
+        os.path.join(workload_url['workload_url'], 'workload_db')))
     if upgrade == True:
         # make sure that cntx is admin
         # make sure tenant id exists on this openstack
@@ -88,9 +95,14 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
     else:
         tenantcontext = cntx
 
-    workload_values = _adjust_values(tenantcontext, new_version, workload_values, upgrade)
+    workload_values = _adjust_values(tenantcontext, new_version,
+                                     workload_values, upgrade)
+
     if workload_values['status'] == 'locked':
         workload_values['status'] = 'available'
+
+    #TODO: Set the backup_media_target metadata variable if it is not already set
+    # TODO: look at the job scheduler
    
     try:
         workload = db.workload_get(tenantcontext, workload_values['id'])
@@ -100,25 +112,28 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
     except exception.WorkloadNotFound as ex:
         # workload is not found in the database
         workload = db.workload_create(tenantcontext, workload_values)
-        
 
     if len(workload_values['jobschedule']): 
         workload_api = workloadAPI.API()
         workload_api.workload_add_scheduler_job(pickle.loads(str(workload_values['jobschedule'])), workload)                                       
                 
-    workload_vms = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_vms_db'))
+    workload_vms = json.loads(backup_target.get_object(
+        os.path.join(workload_url['workload_url'], 'workload_vms_db')))
     for workload_vm_values in workload_vms:
-        workload_vm_values = _adjust_values(tenantcontext, new_version, workload_vm_values, upgrade)
+        workload_vm_values = _adjust_values(tenantcontext, new_version,
+                                            workload_vm_values, upgrade)
         if db.workload_vm_get(tenantcontext, workload_vm_values['id']):
             workload_vm_id = workload_vm_values.pop('id')
-            db.workload_vms_update(tenantcontext, workload_vm_id, workload_vm_values)
+            db.workload_vms_update(tenantcontext, workload_vm_id,
+                                   workload_vm_values)
         else:
             db.workload_vms_create(tenantcontext, workload_vm_values)
 
     snapshot_values_list = []
     for snapshot_url in workload_url['snapshot_urls']:
         try:
-            snapshot_values = json.loads(vault.get_object(snapshot_url + '/snapshot_db'))
+            snapshot_values = json.loads(backup_target.get_object(
+                os.path.join(snapshot_url, 'snapshot_db')))
             snapshot_values['snapshot_url'] = snapshot_url
             snapshot_values_list.append(snapshot_values)
         except Exception as ex:
@@ -137,62 +152,75 @@ def import_workload(cntx, workload_url, new_version, upgrade=True):
             snapshot = db.snapshot_create(tenantcontext, snapshot_values)
 
         try:
-            snapshot_vms = json.loads(vault.get_object(snapshot_values['snapshot_url'] + '/snapshot_vms_db'))
+            snapshot_vms = json.loads(backup_target.get_object(
+                os.path.join(snapshot_values['snapshot_url'], 'snapshot_vms_db')))
             for snapshot_vm_values in snapshot_vms:
-                snapshot_vm_values = _adjust_values(tenantcontext, new_version, snapshot_vm_values, upgrade)
+                snapshot_vm_values = _adjust_values(tenantcontext, new_version,
+                                                    snapshot_vm_values, upgrade)
                 snapshot_vm_id = snapshot_vm_values['id']
                 if db.snapshot_vm_get(tenantcontext, snapshot_vm_id, snapshot_id):
                     snapshot_vm_id = snapshot_vm_values.pop('id')
-                    db.snapshot_vm_update(tenantcontext, snapshot_vm_id, snapshot_id, snapshot_vm_values)
+                    db.snapshot_vm_update(tenantcontext, snapshot_vm_id,
+                                          snapshot_id, snapshot_vm_values)
                 else:
                     db.snapshot_vm_create(tenantcontext, snapshot_vm_values)
 
-            snapshot_vm_resources = json.loads(vault.get_object(snapshot_values['snapshot_url'] + '/resources_db'))
+            snapshot_vm_resources = json.loads(backup_target.get_object(
+                os.path.join(snapshot_values['snapshot_url'], 'resources_db')))
             for snapshot_vm_resource_values in snapshot_vm_resources:
-                snapshot_vm_resource_values = _adjust_values(tenantcontext, new_version, snapshot_vm_resource_values, upgrade)
+                snapshot_vm_resource_values = _adjust_values(tenantcontext, new_version,
+                                                             snapshot_vm_resource_values, upgrade)
                 db.snapshot_vm_resource_create(tenantcontext, snapshot_vm_resource_values)
 
             resources = db.snapshot_resources_get(tenantcontext, snapshot.id)
             for res in resources:
-                vm_res_id = '/vm_res_id_%s' % (res['id'])
+                vm_res_id = 'vm_res_id_%s' % (res['id'])
                 for meta in res.metadata:
                     if meta.key == "label":
-                        vm_res_id = '/vm_res_id_%s_%s' % (res['id'], meta.value)
+                        vm_res_id = 'vm_res_id_%s_%s' % (res['id'], meta.value)
                         break
                 if res.resource_type == "network" or \
                     res.resource_type == "subnet" or \
                     res.resource_type == "router" or \
                     res.resource_type == "nic":                
-                    path = "workload_" + snapshot['workload_id'] + \
-                           "/snapshot_" + snapshot['id'] + \
-                           "/network" + vm_res_id +\
-                           "/network_db"
-                    vm_network_resource_snaps = json.loads(vault.get_object(path))
+                    path = os.path.join("workload_" + snapshot['workload_id'],
+                                        "snapshot_" + snapshot['id'],
+                                        "network", vm_res_id,
+                                        "network_db")
+                    vm_network_resource_snaps = json.loads(backup_target.get_object(path))
                     for vm_network_resource_snap_values in vm_network_resource_snaps:
-                        vm_network_resource_snap_values = _adjust_values(tenantcontext, new_version, vm_network_resource_snap_values, upgrade)
-                        db.vm_network_resource_snap_create(tenantcontext, vm_network_resource_snap_values)
+                        vm_network_resource_snap_values = _adjust_values(
+                            tenantcontext, new_version,
+                            vm_network_resource_snap_values, upgrade)
+                        db.vm_network_resource_snap_create(tenantcontext,
+                            vm_network_resource_snap_values)
 
                 elif res.resource_type == "disk":
-                    path = "workload_" + snapshot['workload_id'] + \
-                           "/snapshot_" + snapshot['id'] + \
-                           "/vm_id_" + res.vm_id + vm_res_id.replace(' ','') + \
-                           "/disk_db"
-                    vm_disk_resource_snaps = json.loads(vault.get_object(path))
-                    vm_disk_resource_snaps_sorted = sorted(vm_disk_resource_snaps, key=itemgetter('created_at'))
+                    path = os.path.join("workload_" + snapshot['workload_id'],
+                                        "snapshot_" + snapshot['id'],
+                                        "vm_id_" + res.vm_id + vm_res_id.replace(' ',''),
+                                        "disk_db")
+                    vm_disk_resource_snaps = json.loads(backup_target.get_object(path))
+                    vm_disk_resource_snaps_sorted = sorted(
+                        vm_disk_resource_snaps, key=itemgetter('created_at'))
                     for vm_disk_resource_snap_values in vm_disk_resource_snaps_sorted:
-                        vm_disk_resource_snap_values = _adjust_values(tenantcontext, new_version, vm_disk_resource_snap_values, upgrade)
+                        vm_disk_resource_snap_values = _adjust_values(
+                            tenantcontext, new_version, vm_disk_resource_snap_values, upgrade)
 
-                        db.vm_disk_resource_snap_create(tenantcontext, vm_disk_resource_snap_values)
+                        db.vm_disk_resource_snap_create(tenantcontext,
+                                                        vm_disk_resource_snap_values)
 
                 elif res.resource_type == "securty_group":
-                    path = "workload_" + snapshot['workload_id'] + \
-                           "/snapshot_" + snapshot['id'] + \
-                           "/securty_group" + vm_res_id +\
-                           "/security_group_db"
-                    vm_security_group_rule_snaps= json.loads(vault.get_object(path))
+                    path = os.path.join("workload_" + snapshot['workload_id'],
+                                        "snapshot_" + snapshot['id'],
+                                        "securty_group" + vm_res_id,
+                                        "security_group_db")
+                    vm_security_group_rule_snaps= json.loads(backup_target.get_object(path))
                     for vm_security_group_rule_snap_values in vm_security_group_rule_snaps:
-                        vm_security_group_rule_snap_values = _adjust_values(tenantcontext, new_version, vm_security_group_rule_snap_values, upgrade)
-                        db.vm_security_group_rule_snap_create(tenantcontext, vm_security_group_rule_snap_values)
+                        vm_security_group_rule_snap_values = _adjust_values(
+                            tenantcontext, new_version, vm_security_group_rule_snap_values, upgrade)
+                        db.vm_security_group_rule_snap_create(
+                            tenantcontext, vm_security_group_rule_snap_values)
 
         except Exception as ex:
             LOG.exception(ex)

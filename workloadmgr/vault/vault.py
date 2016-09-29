@@ -121,32 +121,6 @@ wlm_vault_opts = [
 CONF = cfg.CONF
 CONF.register_opts(wlm_vault_opts)
 
-def ensure_nfs_mounted():
-    '''Make sure NFS share is mounted at CONF.vault_data_directory.'''
-    def wrap(func):
-        def new_function(*args, **kw):
-            if CONF.vault_storage_type != 'nfs':
-                return
-
-            mountpoint = CONF.vault_data_directory
-
-            if not os.path.ismount(mountpoint):
-                raise exception.InvalidNFSMountPoint(
-                    reason="'%s' is not a valid mount point" % mountpoint)
-
-            with open('/proc/mounts','r') as f:
-                mounts = [{line.split()[1]:line.split()[0]}
-                          for line in f.readlines() if line.split()[1] == mountpoint]
-
-            if len(mounts) == 0 or mounts[0].get(mountpoint, None) != CONF.vault_storage_nfs_export:
-                raise exception.InvalidNFSMountPoint(
-                    reason="'%s' is not '%s' mounted" % (mountpoint, CONF.vault_storage_nfs_export))
-
-            return func(*args, **kw)
-
-        return new_function
-    return wrap
-
 def run_async(func):
     """
         run_async(func)
@@ -383,7 +357,7 @@ class TrilioVaultBackupTarget(object):
         pass
 
     @abc.abstractmethod
-    def get_total_capacity(context):
+    def get_total_capacity(self, context):
         """
         return total capacity of the backup target and
         amount of storage that is utilized
@@ -426,7 +400,7 @@ class TrilioVaultBackupTarget(object):
         pass
 
     @abc.abstractmethod
-    def get_object_size(vault_path):
+    def get_object_size(self, vault_path):
         pass
 
     @abc.abstractmethod
@@ -443,6 +417,9 @@ class TrilioVaultBackupTarget(object):
     def upload_snapshot_metatdata_to_object_store(self, context,
                                                   snapshot_metadata):
         pass
+
+    def download_metadata_from_object_store(self, context):
+        return 0
 
 def ensure_mounted():
     '''Make sure NFS share is mounted at designated location. Otherwise
@@ -795,7 +772,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
     @autolog.log_method(logger=Logger)
     def get_workloads(self, context):
-        download_metadata_from_object_store(context)
+        self.download_metadata_from_object_store(context)
         parent_path = self.mount_path
         workload_urls = []
         try:
@@ -862,7 +839,13 @@ def mount_backup_media():
 
 
 def get_backup_target(backup_endpoint):
-    return triliovault_backup_targets.get(backup_endpoint, None)
+    backup_target = triliovault_backup_targets.get(backup_endpoint, None)
+    
+    if backup_target is None:
+        mount_backup_media()
+        backup_target = triliovault_backup_targets.get(backup_endpoint, None)
+
+    return backup_target
 
 
 def get_settings_backup_target():
@@ -876,6 +859,18 @@ def get_settings_backup_target():
                                                       json.loads("[]"))
     return triliovault_backup_targets.values()[0]
 
+
+def get_workloads(context):
+    workloads = []
+
+    for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+        get_backup_target(backup_endpoint)
+
+    for endpoint, backup_target in triliovault_backup_targets.iteritems():
+        workloads += backup_target.get_workloads(context)
+
+    return workloads
+        
 
 def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     """

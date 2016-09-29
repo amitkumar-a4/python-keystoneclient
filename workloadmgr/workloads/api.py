@@ -10,6 +10,7 @@ import base64
 import cPickle as pickle
 import importlib
 import json
+import os
 import socket
 import threading
 import time
@@ -793,54 +794,73 @@ class API(base.Base):
         if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
 
-        try:
-            workloads = []
-            import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  models.DB_VERSION.replace('.', '_'))
-            import_settings_method = getattr(import_workload_module, 'import_settings')
-            import_settings_method(context, models.DB_VERSION)            
-            
-            workload_url = vault.get_workloads(context)
-            workload_url_iterate = []
+        # call get_backup_target that makes sure all shares are mounted
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            vault.get_backup_target(backup_endpoint)
 
-            if len(workload_ids) > 0:
-                for workload in workload_url:
-                    if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
+        module_name = 'workloadmgr.db.imports.import_workload_' +\
+                       models.DB_VERSION.replace('.', '_')
+        import_workload_module = importlib.import_module(module_name)
+        import_settings_method = getattr(import_workload_module,
+                                         'import_settings')
+        import_settings_method(context, models.DB_VERSION)            
+ 
+        workloads = []
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            backup_target = None
+            try:
+                backup_target = vault.get_backup_target(backup_endpoint)
+
+                workload_url = backup_target.get_workloads(context)
+                workload_url_iterate = []
+
+                if len(workload_ids) > 0:
+                    for workload in workload_url:
+                        if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
+                            workload_url_iterate.append(workload)
+                else:
+                    for workload in workload_url:
                         workload_url_iterate.append(workload)
-            else:
-                for workload in workload_url:
-                    workload_url_iterate.append(workload)
 
-            del workload_url[:]
-            for workload_url in workload_url_iterate:
-                try:
-                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
-                except Exception as ex:
-                    LOG.exception(ex)
-                    continue                    
-                """
-                try:
-                    jobs = self._scheduler.get_jobs()
-                    for job in jobs:
-                        if job.kwargs['workload_id'] == workload_values['id']:
-                            self._scheduler._remove_job(job, 'alias', self._jobstore)
-                    self.db.purge_workload(context, workload_values['id'])
-                except Exception as ex:
-                    LOG.exception(ex)
-                """
-                try:            
-                    import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
-                    import_workload_method = getattr(import_workload_module, 'import_workload')
-                    workload = import_workload_method(context, workload_url, models.DB_VERSION, upgrade)
-                    workloads.append(workload)
-                except Exception as ex:
-                    LOG.exception(ex)
-        except Exception as ex:
-            LOG.exception(ex)
-        finally:
-            vault.purge_staging_area(context)                
+                del workload_url[:]
+                for workload_url in workload_url_iterate:
+                    try:
+                        workload_values = json.loads(backup_target.get_object(
+                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        continue                    
+                    """
+                    try:
+                        jobs = self._scheduler.get_jobs()
+                        for job in jobs:
+                            if job.kwargs['workload_id'] == workload_values['id']:
+                                self._scheduler._remove_job(job, 'alias', self._jobstore)
+                        self.db.purge_workload(context, workload_values['id'])
+                    except Exception as ex:
+                        LOG.exception(ex)
+                    """
+                    try:            
+                        import_workload_module = importlib.import_module(
+                            'workloadmgr.db.imports.import_workload_' +
+                            workload_values['version'].replace('.', '_'))
+                        import_workload_method = getattr(import_workload_module,
+                                                         'import_workload')
+                        workload = import_workload_method(context, workload_url,
+                                                          models.DB_VERSION,
+                                                          backup_endpoint,
+                                                          upgrade)
+                        workloads.append(workload)
+                    except Exception as ex:
+                        LOG.exception(ex)
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                backup_target and backup_target.purge_staging_area(context)
+
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
-    
+
     @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
         nodes = []
@@ -958,9 +978,10 @@ class API(base.Base):
         storages_usage = {}
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
             nfsshare = nfsshare.strip()
-            nfsstatus = vault.nfs_status(nfsshare)
-            if nfsstatus == "Online":
-                total_capacity, total_utilization = vault.get_total_capacity(context, nfsshare)
+            backup_target = vault.get_backup_target(nfsshare)
+            nfsstatus = backup_target.is_online()
+            if nfsstatus is True:
+                total_capacity, total_utilization = backup_target.get_total_capacity(context)
             else:
                 total_capacity = -1
                 total_utilization = -1
@@ -969,7 +990,7 @@ class API(base.Base):
                                          'nfs_share(s)': [
                                           {
                                             "nfsshare": nfsshare,
-                                            "status":  nfsstatus,
+                                            "status":  "Online" if nfsstatus else "Offline",
                                             "capacity": utils.sizeof_fmt(total_capacity),
                                             "utilization": utils.sizeof_fmt(total_utilization),
                                           },
@@ -990,7 +1011,7 @@ class API(base.Base):
                                              round(((float(total_utilization)
                                                      / float(total_capacity)) * 100), 2),
                                         }
-             
+
 
         try:
             workloads_list = {}
