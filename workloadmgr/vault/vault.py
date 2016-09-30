@@ -153,7 +153,7 @@ def run_async(func):
     return async_func
 
 
-def get_user_to_get_email_address(context):
+def get_client(context):
     try:
         username=CONF.get('keystone_authtoken').username 
     except:
@@ -190,7 +190,22 @@ def get_user_to_get_email_address(context):
                                     project_name=tenant_name,
                                     )
     sess = session.Session(auth=auth, verify=False)
-    keystone_client = client.Client(session=sess, auth_url=auth_url, insecure=True)
+    return client.Client(session=sess, auth_url=auth_url, insecure=True)
+
+def get_project_list_for_import(context):
+    keystone_client = get_client(context)
+    if keystone_client.version == 'v3':
+       if(context.user == CONF.get('nova_admin_username')):
+           projects = keystone_client.projects.list()
+       else:
+            user = keystone_client.users.get(context.user_id)
+            projects = keystone_client.projects.list(user=user)
+    else:
+         projects = keystone_client.tenants.list()
+    return projects
+
+def get_user_to_get_email_address(context):
+    keystone_client = get_client(context)
     user = keystone_client.users.get(context.user_id)
     if not hasattr(user, 'email'):
        user.email = None

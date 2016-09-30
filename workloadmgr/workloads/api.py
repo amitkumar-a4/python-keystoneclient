@@ -1013,7 +1013,41 @@ class API(base.Base):
                                         }
 
 
-        try:
+        full = 0
+        incr = 0
+        total = 0
+        full_size = 0
+        incr_size = 0 
+        for snapshot in self.db.snapshot_get_all(context):
+            if snapshot.snapshot_type == 'full':
+               full = full + 1
+               full_size = full_size + float(snapshot.size)
+            elif snapshot.snapshot_type == 'incremental':
+                 incr = incr + 1
+                 incr_size = incr_size + float(snapshot.size)
+            total = total + 1    
+
+        if (full + incr) > 0:
+           full_total_count_percent = \
+               round(((float(full) / float((full  + incr))) * 100), 2)
+           storage_usage['full_total_count_percent'] = \
+                str(full_total_count_percent)
+           storage_usage['full_total_count'] = str(full)
+           storage_usage['incr_total_count'] = str(incr)
+
+        storage_usage['full'] = full_size
+        storage_usage['incremental'] = incr_size
+        storage_usage['total'] = full_size + incr_size
+
+        if float(storage_usage['total']) > 0:
+           storage_usage['full_snaps_utilization'] = \
+               round(((float(full_size) / float(storage_usage['total'])) * 100), 2)
+           storage_usage['incremental_snaps_utilization'] = \
+               round(((float(incr) / float(storage_usage['total'])) * 100), 2)
+        else:
+             storage_usage['full_snaps_utilization'] = '0'
+             storage_usage['incremental_snaps_utilization'] = '0'
+        """try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,
                                                 dashboard_item='storage'):
@@ -1134,7 +1168,7 @@ class API(base.Base):
             """
 
         except Exception as ex:
-            LOG.exception(ex)
+            LOG.exception(ex)"""
 
         return {'storage_usage': storages_usage.values()}
     
