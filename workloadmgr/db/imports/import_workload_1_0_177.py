@@ -15,6 +15,7 @@ from workloadmgr import workloads as workloadAPI
 from workloadmgr.vault import vault
 from workloadmgr import exception
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.workloads import workload_utils
 from workloadmgr.common import context as wlm_context
 from workloadmgr.common import clients
 
@@ -98,13 +99,11 @@ def import_workload(cntx, workload_url, new_version,
 
     workload_values = _adjust_values(tenantcontext, new_version,
                                      workload_values, upgrade)
+    workload_metadata = workload_values['metadata']
 
     if workload_values['status'] == 'locked':
         workload_values['status'] = 'available'
 
-    #TODO: Set the backup_media_target metadata variable if it is not already set
-    # TODO: look at the job scheduler
-   
     try:
         workload = db.workload_get(tenantcontext, workload_values['id'])
         # If the workload already exists, update the values from the nfs media
@@ -116,6 +115,7 @@ def import_workload(cntx, workload_url, new_version,
 
     if len(workload_values['jobschedule']): 
         workload_api = workloadAPI.API()
+        #TODO: look at the job scheduler
         workload_api.workload_add_scheduler_job(pickle.loads(str(workload_values['jobschedule'])), workload)                                       
                 
     workload_vms = json.loads(backup_target.get_object(
@@ -140,7 +140,39 @@ def import_workload(cntx, workload_url, new_version,
         except Exception as ex:
             LOG.exception(ex)
 
-    snapshot_values_list_sorted = sorted(snapshot_values_list, key=itemgetter('created_at'))
+    snapshot_values_list_sorted = sorted(snapshot_values_list,
+                                         key=itemgetter('created_at'))
+    for snap in snapshot_values_list_sorted:
+        if snap['snapshot_type'] == 'full':
+            workload_backup_media_size = snap['size']
+            break
+
+    update_media = False
+    if 'backup_media_target' not in workload_metadata:
+        jobschedule = pickle.loads(str(workload_values['jobschedule']))
+        if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
+            incrs = jobschedule['retention_policy_value']
+        else:
+            jobsperday = int(jobschedule['interval'].split("hr")[0])
+            incrs = jobschedule['retention_policy_value'] * jobsperday
+
+        if jobschedule['fullbackup_interval'] == '-1':
+            fulls = 1
+        else:
+            fulls = incrs/jobschedule['fullbackup_interval']
+            incrs = incrs - fulls
+
+        workload_approx_backup_size = \
+            (fulls * workload_backup_media_size * vault.CONF.workload_full_backup_factor +
+            incrs * workload_backup_media_size * vault.CONF.workload_incr_backup_factor) / 100
+
+        workload_metadata['backup_media_target'] = backup_endpoint
+        workload_metadata['workload_approx_backup_size'] = workload_approx_backup_size
+        
+        db.workload_update(tenantcontext, 
+                           workload.id,
+                           {'metadata': workload_metadata})
+        workload_utils.upload_workload_db_entry(tenantcontext, workload.id)
 
     for snapshot_values in snapshot_values_list_sorted:
         snapshot_values = _adjust_values(tenantcontext, new_version, snapshot_values, upgrade)
