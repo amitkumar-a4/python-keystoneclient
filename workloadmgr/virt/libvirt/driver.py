@@ -1052,15 +1052,19 @@ class LibvirtDriver(driver.ComputeDriver):
 
     @autolog.log_method(Logger, 'libvirt.driver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot):
-        
+
         def _commit_image(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing):
-            image_info = qemuimages.qemu_img_info(vm_disk_resource_snap_to_commit.vault_path)
-            image_backing_info = qemuimages.qemu_img_info(vm_disk_resource_snap_to_commit_backing.vault_path)
+            vault_path = os.path.join(backup_target.mount_path,
+                                      vm_disk_resource_snap_to_commit.vault_path)
+            image_info = qemuimages.qemu_img_info(vault_path)
+            backing_vault_path = os.path.join(backup_target.mount_path,
+                                              vm_disk_resource_snap_to_commit_backing.vault_path)
+            image_backing_info = qemuimages.qemu_img_info(backing_vault_path)
             #increase the size of the base image
             if image_backing_info.virtual_size < image_info.virtual_size :
-                qemuimages.resize_image(vm_disk_resource_snap_to_commit_backing.vault_path, image_info.virtual_size)  
-            qemuimages.commit_qcow2(vm_disk_resource_snap_to_commit.vault_path, True)
-            os.remove(vm_disk_resource_snap_to_commit.vault_path)
+                qemuimages.resize_image(backing_vault_path, image_info.virtual_size)  
+            qemuimages.commit_qcow2(vault_path, True)
+            os.remove(vault_path)
             db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
             
         try:
@@ -1069,7 +1073,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
             if swift == 0:
                 return
-
+           
+            
+            backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                'backup_media_target')
+            backup_target = vault.get_backup_target(backup_endpoint)
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':               
                 for snap in snapshots_to_delete:
                     workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)            
@@ -1107,7 +1115,11 @@ class LibvirtDriver(driver.ComputeDriver):
                                     else:
                                         break
                                 if vm_disk_resource_snap_to_commit_backing:
-                                    shutil.move(vm_disk_resource_snap_to_commit_backing.vault_path, vm_disk_resource_snap.vault_path)
+                                    backing_vault_path = os.path.join(backup_target.mount_path,
+                                                                      vm_disk_resource_snap_to_commit_backing.vault_path)
+                                    vault_path = os.path.join(backup_target.mount_path,
+                                                              vm_disk_resource_snap.vault_path)
+                                    shutil.move(backing_vault_path, vault_path)
                                     affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, 
                                                                                              snapshot_vm_resource, 
                                                                                              vm_disk_resource_snap, 

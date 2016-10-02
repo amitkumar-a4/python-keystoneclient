@@ -1185,7 +1185,9 @@ def snapshot_type_time_size_update(context, snapshot_id):
                     
                 disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
                 if disk_format == 'vmdk':
-                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
+                    vault_path = os.path.join(backup_target.mount_path, 
+                                              vm_disk_resource_snap.vault_path)
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
                                                                                 disk_format, disk_type)
                 else:
                     vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size

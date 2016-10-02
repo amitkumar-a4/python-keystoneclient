@@ -1080,7 +1080,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             pervmdisks = {}
             snapshot_obj = db.snapshot_get(cntx, snapshot_id)
+            workload_obj = self.db.workload_get(context, snapshot_obj.workload_id)
             snapshotvms = self.db.snapshot_vms_get(context, snapshot_id)
+
             if not FLAGS.vault_storage_type in ("nfs", "local"):
 
                 context_dict = dict([('%s' % key, value)
@@ -1123,31 +1125,37 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             path = result['restore_file_path_'+snapshot_vm_resource.id]
                             pervmdisks[snapshot_vm_resource.vm_id].append(path)
             else:
+                backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
+                                                             'backup_media_target')
+                backup_target = vault.get_backup_target(backup_endpoint)
                 snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type == 'disk':
                         if not snapshot_vm_resource.vm_id in pervmdisks:
                             pervmdisks[snapshot_vm_resource.vm_id] = []
                         vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
-                        pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
+                        vault_path = os.path.join(backup_target.mount_path,
+                                                  vm_disk_resource_snap.vault_url.lstrip(os.sep))
+                        pervmdisks[snapshot_vm_resource.vm_id].append(vault_path)
             return pervmdisks
 
         try:
             devpaths = {}
             logicalobjects = {}
             snapshot_metadata = {}
-            
+
             head, tail = os.path.split(FLAGS.mountdir + '/')
             fileutils.ensure_tree(head)
 
-            snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-            workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+            snapshot = self.db.snapshot_get(context, snapshot_id)
+            workload = self.db.workload_get(context, snapshot.workload_id)
             pervmdisks = _prepare_snapshot_for_mount(context, self.db, snapshot_id)
 
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-                fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks,
-                                            mount_vm_id=mount_vm_id)
+                fminstance = virtdriver.snapshot_mount(context, snapshot,
+                                                       pervmdisks,
+                                                       mount_vm_id=mount_vm_id)
                 urls = []
                 for netname, addresses in fminstance.addresses.iteritems():
                     for addr in addresses:
@@ -1216,6 +1224,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
 
         except Exception as ex:
+            self.db.snapshot_update(context, snapshot['id'],
+                                    {'status': 'available'})
             try:
                 self.snapshot_dismount(context, snapshot['id'])
             except:
