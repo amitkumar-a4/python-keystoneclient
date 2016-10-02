@@ -770,20 +770,30 @@ class API(base.Base):
         AUDITLOG.log(context,'Get Import Workloads List Requested', None)
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
-        try:
-            workloads = []
-            for workload_url in vault.get_workloads(context):
-                try:
-                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
-                    workloads.append(workload_values)
 
-                except Exception as ex:
-                    LOG.exception(ex)
-                    continue
-        except Exception as ex:
-            LOG.exception(ex)
-        finally:
-            vault.purge_staging_area(context)
+        workloads = []
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            vault.get_backup_target(backup_endpoint)
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            backup_target = None
+            try:
+                backup_target = vault.get_backup_target(backup_endpoint)
+
+                workload_url = backup_target.get_workloads(context)
+                for workload_url in backup_target.get_workloads(context):
+                    try:
+                        workload_values = json.loads(backup_target.get_object(
+                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                        workloads.append(workload_values)
+
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        continue
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                backup_target.purge_staging_area(context)
+
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
     
@@ -1045,8 +1055,8 @@ class API(base.Base):
            storage_usage['incremental_snaps_utilization'] = \
                round(((float(incr) / float(storage_usage['total'])) * 100), 2)
         else:
-             storage_usage['full_snaps_utilization'] = '0'
-             storage_usage['incremental_snaps_utilization'] = '0'
+            storage_usage['full_snaps_utilization'] = '0'
+            storage_usage['incremental_snaps_utilization'] = '0'
         """try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,

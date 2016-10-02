@@ -231,7 +231,8 @@ def import_workload(cntx, workload_url, new_version,
                 elif res.resource_type == "disk":
                     path = os.path.join("workload_" + snapshot['workload_id'],
                                         "snapshot_" + snapshot['id'],
-                                        "vm_id_" + res.vm_id + vm_res_id.replace(' ',''),
+                                        "vm_id_" + res.vm_id,
+                                        vm_res_id.replace(' ',''),
                                         "disk_db")
                     vm_disk_resource_snaps = json.loads(backup_target.get_object(path))
                     vm_disk_resource_snaps_sorted = sorted(
