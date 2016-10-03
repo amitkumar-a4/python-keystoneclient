@@ -280,9 +280,9 @@ def send_tvault_contego_install():
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.answers', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
 
-@bottle.route('/tvault-ansible-scripts')
+@bottle.route('/tvault-ansible-scripts.tar.gz')
 def send_ansible_scripts():
-    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='text/plain', download=True)
+    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='application/x-gzip', download=True)
 
 @bottle.route('/tvault-horizon-plugin-install.sh')
 def send_tvault_horizon_plugin_install():
@@ -645,14 +645,32 @@ def _register_service():
     if config_data['configuration_type'] == 'vmware':
         authenticate_with_keystone()
     
-    if config_data['nodetype'] != 'controller':
-        #nothing to do
-        return {'status':'Success'}
-    
-   
     sess = _get_session()
     keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
  
+    if config_data['nodetype'] != 'controller':
+        config_data['triliovault_user_domain_id'] = 'default'
+        wlm_user = None
+        users = keystone.users.list()
+        for user in users:
+            if user.name == 'compute':
+                if hasattr(user, 'domain_id'):
+                    config_data['triliovault_user_domain_id'] = user.domain_id
+            if keystone.version == 'v3':
+                if user.name == config_data['workloadmgr_user']:
+                    wlm_user = user
+            else:
+                if user.name == config_data['workloadmgr_user'] and \
+                    user.tenantId == config_data['service_tenant_id']:
+                    wlm_user = user
+
+        if wlm_user is None:
+            raise Exception("Trilio Vault Appliance controller node may not have been configured. Cannot find 'triliovault' user")
+
+        config_data['cloud_unique_id'] = wlm_user.id
+        return {'status':'Success'}
+    
+   
     if config_data['configuration_type'] == 'openstack':
         #create user
         try:
