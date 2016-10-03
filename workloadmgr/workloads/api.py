@@ -1023,6 +1023,7 @@ class API(base.Base):
                                         }
 
 
+        """
         full = 0
         incr = 0
         total = 0
@@ -1057,7 +1058,8 @@ class API(base.Base):
         else:
             storage_usage['full_snaps_utilization'] = '0'
             storage_usage['incremental_snaps_utilization'] = '0'
-        """try:
+
+        try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,
                                                 dashboard_item='storage'):
@@ -1139,7 +1141,6 @@ class API(base.Base):
                     total_incre_snap_size + float(incre_snap_size)
                 # Calculate total usage and count of snapshots for all workloads - end
 
-            """
             storages_usage['workloads_storage_usage'] = workloads_storage_data
             storages_usage['workloads_snaps_usage'] = workloads_snaps_data
 
@@ -1175,7 +1176,6 @@ class API(base.Base):
                 storages_usage['full_snaps_utilization'] = '0'
                 storages_usage['incremental_snaps_utilization'] = '0'
             # Calculate utilization of full snaps and incremental snaps - end
-            """
 
         except Exception as ex:
             LOG.exception(ex)"""
