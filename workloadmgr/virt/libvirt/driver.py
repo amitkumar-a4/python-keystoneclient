@@ -1055,10 +1055,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
         def _commit_image(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing):
             vault_path = os.path.join(backup_target.mount_path,
-                                      vm_disk_resource_snap_to_commit.vault_path)
+                                      vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
             image_info = qemuimages.qemu_img_info(vault_path)
             backing_vault_path = os.path.join(backup_target.mount_path,
-                                              vm_disk_resource_snap_to_commit_backing.vault_path)
+                                              vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
             image_backing_info = qemuimages.qemu_img_info(backing_vault_path)
             #increase the size of the base image
             if image_backing_info.virtual_size < image_info.virtual_size :
@@ -1116,9 +1116,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                         break
                                 if vm_disk_resource_snap_to_commit_backing:
                                     backing_vault_path = os.path.join(backup_target.mount_path,
-                                                                      vm_disk_resource_snap_to_commit_backing.vault_path)
+                                                                      vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
                                     vault_path = os.path.join(backup_target.mount_path,
-                                                              vm_disk_resource_snap.vault_path)
+                                                              vm_disk_resource_snap.vault_url.lstrip(os.sep))
                                     shutil.move(backing_vault_path, vault_path)
                                     affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, 
                                                                                              snapshot_vm_resource, 
