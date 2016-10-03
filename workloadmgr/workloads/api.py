@@ -10,6 +10,7 @@ import base64
 import cPickle as pickle
 import importlib
 import json
+import os
 import socket
 import threading
 import time
@@ -769,20 +770,30 @@ class API(base.Base):
         AUDITLOG.log(context,'Get Import Workloads List Requested', None)
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
-        try:
-            workloads = []
-            for workload_url in vault.get_workloads(context):
-                try:
-                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
-                    workloads.append(workload_values)
 
-                except Exception as ex:
-                    LOG.exception(ex)
-                    continue
-        except Exception as ex:
-            LOG.exception(ex)
-        finally:
-            vault.purge_staging_area(context)
+        workloads = []
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            vault.get_backup_target(backup_endpoint)
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            backup_target = None
+            try:
+                backup_target = vault.get_backup_target(backup_endpoint)
+
+                workload_url = backup_target.get_workloads(context)
+                for workload_url in backup_target.get_workloads(context):
+                    try:
+                        workload_values = json.loads(backup_target.get_object(
+                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                        workloads.append(workload_values)
+
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        continue
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                backup_target.purge_staging_area(context)
+
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
     
@@ -793,54 +804,73 @@ class API(base.Base):
         if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
 
-        try:
-            workloads = []
-            import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  models.DB_VERSION.replace('.', '_'))
-            import_settings_method = getattr(import_workload_module, 'import_settings')
-            import_settings_method(context, models.DB_VERSION)            
-            
-            workload_url = vault.get_workloads(context)
-            workload_url_iterate = []
+        # call get_backup_target that makes sure all shares are mounted
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            vault.get_backup_target(backup_endpoint)
 
-            if len(workload_ids) > 0:
-                for workload in workload_url:
-                    if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
+        module_name = 'workloadmgr.db.imports.import_workload_' +\
+                       models.DB_VERSION.replace('.', '_')
+        import_workload_module = importlib.import_module(module_name)
+        import_settings_method = getattr(import_workload_module,
+                                         'import_settings')
+        import_settings_method(context, models.DB_VERSION)            
+ 
+        workloads = []
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            backup_target = None
+            try:
+                backup_target = vault.get_backup_target(backup_endpoint)
+
+                workload_url = backup_target.get_workloads(context)
+                workload_url_iterate = []
+
+                if len(workload_ids) > 0:
+                    for workload in workload_url:
+                        if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
+                            workload_url_iterate.append(workload)
+                else:
+                    for workload in workload_url:
                         workload_url_iterate.append(workload)
-            else:
-                for workload in workload_url:
-                    workload_url_iterate.append(workload)
 
-            del workload_url[:]
-            for workload_url in workload_url_iterate:
-                try:
-                    workload_values = json.loads(vault.get_object(workload_url['workload_url'] + '/workload_db'))
-                except Exception as ex:
-                    LOG.exception(ex)
-                    continue                    
-                """
-                try:
-                    jobs = self._scheduler.get_jobs()
-                    for job in jobs:
-                        if job.kwargs['workload_id'] == workload_values['id']:
-                            self._scheduler._remove_job(job, 'alias', self._jobstore)
-                    self.db.purge_workload(context, workload_values['id'])
-                except Exception as ex:
-                    LOG.exception(ex)
-                """
-                try:            
-                    import_workload_module = importlib.import_module('workloadmgr.db.imports.import_workload_' +  workload_values['version'].replace('.', '_'))
-                    import_workload_method = getattr(import_workload_module, 'import_workload')
-                    workload = import_workload_method(context, workload_url, models.DB_VERSION, upgrade)
-                    workloads.append(workload)
-                except Exception as ex:
-                    LOG.exception(ex)
-        except Exception as ex:
-            LOG.exception(ex)
-        finally:
-            vault.purge_staging_area(context)                
+                del workload_url[:]
+                for workload_url in workload_url_iterate:
+                    try:
+                        workload_values = json.loads(backup_target.get_object(
+                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        continue                    
+                    """
+                    try:
+                        jobs = self._scheduler.get_jobs()
+                        for job in jobs:
+                            if job.kwargs['workload_id'] == workload_values['id']:
+                                self._scheduler._remove_job(job, 'alias', self._jobstore)
+                        self.db.purge_workload(context, workload_values['id'])
+                    except Exception as ex:
+                        LOG.exception(ex)
+                    """
+                    try:            
+                        import_workload_module = importlib.import_module(
+                            'workloadmgr.db.imports.import_workload_' +
+                            workload_values['version'].replace('.', '_'))
+                        import_workload_method = getattr(import_workload_module,
+                                                         'import_workload')
+                        workload = import_workload_method(context, workload_url,
+                                                          models.DB_VERSION,
+                                                          backup_endpoint,
+                                                          upgrade)
+                        workloads.append(workload)
+                    except Exception as ex:
+                        LOG.exception(ex)
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                backup_target and backup_target.purge_staging_area(context)
+
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
-    
+
     @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
         nodes = []
@@ -955,56 +985,45 @@ class API(base.Base):
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
-        def nfs_status(nfsshare):
-            status = "Offline"
-            try:
-                nfsserver = nfsshare.split(":")[0]
-                rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
+        storages_usage = {}
+        for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
+            nfsshare = nfsshare.strip()
+            backup_target = vault.get_backup_target(nfsshare)
+            nfsstatus = backup_target.is_online()
+            if nfsstatus is True:
+                total_capacity, total_utilization = backup_target.get_total_capacity(context)
+            else:
+                total_capacity = -1
+                total_utilization = -1
 
-                for i in rpcinfo[0].split("\n")[1:]:
-                    if len(i.split()) and i.split()[3] == 'nfs':
-                        status = "Online"
-                        break
-            except Exception as ex:
-                LOG.exception(ex)
-                pass
-            
-            return status 
+            storages_usage[nfsshare]  = {'storage_type': vault.CONF.vault_storage_type,
+                                         'nfs_share(s)': [
+                                          {
+                                            "nfsshare": nfsshare,
+                                            "status":  "Online" if nfsstatus else "Offline",
+                                            "capacity": utils.sizeof_fmt(total_capacity),
+                                            "utilization": utils.sizeof_fmt(total_utilization),
+                                          },
+                                         ],
+                                         'total': 0,
+                                         'full': 0,
+                                         'incremental': 0,
+                                         'total_capacity': total_capacity,
+                                         'total_utilization': total_utilization,
+                                         'total_capacity_humanized':
+                                             utils.sizeof_fmt(total_capacity),
+                                         'total_utilization_humanized' :
+                                             utils.sizeof_fmt(total_utilization),
+                                         'available_capacity_humanized':
+                                             utils.sizeof_fmt(float(total_capacity)
+                                                              - float(total_utilization)),
+                                         'total_utilization_percent'   :
+                                             round(((float(total_utilization)
+                                                     / float(total_capacity)) * 100), 2),
+                                        }
 
-        nfsshare = vault.CONF.vault_storage_nfs_export
-        nfsstatus = nfs_status(nfsshare)
-        if nfsstatus == "Online":
-            total_capacity, total_utilization = vault.get_total_capacity(context)
-        else:
-            total_capacity = -1
-            total_utilization = -1
 
-        storage_usage = {'storage_type': vault.CONF.vault_storage_type,
-                         'nfs_shares': [
-                          {
-                            "nfsshare": nfsshare,
-                            "status":  nfsstatus,
-                            "capacity": utils.sizeof_fmt(total_capacity),
-                            "utilization": utils.sizeof_fmt(total_utilization),
-                          },
-                         ],
-                         'total': 0,
-                         'full': 0,
-                         'incremental': 0,
-                         'total_capacity': total_capacity,
-                         'total_utilization': total_utilization,
-                         'total_capacity_humanized':
-                             utils.sizeof_fmt(total_capacity),
-                         'total_utilization_humanized' :
-                             utils.sizeof_fmt(total_utilization),
-                         'available_capacity_humanized':
-                             utils.sizeof_fmt(float(total_capacity)
-                                              - float(total_utilization)),
-                         'total_utilization_percent'   :
-                             round(((float(total_utilization)
-                                     / float(total_capacity)) * 100), 2),
-                         }
-
+        """
         full = 0
         incr = 0
         total = 0
@@ -1037,9 +1056,10 @@ class API(base.Base):
            storage_usage['incremental_snaps_utilization'] = \
                round(((float(incr) / float(storage_usage['total'])) * 100), 2)
         else:
-             storage_usage['full_snaps_utilization'] = '0'
-             storage_usage['incremental_snaps_utilization'] = '0'
-        """try:
+            storage_usage['full_snaps_utilization'] = '0'
+            storage_usage['incremental_snaps_utilization'] = '0'
+
+        try:
             workloads_list = {}
             for workload in self.db.workload_get_all(context,
                                                 dashboard_item='storage'):
@@ -1121,12 +1141,12 @@ class API(base.Base):
                     total_incre_snap_size + float(incre_snap_size)
                 # Calculate total usage and count of snapshots for all workloads - end
 
-            storage_usage['workloads_storage_usage'] = workloads_storage_data
-            storage_usage['workloads_snaps_usage'] = workloads_snaps_data
+            storages_usage['workloads_storage_usage'] = workloads_storage_data
+            storages_usage['workloads_snaps_usage'] = workloads_snaps_data
 
             # Total snapshots count and Calculating percent of full snapshots on total count - start
-            storage_usage['full_total_count'] = str(total_full_snap_count)
-            storage_usage['incr_total_count'] = str(total_incre_snap_count)
+            storages_usage['full_total_count'] = str(total_full_snap_count)
+            storages_usage['incr_total_count'] = str(total_incre_snap_count)
 
             full_total_count_percent = 0
             if (total_full_snap_count + total_incre_snap_count) > 0:
@@ -1134,33 +1154,33 @@ class API(base.Base):
                     round(((float(total_full_snap_count)
                             / float((total_full_snap_count
                                     + total_incre_snap_count))) * 100), 2)
-            storage_usage['full_total_count_percent'] = \
+            storages_usage['full_total_count_percent'] = \
                 str(full_total_count_percent)
             # Total snapshots count and Calculating percent of full snapshots on total count - end
 
             # Total usage of storage of all workloads - start
-            storage_usage['full'] = total_full_snap_size
-            storage_usage['incremental'] = total_incre_snap_size
-            storage_usage['total'] = total_full_snap_size + total_incre_snap_size
+            storages_usage['full'] = total_full_snap_size
+            storages_usage['incremental'] = total_incre_snap_size
+            storages_usage['total'] = total_full_snap_size + total_incre_snap_size
             # Total usage of storage of all workloads - end
 
             # Calculate utilization of full snaps and incremental snaps - start
-            if float(storage_usage['total']) > 0:
-                storage_usage['full_snaps_utilization'] = \
+            if float(storages_usage['total']) > 0:
+                storages_usage['full_snaps_utilization'] = \
                     round(((float(total_full_snap_size)
                             / float(storage_usage['total'])) * 100), 2)
-                storage_usage['incremental_snaps_utilization'] = \
+                storages_usage['incremental_snaps_utilization'] = \
                     round(((float(total_incre_snap_size)
                             / float(storage_usage['total'])) * 100), 2)
             else:
-                storage_usage['full_snaps_utilization'] = '0'
-                storage_usage['incremental_snaps_utilization'] = '0'
+                storages_usage['full_snaps_utilization'] = '0'
+                storages_usage['incremental_snaps_utilization'] = '0'
             # Calculate utilization of full snaps and incremental snaps - end
 
         except Exception as ex:
             LOG.exception(ex)"""
 
-        return storage_usage
+        return {'storage_usage': storages_usage.values()}
     
     @autolog.log_method(logger=Logger)
     def get_recentactivities(self, context, time_in_minutes):

@@ -12,8 +12,8 @@ LOG = logging.getLogger(__name__)
 def import_settings(cntx, new_version):
     return import_workload_2_1_108.import_settings(cntx, new_version)
 
-def import_workload(cntx, workload_url, new_version, upgrade=True):
+def import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade=True):
     """ Import workload and snapshot records from vault 
     Versions Supported: 2.1.109
     """
-    return import_workload_2_1_108.import_workload(cntx, workload_url, new_version, upgrade)
+    return import_workload_2_1_108.import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade)

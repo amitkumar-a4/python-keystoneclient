@@ -6,6 +6,7 @@
 """Implementation of SQLAlchemy backend."""
 
 from datetime import datetime, timedelta
+import os
 import uuid
 import warnings
 import threading
@@ -1142,6 +1143,13 @@ def snapshot_update(context, snapshot_id, values, purge_metadata=False):
 @require_context
 def snapshot_type_time_size_update(context, snapshot_id):
     snapshot = snapshot_get(context, snapshot_id, read_deleted='yes')
+    workload = workload_get(context, snapshot['workload_id'])
+
+    backup_endpoint = get_metadata_value(workload.metadata,
+                                         'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
+
     snapshot_type_full = False
     snapshot_type_incremental = False
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
@@ -1157,6 +1165,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
         time_taken = time_taken + snapshot_vm_resource.time_taken
+
         #update size
         if snapshot_vm_resource.status != 'deleted':
             disk_type = get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
@@ -1164,38 +1173,45 @@ def snapshot_type_time_size_update(context, snapshot_id):
             snapshot_vm_resource_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 vm_disk_resource_snap_restore_size = 0
-                if vm_disk_resource_snap.vault_path:
-                    vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_path)
-                    if vm_disk_resource_snap_size == 0:
-                        vm_disk_resource_snap_size = vm_disk_resource_snap.size
+
+                if vm_disk_resource_snap.vault_url is None:
+                    continue
+
+                resource_snap_path = os.path.join(backup_target.mount_path,
+                                                  vm_disk_resource_snap.vault_url)
+                vm_disk_resource_snap_size = backup_target.get_object_size(resource_snap_path)
+                if vm_disk_resource_snap_size == 0:
+                    vm_disk_resource_snap_size = vm_disk_resource_snap.size
                     
-                    disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-                    if disk_format == 'vmdk':
-                        vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
-                                                                                    disk_format, disk_type)
-                    else:
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                        while vm_disk_resource_snap_backing_id:
-                            vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
+                if disk_format == 'vmdk':
+                    vault_path = os.path.join(backup_target.mount_path, 
+                                              vm_disk_resource_snap.vault_path)
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
+                                                                                disk_format, disk_type)
+                else:
+                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
+                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
+                    while vm_disk_resource_snap_backing_id:
+                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                                 
-                    #For vmdk   
-                    if vm_disk_resource_snap_restore_size == 0:
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                        while vm_disk_resource_snap_backing_id:
-                            vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                            if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
-                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                            else:
-                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
-                            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                #For vmdk   
+                if vm_disk_resource_snap_restore_size == 0:
+                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
+                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
+                    while vm_disk_resource_snap_backing_id:
+                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                        if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
+                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                        else:
+                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
+                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                 
-                    vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
-                                                                                     'restore_size' : vm_disk_resource_snap_restore_size}) 
-                    snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
+                vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
+                                                                                 'restore_size' : vm_disk_resource_snap_restore_size}) 
+                snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
                     
             vm_disk_resource_snap_top = vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
             snapshot_vm_resource_restore_size = vm_disk_resource_snap_top.restore_size
