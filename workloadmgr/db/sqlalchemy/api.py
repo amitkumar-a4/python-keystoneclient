@@ -1036,41 +1036,14 @@ def snapshot_get_all(context, workload_id=None, **kwargs):
         else:
             return snapshot_get_all_by_project(context, context.project_id, **kwargs)
     if workload_id == None:
-        if 'dashboard_item' in kwargs:
-            if kwargs.get('dashboard_item') == 'activities':
-                if 'time_in_minutes' in kwargs:
-                    time_in_minutes = int(kwargs.get('time_in_minutes'))
-                else:
-                    time_in_minutes = 0
-                time_delta = ((time_in_minutes / 60) / 24) * -1
-                result = \
-                    model_query(context,
-                       models.Snapshots.id,
-                       models.Snapshots.deleted,
-                       models.Snapshots.deleted_at,
-                       models.Snapshots.display_name,
-                       models.Snapshots.status,
-                       models.Snapshots.created_at,
-                       models.Snapshots.user_id,
-                       models.Snapshots.project_id,
-                       (models.Workloads.display_name).label('workload_name'),
-                       (models.Workloads.created_at).label('workload_created_at'),
-                       **kwargs). \
-                    filter(or_(models.Snapshots.created_at > func.adddate(func.now(), time_delta),
-                               models.Snapshots.deleted_at > func.adddate(func.now(), time_delta),)). \
-                    outerjoin(models.Workloads,
-                              models.Snapshots.workload_id == models.Workloads.id). \
-                    order_by(models.Snapshots.created_at.desc()).all()
-        else:
-            return model_query(context, models.Snapshots, **kwargs).\
+        return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            order_by(models.Snapshots.created_at.desc()).all()        
+                            order_by(models.Snapshots.created_at.desc()).all()
     else:
         return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
                             filter_by(workload_id=workload_id).\
-                            order_by(models.Snapshots.created_at.desc()).all()   
-    return result
+                            order_by(models.Snapshots.created_at.desc()).all()
 
 @require_context
 def snapshot_get_all_by_host(context, host, **kwargs):
