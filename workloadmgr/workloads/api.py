@@ -1251,7 +1251,6 @@ class API(base.Base):
         """
         workload = self.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Pause Requested', workload)
-        import pdb;pdb.set_trace()
         jobs = self._scheduler.get_jobs()
         for job in jobs:
             if job.kwargs['workload_id'] == workload_id:
