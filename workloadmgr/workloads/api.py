@@ -1447,6 +1447,8 @@ class API(base.Base):
             # scheduler is already running. Nothing to do
             return
 
+        self._scheduler = Scheduler()
+        self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
         self._scheduler.start()
 
         setting = {u'category': "job_scheduler",
