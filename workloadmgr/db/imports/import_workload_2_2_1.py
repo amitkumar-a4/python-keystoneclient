@@ -7,8 +7,8 @@ from workloadmgr.db.imports import import_workload_2_1_125
 
 LOG = logging.getLogger(__name__)
 
-def import_settings(cntx, new_version):
-    return import_workload_2_1_125.import_settings(cntx, new_version)
+def import_settings(cntx, new_version, upgrade=True):
+    return import_workload_2_1_125.import_settings(cntx, new_version, upgrade)
 
 def import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade=True):
     """ Import workload and snapshot records from vault
