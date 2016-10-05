@@ -136,12 +136,12 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             network_json = jsonutils.dumps(network)
             backup_target.put_object(path, network_json)
         elif res.resource_type == "disk":
-            path = os.path.join(parent, "vm_id_" + res.vm_id + vm_res_id.replace(' ',''), "disk_db")
+            path = os.path.join(parent, "vm_id_" + res.vm_id, vm_res_id.replace(' ',''), "disk_db")
             disk = db.vm_disk_resource_snaps_get(cntx, res.id)
             disk_json = jsonutils.dumps(disk)
             backup_target.put_object(path, disk_json)
         elif res.resource_type == "securty_group":
-            path = os.path.join(parent, "securty_group" + vm_res_id, "security_group_db")
+            path = os.path.join(parent, "securty_group", vm_res_id, "security_group_db")
             security_group = db.vm_security_group_rule_snaps_get(cntx, res.id)
             security_group_json = jsonutils.dumps(security_group)
             backup_target.put_object(path, security_group_json)
