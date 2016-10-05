@@ -9,7 +9,7 @@ import os
 from oslo_config import cfg
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
-from workloadmgr.db.imports import import_workload_2_0_205
+from workloadmgr.db.imports import import_workload_2_1_125
 from workloadmgr.vault import vault
 
 CONF = cfg.CONF
@@ -46,10 +46,10 @@ def import_settings(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
-    return import_workload_2_0_205.import_settings(cntx, new_version)
+    return import_workload_2_1_125.import_settings(cntx, new_version)
 
 def import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade=True):
     """ Import workload and snapshot records from vault 
-    Versions Supported: 2.0.205
+    Versions Supported: 2.1.1
     """
-    return import_workload_2_0_205.import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade)
+    return import_workload_2_1_125.import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade)
