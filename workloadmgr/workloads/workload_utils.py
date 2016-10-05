@@ -31,6 +31,8 @@ db = WorkloadMgrDB().db
 def upload_settings_db_entry(cntx):
     #use context as none since we want settings of all users/tenants
     #TODO: implement settings persistance per user/tenant
+    backup_target = vault.get_settings_backup_target()
+
     settings_db = db.setting_get_all(None, read_deleted = 'no')
     for setting in settings_db:
         if 'password' in setting.name.lower():
@@ -38,95 +40,111 @@ def upload_settings_db_entry(cntx):
         for kvpair in setting.metadata:
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
                 kvpair['value'] = '******'
+
     settings_jason = jsonutils.dumps(settings_db)
-    path = os.path.join(vault.get_vault_data_directory(), str(CONF.cloud_unique_id))
-    path = os.path.join(path, "settings_db")
-    vault.put_object(path, settings_jason)
+    settings_path = os.path.join(str(CONF.cloud_unique_id), "settings_db")
+    backup_target.put_object(settings_path, settings_jason)
+
 
 def upload_workload_db_entry(cntx, workload_id):
     upload_settings_db_entry(cntx)
     
-    parent = vault.get_workload_path({'workload_id': workload_id})
     workload_db = db.workload_get(cntx, workload_id)
+    backup_endpoint = db.get_metadata_value(workload_db.metadata,
+                                            'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
+    parent = backup_target.get_workload_path({'workload_id': workload_id})
+
     for kvpair in workload_db.metadata:
         if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
             kvpair['value'] = '******'
     workload_json = jsonutils.dumps(workload_db)
-    path = parent + "/workload_db"
-    vault.put_object(path, workload_json)
+    path = os.path.join(parent, "workload_db")
+    backup_target.put_object(path, workload_json)
 
     workload_vms_db = db.workload_vms_get(cntx, workload_id)
     workload_vms_json = jsonutils.dumps(workload_vms_db)
-    path = parent + "/workload_vms_db"
-    vault.put_object(path, workload_vms_json)
+    path = os.path.join(parent, "workload_vms_db")
+    backup_target.put_object(path, workload_vms_json)
 
 def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
     upload_settings_db_entry(cntx)
-    
+
     snapshot = db.snapshot_get(cntx, snapshot_id, read_deleted='yes')
     if snapshot['data_deleted']:
         return
-    parent = vault.get_workload_path({'workload_id': snapshot['workload_id']})
 
-    workload_db = db.workload_get(cntx, snapshot['workload_id'])
+    workload_id = snapshot['workload_id']
+    workload_db = db.workload_get(cntx, workload_id)
+    backup_endpoint = db.get_metadata_value(workload_db.metadata,
+                                            'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
+
+    parent = backup_target.get_workload_path({'workload_id': workload_id})
+
     for kvpair in workload_db.metadata:
         if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
             kvpair['value'] = '******'
     workload_json = jsonutils.dumps(workload_db)
-    path = parent + "/workload_db"
-    vault.put_object(path, workload_json)
+
+    path = os.path.join(parent, "workload_db")
+    backup_target.put_object(path, workload_json)
 
     workload_vms_db = db.workload_vms_get(cntx, snapshot['workload_id'])
     workload_vms_json = jsonutils.dumps(workload_vms_db)
-    path = parent + "/workload_vms_db"
-    vault.put_object(path, workload_vms_json)
+    path = os.path.join(parent, "workload_vms_db")
+    backup_target.put_object(path, workload_vms_json)
 
     snapshot_db = db.snapshot_get(cntx, snapshot['id'], read_deleted='yes')
     if snapshot_status:
         snapshot_db.status = snapshot_status 
     snapshot_json = jsonutils.dumps(snapshot_db)
-    parent = vault.get_snapshot_path({'workload_id': snapshot['workload_id'], 'snapshot_id': snapshot['id']})
-    path = parent + "/snapshot_db"
+    parent = backup_target.get_snapshot_path({'workload_id': workload_id,
+                                              'snapshot_id': snapshot['id']})
+    path = os.path.join(parent, "snapshot_db")
     # Add to the vault
-    vault.put_object(path, snapshot_json)
+    backup_target.put_object(path, snapshot_json)
 
     snapvms = db.snapshot_vms_get(cntx, snapshot['id'])
     snapvms_json = jsonutils.dumps(snapvms)
-    path = parent + "/snapshot_vms_db"
+    path = os.path.join(parent, "snapshot_vms_db")
+
     # Add to the vault
-    vault.put_object(path, snapvms_json)
+    backup_target.put_object(path, snapvms_json)
 
     resources = db.snapshot_resources_get(cntx, snapshot['id'])
     resources_json = jsonutils.dumps(resources)
-    path = parent + "/resources_db"
-    vault.put_object(path, resources_json)
+    path = os.path.join(parent, "resources_db")
+    backup_target.put_object(path, resources_json)
     
     for res in resources:
         res_json = jsonutils.dumps(res, sort_keys=True, indent=2)
 
-        vm_res_id = '/vm_res_id_%s' % (res['id'])
+        vm_res_id = 'vm_res_id_%s' % (res['id'])
         for meta in res.metadata:
             if meta.key == "label":
-                vm_res_id = '/vm_res_id_%s_%s' % (res['id'], meta.value)
+                vm_res_id = 'vm_res_id_%s_%s' % (res['id'], meta.value)
                 break
         if res.resource_type == "network" or \
             res.resource_type == "subnet" or \
             res.resource_type == "router" or \
             res.resource_type == "nic":
-            path = parent + "/network" + vm_res_id + "/network_db"
+            path = os.path.join(parent, "network", vm_res_id, "network_db")
             network = db.vm_network_resource_snaps_get(cntx, res.id)
             network_json = jsonutils.dumps(network)
-            vault.put_object(path, network_json)
+            backup_target.put_object(path, network_json)
         elif res.resource_type == "disk":
-            path = parent + "/vm_id_" + res.vm_id + vm_res_id.replace(' ','') + "/disk_db"
+            path = os.path.join(parent, "vm_id_" + res.vm_id, vm_res_id.replace(' ',''), "disk_db")
             disk = db.vm_disk_resource_snaps_get(cntx, res.id)
             disk_json = jsonutils.dumps(disk)
-            vault.put_object(path, disk_json)
+            backup_target.put_object(path, disk_json)
         elif res.resource_type == "securty_group":
-            path = parent + "/securty_group" + vm_res_id + "/security_group_db"
+            path = os.path.join(parent, "securty_group", vm_res_id, "security_group_db")
             security_group = db.vm_security_group_rule_snaps_get(cntx, res.id)
             security_group_json = jsonutils.dumps(security_group)
-            vault.put_object(path, security_group_json)
+            backup_target.put_object(path, security_group_json)
 
 
 @autolog.log_method(logger=Logger)
@@ -139,11 +157,19 @@ def _remove_data(context, snapshot_id):
     try:
         LOG.info(_('Deleting the data of snapshot %s of workload %s') % (snapshot_with_data.id, snapshot_with_data.workload_id))
         workload_obj = db.workload_get(context, snapshot_with_data.workload_id)                            
-        vault.snapshot_delete(context, {'workload_id': snapshot_with_data.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snapshot_with_data.id})
+        backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                'backup_media_target')
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        backup_target.snapshot_delete(context,
+            {'workload_id': snapshot_with_data.workload_id,
+             'workload_name': workload_obj.display_name,
+             'snapshot_id': snapshot_with_data.id})
         db.snapshot_update(context, snapshot_with_data.id, {'data_deleted':True})
     except Exception as ex:
         LOG.exception(ex)
-                  
+
+
 @autolog.log_method(logger=Logger)    
 def _snapshot_delete(context, snapshot_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')    
@@ -165,6 +191,7 @@ def _snapshot_delete(context, snapshot_id):
         _remove_data(context, snapshot_id)
     upload_snapshot_db_entry(context, snapshot_id) 
         
+
 @autolog.log_method(logger=Logger)
 def snapshot_delete(context, snapshot_id):
     """
@@ -191,6 +218,7 @@ def snapshot_delete(context, snapshot_id):
                 _snapshot_delete(context, parent_snapshot_id)
         except Exception as ex:
             LOG.exception(ex)
+
 
 @autolog.log_method(logger=Logger)    
 def delete_if_chain(context, snapshot, snapshots_to_delete):
@@ -278,10 +306,16 @@ def download_snapshot_vm_resource_from_object_store(context, restore_id, snapsho
     
 def purge_snapshot_vm_from_staging_area(context, snapshot_id, snapshot_vm_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
+    workload = db.workload_get(context, snapshot.workload_id)
+    backup_endpoint = db.get_metadata_value(workload.metadata,
+                                            'backup_media_target')
 
-    vault.purge_snapshot_vm_from_staging_area(context, {'workload_id': snapshot.workload_id,
-                                                        'snapshot_id': snapshot_id,
-                                                        'snapshot_vm_id': snapshot_vm_id})
+    backup_target = vault.get_backup_target(backup_endpoint)
+
+    backup_target.purge_snapshot_vm_from_staging_area(context, 
+        {'workload_id': snapshot.workload_id,
+         'snapshot_id': snapshot_id,
+         'snapshot_vm_id': snapshot_vm_id})
     
     parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
    
@@ -289,35 +323,50 @@ def purge_snapshot_vm_from_staging_area(context, snapshot_id, snapshot_vm_id):
         parent_snapshot_vms = db.snapshot_vms_get(context, parent_snapshot_id) 
         for parent_snapshot_vm in parent_snapshot_vms:
             if  parent_snapshot_vm.vm_id == snapshot_vm_id:
-                vault.purge_snapshot_vm_from_staging_area(context, {'workload_id': snapshot.workload_id,
-                                                                    'snapshot_id': parent_snapshot_id,
-                                                                    'snapshot_vm_id': snapshot_vm_id})                               
-               
+                backup_target.purge_snapshot_vm_from_staging_area(context,
+                    {'workload_id': snapshot.workload_id,
+                     'snapshot_id': parent_snapshot_id,
+                     'snapshot_vm_id': snapshot_vm_id})                               
+
+
 def purge_snapshot_vm_resource_from_staging_area(context, snapshot_id, snapshot_vm_resource_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')    
+    workload = db.workload_get(context, snapshot.workload_id)
+    backup_endpoint = db.get_metadata_value(workload.metadata,
+                                            'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
     snapshot_vm_resource = db.snapshot_vm_resource_get(context, snapshot_vm_resource_id)
     snapshot_vm = db.snapshot_vm_get(context, snapshot_vm_resource.vm_id, snapshot.id)    
 
     while snapshot_vm_resource:
-        vault.purge_snapshot_vm_resource_from_staging_area(context,{'workload_id': snapshot.workload_id,
-                                                                    'snapshot_id': snapshot_vm_resource.snapshot_id,
-                                                                    'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                                    'snapshot_vm_name': snapshot_vm.vm_name,
-                                                                    'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                                    'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
+        backup_target.purge_snapshot_vm_resource_from_staging_area(context,
+            {'workload_id': snapshot.workload_id,
+             'snapshot_id': snapshot_vm_resource.snapshot_id,
+             'snapshot_vm_id': snapshot_vm_resource.vm_id,
+             'snapshot_vm_name': snapshot_vm.vm_name,
+             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+             'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
         if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
             vm_disk_resource_snap = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
             snapshot_vm_resource = db.snapshot_vm_resource_get(context, vm_disk_resource_snap.snapshot_vm_resource_id)
         else:
             snapshot_vm_resource = None
-            
+
+
 def purge_restore_vm_from_staging_area(context, restore_id, snapshot_id, snapshot_vm_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
-    vault.purge_restore_vm_from_staging_area(context, { 'restore_id': restore_id,
-                                                        'workload_id': snapshot.workload_id,
-                                                        'snapshot_id': snapshot_id,
-                                                        'snapshot_vm_id': snapshot_vm_id})
+    workload = db.workload_get(context, snapshot.workload_id)
+    backup_endpoint = db.get_metadata_value(workload.metadata,
+                                            'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
+    backup_target.purge_restore_vm_from_staging_area(context,
+        {'restore_id': restore_id,
+         'workload_id': snapshot.workload_id,
+         'snapshot_id': snapshot_id,
+         'snapshot_vm_id': snapshot_vm_id})
     """
     parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
    
@@ -333,17 +382,23 @@ def purge_restore_vm_from_staging_area(context, restore_id, snapshot_id, snapsho
                
 def purge_restore_vm_resource_from_staging_area(context, restore_id, snapshot_id, snapshot_vm_resource_id):
     snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')    
+    workload = db.workload_get(context, snapshot.workload_id)
+    backup_endpoint = db.get_metadata_value(workload.metadata,
+                                            'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
     snapshot_vm_resource = db.snapshot_vm_resource_get(context, snapshot_vm_resource_id)
     snapshot_vm = db.snapshot_vm_get(context, snapshot_vm_resource.vm_id, snapshot.id)    
 
     while snapshot_vm_resource:
-        vault.purge_restore_vm_resource_from_staging_area(context,{ 'restore_id': restore_id,
-                                                                    'workload_id': snapshot.workload_id,
-                                                                    'snapshot_id': snapshot_vm_resource.snapshot_id,
-                                                                    'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                                    'snapshot_vm_name': snapshot_vm.vm_name,
-                                                                    'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                                    'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
+        backup_target.purge_restore_vm_resource_from_staging_area(context,
+            {'restore_id': restore_id,
+             'workload_id': snapshot.workload_id,
+             'snapshot_id': snapshot_vm_resource.snapshot_id,
+             'snapshot_vm_id': snapshot_vm_resource.vm_id,
+             'snapshot_vm_name': snapshot_vm.vm_name,
+             'snapshot_vm_resource_id': snapshot_vm_resource.id,
+             'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
         if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
             vm_disk_resource_snap = db.vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
@@ -351,13 +406,20 @@ def purge_restore_vm_resource_from_staging_area(context, restore_id, snapshot_id
         else:
             snapshot_vm_resource = None
 
+
 def common_apply_retention_policy(cntx, instances, snapshot): 
         
     def _delete_deleted_snap_chains(cntx, snapshot):
         try:
             snapshot_obj = db.snapshot_type_time_size_update(cntx, snapshot['id'])
             workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)            
-            snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
+
+            backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                    'backup_media_target')
+            backup_target = vault.get_backup_target(backup_endpoint)
+
+            snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id,
+                                                                    workload_obj.id, read_deleted='yes')
                 
             snap_chains = []
             snap_chain = []
@@ -367,7 +429,7 @@ def common_apply_retention_policy(cntx, instances, snapshot):
                     snap_chain = []
                     snap_chains.append(snap_chain)
                     snap_chain.append(snap)
-                        
+
             deleted_snap_chains = []        
             for snap_chain in snap_chains:
                 deleted_chain = True
@@ -386,16 +448,22 @@ def common_apply_retention_policy(cntx, instances, snapshot):
                                                                                                 snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                                 workload_obj.display_name ))
                         db.snapshot_update(cntx, snap.id, {'data_deleted':True})
-                        vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+                        backup_target.snapshot_delete(cntx,
+                            {'workload_id': snap.workload_id,
+                             'workload_name': workload_obj.display_name,
+                             'snapshot_id': snap.id})
         except Exception as ex:
                 LOG.exception(ex)
-                
+
     try:
         db.snapshot_update(cntx, snapshot['id'],{'progress_msg': 'Applying retention policy','status': 'executing'})
         _delete_deleted_snap_chains(cntx, snapshot)
         affected_snapshots = []             
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
+        backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                'backup_media_target')
+        backup_target = vault.get_backup_target(backup_endpoint)
 
         retention_policy_type = pickle.loads(str(workload_obj.jobschedule))['retention_policy_type']
         retention_policy_value = pickle.loads(str(workload_obj.jobschedule))['retention_policy_value']
@@ -442,7 +510,7 @@ def common_apply_retention_policy(cntx, instances, snapshot):
                         snapshot_to_commit = snapshots_valid[idx-1]
                     snapshots_to_delete.add(snap)
             
-        if vault.commit_supported() == False:
+        if backup_target.commit_supported() == False:
             delete_if_chain(cntx, snapshot, snapshots_to_delete)
             return (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, 0)
 
@@ -451,6 +519,7 @@ def common_apply_retention_policy(cntx, instances, snapshot):
     except Exception as ex:
         LOG.exception(ex)
         raise ex       
+
 
 def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj):
     def _snapshot_disks_deleted(snap):
@@ -471,7 +540,10 @@ def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_o
             return False,True
 
     db.snapshot_type_time_size_update(cntx, snapshot_to_commit.id)
-    
+    backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                            'backup_media_target')
+    backup_target = vault.get_backup_target(backup_endpoint)
+
     all_disks_deleted, some_disks_deleted = _snapshot_disks_deleted(snap)
     if some_disks_deleted:
         db.snapshot_delete(cntx, snap.id)
@@ -483,12 +555,19 @@ def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_o
                                                                                     snap.id,
                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                     workload_obj.display_name ))                            
-            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+            backup_target.snapshot_delete(cntx,
+                {'workload_id': snap.workload_id,
+                 'workload_name': workload_obj.display_name,
+                 'snapshot_id': snap.id})
         except Exception as ex:
             LOG.exception(ex)
 
+
 def common_apply_retention_snap_delete(cntx, snap, workload_obj):
     db.snapshot_delete(cntx, snap.id)
+    backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                            'backup_media_target')
+    backup_target = vault.get_backup_target(backup_endpoint)
     if snap.data_deleted == False:
         db.snapshot_update(cntx, snap.id, {'data_deleted':True})
         try:
@@ -496,11 +575,17 @@ def common_apply_retention_snap_delete(cntx, snap, workload_obj):
                                                                                     snap.id,
                                                                                     snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
                                                                                     workload_obj.display_name ))                            
-            vault.snapshot_delete(cntx, {'workload_id': snap.workload_id, 'workload_name': workload_obj.display_name, 'snapshot_id': snap.id})
+            backup_target.snapshot_delete(cntx,
+                {'workload_id': snap.workload_id,
+                 'workload_name': workload_obj.display_name,
+                 'snapshot_id': snap.id})
         except Exception as ex:
             LOG.exception(ex)   
 
-def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource, vm_disk_resource_snap, vm_disk_resource_snap_backing, affected_snapshots):
+def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
+                                             vm_disk_resource_snap,
+                                             vm_disk_resource_snap_backing,
+                                             affected_snapshots):
     vm_disk_resource_snap_values = {'size' : vm_disk_resource_snap_backing.size, 
                                     'vm_disk_resource_snap_backing_id' : vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                    }

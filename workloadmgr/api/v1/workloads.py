@@ -665,12 +665,12 @@ class WorkloadMgrsController(wsgi.Controller):
     def get_storage_usage(self, req):
         try:
             context = req.environ['workloadmgr.context']
-            storage_usage = {'total': 0, 'full': 0, 'incremental': 0}
+            storages_usage = {'storage_usage': [{'total': 0, 'full': 0, 'incremental': 0}]}
             try:
-                storage_usage = self.workload_api.get_storage_usage(context)
+                storages_usage = self.workload_api.get_storage_usage(context)
             except Exception as ex:
                 LOG.exception(ex)
-            return storage_usage
+            return storages_usage
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

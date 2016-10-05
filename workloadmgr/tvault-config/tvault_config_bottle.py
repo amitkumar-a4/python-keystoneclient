@@ -7,6 +7,7 @@
 # The following users are already available:
 #  admin/password
 
+import base64
 import os
 import socket
 import fcntl
@@ -1782,63 +1783,101 @@ def configure_host():
                 subprocess.call(command, shell=False)                 
             except:
                 pass
-        try:
-            command = ['sudo', 'umount', '/var/triliovault']
-            subprocess.call(command, shell=False)
-        except Exception as exception:
-            pass
+
+        def cleanup_mount(path):
+            try:
+                command = ['sudo', 'umount', path]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
         
-        try:
-            command = ['sudo', 'umount', '/var/triliovault']
-            subprocess.call(command, shell=False)
-        except Exception as exception:
-            pass           
+            try:
+                command = ['sudo', 'umount', path]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass           
         
-        try:
-            command = ['sudo', 'umount', '-l', '/var/triliovault']
-            subprocess.call(command, shell=False)
-        except Exception as exception:
-            pass                
+            try:
+                command = ['sudo', 'umount', '-l', path]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass                
+
+        def mount_share(mountpath, nfsshare):
+            with open('/proc/mounts','r') as procfile:
+                mounts = [{line.split()[1]:line.split()[0]}
+                          for line in procfile.readlines() if line.split()[1] == mountpath]
+
+            setting_str = nfsshare+ \
+                              '        %s        nfs     rw,nofail,auto  0       0\n' % mountpath
+            if len(mounts) == 0 or mounts[0].get(mountpath, None) != nfsshare:
+                command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', nfsshare, mountpath]
+                subprocess.check_call(command, shell=False)
+            else:
+                found = 0
+                with open('/etc/fstab', 'r') as ins:
+                    for line in ins:
+                        if line == setting_str:
+                           found = 1
+                           break
+                if found == 0:
+                    fs_file = open('/etc/fstab', 'a')
+                    fs_file.write(setting_str)
+                    fs_file.close()
+
+                try:
+                    temp_file_name = os.path.join(mountpath, str(uuid.uuid4()) + '_test.txt')
+                    command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
+                    subprocess.check_call(command, shell=False)
+                    command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
+                    subprocess.check_call(command, shell=True)
+                    command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
+                    subprocess.check_call(command, shell=True)
+                    command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                    subprocess.check_call(command, shell=False)
+                except Exception as exception:
+                    command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                    subprocess.check_call(command, shell=False)
+                    raise Exception("Failed to verify R/W permissions of the NFS export: " + nfsshare)
+
+        if os.path.ismount(config_data['vault_data_directory_old']):
+            cleanup_mount(config_data['vault_data_directory_old'])
+
+        for d in os.listdir(config_data['vault_data_directory']):
+            if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
+                cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
 
         #mount nfs export
-        if not os.path.isdir('/var/triliovault'):
-           command = ['sudo', 'mkdir', '/var/triliovault']
-           subprocess.call(command, shell=False)
-           os.chmod('/var/triliovault',0777)
+        if not os.path.isdir(config_data['vault_data_directory_old']):
+            command = ['sudo', 'mkdir', config_data['vault_data_directory_old']]
+            subprocess.call(command, shell=False)
+        os.chmod(config_data['vault_data_directory_old'], 0777)
 
-        replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
-        command = ['sudo', 'service', 'rpcbind', 'restart']
-        subprocess.call(command, shell=False)            
-        command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
-        subprocess.check_call(command, shell=False) 
-        setting_str = config_data['storage_nfs_export']+ \
-                      '        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
-        found = 0
-        with open('/etc/fstab', 'r') as ins:
-             for line in ins:
-                 if line == setting_str:
-                    found = 1
-                    break
-        if found == 0:
-           fs_file = open('/etc/fstab', 'a')
-           fs_file.write(setting_str)
-           fs_file.close()
+        for idx, nfsshare in enumerate(str.split(config_data['storage_nfs_export'], ',')):
+            replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(nfsshare, ':')[0])
+            command = ['sudo', 'service', 'rpcbind', 'restart']
+            subprocess.call(command, shell=False)
+            base64encode = base64.b64encode(nfsshare)
 
-        try:
-            temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
-            command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
-            subprocess.check_call(command, shell=False)
-            command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
-            subprocess.check_call(command, shell=True)
-            command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
-            subprocess.check_call(command, shell=True)
-            command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
-            subprocess.check_call(command, shell=False)
-        except Exception as exception:
-            command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
-            subprocess.check_call(command, shell=False)
-            raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
-            
+            mountpath = os.path.join(config_data['vault_data_directory'], base64encode)
+            if not os.path.isdir(mountpath):
+                command = ['sudo', 'mkdir', '-p', mountpath]
+                subprocess.call(command, shell=False)
+
+            # make sure we have right permissions
+            os.chmod(mountpath, 0777)
+            mount_share(mountpath, nfsshare)
+            """
+            if idx == 0:
+                command = ['timeout', '-sKILL', '30' ,
+                           'sudo', 'mount',
+                           '--bind', mountpath,
+                           config_data['vault_data_directory_old']]
+                subprocess.check_call(command, shell=False)
+                mount_share(config_data['vault_data_directory_old'], nfsshare)
+            """
+
+
         if config_data['ntp_enabled'] != 'off' and config_data['ntp_enabled'] != 'False':
             ntp_setup()
     except Exception as exception:
@@ -1849,6 +1888,7 @@ def configure_host():
             return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
+
 
 @bottle.route('/authenticate_with_vcenter')
 @authorize()
@@ -2064,8 +2104,10 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_production_endpoint_template = ', 'cinder_production_endpoint_template = ' + config_data['cinder_production_endpoint_template'])
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['vault_swift_url'])
-        
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory = ', 'vault_data_directory = ' + config_data['vault_data_directory'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory_old = ', 'vault_data_directory_old = ' + config_data['vault_data_directory_old'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
@@ -2550,6 +2592,8 @@ def configure_openstack():
         config_data['workloadmgr_user'] = 'triliovault'
         config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
 
+        config_data['vault_data_directory'] = '/var/triliovault-mounts'
+        config_data['vault_data_directory_old'] = '/var/triliovault'
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
         
         config_data['swift_auth_version'] = ''
@@ -2728,7 +2772,7 @@ def validate_nfs_share():
             if len(i.split()) and i.split()[3] == 'nfs':
                 return {'status': 'Success'}
         return bottle.HTTPResponse(status=500,
-            body=str("NFS Daemon not running on the server"))
+            body=str("NFS Daemon not running on the server '%s'" % nfsserver))
     except Exception as exception:
         return bottle.HTTPResponse(status=500, body=str(exception))
 
