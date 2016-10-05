@@ -1786,50 +1786,24 @@ def configure_host():
 
         def cleanup_mount(path):
             try:
-                command = ['sudo', 'umount', '/var/triliovault']
+                command = ['sudo', 'umount', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass
         
             try:
-                command = ['sudo', 'umount', '/var/triliovault']
+                command = ['sudo', 'umount', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass           
         
             try:
-                command = ['sudo', 'umount', '-l', '/var/triliovault']
+                command = ['sudo', 'umount', '-l', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass                
 
-        if os.path.ismount('/var/triliovault'):
-            cleanup_mount('/var/triliovault')
-        else:
-            for d in os.listdir('/var/triliovault'):
-                if os.path.ismount(d):
-                    cleanup_mount(d)
-
-        #mount nfs export
-        if not os.path.isdir('/var/triliovault'):
-            command = ['sudo', 'mkdir', '/var/triliovault']
-            subprocess.call(command, shell=False)
-        os.chmod('/var/triliovault',0777)
-
-        for nfsshare in str.split(config_data['storage_nfs_export'], ','):
-            replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(nfsshare, ':')[0])
-            command = ['sudo', 'service', 'rpcbind', 'restart']
-            subprocess.call(command, shell=False)
-            base64encode = base64.b64encode(nfsshare)
-
-            mountpath = os.path.join('/var/triliovault', base64encode)
-            if not os.path.isdir(mountpath):
-                command = ['sudo', 'mkdir', '-p', mountpath]
-                subprocess.call(command, shell=False)
-
-            # make sure we have right permissions
-            os.chmod(mountpath, 0777)
-
+        def mount_share(mountpath, nfsshare):
             with open('/proc/mounts','r') as procfile:
                 mounts = [{line.split()[1]:line.split()[0]}
                           for line in procfile.readlines() if line.split()[1] == mountpath]
@@ -1865,7 +1839,45 @@ def configure_host():
                     command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
                     subprocess.check_call(command, shell=False)
                     raise Exception("Failed to verify R/W permissions of the NFS export: " + nfsshare)
-            
+
+        if os.path.ismount(config_data['vault_data_directory_old']):
+            cleanup_mount(config_data['vault_data_directory_old'])
+
+        for d in os.listdir(config_data['vault_data_directory']):
+            if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
+                cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
+
+        #mount nfs export
+        if not os.path.isdir(config_data['vault_data_directory_old']):
+            command = ['sudo', 'mkdir', config_data['vault_data_directory_old']]
+            subprocess.call(command, shell=False)
+        os.chmod(config_data['vault_data_directory_old'], 0777)
+
+        for idx, nfsshare in enumerate(str.split(config_data['storage_nfs_export'], ',')):
+            replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(nfsshare, ':')[0])
+            command = ['sudo', 'service', 'rpcbind', 'restart']
+            subprocess.call(command, shell=False)
+            base64encode = base64.b64encode(nfsshare)
+
+            mountpath = os.path.join(config_data['vault_data_directory'], base64encode)
+            if not os.path.isdir(mountpath):
+                command = ['sudo', 'mkdir', '-p', mountpath]
+                subprocess.call(command, shell=False)
+
+            # make sure we have right permissions
+            os.chmod(mountpath, 0777)
+            mount_share(mountpath, nfsshare)
+            """
+            if idx == 0:
+                command = ['timeout', '-sKILL', '30' ,
+                           'sudo', 'mount',
+                           '--bind', mountpath,
+                           config_data['vault_data_directory_old']]
+                subprocess.check_call(command, shell=False)
+                mount_share(config_data['vault_data_directory_old'], nfsshare)
+            """
+
+
         if config_data['ntp_enabled'] != 'off' and config_data['ntp_enabled'] != 'False':
             ntp_setup()
     except Exception as exception:
@@ -2092,8 +2104,10 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_production_endpoint_template = ', 'cinder_production_endpoint_template = ' + config_data['cinder_production_endpoint_template'])
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['vault_swift_url'])
-        
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory = ', 'vault_data_directory = ' + config_data['vault_data_directory'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory_old = ', 'vault_data_directory_old = ' + config_data['vault_data_directory_old'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
@@ -2578,6 +2592,8 @@ def configure_openstack():
         config_data['workloadmgr_user'] = 'triliovault'
         config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
 
+        config_data['vault_data_directory'] = '/var/triliovault-mounts'
+        config_data['vault_data_directory_old'] = '/var/triliovault'
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
         
         config_data['swift_auth_version'] = ''

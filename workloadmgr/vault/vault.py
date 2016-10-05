@@ -56,8 +56,11 @@ wlm_vault_opts = [
                help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'), 
     # swift-i: integrated(keystone), swift-s: standalone
     cfg.StrOpt('vault_data_directory',
-               default='/var/triliovault',
+               default='/var/triliovault-mounts',
                help='Location where snapshots will be stored'),
+    cfg.StrOpt('vault_data_directory_old',
+               default='/var/triliovault',
+               help='Legacy location where snapshots will be stored'),
     cfg.StrOpt('vault_storage_nfs_export',
                default='local',
                help='NFS Export'),
@@ -669,7 +672,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             pass                
 
     @autolog.log_method(logger=Logger) 
-    def mount_backup_target(self):
+    def mount_backup_target(self, old_share=False):
         self.umount_backup_target()
 
         nfsshare = self.backup_endpoint
@@ -680,6 +683,11 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                        'mount', '-o', 'nolock', nfsshare,
                        mountpath]
             subprocess.check_call(command, shell=False) 
+            if old_share is True:
+                command = ['timeout', '-sKILL', '30' , 'sudo',
+                           'mount', '--bind', mountpath,
+                           CONF.vault_data_directory_old]
+                subprocess.check_call(command, shell=False) 
         else:
             raise exception.BackupTargetOffline(endpoint=nfsshare)
 
@@ -847,7 +855,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 triliovault_backup_targets = {}
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
-    for backup_target in CONF.vault_storage_nfs_export.split(','):
+    for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
         backend = NfsTrilioVaultBackupTarget(backup_target)
         triliovault_backup_targets[backup_target] = backend
         backend.mount_backup_target()
