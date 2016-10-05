@@ -1,3 +1,4 @@
+'''
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 Trilio Data, Inc
@@ -126,3 +127,5 @@ class BaseWorkloadTypeTestCase(test.TestCase):
         self.workloadAPI.workload_type_delete(self.context, workload_type_id)
         workload_type = db.workload_type_get(self.context, workload_type_id)
         self.assertEqual(workload_type['status'], 'deleted')
+'''
+
