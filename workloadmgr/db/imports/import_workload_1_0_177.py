@@ -92,8 +92,8 @@ def import_workload(cntx, workload_url, new_version,
                                 tenant_id=tenant_id)
         else:
             raise exception.InvalidRequest(
-                "Workload %s tenant %s does not belong to this cloud" %
-                (workload_values['id'], tenant_id))
+                reason=("Workload %s tenant %s does not belong to this cloud" %
+                (workload_values['id'], tenant_id)))
     else:
         tenantcontext = cntx
 

@@ -491,6 +491,10 @@ class API(base.Base):
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
             #TODO(giri): optimize this lookup
+
+            if len(instances) == 0:
+                raise wlm_exceptions.InvalidRequest(reason="No instances found in the workload create request")
+
             for instance in instances:
                 #Check whether given instance id exist or not.
                 if not instance_ids or instance['instance-id'] not in instance_ids:
