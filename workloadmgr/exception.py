@@ -167,7 +167,7 @@ class InvalidWorkload(Invalid):
     message = _("Invalid workload") + ": %(reason)s"
 
 class InvalidRequest(Invalid):
-    message = _("The request is invalid.")
+    message = _("The request is invalid. %(reason)s")
 
 
 class InvalidResults(Invalid):
