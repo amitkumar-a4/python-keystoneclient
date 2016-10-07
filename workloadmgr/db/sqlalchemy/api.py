@@ -554,13 +554,17 @@ def workload_update(context, id, values, purge_metadata=False):
 @require_context
 def workload_get_all(context, **kwargs):
         qs = None
+        nfs_share = kwargs.get('nfs_share', None)
+        all_workloads = kwargs.get('all_workloads', False)
+        page_number = kwargs.get('page_number', None)
         if is_admin_context(context):
-           if kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
+           if nfs_share is not None and nfs_share != '':
               qs = model_query( context, models.Workloads, **kwargs).\
                                 options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])), models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']])))).\
+                                filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),
+                                                                          models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([nfs_share])))).\
                                 order_by(models.Workloads.created_at.desc())
-           elif kwargs['all_workloads'] is True:
+           elif all_workloads is True:
                 qs = model_query( context, models.Workloads, **kwargs).\
                             options(sa_orm.joinedload(models.Workloads.metadata)).\
                             order_by(models.Workloads.created_at.desc())
@@ -589,9 +593,9 @@ def workload_get_all(context, **kwargs):
         if qs is None:
            qs = workload_get_all_by_project(context, context.project_id)
 
-        if kwargs['page_number'] is not None and kwargs['page_number'] != '':
+        if page_number is not None and page_number != '':
            page_size = setting_get(context,'page_size')
-           return qs.limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
+           return qs.limit(int(page_size)).offset(int(page_size)*(int(page_number)-1)).all()
         else:
              return qs.all()
 
