@@ -464,19 +464,9 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_get_all(self, context, search_opts={}):
-        if 'page_number' in search_opts:
-            workloads = self.db.workload_get_all(context,page_number=search_opts['page_number'])
-        else:
-            workloads = self.db.workload_get_all(context)
+        workloads = self.db.workload_get_all(context,**search_opts)
         return workloads
 
-    @autolog.log_method(logger=Logger)
-    def workload_get_all_by_admin(self, context, search_opts={}):
-        if context.is_admin is False:
-            raise wlm_exceptions.AdminRequired()
-        workloads = self.db.workload_get_all_by_admin(context)
-        return workloads        
-    
     @autolog.log_method(logger=Logger)
     @create_trust
     def workload_create(self, context, name, description, workload_type_id,

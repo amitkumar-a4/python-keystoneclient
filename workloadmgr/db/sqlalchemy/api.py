@@ -553,57 +553,47 @@ def workload_update(context, id, values, purge_metadata=False):
 
 @require_context
 def workload_get_all(context, **kwargs):
-        if 'page_number' in kwargs:
-            page_size = setting_get(context,'page_size')
-            return model_query( context, models.Workloads, **kwargs).\
-                                    options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                    filter_by(project_id=context.project_id).\
-                                    order_by(models.Workloads.created_at.desc()).limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
-        else:
-            if not is_admin_context(context):
-                return workload_get_all_by_project(context, context.project_id)
-            else:
+        qs = None
+        if is_admin_context(context):
+           if kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
+              qs = model_query( context, models.Workloads, **kwargs).\
+                                options(sa_orm.joinedload(models.Workloads.metadata)).\
+                                filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])), models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']])))).\
+                                order_by(models.Workloads.created_at.desc())
+           elif kwargs['all_workloads'] is True:
+                qs = model_query( context, models.Workloads, **kwargs).\
+                            options(sa_orm.joinedload(models.Workloads.metadata)).\
+                            order_by(models.Workloads.created_at.desc())
+           else:
                 if 'dashboard_item' in kwargs:
-                    if kwargs.get('dashboard_item') ==  'storage':
-                        return \
-                            model_query(context,
-                                (models.Workloads.id).label('workload_id'),
-                                (models.Workloads.display_name).label('workload_name'),
-                                (models.Workloads.created_at).label('created_at'),
-                                (models.Snapshots.snapshot_type).label('snapshots_type'),
-                                func.count(models.Snapshots.snapshot_type).label('snapshots_count'),
-                                func.sum(models.Snapshots.size).label('snapshots_size'),
-                                **kwargs). \
-                            filter_by(deleted = 0). \
-                            outerjoin(models.Snapshots,
-                                      models.Workloads.id == models.Snapshots.workload_id). \
-                            group_by(models.Snapshots.workload_id,
-                                     models.Snapshots.snapshot_type). \
-                            order_by(models.Workloads.created_at.desc()).all()
-                    elif kwargs.get('dashboard_item') ==  'activities':
-                        if 'time_in_minutes' in kwargs:
-                            time_in_minutes = int(kwargs.get('time_in_minutes'))
-                        else:
-                            time_in_minutes = 0
-                        time_delta = ((time_in_minutes / 60) / 24) * -1
-                        return model_query( context,
-                                models.Workloads.id,
-                                models.Workloads.deleted,
-                                models.Workloads.deleted_at,
-                                models.Workloads.display_name,
-                                models.Workloads.status,
-                                models.Workloads.created_at,
-                                models.Workloads.user_id,
-                                models.Workloads.project_id,
-                                **kwargs). \
-                            filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
-                                       models.Workloads.deleted_at > func.adddate(func.now(), time_delta))). \
-                            order_by(models.Workloads.created_at.desc()).all()
-                else:
-                    return model_query( context, models.Workloads, **kwargs).\
-                                    options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                    filter_by(project_id=context.project_id).\
-                                    order_by(models.Workloads.created_at.desc()).all()
+                   if kwargs.get('dashboard_item') ==  'activities':
+                      if 'time_in_minutes' in kwargs:
+                          time_in_minutes = int(kwargs.get('time_in_minutes'))
+                      else:
+                           time_in_minutes = 0
+                      time_delta = ((time_in_minutes / 60) / 24) * -1
+                      qs = model_query( context,
+                                 models.Workloads.id,
+                                 models.Workloads.deleted,
+                                 models.Workloads.deleted_at,
+                                 models.Workloads.display_name,
+                                 models.Workloads.status,
+                                 models.Workloads.created_at,
+                                 models.Workloads.user_id,
+                                 models.Workloads.project_id,
+                                 **kwargs). \
+                                 filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
+                                 models.Workloads.deleted_at > func.adddate(func.now(), time_delta))). \
+                                 order_by(models.Workloads.created_at.desc())
+
+        if qs is None:
+           qs = workload_get_all_by_project(context, context.project_id)
+
+        if kwargs['page_number'] is not None and kwargs['page_number'] != '':
+           page_size = setting_get(context,'page_size')
+           return qs.limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
+        else:
+             return qs.all()
 
 @require_admin_context
 def workload_get_all_by_host(context, host):
@@ -631,19 +621,13 @@ def workload_get_all_by_project(context, project_id):
                        .filter_by(project_id=project_id)
 
         #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query.all()
+        workloads = query
 
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadsNotFound() 
     
     return workloads
 
-@require_admin_context
-def workload_get_all_by_admin(context, **kwargs):           
-    return model_query( context, models.Workloads, **kwargs).\
-                            options(sa_orm.joinedload(models.Workloads.metadata)).\
-                            order_by(models.Workloads.created_at.desc()).all()
-    
 @require_context
 def _workload_get(context, id, session, **kwargs):
     try:
