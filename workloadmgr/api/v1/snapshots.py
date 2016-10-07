@@ -140,10 +140,10 @@ class SnapshotsController(wsgi.Controller):
             raise exc.HTTPServerError(explanation=unicode(error))   
         
     @wsgi.serializers(xml=SnapshotsTemplate)
-    def index(self, req, workload_id=None, host=None):
+    def index(self, req):
         """Returns a summary list of snapshots."""
         try:
-            return self._get_snapshots(req, workload_id, host, is_detail=False)
+            return self._get_snapshots(req, is_detail=False)
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -158,10 +158,10 @@ class SnapshotsController(wsgi.Controller):
             raise exc.HTTPServerError(explanation=unicode(error))   
         
     @wsgi.serializers(xml=SnapshotsTemplate)
-    def detail(self, req, workload_id=None, host=None):
+    def detail(self, req):
         """Returns a detailed list of snapshots."""
         try:
-            return self._get_snapshots(req, workload_id, host, is_detail=True)
+            return self._get_snapshots(req, is_detail=True)
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -175,35 +175,29 @@ class SnapshotsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
         
-    def _get_snapshots(self, req, workload_id, host, is_detail):
+    def _get_snapshots(self, req, is_detail):
         """Returns a list of snapshots, transformed through view builder."""
+
         context = req.environ['workloadmgr.context']
-        if not workload_id:
-            workload_id = req.GET.get('workload_id', None)
-        if not host:
-            host = req.GET.get('host', None)
-         
-        if host is not None:            
-            if context.is_admin is not True:
-                raise exception.AdminRequired()
-            snapshots_all = self.workload_api.snapshot_get_all_by_host(context, host)
-        elif workload_id:
-            snapshots_all = self.workload_api.snapshot_get_all(context, workload_id)
-        else:
-            snapshots_all = self.workload_api.snapshot_get_all(context)
+        workload_id = req.GET.get('workload_id', None)
+        host = req.GET.get('host', None)
+        get_all = bool(req.GET.get('all', False))
+
+        date_from = req.GET.get('date_from', None)
+        date_to = req.GET.get('date_to', None)
+        
+        search_opts={'workload_id':workload_id,\
+                     'host':host, 'get_all':get_all,\
+                     'date_from':date_from, 'date_to':date_to}
+ 
+        snapshots_all = self.workload_api.snapshot_get_all(context, search_opts)
    
         limited_list = common.limited(snapshots_all, req)
         
-        #TODO(giri): implement the search_opts to specify the filters
-        snapshots = []
-        for snapshot in limited_list:
-            if snapshot['deleted'] == False:
-                snapshots.append(snapshot)        
-        
         if is_detail:
-            snapshots = self._view_builder.detail_list(req, snapshots)
+            snapshots = self._view_builder.detail_list(req, snapshots_all)
         else:
-            snapshots = self._view_builder.summary_list(req, snapshots)
+            snapshots = self._view_builder.summary_list(req, snapshots_all)
         return snapshots
 
     def _restore(self, context, id, workload_id=None, body=None, test=False):

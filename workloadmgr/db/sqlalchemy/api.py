@@ -137,7 +137,6 @@ def model_query(context, *args, **kwargs):
     project_only = kwargs.get('project_only')
 
     query = session.query(*args)
-
     if read_deleted == 'no':
         query = query.filter_by(deleted=False)
     elif read_deleted == 'yes':
@@ -555,12 +554,13 @@ def workload_update(context, id, values, purge_metadata=False):
 def workload_get_all(context, **kwargs):
         qs = None
         if is_admin_context(context):
-           if kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
+           if 'nfs_share' in kwargs and kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
               qs = model_query( context, models.Workloads, **kwargs).\
                                 options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])), models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']])))).\
+                                filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),\
+                                models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']])))).\
                                 order_by(models.Workloads.created_at.desc())
-           elif kwargs['all_workloads'] is True:
+           elif 'all_workloads' in kwargs and kwargs['all_workloads'] is True:
                 qs = model_query( context, models.Workloads, **kwargs).\
                             options(sa_orm.joinedload(models.Workloads.metadata)).\
                             order_by(models.Workloads.created_at.desc())
@@ -587,46 +587,16 @@ def workload_get_all(context, **kwargs):
                                  order_by(models.Workloads.created_at.desc())
 
         if qs is None:
-           qs = workload_get_all_by_project(context, context.project_id)
+           qs = model_query( context, models.Workloads, **kwargs).\
+                            options(sa_orm.joinedload(models.Workloads.metadata)).\
+                            filter_by(project_id=context.project_id).\
+                            order_by(models.Workloads.created_at.desc())
 
-        if kwargs['page_number'] is not None and kwargs['page_number'] != '':
+        if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
            page_size = setting_get(context,'page_size')
            return qs.limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
         else:
              return qs.all()
-
-@require_admin_context
-def workload_get_all_by_host(context, host):
-    session = get_session()
-    try:
-        query = session.query(models.Workloads)\
-                       .options(sa_orm.joinedload(models.Workloads.metadata))\
-                       .filter_by(host=host)
-
-        #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query.all()
-
-    except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsNotFound()
-    
-    return workloads
-
-@require_context
-def workload_get_all_by_project(context, project_id):
-    authorize_project_context(context, project_id)    
-    session = get_session()
-    try:
-        query = session.query(models.Workloads)\
-                       .options(sa_orm.joinedload(models.Workloads.metadata))\
-                       .filter_by(project_id=project_id)
-
-        #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query
-
-    except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsNotFound() 
-    
-    return workloads
 
 @require_context
 def _workload_get(context, id, session, **kwargs):
@@ -1014,37 +984,28 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     return result
 
 @require_context
-def snapshot_get_all(context, workload_id=None, **kwargs):
+def snapshot_get_all(context, **kwargs):
+    qs = model_query(context, models.Snapshots, **kwargs).\
+                    options(sa_orm.joinedload(models.Snapshots.metadata))
+    if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':  
+       qs = qs.filter_by(workload_id=kwargs['workload_id'])
+    if 'host' in kwargs and kwargs['host'] is not None and kwargs['host'] != '':
+       qs = qs.filter(models.Snapshots.host == kwargs['host'])
+    if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
+       if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
+           date_to = kwargs['date_to']
+       else:
+            date_to = datetime.now()
+       qs = qs.filter(and_(models.Snapshots.created_at >= func.date_format(func.date(kwargs['date_from']),'%y-%m-%d'),\
+                      models.Snapshots.created_at <= func.date_format(func.date(date_to),'%y-%m-%d')))
+
     if not is_admin_context(context):
-        if workload_id:
-            return snapshot_get_all_by_workload(context, workload_id, **kwargs)
-        else:
-            return snapshot_get_all_by_project(context, context.project_id, **kwargs)
-    if workload_id == None:
-        return model_query(context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            order_by(models.Snapshots.created_at.desc()).all()
+       qs = qs.filter_by(project_id=context.project_id)
     else:
-        return model_query(context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            filter_by(workload_id=workload_id).\
-                            order_by(models.Snapshots.created_at.desc()).all()
+         if 'get_all' in kwargs and kwargs['get_all'] is not True:
+            qs = qs.filter_by(project_id=context.project_id)
+    return qs.order_by(models.Snapshots.created_at.desc()).all() 
 
-@require_context
-def snapshot_get_all_by_host(context, host, **kwargs):
-    if is_admin_context(context) is not True:
-        raise exception.AdminRequired()
-
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
-    result = model_query(context, models.Snapshots, **kwargs).\
-                        options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                        filter(models.Snapshots.host == host).\
-                        order_by(models.Snapshots.created_at.desc()).all()
-    if not result:
-        raise exception.SnapshotsOfHostNotFound(host=host)
-    return result
-    
 @require_context                            
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
     if kwargs.get('session') == None:
