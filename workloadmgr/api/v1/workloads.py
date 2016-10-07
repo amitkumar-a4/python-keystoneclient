@@ -240,20 +240,13 @@ class WorkloadMgrsController(wsgi.Controller):
                 all_workloads = bool(escape(all_workloads))
                 page_number = var.get('page_number',[''])[0]
                 nfs_share = var.get('nfs_share',[''])[0]
-            
             workloads_all = self.workload_api.workload_get_all(context,search_opts={'page_number':page_number,\
                             'nfs_share':nfs_share, 'all_workloads':all_workloads})
             limited_list = common.limited(workloads_all, req)
-            #TODO(giri): implement the search_opts to specify the filters
-            workloads = []
-            for workload in limited_list:
-                if workload['deleted'] == False:
-                    workloads.append(workload)
-
             if is_detail:
-                workloads = self._view_builder.detail_list(req, workloads)
+                workloads = self._view_builder.detail_list(req, workloads_all)
             else:
-                workloads = self._view_builder.summary_list(req, workloads)
+                workloads = self._view_builder.summary_list(req, workloads_all)
             return workloads
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
