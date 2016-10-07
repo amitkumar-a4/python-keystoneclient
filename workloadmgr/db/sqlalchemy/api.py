@@ -592,7 +592,7 @@ def workload_get_all(context, **kwargs):
                             filter_by(project_id=context.project_id).\
                             order_by(models.Workloads.created_at.desc())
 
-        if 'page_numver' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
+        if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
            page_size = setting_get(context,'page_size')
            return qs.limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
         else:
