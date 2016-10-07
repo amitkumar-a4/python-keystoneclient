@@ -376,6 +376,8 @@ class API(base.Base):
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
+        if context.is_admin is False:
+            metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata        
         
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
@@ -447,6 +449,8 @@ class API(base.Base):
                 metadata.setdefault(kvpair['key'], kvpair['value'])
                 pass
 
+        if context.is_admin is False:
+            metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False 
@@ -980,15 +984,13 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         storages_usage = {}
+        nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
-            nfsshare = nfsshare.strip()
-            backup_target = vault.get_backup_target(nfsshare)
-            nfsstatus = backup_target.is_online()
-            if nfsstatus is True:
-                total_capacity, total_utilization = backup_target.get_total_capacity(context)
-            else:
-                total_capacity = -1
-                total_utilization = -1
+            stat = nfsstats[nfsshare]
+
+            total_capacity = stat['total_capacity']
+            total_utilization = stat['total_utilization']
+            nfsstatus = stat['nfsstatus']
 
             storages_usage[nfsshare]  = {'storage_type': vault.CONF.vault_storage_type,
                                          'nfs_share(s)': [
