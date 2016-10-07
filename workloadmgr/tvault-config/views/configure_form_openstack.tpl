@@ -367,6 +367,10 @@ $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
     });
 });
 
+if ($('input:radio[name=nodetype]:checked').val() == "additional") {
+    $("#panel4")[0].hidden=true
+}
+
 </script>
 </body>
 </html>
