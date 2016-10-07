@@ -801,11 +801,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         try:
             for name in os.listdir(parent_path):
                 if os.path.isdir(os.path.join(parent_path, name)):
-                    workload_url = {'workload_url': name, 'snapshot_urls': []}
-                    for subname in os.listdir(os.path.join(parent_path, workload_url['workload_url'])):
-                        if os.path.isdir(os.path.join(parent_path, workload_url['workload_url'], subname)):
-                            workload_url['snapshot_urls'].append(os.path.join(workload_url['workload_url'], subname))
-                    workload_urls.append(workload_url)
+                    workload_urls.append(os.path.join(parent_path, name))
         except Exception as ex:
             LOG.exception(ex)
         return workload_urls  
@@ -870,7 +866,6 @@ def get_backup_target(backup_endpoint):
 
     return backup_target
 
-
 def get_settings_backup_target():
     settings_path = os.path.join(CONF.cloud_unique_id,"settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
@@ -882,7 +877,6 @@ def get_settings_backup_target():
     triliovault_backup_targets.values()[0].put_object(settings_path,
                                                       json.dumps([]))
     return triliovault_backup_targets.values()[0]
-
 
 def get_workloads(context):
     workloads = []

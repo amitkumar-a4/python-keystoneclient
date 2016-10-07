@@ -18,8 +18,161 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.workloads import workload_utils
 from workloadmgr.common import context as wlm_context
 from workloadmgr.common import clients
+from workloadmgr.db.sqlalchemy import models
+from workloadmgr.db.sqlalchemy.session import get_session
 
 LOG = logging.getLogger(__name__)
+DBSession = get_session()
+
+# Directory to store database files for all json files.
+db_temp_dir = '/tmp/triliodata_imports/'
+workloads = []
+
+import_map = [
+    {'file': 'workload_db',
+     'model_class': 'Workloads',
+     'metadata_model_class': 'WorkloadMetadata',
+     'getter_method' : 'workload_get',
+     'getter_method_params' : ['id']
+     },
+    {'file': 'workload_vms_db',
+     'model_class': 'WorkloadVMs',
+     'metadata_model_class': 'WorkloadVMMetadata',
+     'getter_method' : 'workload_vm_get',
+     'getter_method_params' : ['id']
+     },
+    {'file': 'snapshot_db',
+     'model_class': 'Snapshots',
+     'metadata_model_class': 'SnapshotMetadata',
+     'getter_method' : 'snapshot_get',
+     'getter_method_params' : ['id']
+     },
+    {'file': 'snapshot_vms_db',
+     'model_class': 'SnapshotVMs',
+     'metadata_model_class': 'SnapshotVMMetadata',
+     'getter_method' : 'snapshot_vm_get',
+     'getter_method_params' : ['vm_id', 'snapshot_id']
+     },
+    {'file': 'resources_db',
+     'model_class': 'SnapshotVMResources',
+     'metadata_model_class': 'SnapshotVMResourceMetadata',
+     'getter_method' : 'snapshot_vm_resource_get',
+     'getter_method_params' : ['id']
+     },
+    {'file': 'disk_db',
+     'model_class': 'VMDiskResourceSnaps',
+     'metadata_model_class': 'VMDiskResourceSnapMetadata',
+     'getter_method' : 'vm_disk_resource_snaps_get',
+     'getter_method_params' : ['snapshot_vm_resource_id']
+     },
+    {'file': 'network_db',
+     'model_class': 'VMNetworkResourceSnaps',
+     'metadata_model_class': 'VMNetworkResourceSnapMetadata',
+     'getter_method' : 'vm_network_resource_snaps_get',
+     'getter_method_params' : ['vm_network_resource_snap_id']
+     },
+    {'file': 'security_db',
+     'model_class': 'VMSecurityGroupRuleSnaps',
+     'metadata_model_class': 'VMSecurityGroupRuleSnapMetadata',
+     'getter_method' : 'vm_security_group_rule_snaps_get',
+     'getter_method_params' : ['vm_security_group_snap_id']
+     }
+]
+
+
+def import_resources(tenantcontext, resource_map, new_version, upgrade):
+    '''
+    create list of dictionary object for each resource and
+    dump it into the database.
+    '''
+
+    resources_list = [] #Contains list of json objects need to insert
+    resources_list_update = [] #Contains list of json objects need to update
+    resources_metadata_list = []
+    resources_metadata_list_update = []
+ 
+    file = resource_map['file']
+    model_class =  resource_map['model_class']
+    metadata_model_class =  resource_map['metadata_model_class']
+    getter_method =  resource_map['getter_method']
+    getter_method_params =  resource_map['getter_method_params']
+
+    db = WorkloadMgrDB().db
+    get_resource_method = getattr(db, getter_method)
+
+    def update_resource_list(cntxt, resource):
+        '''
+        Update resource list with resource objects need to
+        insert/update in database.
+        '''
+        # if resource is workload then check the status of workload and
+        # set it to available.
+        if file == 'workload_db':
+            if resources['status'] == 'locked':
+               resources['status'] = 'available'
+
+        try:
+            # Check if resource already in the database then update.
+            param_list = tuple([resource[param] for param in getter_method_params])
+            if get_resource_method(tenantcontext, *param_list):
+               for resource_metadata in resource.pop('metadata'):
+                   resources_metadata_list_update.append(resource_metadata)
+               _adjust_values(tenantcontext, new_version, resource, upgrade)
+               resources_list_update.append(resource)
+            else:
+                raise Exception
+        except Exception:
+            #If resource not found then create new entry in database
+            for resource_metadata in resource.pop('metadata'):
+                resources_metadata_list.append(resource_metadata)
+            _adjust_values(tenantcontext, new_version, resource, upgrade)
+            resources_list.append(resource)
+
+    try:
+        #Load file for resource containing all objects neeed to import
+        resources_db_list = pickle.load(open(db_temp_dir + file, "rb"))
+
+        for resources in resources_db_list:
+            if isinstance(resources, list):
+                for resource in resources:
+                    update_resource_list(tenantcontext, resource)
+            else:
+                update_resource_list(tenantcontext,resources)
+
+        # Dump list of objects into the database.
+        DBSession.bulk_update_mappings(eval('models.%s' % (model_class)), resources_list_update)
+        DBSession.commit()
+        DBSession.bulk_update_mappings(eval('models.%s' % (metadata_model_class)), resources_metadata_list_update)
+        DBSession.commit()
+
+        DBSession.bulk_insert_mappings(eval('models.%s' % (model_class)), resources_list)
+        DBSession.commit()
+        DBSession.bulk_insert_mappings(eval('models.%s' % (metadata_model_class)), resources_metadata_list)
+        DBSession.commit()
+
+        # if workloads then check for job schedule, if it's there then update it.
+        if file == 'workload_db':
+            resources_list.extend(resources_list_update)
+            for resource in resources_list:
+                workload = models.Workloads()
+                workload.update(resource)
+                workloads.append(workload)
+                if len(resources['jobschedule']):
+                    workload_api = workloadAPI.API()
+                    workload_api.workload_add_scheduler_job(pickle.loads(str(resources['jobschedule'])), workload)
+
+    except Exception as ex:
+        LOG.exception(ex)
+
+#TODO: Need to remove workload_url and and backup_endpoint from parameters.
+def import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade=True):
+    DBSession.autocommit = False
+    del workloads[:]
+    for resource_map in import_map:
+        import_resources(cntx, resource_map, new_version, upgrade)
+    DBSession.autocommit = True
+    return workloads
+
 
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
@@ -69,7 +222,7 @@ def project_id_exists(context, project_id):
 
     return False
 
-
+'''
 def import_workload(cntx, workload_url, new_version,
                     backup_endpoint, upgrade=True):
     """ Import workload and snapshot records from vault 
@@ -92,8 +245,8 @@ def import_workload(cntx, workload_url, new_version,
                                 tenant_id=tenant_id)
         else:
             raise exception.InvalidRequest(
-                reason=("Workload %s tenant %s does not belong to this cloud" %
-                (workload_values['id'], tenant_id)))
+                "Workload %s tenant %s does not belong to this cloud" %
+                (workload_values['id'], tenant_id))
     else:
         tenantcontext = cntx
 
@@ -262,3 +415,4 @@ def import_workload(cntx, workload_url, new_version,
             db.snapshot_update(tenantcontext,snapshot.id, {'status': 'import-error'})
 
     return workload
+'''

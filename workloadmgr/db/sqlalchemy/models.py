@@ -211,7 +211,7 @@ class WorkloadMetadata(BASE, WorkloadsBase):
     __tablename__ = 'workload_metadata'
     __table_args__ = (UniqueConstraint('workload_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     workload_id = Column(String(36), ForeignKey('workloads.id'), nullable=False)
     workload = relationship(Workloads, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -236,7 +236,7 @@ class WorkloadVMMetadata(BASE, WorkloadsBase):
     __tablename__ = 'workload_vm_metadata'
     __table_args__ = (UniqueConstraint('workload_vm_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     workload_vm_id = Column(String(36), ForeignKey('workload_vms.id'), nullable=False)
     workload_vm = relationship(WorkloadVMs, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -296,7 +296,7 @@ class SnapshotMetadata(BASE, WorkloadsBase):
     __tablename__ = 'snapshot_metadata'
     __table_args__ = (UniqueConstraint('snapshot_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     snapshot_id = Column(String(36), ForeignKey('snapshots.id'), nullable=False)
     snapshot = relationship(Snapshots, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -325,7 +325,7 @@ class SnapshotVMMetadata(BASE, WorkloadsBase):
     __tablename__ = 'snapshot_vm_metadata'
     __table_args__ = (UniqueConstraint('snapshot_vm_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     snapshot_vm_id = Column(String(36), ForeignKey('snapshot_vms.id'), nullable=False)
     snapshot_vm = relationship(SnapshotVMs, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -369,7 +369,7 @@ class SnapshotVMResourceMetadata(BASE, WorkloadsBase):
     __tablename__ = 'snapshot_vm_resource_metadata'
     __table_args__ = (UniqueConstraint('snapshot_vm_resource_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     snapshot_vm_resource_id = Column(String(36), ForeignKey('snapshot_vm_resources.id'), nullable=False)
     snapshot_vm_resource = relationship(SnapshotVMResources, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -384,6 +384,13 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     def name(self):
         return FLAGS.workload_name_template % self.id
     
+    @property
+    def vault_path(self):
+        if self.vault_url:
+            return vault.get_vault_data_directory() + self.vault_url
+        else:
+            return None    
+
     snapshot_vm_resource_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'))
     vm_disk_resource_snap_backing_id = Column(String(255))
     vm_disk_resource_snap_child_id = Column(String(255))
@@ -402,7 +409,7 @@ class VMDiskResourceSnapMetadata(BASE, WorkloadsBase):
     __tablename__ = 'vm_disk_resource_snap_metadata'
     __table_args__ = (UniqueConstraint('vm_disk_resource_snap_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     vm_disk_resource_snap_id = Column(String(36), ForeignKey('vm_disk_resource_snaps.id'), nullable=False)
     vm_disk_resource_snap = relationship(VMDiskResourceSnaps, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -425,7 +432,7 @@ class VMNetworkResourceSnapMetadata(BASE, WorkloadsBase):
     __tablename__ = 'vm_network_resource_snap_metadata'
     __table_args__ = (UniqueConstraint('vm_network_resource_snap_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     vm_network_resource_snap_id = Column(String(36), ForeignKey('vm_network_resource_snaps.vm_network_resource_snap_id'), nullable=False)
     vm_network_resource_snap = relationship(VMNetworkResourceSnaps, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -449,7 +456,7 @@ class VMSecurityGroupRuleSnapMetadata(BASE, WorkloadsBase):
     __tablename__ = 'vm_security_group_rule_snap_metadata'
     __table_args__ = (UniqueConstraint('vm_security_group_rule_snap_id', 'key'), {})
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(255), primary_key=True)
     vm_security_group_rule_snap_id = Column(String(36), ForeignKey('vm_security_group_rule_snaps.id'), nullable=False)
     vm_security_group_rule_snap = relationship(VMSecurityGroupRuleSnaps, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
@@ -643,3 +650,4 @@ def register_models():
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:
         model.metadata.create_all(engine)
+
