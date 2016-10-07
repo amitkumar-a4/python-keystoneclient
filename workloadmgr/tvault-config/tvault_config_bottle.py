@@ -1840,12 +1840,14 @@ def configure_host():
                     subprocess.check_call(command, shell=False)
                     raise Exception("Failed to verify R/W permissions of the NFS export: " + nfsshare)
 
-        if os.path.ismount(config_data['vault_data_directory_old']):
+        if os.path.exists(config_data['vault_data_directory_old']) and \
+            os.path.ismount(config_data['vault_data_directory_old']):
             cleanup_mount(config_data['vault_data_directory_old'])
 
-        for d in os.listdir(config_data['vault_data_directory']):
-            if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
-                cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
+        if os.path.exists(config_data['vault_data_directory']):
+            for d in os.listdir(config_data['vault_data_directory']):
+                if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
+                    cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
 
         #mount nfs export
         if not os.path.isdir(config_data['vault_data_directory_old']):

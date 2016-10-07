@@ -11,6 +11,7 @@ from workloadmgr.openstack.common import fileutils
 from oslo.config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
 from workloadmgr.openstack.common import log as logging
+from workloadmgr.vault import vault
  
 auditlog_opts = [
     cfg.StrOpt('auditlog_admin_user',
@@ -37,7 +38,8 @@ lock = threading.Lock()
 def getAuditLogger(name='auditlog', version='unknown', filepath=None):
  
     if filepath is None:
-        filepath = os.path.join(CONF.vault_data_directory, CONF.cloud_unique_id)
+        backup_target = vault.get_settings_backup_target()
+        filepath = os.path.join(backup_target.mount_path, CONF.cloud_unique_id)
         filepath = os.path.join(filepath, CONF.audit_log_file)
     
     if name not in _auditloggers:
