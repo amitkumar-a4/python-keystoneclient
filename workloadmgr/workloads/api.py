@@ -377,6 +377,7 @@ class API(base.Base):
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
         if context.is_admin is False:
+            metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata        
         
@@ -450,6 +451,7 @@ class API(base.Base):
                 pass
 
         if context.is_admin is False:
+            metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
