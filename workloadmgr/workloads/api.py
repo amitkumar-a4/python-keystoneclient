@@ -985,6 +985,10 @@ class API(base.Base):
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
         storages_usage = {}
         nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
