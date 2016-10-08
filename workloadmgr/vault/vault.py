@@ -23,6 +23,7 @@ import re
 import shutil
 import socket
 import uuid
+import threading
 
 from oslo.config import cfg
 
@@ -882,6 +883,36 @@ def get_settings_backup_target():
     triliovault_backup_targets.values()[0].put_object(settings_path,
                                                       json.dumps([]))
     return triliovault_backup_targets.values()[0]
+
+
+def get_capacities_utilizations(context):
+    def fill_capacity_utilization(context, backup_target, stats):
+        nfsshare = backup_target.backup_endpoint
+        cap, util = backup_target.get_total_capacity(context)
+        stats[nfsshare] = {'total_capacity': cap,
+                           'total_utilization': util,
+                           'nfsstatus': True }
+
+    stats = {}
+    threads = []
+    for nfsshare in CONF.vault_storage_nfs_export.split(','):
+        nfsshare = nfsshare.strip()
+        backup_target = get_backup_target(nfsshare)
+        nfsstatus = backup_target.is_online()
+
+        stats[nfsshare] = {'total_capacity': -1,
+                           'total_utilization': -1,
+                           'nfsstatus': nfsstatus }
+        if nfsstatus is True:
+            t = threading.Thread(target=fill_capacity_utilization,
+                                 args=[context, backup_target, stats])
+            t.start()
+            threads.append(t)
+
+    for t in threads:
+        t.join()
+
+    return stats
 
 
 def get_workloads(context):
