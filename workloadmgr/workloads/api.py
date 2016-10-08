@@ -1017,7 +1017,6 @@ class API(base.Base):
                                                      / float(total_capacity)) * 100), 2),
                                         }
 
-      
         storage_usage = {'storage_usage': storages_usage.values(), 'count_dict':{}} 
         full = 0
         incr = 0
@@ -2346,4 +2345,6 @@ class API(base.Base):
 
         if len(license) == 0:
             raise Exception("No licenses added to TrilioVault")
+
+        return json.loads(license[0].value)
 
