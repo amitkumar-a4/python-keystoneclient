@@ -1007,7 +1007,7 @@ class API(base.Base):
                                             "capacity": utils.sizeof_fmt(total_capacity),
                                             "utilization": utils.sizeof_fmt(total_utilization),
                                           },
-					 ],
+					  ],
                                          'total': 0,
                                          'full': 0,
                                          'incremental': 0,
