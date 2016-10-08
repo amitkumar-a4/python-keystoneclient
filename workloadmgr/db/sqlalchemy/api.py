@@ -1135,7 +1135,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
                     continue
 
                 resource_snap_path = os.path.join(backup_target.mount_path,
-                                                  vm_disk_resource_snap.vault_url)
+                                                  vm_disk_resource_snap.vault_url.strip(os.sep))
                 vm_disk_resource_snap_size = backup_target.get_object_size(resource_snap_path)
                 if vm_disk_resource_snap_size == 0:
                     vm_disk_resource_snap_size = vm_disk_resource_snap.size
@@ -1143,7 +1143,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
                 disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
                 if disk_format == 'vmdk':
                     vault_path = os.path.join(backup_target.mount_path, 
-                                              vm_disk_resource_snap.vault_path)
+                                              vm_disk_resource_snap.vault_url.strip(os.sep))
                     vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
                                                                                 disk_format, disk_type)
                 else:
@@ -1153,7 +1153,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
                         vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
                         vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
                         vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
-                                                
+
                 #For vmdk   
                 if vm_disk_resource_snap_restore_size == 0:
                     vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
@@ -1176,8 +1176,8 @@ def snapshot_type_time_size_update(context, snapshot_id):
                                                                            'restore_size' : snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
             snapshot_restore_size = snapshot_restore_size + snapshot_vm_resource_restore_size
-    
-        
+
+
     snapshot_vms= snapshot_vms_get(context, snapshot_id)
     snapshot_data_transfer_time = 0
     snapshot_object_store_transfer_time = 0
@@ -1203,16 +1203,11 @@ def snapshot_type_time_size_update(context, snapshot_id):
         snapshot_data_transfer_time += snapshot_vm_data_transfer_time        
         snapshot_object_store_transfer_time += snapshot_vm_object_store_transfer_time
 
-                
-               
-    
     if snapshot.finished_at:
         time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
     else:
         time_taken = max(time_taken, int((timeutils.utcnow() - snapshot.created_at).total_seconds()))
-        
-    
-        
+
     if snapshot_type_full and snapshot_type_incremental:
         snapshot_type = 'mixed'
     elif snapshot_type_incremental:
