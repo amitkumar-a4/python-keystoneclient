@@ -980,6 +980,7 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
         storages_usage = {}
+        total_usage = 0
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
             nfsshare = nfsshare.strip()
             backup_target = vault.get_backup_target(nfsshare)
@@ -989,7 +990,7 @@ class API(base.Base):
             else:
                 total_capacity = -1
                 total_utilization = -1
-
+            total_usage = total_usage + total_capacity
             storages_usage[nfsshare]  = {'storage_type': vault.CONF.vault_storage_type,
                                          'nfs_share(s)': [
                                           {
@@ -1016,14 +1017,15 @@ class API(base.Base):
                                                      / float(total_capacity)) * 100), 2),
                                         }
 
-
-        """
+      
+        storage_usage = {'storage_usage': storages_usage.values(), 'count_dict':{}} 
         full = 0
         incr = 0
         total = 0
         full_size = 0
         incr_size = 0 
-        for snapshot in self.db.snapshot_get_all(context):
+        kwargs = {"get_all":True}
+        for snapshot in self.db.snapshot_get_all(context, **kwargs):
             if snapshot.snapshot_type == 'full':
                full = full + 1
                full_size = full_size + float(snapshot.size)
@@ -1035,26 +1037,23 @@ class API(base.Base):
         if (full + incr) > 0:
            full_total_count_percent = \
                round(((float(full) / float((full  + incr))) * 100), 2)
-           storage_usage['full_total_count_percent'] = \
+           storage_usage['count_dict']['full_total_count_percent'] = \
                 str(full_total_count_percent)
-           storage_usage['full_total_count'] = str(full)
-           storage_usage['incr_total_count'] = str(incr)
+           storage_usage['count_dict']['full_total_count'] = str(full)
+           storage_usage['count_dict']['incr_total_count'] = str(incr)
 
-        storage_usage['full'] = full_size
-        storage_usage['incremental'] = incr_size
-        storage_usage['total'] = full_size + incr_size
-
-        if float(storage_usage['total']) > 0:
-           storage_usage['full_snaps_utilization'] = \
-               round(((float(full_size) / float(storage_usage['total'])) * 100), 2)
-           storage_usage['incremental_snaps_utilization'] = \
-               round(((float(incr) / float(storage_usage['total'])) * 100), 2)
+        storage_usage['count_dict']['full'] = full_size
+        storage_usage['count_dict']['incremental'] = incr_size
+        storage_usage['count_dict']['total'] = full_size + incr_size
+        if float(total_usage) > 0:
+           storage_usage['count_dict']['full_snaps_utilization'] = \
+               round(((float(full_size) / float(total_usage)) * 100), 2)
+           storage_usage['count_dict']['incremental_snaps_utilization'] = \
+               round(((float(incr) / float(total_usage)) * 100), 2)
         else:
-             storage_usage['full_snaps_utilization'] = '0'
-             storage_usage['incremental_snaps_utilization'] = '0'
-        """
-
-        return {'storage_usage': storages_usage.values()}
+             storage_usage['count_dict']['full_snaps_utilization'] = '0'
+             storage_usage['count_dict']['incremental_snaps_utilization'] = '0'
+        return storage_usage
     
     @autolog.log_method(logger=Logger)
     def get_recentactivities(self, context, time_in_minutes):
@@ -1854,7 +1853,8 @@ class API(base.Base):
         """
         try:
             mounted_snapshots = []
-            snapshots = self.db.snapshot_get_all(context, workload_id)
+            kwargs = {"workload_id":workload_id}
+            snapshots = self.db.snapshot_get_all(context, **kwargs)
             if len(snapshots) == 0:
                msg = _("Not found any snapshots")
                wlm_exceptions.ErrorOccurred(reason=msg)               
@@ -2347,4 +2347,3 @@ class API(base.Base):
         if len(license) == 0:
             raise Exception("No licenses added to TrilioVault")
 
-        return json.loads(license[0].value)
