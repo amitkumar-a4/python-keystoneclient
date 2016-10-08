@@ -935,16 +935,17 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     """
 
     shares = {}
+    caps = get_capacities_utilizations(context)
+
     for endpoint, backend in triliovault_backup_targets.iteritems():
-        if backend.is_online() is False:
+        if caps[endpoint]['nfsstatus'] is False:
             continue
-        capacity, used = backend.get_total_capacity(context)
         shares[endpoint] = {
                      'noofworkloads': 0,
                      'totalcommitted': 0,
                      'endpoint': endpoint,
-                     'capacity': capacity,
-                     'used': used
+                     'capacity': caps[endpoint]['total_capacity'],
+                     'used': caps[endpoint]['total_utilization']
                     }
 
     for endpoint, values in shares.iteritems():
