@@ -145,7 +145,6 @@ def model_query(context, *args, **kwargs):
         query = query.filter_by(deleted=True)
     else:
         raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
-
     if context:
         if project_only and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
@@ -552,18 +551,13 @@ def workload_update(context, id, values, purge_metadata=False):
 
 @require_context
 def workload_get_all(context, **kwargs):
-        qs = None
+        qs =  model_query( context, models.Workloads, **kwargs).\
+                                options(sa_orm.joinedload(models.Workloads.metadata))
+
         if is_admin_context(context):
            if 'nfs_share' in kwargs and kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
-              qs = model_query( context, models.Workloads, **kwargs).\
-                                options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),\
-                                models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']])))).\
-                                order_by(models.Workloads.created_at.desc())
-           elif 'all_workloads' in kwargs and kwargs['all_workloads'] is True:
-                qs = model_query( context, models.Workloads, **kwargs).\
-                            options(sa_orm.joinedload(models.Workloads.metadata)).\
-                            order_by(models.Workloads.created_at.desc())
+              qs = qs.filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),\
+                             models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']]))))
            else:
                 if 'dashboard_item' in kwargs:
                    if kwargs.get('dashboard_item') ==  'activities':
@@ -583,14 +577,13 @@ def workload_get_all(context, **kwargs):
                                  models.Workloads.project_id,
                                  **kwargs). \
                                  filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
-                                 models.Workloads.deleted_at > func.adddate(func.now(), time_delta))). \
-                                 order_by(models.Workloads.created_at.desc())
+                                 models.Workloads.deleted_at > func.adddate(func.now(), time_delta)))
+           if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:   
+               qs = qs.filter_by(project_id=context.project_id)
+        else:
+             qs = qs.filter_by(project_id=context.project_id)
 
-        if qs is None:
-           qs = model_query( context, models.Workloads, **kwargs).\
-                            options(sa_orm.joinedload(models.Workloads.metadata)).\
-                            filter_by(project_id=context.project_id).\
-                            order_by(models.Workloads.created_at.desc())
+        qs = qs.order_by(models.Workloads.created_at.desc())
 
         if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
            page_size = setting_get(context,'page_size')
