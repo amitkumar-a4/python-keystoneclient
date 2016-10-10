@@ -14,4 +14,4 @@ def import_workload(cntx, workload_ids, new_version, upgrade=True):
     """ Import workload and snapshot records from vault
         Versions Supported: 2.2.1
     """
-    return import_workload_2_1_125.import_workload(cntx, workload_ids, new_version, upgrade=True)
+    return import_workload_2_1_125.import_workload(cntx, workload_ids, new_version, upgrade)
