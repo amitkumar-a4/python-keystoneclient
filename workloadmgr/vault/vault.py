@@ -953,7 +953,7 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     # if only one nfs share is configured, then return that share
     if len(shares) == 1:
-        return shares[0]['endpoint']
+        return shares.keys()[0]
 
     for endpoint, values in shares.iteritems():
         base64encode = base64.b64encode(endpoint)
