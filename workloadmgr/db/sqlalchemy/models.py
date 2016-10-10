@@ -24,7 +24,7 @@ from workloadmgr.vault import vault
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '2.2.1'
+DB_VERSION = '2.2.3'
 
 
 class WorkloadsBase(object):
@@ -384,13 +384,6 @@ class VMDiskResourceSnaps(BASE, WorkloadsBase):
     def name(self):
         return FLAGS.workload_name_template % self.id
     
-    @property
-    def vault_path(self):
-        if self.vault_url:
-            return vault.get_vault_data_directory() + self.vault_url
-        else:
-            return None    
-
     snapshot_vm_resource_id = Column(String(255), ForeignKey('snapshot_vm_resources.id'))
     vm_disk_resource_snap_backing_id = Column(String(255))
     vm_disk_resource_snap_child_id = Column(String(255))

@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 import zlib
-import shutil
+
 from M2Crypto import DSA
 
 from eventlet import greenthread
@@ -66,9 +66,7 @@ FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
-db_dir = '/tmp/triliodata_imports'
-workload_backup_endpoint = {}
-workload_backup_media_size = {}
+
 
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
@@ -172,6 +170,7 @@ def create_trust(func):
    return trust_create_wrapper
 
 
+
 def upload_settings(func):
    def upload_settings_wrapper(*args, **kwargs):
        # Clean up trust if the role is changed
@@ -205,40 +204,6 @@ def check_policy(context, action, target_obj=None):
 
     _action = 'workload:%s' % action
     policy.enforce(context, _action, target)
-
-def update_workload_metadata(workload_values):
-    '''
-    Update workload values with "backup_media_target"
-    and "workload_approx_backup_size".
-    '''
-    try:
-        workload_metadata = workload_values['metadata']
-        if 'backup_media_target' not in workload_metadata:
-            jobschedule = pickle.loads(str(workload_values['jobschedule']))
-            if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
-                incrs = jobschedule['retention_policy_value']
-            else:
-                jobsperday = int(jobschedule['interval'].split("hr")[0])
-                incrs = jobschedule['retention_policy_value'] * jobsperday
-
-            if jobschedule['fullbackup_interval'] == '-1':
-                fulls = 1
-            else:
-                fulls = incrs / jobschedule['fullbackup_interval']
-                incrs = incrs - fulls
-
-            workload_approx_backup_size = \
-                (fulls * workload_backup_media_size[workload_values['id']] * vault.CONF.workload_full_backup_factor +
-                 incrs * workload_backup_media_size[
-                     workload_values['id']] * vault.CONF.workload_incr_backup_factor) / 100
-
-            workload_values['metadata'][0]['backup_media_target'] = workload_backup_endpoint[ workload_values['id'] ]
-            workload_values['metadata'][0]['workload_approx_backup_size'] = workload_approx_backup_size
-
-        return workload_values
-    except Exception as ex:
-        LOG.exception(ex)
-
 
 
 class API(base.Base):
@@ -528,7 +493,7 @@ class API(base.Base):
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
             #TODO(giri): optimize this lookup
-              
+
             if len(instances) == 0:
                 raise wlm_exceptions.InvalidRequest(reason="No instances found in the workload create request")
 
@@ -837,7 +802,7 @@ class API(base.Base):
 
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
-    
+   
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
 
@@ -845,104 +810,17 @@ class API(base.Base):
         if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
 
-        #Map to store all path of all JSON files for a  resource
-        db_files_map = {
-                'workload_db' : [] ,
-                'workload_vms_db' : [],
-                'snapshot_db' : [],
-                'snapshot_vms_db' : [],
-                'resources_db' : [],
-                'network_db' : [],
-                'disk_db' : [],
-                'security_db' : []
-        }
- 
-        #Create temporary folder to store JSON files.
-        if not os.path.exists(db_dir):
-             os.makedirs(db_dir)
-
-        # call get_backup_target that makes sure all shares are mounted
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            vault.get_backup_target(backup_endpoint)
-
-        module_name = 'workloadmgr.db.imports.import_workload_' +\
-                       models.DB_VERSION.replace('.', '_')
-        import_workload_module = importlib.import_module(module_name)
-        import_settings_method = getattr(import_workload_module,
-                                         'import_settings')
-        import_settings_method(context, models.DB_VERSION)            
- 
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            backup_target = None
-            try:
-                backup_target = vault.get_backup_target(backup_endpoint)
-                workload_url = backup_target.get_workloads(context)
-                workload_url_iterate = []
-
-                if len(workload_ids) > 0:
-                    for workload in workload_url:
-                        workload_id = os.path.split(workload)[1].replace('workload_','')
-                        if workload_ids.count(workload_id) == 1:
-                            #update workload_backend_endpoint map
-                            workload_backup_endpoint[workload_id] = backup_endpoint
-                            workload_url_iterate.append(workload)
-                else:
-                    for workload in workload_url:
-                        workload_id = os.path.split(workload)[1].replace('workload_','')
-                        #update workload_backend_endpoint map
-                        workload_backup_endpoint[workload_id] = backup_endpoint
-                        workload_url_iterate.append(workload)
-
-                #Create list of all files related to a common resource
-                for workload_path in workload_url_iterate:
-                    for path, subdirs, files in os.walk( workload_path ):
-                        for name in files:
-                            if name.endswith("workload_db"):
-                                db_files_map['workload_db'].append(os.path.join(path, name))
-                            elif name.endswith("workload_vms_db"):
-                                db_files_map['workload_vms_db'].append(os.path.join(path, name))
-                            elif name.endswith("snapshot_db"):
-                                db_files_map['snapshot_db'].append(os.path.join(path, name))
-                            elif name.endswith("snapshot_vms_db"):
-                                db_files_map['snapshot_vms_db'].append(os.path.join(path, name))
-                            elif name.endswith("resources_db"):
-                                db_files_map['resources_db'].append(os.path.join(path, name))
-                            elif name.endswith("network_db"):
-                                db_files_map['network_db'].append(os.path.join(path, name))
-                            elif name.endswith("disk_db"):
-                                db_files_map['disk_db'].append(os.path.join(path, name))
-                            elif name.endswith("security_db"):
-                                db_files_map['security_db'].append(os.path.join(path, name))
-
-            except Exception as ex:
-                LOG.exception(ex)
-
         try:
-            #Creating a map for each workload with workload_backup_media_size.
-            for snap in db_files_map['snapshot_db']:
-                    with open(snap, 'r') as snapshot_file:
-                         snapshot = snapshot_file.read()
-                    snapshot_json = json.loads(snapshot)
-                    if snapshot_json['snapshot_type'] == 'full':
-                       workload_backup_media_size[ snapshot_json['workload_id'] ] = snapshot_json['size']
+            # call get_backup_target that makes sure all shares are mounted
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                vault.get_backup_target(backup_endpoint)
 
-            # Iterate over each file for a resource in all NFS mounts
-            # and create a single db file for that.
-            for db, files in db_files_map.iteritems():
-                db_json = []
-
-                for file in files:
-                    with open(file, 'r') as file_db:
-                        file_data = file_db.read()
-                    json_obj = json.loads(file_data)
-
-                    if db == 'workload_db':
-                       #In case of workload updating each object with 
-                       #"workload_backup_media_size" and "backup_media_target"
-                       json_obj = update_workload_metadata(json_obj)
-                    db_json.append(json_obj)
-
-                pickle.dump(db_json, open(db_dir + '/' + db, "wb"))
+            module_name = 'workloadmgr.db.imports.import_workload_' +\
+                           models.DB_VERSION.replace('.', '_')
+            import_workload_module = importlib.import_module(module_name)
+            import_settings_method = getattr(import_workload_module,
+                                             'import_settings')
+            import_settings_method(context, models.DB_VERSION)
 
             #TODO:Need to make this call to a single import module instead of 
             #looking for new import module for each new build.
@@ -950,21 +828,16 @@ class API(base.Base):
                   'workloadmgr.db.imports.import_workload_' +
                    models.DB_VERSION.replace('.', '_'))
             import_workload_method = getattr(import_workload_module, 'import_workload')
-            #TODO: Need to change signature for "import_workload" as 
-            #workload_url is not required
-            workloads = import_workload_method(context, workload_url,
+
+            workloads = import_workload_method(context, workload_ids,
                                                           models.DB_VERSION,
-                                                          backup_endpoint,
                                                           upgrade)
         except Exception as ex:
             LOG.exception(ex)
 
-        finally:
-                backup_target and backup_target.purge_staging_area(context)
-                if  os.path.exists(db_dir):
-                    shutil.rmtree(db_dir, ignore_errors=True)
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
+
 
     @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
@@ -2454,3 +2327,5 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+
