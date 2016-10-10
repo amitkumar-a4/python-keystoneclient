@@ -1,4 +1,4 @@
-# Copyright (c) 2016 TrilioData, Inc.
+opyright (c) 2016 TrilioData, Inc.
 # All Rights Reserved.
 
 from workloadmgr.openstack.common import log as logging
@@ -10,8 +10,8 @@ LOG = logging.getLogger(__name__)
 def import_settings(cntx, new_version, upgrade=True):
     return import_workload_2_2_2.import_settings(cntx, new_version, upgrade)
 
-def import_workload(cntx, workload_ids, new_version, upgrade=True):
+def import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade=True):
     """ Import workload and snapshot records from vault
         Versions Supported: 2.2.3
     """
-    return import_workload_2_2_2.import_workload(cntx, workload_ids, new_version, upgrade)
+    return import_workload_2_2_2.import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade)
