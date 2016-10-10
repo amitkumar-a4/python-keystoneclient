@@ -1,4 +1,4 @@
-opyright (c) 2016 TrilioData, Inc.
+# Copyright (c) 2016 TrilioData, Inc.
 # All Rights Reserved.
 
 from workloadmgr.openstack.common import log as logging
