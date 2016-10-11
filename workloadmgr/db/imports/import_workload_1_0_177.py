@@ -10,6 +10,7 @@ import uuid
 from operator import itemgetter
 import cPickle as pickle
 import shutil
+import tempfile
 
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import workloads as workloadAPI
@@ -29,8 +30,6 @@ DBSession = get_session()
 workloads = []
 workload_backup_endpoint = {}
 workload_backup_media_size = {}
-context_map = {}
-db_dir = '/tmp/triliodata_imports/'
 
 import_map = [
     {'file': 'workload_db',
@@ -103,26 +102,29 @@ def check_tenant(cntx, workload_path, upgrade):
     '''
     try:
         workload_values = json.loads( open(os.path.join(workload_path, 'workload_db'), 'r').read() )
-        if upgrade == True:
-           tenant_id = workload_values.get('tenant_id', None)
-           tenant_id = workload_values.get('project_id', tenant_id)
-           if project_id_exists(cntx, tenant_id):
-              tenantcontext = wlm_context.RequestContext(
-                                user_id=workload_values['user_id'],
-                                project_id=tenant_id,
-                                tenant_id=tenant_id)
-              context_map[ workload_values['id'] ] = tenantcontext
-              return True
-           else:
-               raise exception.InvalidRequest(
-                     reason=("Workload %s tenant %s does not belong to this cloud" %
-                     (workload_values['id'], tenant_id)))
-        else:
-            context_map[ workload_values['id'] ] = tenantcontext
+        tenant_id = workload_values.get('tenant_id', None)
+        tenant_id = workload_values.get('project_id', tenant_id)
+        if project_id_exists(cntx, tenant_id):
             return True
+        else:
+            raise exception.InvalidRequest(
+                  reason=("Workload %s tenant %s does not belong to this cloud" %
+                         (workload_values['id'], tenant_id)))
     except Exception as ex:
            LOG.exception(ex)
-           return False
+
+def get_context(tenantcontext, values):
+    try:
+
+        tenant_id = values.get('tenant_id', None)
+        tenant_id = values.get('project_id', tenant_id)
+        tenantcontext = wlm_context.RequestContext(
+                user_id=values['user_id'],
+                project_id=tenant_id,
+                tenant_id=tenant_id)
+        return tenantcontext
+    except Exception as ex:
+        LOG.exception(ex)
 
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
@@ -161,31 +163,28 @@ def get_workload_url(context, workload_ids, upgrade):
     Iterate over all NFS backups mounted for list of workloads available.
     '''
     workload_url_iterate = []
+    def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
+        # Check whether workload tenant exist in current cloud or not
+        if check_tenant(context, workload, upgrade):
+            # update workload_backend_endpoint map
+            workload_backup_endpoint[workload_id] = backup_endpoint
+            workload_url_iterate.append(workload)
+
     for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
         backup_target = None
         try:
             backup_target = vault.get_backup_target(backup_endpoint)
             workload_url = backup_target.get_workloads(context)
-            workload_url_iterate = []
 
-            if len(workload_ids) > 0:
-                for workload in workload_url:
-                    workload_id = os.path.split(workload)[1].replace('workload_', '')
+            for workload in workload_url:
+                workload_id = os.path.split(workload)[1].replace('workload_', '')
+                if len(workload_ids) > 0:
+                    #If workload found in given workload id's then add to iterate list
+                    if workload_id in workload_ids:
+                        add_workload(context, workload_id, workload, backup_endpoint, upgrade)
+                else:
+                    add_workload(context, workload_id, workload, backup_endpoint, upgrade)
 
-                    if workload_ids.count(workload_id) == 1:
-                        # Check whether workload tenant exist in current cloud or not
-                        if check_tenant(context, workload, upgrade):
-                            # update workload_backend_endpoint map
-                            workload_backup_endpoint[workload_id] = backup_endpoint
-                            workload_url_iterate.append(workload)
-            else:
-                for workload in workload_url:
-                    workload_id = os.path.split(workload)[1].replace('workload_', '')
-                    # Check whether workload tenant exist in current cloud or not
-                    if check_tenant(context, workload, upgrade):
-                        # update workload_backend_endpoint map
-                        workload_backup_endpoint[workload_id] = backup_endpoint
-                        workload_url_iterate.append(workload)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -226,7 +225,7 @@ def update_workload_metadata(workload_values):
     except Exception as ex:
         LOG.exception(ex)
 
-def get_json_files(context, workload_ids, upgrade):
+def get_json_files(context, workload_ids, db_dir, upgrade):
 
     # Map to store all path of all JSON files for a  resource
     db_files_map = {
@@ -241,10 +240,6 @@ def get_json_files(context, workload_ids, upgrade):
     }
 
     try:
-        # Create temporary folder to store JSON files.
-        if not os.path.exists(db_dir):
-            os.makedirs(db_dir)
-
         workload_url_iterate = get_workload_url(context, workload_ids, upgrade)
 
         # Create list of all files related to a common resource
@@ -297,12 +292,8 @@ def get_json_files(context, workload_ids, upgrade):
     except Exception as ex:
         LOG.exception(ex)
 
-    #finally:
-    #    #if  os.path.exists(db_dir):
-    #shutil.rmtree(db_dir, ignore_errors=True)
 
-
-def import_resources(tenantcontext, resource_map, new_version, upgrade):
+def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
     '''
     create list of dictionary object for each resource and
     dump it into the database.
@@ -354,7 +345,7 @@ def import_resources(tenantcontext, resource_map, new_version, upgrade):
 
     try:
         #Load file for resource containing all objects neeed to import
-        resources_db_list = pickle.load(open(db_dir + file, "rb"))
+        resources_db_list = pickle.load(open(db_dir + '/' + file, "rb"))
 
         for resources in resources_db_list:
             if isinstance(resources, list):
@@ -362,17 +353,11 @@ def import_resources(tenantcontext, resource_map, new_version, upgrade):
                     #In case if workoad/snapshod updating object values
                     #with their respective tenant id and user id using context
                     if file in ['workload_db', 'snapshot_db']:
-                       if resource['id'] in context_map.keys():
-                          tenantcontext = context_map[ resource['id'] ]
-                       else:
-                          tenantcontext = context_map[ resource['workload_id'] ]
+                          tenantcontext = get_context(tenantcontext, resource)
                     update_resource_list(tenantcontext, resource)
             else:
                 if file in ['workload_db', 'snapshot_db']:
-                   if resources['id'] in context_map.keys():
-                      tenantcontext = context_map[ resources['id'] ]
-                   else:
-                      tenantcontext = context_map[ resources['workload_id'] ]
+                      tenantcontext = get_context(tenantcontext, resources)
                 update_resource_list(tenantcontext,resources)
 
         #TODO: Uncomment the code for updating existing resources
@@ -409,11 +394,14 @@ def import_workload(cntx, workload_ids, new_version, upgrade=True):
     and perform bulk insert in the database.
     '''
     try:
-        get_json_files(cntx, workload_ids, upgrade)
-        DBSession.autocommit = False
+        # Create temporary folder to store JSON files.
+        db_dir = tempfile.mkdtemp()
+
         del workloads[:]
+        DBSession.autocommit = False
+        get_json_files(cntx, workload_ids, db_dir, upgrade)
         for resource_map in import_map:
-            import_resources(cntx, resource_map, new_version, upgrade)
+            import_resources(cntx, resource_map, new_version, db_dir, upgrade)
         DBSession.autocommit = True
     except Exception as ex:
         LOG.exception(ex)
