@@ -93,7 +93,6 @@ def project_id_exists(cntx, project_id):
     for prj in projects:
         if uuid.UUID(prj.id) == uuid.UUID(project_id):
             return True
-
     return False
 
 def check_tenant(cntx, workload_path, upgrade):
@@ -113,9 +112,8 @@ def check_tenant(cntx, workload_path, upgrade):
     except Exception as ex:
            LOG.exception(ex)
 
-def get_context(tenantcontext, values):
+def get_context(values):
     try:
-
         tenant_id = values.get('tenant_id', None)
         tenant_id = values.get('project_id', tenant_id)
         tenantcontext = wlm_context.RequestContext(
@@ -138,7 +136,6 @@ def _adjust_values(cntx, new_version, values, upgrade):
         values['metadata'] = metadata
     if 'host' in values:
         values['host'] = socket.gethostname()
-
     return values
 
 def import_settings(cntx, new_version, upgrade=True):
@@ -190,7 +187,7 @@ def get_workload_url(context, workload_ids, upgrade):
 
         finally:
             backup_target and backup_target.purge_staging_area(context)
-        return workload_url_iterate
+    return workload_url_iterate
 
 def update_workload_metadata(workload_values):
     '''
@@ -353,11 +350,11 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
                     #In case if workoad/snapshod updating object values
                     #with their respective tenant id and user id using context
                     if file in ['workload_db', 'snapshot_db']:
-                          tenantcontext = get_context(tenantcontext, resource)
+                          tenantcontext = get_context(resource)
                     update_resource_list(tenantcontext, resource)
             else:
                 if file in ['workload_db', 'snapshot_db']:
-                      tenantcontext = get_context(tenantcontext, resources)
+                      tenantcontext = get_context(resources)
                 update_resource_list(tenantcontext,resources)
 
         #TODO: Uncomment the code for updating existing resources
