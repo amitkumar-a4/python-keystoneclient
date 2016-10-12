@@ -285,7 +285,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                     json_obj = update_workload_metadata(json_obj)
                 db_json.append(json_obj)
 
-            pickle.dump(db_json, open(db_dir + '/' + db, "wb"))
+            pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
     except Exception as ex:
         LOG.exception(ex)
 
@@ -342,7 +342,7 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
 
     try:
         #Load file for resource containing all objects neeed to import
-        resources_db_list = pickle.load(open(db_dir + '/' + file, "rb"))
+        resources_db_list = pickle.load(open(os.path.join(db_dir, file), 'rb'))
 
         for resources in resources_db_list:
             if isinstance(resources, list):
