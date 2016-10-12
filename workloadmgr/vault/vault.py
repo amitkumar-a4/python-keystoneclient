@@ -948,6 +948,13 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                      'used': caps[endpoint]['total_utilization']
                     }
 
+    if len(shares) == 0:
+        raise exception.InvalidState(reason="No NFS shares mounted")
+
+    # if only one nfs share is configured, then return that share
+    if len(shares) == 1:
+        return shares.keys()[0]
+
     for endpoint, values in shares.iteritems():
         base64encode = base64.b64encode(endpoint)
         mountpath = os.path.join(CONF.vault_data_directory, base64encode)
