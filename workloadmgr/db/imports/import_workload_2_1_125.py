@@ -48,8 +48,8 @@ def import_settings(cntx, new_version, upgrade=True):
 
     return import_workload_2_0_205.import_settings(cntx, new_version)
 
-def import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade=True):
+def import_workload(cntx, workload_ids, new_version, upgrade=True):
     """ Import workload and snapshot records from vault 
     Versions Supported: 2.0.205
     """
-    return import_workload_2_0_205.import_workload(cntx, workload_url, new_version, backup_endpoint, upgrade)
+    return import_workload_2_0_205.import_workload(cntx, workload_ids, new_version, upgrade)
