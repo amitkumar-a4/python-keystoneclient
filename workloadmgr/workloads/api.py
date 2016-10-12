@@ -784,12 +784,10 @@ class API(base.Base):
             backup_target = None
             try:
                 backup_target = vault.get_backup_target(backup_endpoint)
-
-                workload_url = backup_target.get_workloads(context)
                 for workload_url in backup_target.get_workloads(context):
                     try:
                         workload_values = json.loads(backup_target.get_object(
-                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                            os.path.join(workload_url, 'workload_db')))
                         workloads.append(workload_values)
 
                     except Exception as ex:
