@@ -67,6 +67,7 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
 
+
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
     try:
@@ -167,6 +168,7 @@ def create_trust(func):
 
        return func(*args, **kwargs)
    return trust_create_wrapper
+
 
 
 def upload_settings(func):
@@ -778,12 +780,10 @@ class API(base.Base):
             backup_target = None
             try:
                 backup_target = vault.get_backup_target(backup_endpoint)
-
-                workload_url = backup_target.get_workloads(context)
                 for workload_url in backup_target.get_workloads(context):
                     try:
                         workload_values = json.loads(backup_target.get_object(
-                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                            os.path.join(workload_url, 'workload_db')))
                         workloads.append(workload_values)
 
                     except Exception as ex:
@@ -796,7 +796,7 @@ class API(base.Base):
 
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
-    
+   
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
 
@@ -804,72 +804,34 @@ class API(base.Base):
         if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
 
-        # call get_backup_target that makes sure all shares are mounted
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            vault.get_backup_target(backup_endpoint)
+        try:
+            # call get_backup_target that makes sure all shares are mounted
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                vault.get_backup_target(backup_endpoint)
 
-        module_name = 'workloadmgr.db.imports.import_workload_' +\
-                       models.DB_VERSION.replace('.', '_')
-        import_workload_module = importlib.import_module(module_name)
-        import_settings_method = getattr(import_workload_module,
-                                         'import_settings')
-        import_settings_method(context, models.DB_VERSION)            
- 
-        workloads = []
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            backup_target = None
-            try:
-                backup_target = vault.get_backup_target(backup_endpoint)
+            module_name = 'workloadmgr.db.imports.import_workload_' +\
+                           models.DB_VERSION.replace('.', '_')
+            import_workload_module = importlib.import_module(module_name)
+            import_settings_method = getattr(import_workload_module,
+                                             'import_settings')
+            import_settings_method(context, models.DB_VERSION)
 
-                workload_url = backup_target.get_workloads(context)
-                workload_url_iterate = []
+            #TODO:Need to make this call to a single import module instead of 
+            #looking for new import module for each new build.
+            import_workload_module = importlib.import_module(
+                  'workloadmgr.db.imports.import_workload_' +
+                   models.DB_VERSION.replace('.', '_'))
+            import_workload_method = getattr(import_workload_module, 'import_workload')
 
-                if len(workload_ids) > 0:
-                    for workload in workload_url:
-                        if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
-                            workload_url_iterate.append(workload)
-                else:
-                    for workload in workload_url:
-                        workload_url_iterate.append(workload)
-
-                del workload_url[:]
-                for workload_url in workload_url_iterate:
-                    try:
-                        workload_values = json.loads(backup_target.get_object(
-                            os.path.join(workload_url['workload_url'], 'workload_db')))
-                    except Exception as ex:
-                        LOG.exception(ex)
-                        continue                    
-                    """
-                    try:
-                        jobs = self._scheduler.get_jobs()
-                        for job in jobs:
-                            if job.kwargs['workload_id'] == workload_values['id']:
-                                self._scheduler._remove_job(job, 'alias', self._jobstore)
-                        self.db.purge_workload(context, workload_values['id'])
-                    except Exception as ex:
-                        LOG.exception(ex)
-                    """
-                    try:            
-                        import_workload_module = importlib.import_module(
-                            'workloadmgr.db.imports.import_workload_' +
-                            workload_values['version'].replace('.', '_'))
-                        import_workload_method = getattr(import_workload_module,
-                                                         'import_workload')
-                        workload = import_workload_method(context, workload_url,
+            workloads = import_workload_method(context, workload_ids,
                                                           models.DB_VERSION,
-                                                          backup_endpoint,
                                                           upgrade)
-                        workloads.append(workload)
-                    except Exception as ex:
-                        LOG.exception(ex)
-            except Exception as ex:
-                LOG.exception(ex)
-            finally:
-                backup_target and backup_target.purge_staging_area(context)
+        except Exception as ex:
+            LOG.exception(ex)
 
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
+
 
     @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
@@ -2355,3 +2317,5 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+
