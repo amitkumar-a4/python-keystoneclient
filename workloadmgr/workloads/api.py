@@ -378,6 +378,7 @@ class API(base.Base):
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
+        metadata['backup_media_target'] = metadata.get("backup_media_target", "NA")
         if context.is_admin is False:
             metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
@@ -452,6 +453,7 @@ class API(base.Base):
                 metadata.setdefault(kvpair['key'], kvpair['value'])
                 pass
 
+        metadata['backup_media_target'] = metadata.get("backup_media_target", "NA")
         if context.is_admin is False:
             metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
