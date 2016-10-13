@@ -378,6 +378,7 @@ class API(base.Base):
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
+        metadata['backup_media_target'] = metadata.get("backup_media_target", "NA")
         if context.is_admin is False:
             metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
@@ -452,6 +453,7 @@ class API(base.Base):
                 metadata.setdefault(kvpair['key'], kvpair['value'])
                 pass
 
+        metadata['backup_media_target'] = metadata.get("backup_media_target", "NA")
         if context.is_admin is False:
             metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
@@ -805,6 +807,7 @@ class API(base.Base):
             raise wlm_exceptions.AdminRequired()
 
         try:
+            workloads = []
             # call get_backup_target that makes sure all shares are mounted
             for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
                 vault.get_backup_target(backup_endpoint)
@@ -824,8 +827,8 @@ class API(base.Base):
             import_workload_method = getattr(import_workload_module, 'import_workload')
 
             workloads = import_workload_method(context, workload_ids,
-                                                          models.DB_VERSION,
-                                                          upgrade)
+                                               models.DB_VERSION,
+                                               upgrade)
         except Exception as ex:
             LOG.exception(ex)
 
