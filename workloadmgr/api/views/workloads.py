@@ -79,7 +79,7 @@ class ViewBuilder(common.ViewBuilder):
                 'metadata' : workload.get('metadata'),                
                 'jobschedule' : workload.get('jobschedule'),                
                 'status': workload.get('status'),
-                'links': self._get_links(request, workload['id']),
+                'links': self._get_links(request, workload['id'])
             }
         }
 
