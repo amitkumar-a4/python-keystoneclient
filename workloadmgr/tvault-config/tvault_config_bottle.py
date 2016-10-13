@@ -2768,15 +2768,22 @@ def validate_nfs_share():
         from workloadmgr import utils
         nfsshare = bottle.request.query['nfsshare']
         nfsserver = nfsshare.split(":")[0]
+        sharepath = nfsshare.split(":")[1]
         rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
 
         for i in rpcinfo[0].split("\n")[1:]:
-            if len(i.split()) and i.split()[3] == 'nfs':
+            if len(i.split()) and i.split()[3] == 'mountd':
+                mounts = utils.execute("showmount", "-e", "--no-headers", nfsserver)
+                if sharepath not in mounts[0]:
+                    return bottle.HTTPResponse(status=500,
+                        body=str("'%s' is not found in %s export list" % (nfsshare, nfsserver)))
                 return {'status': 'Success'}
         return bottle.HTTPResponse(status=500,
-            body=str("NFS Daemon not running on the server '%s'" % nfsserver))
+            body=str("NFS Daemon is not running on the server '%s'" % nfsserver))
+
     except Exception as exception:
-        return bottle.HTTPResponse(status=500, body=str(exception))
+        body=str("NFS Daemon is not running on the server '%s'" % nfsserver)
+        return bottle.HTTPResponse(status=500, body=body)
 
 
 def findXmlSection(dom, sectionName):
