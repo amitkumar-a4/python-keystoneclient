@@ -67,6 +67,7 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
 
+
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
     try:
@@ -167,6 +168,7 @@ def create_trust(func):
 
        return func(*args, **kwargs)
    return trust_create_wrapper
+
 
 
 def upload_settings(func):
@@ -376,6 +378,9 @@ class API(base.Base):
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
+        if context.is_admin is False:
+            metadata.get("backup_media_target", None) and \
+            metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata        
         
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
@@ -447,6 +452,9 @@ class API(base.Base):
                 metadata.setdefault(kvpair['key'], kvpair['value'])
                 pass
 
+        if context.is_admin is False:
+            metadata.get("backup_media_target", None) and \
+            metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False 
@@ -464,19 +472,9 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_get_all(self, context, search_opts={}):
-        if 'page_number' in search_opts:
-            workloads = self.db.workload_get_all(context,page_number=search_opts['page_number'])
-        else:
-            workloads = self.db.workload_get_all(context)
+        workloads = self.db.workload_get_all(context,**search_opts)
         return workloads
 
-    @autolog.log_method(logger=Logger)
-    def workload_get_all_by_admin(self, context, search_opts={}):
-        if context.is_admin is False:
-            raise wlm_exceptions.AdminRequired()
-        workloads = self.db.workload_get_all_by_admin(context)
-        return workloads        
-    
     @autolog.log_method(logger=Logger)
     @create_trust
     def workload_create(self, context, name, description, workload_type_id,
@@ -782,12 +780,10 @@ class API(base.Base):
             backup_target = None
             try:
                 backup_target = vault.get_backup_target(backup_endpoint)
-
-                workload_url = backup_target.get_workloads(context)
                 for workload_url in backup_target.get_workloads(context):
                     try:
                         workload_values = json.loads(backup_target.get_object(
-                            os.path.join(workload_url['workload_url'], 'workload_db')))
+                            os.path.join(workload_url, 'workload_db')))
                         workloads.append(workload_values)
 
                     except Exception as ex:
@@ -800,7 +796,7 @@ class API(base.Base):
 
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
-    
+   
     @autolog.log_method(logger=Logger)    
     def import_workloads(self, context, workload_ids, upgrade):
 
@@ -808,72 +804,34 @@ class API(base.Base):
         if context.is_admin is not True and upgrade is True:
             raise wlm_exceptions.AdminRequired()
 
-        # call get_backup_target that makes sure all shares are mounted
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            vault.get_backup_target(backup_endpoint)
+        try:
+            # call get_backup_target that makes sure all shares are mounted
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                vault.get_backup_target(backup_endpoint)
 
-        module_name = 'workloadmgr.db.imports.import_workload_' +\
-                       models.DB_VERSION.replace('.', '_')
-        import_workload_module = importlib.import_module(module_name)
-        import_settings_method = getattr(import_workload_module,
-                                         'import_settings')
-        import_settings_method(context, models.DB_VERSION)            
- 
-        workloads = []
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            backup_target = None
-            try:
-                backup_target = vault.get_backup_target(backup_endpoint)
+            module_name = 'workloadmgr.db.imports.import_workload_' +\
+                           models.DB_VERSION.replace('.', '_')
+            import_workload_module = importlib.import_module(module_name)
+            import_settings_method = getattr(import_workload_module,
+                                             'import_settings')
+            import_settings_method(context, models.DB_VERSION)
 
-                workload_url = backup_target.get_workloads(context)
-                workload_url_iterate = []
+            #TODO:Need to make this call to a single import module instead of 
+            #looking for new import module for each new build.
+            import_workload_module = importlib.import_module(
+                  'workloadmgr.db.imports.import_workload_' +
+                   models.DB_VERSION.replace('.', '_'))
+            import_workload_method = getattr(import_workload_module, 'import_workload')
 
-                if len(workload_ids) > 0:
-                    for workload in workload_url:
-                        if workload_ids.count(workload['workload_url'].replace('workload_','')) == 1:
-                            workload_url_iterate.append(workload)
-                else:
-                    for workload in workload_url:
-                        workload_url_iterate.append(workload)
-
-                del workload_url[:]
-                for workload_url in workload_url_iterate:
-                    try:
-                        workload_values = json.loads(backup_target.get_object(
-                            os.path.join(workload_url['workload_url'], 'workload_db')))
-                    except Exception as ex:
-                        LOG.exception(ex)
-                        continue                    
-                    """
-                    try:
-                        jobs = self._scheduler.get_jobs()
-                        for job in jobs:
-                            if job.kwargs['workload_id'] == workload_values['id']:
-                                self._scheduler._remove_job(job, 'alias', self._jobstore)
-                        self.db.purge_workload(context, workload_values['id'])
-                    except Exception as ex:
-                        LOG.exception(ex)
-                    """
-                    try:            
-                        import_workload_module = importlib.import_module(
-                            'workloadmgr.db.imports.import_workload_' +
-                            workload_values['version'].replace('.', '_'))
-                        import_workload_method = getattr(import_workload_module,
-                                                         'import_workload')
-                        workload = import_workload_method(context, workload_url,
+            workloads = import_workload_method(context, workload_ids,
                                                           models.DB_VERSION,
-                                                          backup_endpoint,
                                                           upgrade)
-                        workloads.append(workload)
-                    except Exception as ex:
-                        LOG.exception(ex)
-            except Exception as ex:
-                LOG.exception(ex)
-            finally:
-                backup_target and backup_target.purge_staging_area(context)
+        except Exception as ex:
+            LOG.exception(ex)
 
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
+
 
     @autolog.log_method(logger=Logger)
     def get_nodes(self, context):
@@ -989,16 +947,19 @@ class API(base.Base):
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
         storages_usage = {}
+        total_usage = 0
+        nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
-            nfsshare = nfsshare.strip()
-            backup_target = vault.get_backup_target(nfsshare)
-            nfsstatus = backup_target.is_online()
-            if nfsstatus is True:
-                total_capacity, total_utilization = backup_target.get_total_capacity(context)
-            else:
-                total_capacity = -1
-                total_utilization = -1
+            stat = nfsstats[nfsshare]
+
+            total_capacity = stat['total_capacity']
+            total_utilization = stat['total_utilization']
+            nfsstatus = stat['nfsstatus']
 
             storages_usage[nfsshare]  = {'storage_type': vault.CONF.vault_storage_type,
                                          'nfs_share(s)': [
@@ -1026,14 +987,14 @@ class API(base.Base):
                                                      / float(total_capacity)) * 100), 2),
                                         }
 
-
-        """
+        storage_usage = {'storage_usage': storages_usage.values(), 'count_dict':{}} 
         full = 0
         incr = 0
         total = 0
         full_size = 0
         incr_size = 0 
-        for snapshot in self.db.snapshot_get_all(context):
+        kwargs = {"get_all":True}
+        for snapshot in self.db.snapshot_get_all(context, **kwargs):
             if snapshot.snapshot_type == 'full':
                full = full + 1
                full_size = full_size + float(snapshot.size)
@@ -1045,26 +1006,23 @@ class API(base.Base):
         if (full + incr) > 0:
            full_total_count_percent = \
                round(((float(full) / float((full  + incr))) * 100), 2)
-           storage_usage['full_total_count_percent'] = \
+           storage_usage['count_dict']['full_total_count_percent'] = \
                 str(full_total_count_percent)
-           storage_usage['full_total_count'] = str(full)
-           storage_usage['incr_total_count'] = str(incr)
+           storage_usage['count_dict']['full_total_count'] = str(full)
+           storage_usage['count_dict']['incr_total_count'] = str(incr)
 
-        storage_usage['full'] = full_size
-        storage_usage['incremental'] = incr_size
-        storage_usage['total'] = full_size + incr_size
-
-        if float(storage_usage['total']) > 0:
-           storage_usage['full_snaps_utilization'] = \
-               round(((float(full_size) / float(storage_usage['total'])) * 100), 2)
-           storage_usage['incremental_snaps_utilization'] = \
-               round(((float(incr) / float(storage_usage['total'])) * 100), 2)
+        storage_usage['count_dict']['full'] = full_size
+        storage_usage['count_dict']['incremental'] = incr_size
+        storage_usage['count_dict']['total'] = full_size + incr_size
+        if float(total_usage) > 0:
+           storage_usage['count_dict']['full_snaps_utilization'] = \
+               round(((float(full_size) / float(total_usage)) * 100), 2)
+           storage_usage['count_dict']['incremental_snaps_utilization'] = \
+               round(((float(incr) / float(total_usage)) * 100), 2)
         else:
-             storage_usage['full_snaps_utilization'] = '0'
-             storage_usage['incremental_snaps_utilization'] = '0'
-        """
-
-        return {'storage_usage': storages_usage.values()}
+             storage_usage['count_dict']['full_snaps_utilization'] = '0'
+             storage_usage['count_dict']['incremental_snaps_utilization'] = '0'
+        return storage_usage
     
     @autolog.log_method(logger=Logger)
     def get_recentactivities(self, context, time_in_minutes):
@@ -1591,13 +1549,8 @@ class API(base.Base):
         return snapshot_details
     
     @autolog.log_method(logger=Logger)
-    def snapshot_get_all(self, context, workload_id=None):
-        snapshots = self.db.snapshot_get_all(context, workload_id)
-        return snapshots
-
-    @autolog.log_method(logger=Logger)
-    def snapshot_get_all_by_host(self, context, host=None):
-        snapshots = self.db.snapshot_get_all_by_host(context, host)
+    def snapshot_get_all(self, context, search_opts={}):
+        snapshots = self.db.snapshot_get_all(context, **search_opts)
         return snapshots
 
     @autolog.log_method(logger=Logger)
@@ -1869,7 +1822,8 @@ class API(base.Base):
         """
         try:
             mounted_snapshots = []
-            snapshots = self.db.snapshot_get_all(context, workload_id)
+            kwargs = {"workload_id":workload_id}
+            snapshots = self.db.snapshot_get_all(context, **kwargs)
             if len(snapshots) == 0:
                msg = _("Not found any snapshots")
                wlm_exceptions.ErrorOccurred(reason=msg)               
@@ -2363,3 +2317,5 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+

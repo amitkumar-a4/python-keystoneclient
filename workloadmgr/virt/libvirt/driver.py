@@ -901,7 +901,9 @@ class LibvirtDriver(driver.ComputeDriver):
                 LOG.debug(_('Uploading '+ disk_info['dev'] + ' of VM:' + instance['vm_id'] + \
                             '; backing file:' + os.path.basename(backing['path'])))
 
-                progress_tracker_metadata = {'snapshot_id': snapshot['id'], 'resource_id' : vm_disk_resource_snap_id}
+                progress_tracker_metadata = {'snapshot_id': snapshot['id'],
+                                             'backup_endpoint': backup_endpoint,
+                                             'resource_id' : vm_disk_resource_snap_id}
                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                    progress_tracker_metadata, 
                                                    instance['vm_id'],
@@ -939,7 +941,7 @@ class LibvirtDriver(driver.ComputeDriver):
                         vm_disk_resource_snap.vault_url.strip(os.sep))
                     qemuimages.rebase_qcow2(resource_snap_backing_path,
                                             resource_snap_path)
-                    
+
                 vm_disk_size = vm_disk_size + backing['size']
                 vm_disk_resource_snap_backing = vm_disk_resource_snap
                 
@@ -1037,6 +1039,7 @@ class LibvirtDriver(driver.ComputeDriver):
                      pass
              
         progress_tracker_metadata = {'snapshot_id': snapshot['id'],
+                                     'backup_endpoint': backup_endpoint,
                                      'resource_id' : instance['vm_id']} 
         self._wait_for_remote_nova_process(cntx, compute_service,
                                            progress_tracker_metadata,
