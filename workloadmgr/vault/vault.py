@@ -23,6 +23,7 @@ import re
 import shutil
 import socket
 import uuid
+import threading
 
 from oslo.config import cfg
 
@@ -880,6 +881,36 @@ def get_settings_backup_target():
     return triliovault_backup_targets.values()[0]
 
 
+def get_capacities_utilizations(context):
+    def fill_capacity_utilization(context, backup_target, stats):
+        nfsshare = backup_target.backup_endpoint
+        cap, util = backup_target.get_total_capacity(context)
+        stats[nfsshare] = {'total_capacity': cap,
+                           'total_utilization': util,
+                           'nfsstatus': True }
+
+    stats = {}
+    threads = []
+    for nfsshare in CONF.vault_storage_nfs_export.split(','):
+        nfsshare = nfsshare.strip()
+        backup_target = get_backup_target(nfsshare)
+        nfsstatus = backup_target.is_online()
+
+        stats[nfsshare] = {'total_capacity': -1,
+                           'total_utilization': -1,
+                           'nfsstatus': nfsstatus }
+        if nfsstatus is True:
+            t = threading.Thread(target=fill_capacity_utilization,
+                                 args=[context, backup_target, stats])
+            t.start()
+            threads.append(t)
+
+    for t in threads:
+        t.join()
+
+    return stats
+
+
 def get_workloads(context):
     workloads = []
 
@@ -900,17 +931,25 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     """
 
     shares = {}
+    caps = get_capacities_utilizations(context)
+
     for endpoint, backend in triliovault_backup_targets.iteritems():
-        if backend.is_online() is False:
+        if caps[endpoint]['nfsstatus'] is False:
             continue
-        capacity, used = backend.get_total_capacity(context)
         shares[endpoint] = {
                      'noofworkloads': 0,
                      'totalcommitted': 0,
                      'endpoint': endpoint,
-                     'capacity': capacity,
-                     'used': used
+                     'capacity': caps[endpoint]['total_capacity'],
+                     'used': caps[endpoint]['total_utilization']
                     }
+
+    if len(shares) == 0:
+        raise exception.InvalidState(reason="No NFS shares mounted")
+
+    # if only one nfs share is configured, then return that share
+    if len(shares) == 1:
+        return shares.keys()[0]
 
     for endpoint, values in shares.iteritems():
         base64encode = base64.b64encode(endpoint)

@@ -378,6 +378,9 @@ class API(base.Base):
         metadata = {}
         for kvpair in workload.metadata:
             metadata.setdefault(kvpair['key'], kvpair['value'])
+        if context.is_admin is False:
+            metadata.get("backup_media_target", None) and \
+            metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata        
         
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
@@ -449,6 +452,9 @@ class API(base.Base):
                 metadata.setdefault(kvpair['key'], kvpair['value'])
                 pass
 
+        if context.is_admin is False:
+            metadata.get("backup_media_target", None) and \
+            metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False 
@@ -466,19 +472,9 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_get_all(self, context, search_opts={}):
-        if 'page_number' in search_opts:
-            workloads = self.db.workload_get_all(context,page_number=search_opts['page_number'])
-        else:
-            workloads = self.db.workload_get_all(context)
+        workloads = self.db.workload_get_all(context,**search_opts)
         return workloads
 
-    @autolog.log_method(logger=Logger)
-    def workload_get_all_by_admin(self, context, search_opts={}):
-        if context.is_admin is False:
-            raise wlm_exceptions.AdminRequired()
-        workloads = self.db.workload_get_all_by_admin(context)
-        return workloads        
-    
     @autolog.log_method(logger=Logger)
     @create_trust
     def workload_create(self, context, name, description, workload_type_id,
@@ -951,16 +947,19 @@ class API(base.Base):
  
     @autolog.log_method(logger=Logger)
     def get_storage_usage(self, context):
+
+        if context.is_admin is False:
+            raise wlm_exceptions.AdminRequired()
+
         storages_usage = {}
+        total_usage = 0
+        nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
-            nfsshare = nfsshare.strip()
-            backup_target = vault.get_backup_target(nfsshare)
-            nfsstatus = backup_target.is_online()
-            if nfsstatus is True:
-                total_capacity, total_utilization = backup_target.get_total_capacity(context)
-            else:
-                total_capacity = -1
-                total_utilization = -1
+            stat = nfsstats[nfsshare]
+
+            total_capacity = stat['total_capacity']
+            total_utilization = stat['total_utilization']
+            nfsstatus = stat['nfsstatus']
 
             storages_usage[nfsshare]  = {'storage_type': vault.CONF.vault_storage_type,
                                          'nfs_share(s)': [
@@ -988,14 +987,14 @@ class API(base.Base):
                                                      / float(total_capacity)) * 100), 2),
                                         }
 
-
-        """
+        storage_usage = {'storage_usage': storages_usage.values(), 'count_dict':{}} 
         full = 0
         incr = 0
         total = 0
         full_size = 0
         incr_size = 0 
-        for snapshot in self.db.snapshot_get_all(context):
+        kwargs = {"get_all":True}
+        for snapshot in self.db.snapshot_get_all(context, **kwargs):
             if snapshot.snapshot_type == 'full':
                full = full + 1
                full_size = full_size + float(snapshot.size)
@@ -1007,26 +1006,23 @@ class API(base.Base):
         if (full + incr) > 0:
            full_total_count_percent = \
                round(((float(full) / float((full  + incr))) * 100), 2)
-           storage_usage['full_total_count_percent'] = \
+           storage_usage['count_dict']['full_total_count_percent'] = \
                 str(full_total_count_percent)
-           storage_usage['full_total_count'] = str(full)
-           storage_usage['incr_total_count'] = str(incr)
+           storage_usage['count_dict']['full_total_count'] = str(full)
+           storage_usage['count_dict']['incr_total_count'] = str(incr)
 
-        storage_usage['full'] = full_size
-        storage_usage['incremental'] = incr_size
-        storage_usage['total'] = full_size + incr_size
-
-        if float(storage_usage['total']) > 0:
-           storage_usage['full_snaps_utilization'] = \
-               round(((float(full_size) / float(storage_usage['total'])) * 100), 2)
-           storage_usage['incremental_snaps_utilization'] = \
-               round(((float(incr) / float(storage_usage['total'])) * 100), 2)
+        storage_usage['count_dict']['full'] = full_size
+        storage_usage['count_dict']['incremental'] = incr_size
+        storage_usage['count_dict']['total'] = full_size + incr_size
+        if float(total_usage) > 0:
+           storage_usage['count_dict']['full_snaps_utilization'] = \
+               round(((float(full_size) / float(total_usage)) * 100), 2)
+           storage_usage['count_dict']['incremental_snaps_utilization'] = \
+               round(((float(incr) / float(total_usage)) * 100), 2)
         else:
-             storage_usage['full_snaps_utilization'] = '0'
-             storage_usage['incremental_snaps_utilization'] = '0'
-        """
-
-        return {'storage_usage': storages_usage.values()}
+             storage_usage['count_dict']['full_snaps_utilization'] = '0'
+             storage_usage['count_dict']['incremental_snaps_utilization'] = '0'
+        return storage_usage
     
     @autolog.log_method(logger=Logger)
     def get_recentactivities(self, context, time_in_minutes):
@@ -1553,13 +1549,8 @@ class API(base.Base):
         return snapshot_details
     
     @autolog.log_method(logger=Logger)
-    def snapshot_get_all(self, context, workload_id=None):
-        snapshots = self.db.snapshot_get_all(context, workload_id)
-        return snapshots
-
-    @autolog.log_method(logger=Logger)
-    def snapshot_get_all_by_host(self, context, host=None):
-        snapshots = self.db.snapshot_get_all_by_host(context, host)
+    def snapshot_get_all(self, context, search_opts={}):
+        snapshots = self.db.snapshot_get_all(context, **search_opts)
         return snapshots
 
     @autolog.log_method(logger=Logger)
@@ -1831,7 +1822,8 @@ class API(base.Base):
         """
         try:
             mounted_snapshots = []
-            snapshots = self.db.snapshot_get_all(context, workload_id)
+            kwargs = {"workload_id":workload_id}
+            snapshots = self.db.snapshot_get_all(context, **kwargs)
             if len(snapshots) == 0:
                msg = _("Not found any snapshots")
                wlm_exceptions.ErrorOccurred(reason=msg)               
