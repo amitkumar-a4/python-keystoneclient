@@ -244,7 +244,7 @@ class WorkloadMgrsController(wsgi.Controller):
                             'nfs_share':nfs_share, 'all_workloads':all_workloads})
             limited_list = common.limited(workloads_all, req)
             if is_detail:
-                workloads = self._view_builder.detail_list(req, workloads_all)
+                workloads = self._view_builder.detail_list(req, workloads_all, self.workload_api)
             else:
                 workloads = self._view_builder.summary_list(req, workloads_all)
             return workloads
