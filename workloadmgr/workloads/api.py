@@ -633,7 +633,7 @@ class API(base.Base):
             purge_metadata = True
             options['metadata'] = workload['metadata']     
 
-        if 'jobschedule' in workload and workload['jobschedule']:
+        if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
 
         if  'instances' in workload and workload['instances']:
@@ -989,7 +989,6 @@ class API(base.Base):
                                              round(((float(total_utilization)
                                                      / float(total_capacity)) * 100), 2),
                                         }
-
         storage_usage = {'storage_usage': storages_usage.values(), 'count_dict':{}} 
         full = 0
         incr = 0
@@ -1234,29 +1233,31 @@ class API(base.Base):
         """
         Pause workload job schedule. No RPC call is made
         """
-        workload = self.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Pause Requested', workload)
-        jobs = self._scheduler.get_jobs()
-        for job in jobs:
-            if job.kwargs['workload_id'] == workload_id:
-                self._scheduler.unschedule_job(job)
-                break
-        AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Pause Submitted', workload)
+        if self._scheduler.running is True:
+           workload = self.workload_get(context, workload_id)
+           AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Pause Requested', workload)
+           jobs = self._scheduler.get_jobs()
+           for job in jobs:
+               if job.kwargs['workload_id'] == workload_id:
+                  self._scheduler.unschedule_job(job)
+                  break
+           AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Pause Submitted', workload)
             
 
     @autolog.log_method(logger=Logger)
     def workload_resume(self, context, workload_id):
-        workload = self.db.workload_get(context, workload_id)
-        AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Requested', workload)
-        jobs = self._scheduler.get_jobs()
-        for job in jobs:
-            if job.kwargs['workload_id'] == workload_id:
-                msg = _('Workload job scheduler is not paused')
-                raise wlm_exceptions.InvalidState(reason=msg)
-        jobschedule = pickle.loads(str(workload['jobschedule']))
-        if len(jobschedule) >= 1:
-            self.workload_add_scheduler_job(jobschedule, workload)
-            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Submitted', workload)
+        if self._scheduler.running is True:
+           workload = self.db.workload_get(context, workload_id)
+           AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Requested', workload)
+           jobs = self._scheduler.get_jobs()
+           for job in jobs:
+               if job.kwargs['workload_id'] == workload_id:
+                  msg = _('Workload job scheduler is not paused')
+                  raise wlm_exceptions.InvalidState(reason=msg)
+           jobschedule = pickle.loads(str(workload['jobschedule']))
+           if len(jobschedule) >= 1:
+              self.workload_add_scheduler_job(jobschedule, workload)
+           AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Submitted', workload)
 
     @autolog.log_method(logger=Logger)
     def workload_unlock(self, context, workload_id):
@@ -1315,7 +1316,6 @@ class API(base.Base):
         self._scheduler = Scheduler()
         self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
         self._scheduler.start()
-
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
                    u'description': "Controls job scheduler status",
