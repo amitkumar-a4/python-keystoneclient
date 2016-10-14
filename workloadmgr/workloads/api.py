@@ -386,7 +386,7 @@ class API(base.Base):
         
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False
-
+        workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
         for job in jobs:
@@ -460,7 +460,7 @@ class API(base.Base):
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False 
-
+        workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
         for job in jobs:
