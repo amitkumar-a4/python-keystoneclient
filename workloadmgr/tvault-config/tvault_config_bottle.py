@@ -576,6 +576,7 @@ def _authenticate_with_keystone():
     config_data['neutron_admin_auth_url'] = config_data['keystone_public_url']
     config_data['neutron_admin_username'] = config_data['admin_username']
     config_data['neutron_admin_password'] = config_data['admin_password']
+    config_data['neutron_admin_tenant_name'] = config_data['admin_tenant_name']
     
     #compute       
     if keystone.version == 'v3':
@@ -2096,6 +2097,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_production_url = ', 'neutron_production_url = ' + config_data['neutron_production_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_username = ', 'neutron_admin_username = ' + config_data['neutron_admin_username'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_password = ', 'neutron_admin_password = ' + config_data['neutron_admin_password'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_tenant_name = ', 'neutron_admin_tenant_name = ' + config_data['neutron_admin_tenant_name'])
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_auth_url = ', 'nova_admin_auth_url = ' + config_data['nova_admin_auth_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_production_endpoint_template = ', 'nova_production_endpoint_template = ' + config_data['nova_production_endpoint_template'])
