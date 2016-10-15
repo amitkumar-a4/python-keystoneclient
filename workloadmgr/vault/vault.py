@@ -802,11 +802,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         try:
             for name in os.listdir(parent_path):
                 if os.path.isdir(os.path.join(parent_path, name)):
-                    workload_url = {'workload_url': name, 'snapshot_urls': []}
-                    for subname in os.listdir(os.path.join(parent_path, workload_url['workload_url'])):
-                        if os.path.isdir(os.path.join(parent_path, workload_url['workload_url'], subname)):
-                            workload_url['snapshot_urls'].append(os.path.join(workload_url['workload_url'], subname))
-                    workload_urls.append(workload_url)
+                    workload_urls.append(os.path.join(parent_path, name))
         except Exception as ex:
             LOG.exception(ex)
         return workload_urls  
@@ -947,6 +943,13 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                      'capacity': caps[endpoint]['total_capacity'],
                      'used': caps[endpoint]['total_utilization']
                     }
+
+    if len(shares) == 0:
+        raise exception.InvalidState(reason="No NFS shares mounted")
+
+    # if only one nfs share is configured, then return that share
+    if len(shares) == 1:
+        return shares.keys()[0]
 
     for endpoint, values in shares.iteritems():
         base64encode = base64.b64encode(endpoint)
