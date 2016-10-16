@@ -1695,6 +1695,8 @@ def configure_form_openstack():
     timezone = get_localzone().zone
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
+    if 'storage_nfs_options' not in config_data:
+       config_data['storage_nfs_options'] = 'rw,nofail,auto,nolock'
     roles = ['_member_','Member','member']
     config_data['roles'] = roles
     if 'trustee_role' not in config_data:
@@ -1804,15 +1806,14 @@ def configure_host():
             except Exception as exception:
                 pass                
 
-        def mount_share(mountpath, nfsshare):
+        def mount_share(mountpath, nfsshare, nfsoptions):
             with open('/proc/mounts','r') as procfile:
                 mounts = [{line.split()[1]:line.split()[0]}
                           for line in procfile.readlines() if line.split()[1] == mountpath]
-
             setting_str = nfsshare+ \
-                              '        %s        nfs     rw,nofail,auto  0       0\n' % mountpath
+                              '        %s        nfs     %s  0       0\n' % (mountpath, nfsoptions)
             if len(mounts) == 0 or mounts[0].get(mountpath, None) != nfsshare:
-                command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', nfsshare, mountpath]
+                command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', nfsoptions, nfsshare, mountpath]
                 subprocess.check_call(command, shell=False)
             else:
                 found = 0
@@ -1849,13 +1850,9 @@ def configure_host():
             for d in os.listdir(config_data['vault_data_directory']):
                 if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
                     cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
+                    time.sleep(8)
 
-        #mount nfs export
-        if not os.path.isdir(config_data['vault_data_directory_old']):
-            command = ['sudo', 'mkdir', config_data['vault_data_directory_old']]
-            subprocess.call(command, shell=False)
-        os.chmod(config_data['vault_data_directory_old'], 0777)
-
+        nfsoptions = config_data['storage_nfs_options']
         for idx, nfsshare in enumerate(str.split(config_data['storage_nfs_export'], ',')):
             replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(nfsshare, ':')[0])
             command = ['sudo', 'service', 'rpcbind', 'restart']
@@ -1869,7 +1866,7 @@ def configure_host():
 
             # make sure we have right permissions
             os.chmod(mountpath, 0777)
-            mount_share(mountpath, nfsshare)
+            mount_share(mountpath, nfsshare, nfsoptions)
             """
             if idx == 0:
                 command = ['timeout', '-sKILL', '30' ,
@@ -2599,6 +2596,10 @@ def configure_openstack():
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
+        if 'storage-nfs-options' in config_inputs:
+           config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
+        else:
+             config_data['storage_nfs_options'] = 'rw,nofail,auto,nolock'
         
         config_data['swift_auth_version'] = ''
         config_data['swift_auth_url'] = ''
