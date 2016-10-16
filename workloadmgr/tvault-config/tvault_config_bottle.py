@@ -1696,7 +1696,7 @@ def configure_form_openstack():
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
     if 'storage_nfs_options' not in config_data:
-       config_data['storage_nfs_options'] = 'rw,nofail,auto,nolock'
+       config_data['storage_nfs_options'] = 'nolock'
     roles = ['_member_','Member','member']
     config_data['roles'] = roles
     if 'trustee_role' not in config_data:
@@ -2599,7 +2599,7 @@ def configure_openstack():
         if 'storage-nfs-options' in config_inputs:
            config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
         else:
-             config_data['storage_nfs_options'] = 'rw,nofail,auto,nolock'
+             config_data['storage_nfs_options'] = 'nolock'
         
         config_data['swift_auth_version'] = ''
         config_data['swift_auth_url'] = ''
