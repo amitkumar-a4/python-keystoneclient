@@ -1850,7 +1850,6 @@ def configure_host():
             for d in os.listdir(config_data['vault_data_directory']):
                 if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
                     cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
-                    time.sleep(8)
 
         nfsoptions = config_data['storage_nfs_options']
         for idx, nfsshare in enumerate(str.split(config_data['storage_nfs_export'], ',')):
