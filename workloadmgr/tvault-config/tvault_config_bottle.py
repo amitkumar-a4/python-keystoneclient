@@ -2109,6 +2109,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory = ', 'vault_data_directory = ' + config_data['vault_data_directory'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory_old = ', 'vault_data_directory_old = ' + config_data['vault_data_directory_old'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_options = ', 'vault_storage_nfs_options = ' + config_data['storage_nfs_options'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
