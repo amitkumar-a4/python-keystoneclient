@@ -66,7 +66,7 @@ wlm_vault_opts = [
                default='local',
                help='NFS Export'),
     cfg.StrOpt('vault_storage_nfs_options',
-               default='rw,nofail,auto,nolock',
+               default='nolock',
                help='NFS Options'),
     cfg.StrOpt('vault_storage_das_device',
                default='none',
