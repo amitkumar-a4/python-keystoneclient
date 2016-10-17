@@ -27,7 +27,7 @@ class ViewBuilder(common.ViewBuilder):
         """Detailed view of a list of workloads ."""
         return self._list_view(self.detail, request, workloads, api)
 
-    def summary(self, request, workload, api):
+    def summary(self, request, workload, api=None):
         """Generic, non-detailed view of a workload."""
         return {
             'workload': {
@@ -48,7 +48,7 @@ class ViewBuilder(common.ViewBuilder):
             },
         }
 
-    def restore_summary(self, request, restore, api):
+    def restore_summary(self, request, restore, api=None):
         """Generic, non-detailed view of a restore."""
         return {
             'restore': {
