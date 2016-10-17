@@ -81,6 +81,7 @@ def _get_auth_token():
             tenant_name=CONF.neutron_admin_tenant_name,
             region_name=CONF.neutron_region_name,
             password=CONF.neutron_admin_password,
+            domain_name=CONF.domain_name,
             auth_url=CONF.neutron_admin_auth_url,
             timeout=CONF.neutron_url_timeout,
             auth_strategy=CONF.neutron_auth_strategy,

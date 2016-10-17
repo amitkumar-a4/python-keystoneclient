@@ -184,6 +184,11 @@ function findForm() {
 			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                         <span id="nfs_helpblock" class="help-block">Please enter list of NFS shares separated by commas</span>
 			</div>
+                        <div class="form-group">
+                        <label class="control-label">NFS Options<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
+                        <input name="storage-nfs-options" {{'value=' + storage_nfs_options if defined('storage_nfs_options') else ''}} id="storage-nfs-options" type="text" required placeholder="" class="form-control"  aria-describedby="nfs_options_helpblock" data-role="tagsinput">
+                        <span id="nfs_options_helpblock" class="help-block">Please enter list of NFS options separated by commas</span>
+                        </div>
 		  </div>
 		</div>
 	  </div>
@@ -336,6 +341,10 @@ function validate_keystone_credentials(inputelement) {
         }
     });
 }
+
+/*$('[name="storage-nfs-options"]').tagsinput({
+  allowDuplicates: true
+});*/
 
 $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 //function validate_nfsshare(inputelement) {
