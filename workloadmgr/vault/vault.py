@@ -65,6 +65,9 @@ wlm_vault_opts = [
     cfg.StrOpt('vault_storage_nfs_export',
                default='local',
                help='NFS Export'),
+    cfg.StrOpt('vault_storage_nfs_options',
+               default='nolock',
+               help='NFS Options'),
     cfg.StrOpt('vault_storage_das_device',
                default='none',
                help='das device /dev/sdb'),
@@ -678,10 +681,11 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
         nfsshare = self.backup_endpoint
         mountpath = self.mount_path
+        nfsoptions = CONF.vault_storage_nfs_options
 
         if self.is_online():
             command = ['timeout', '-sKILL', '30' , 'sudo',
-                       'mount', '-o', 'nolock', nfsshare,
+                       'mount', '-o', nfsoptions, nfsshare,
                        mountpath]
             subprocess.check_call(command, shell=False) 
             if old_share is True:
