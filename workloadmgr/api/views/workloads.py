@@ -23,11 +23,11 @@ class ViewBuilder(common.ViewBuilder):
         """Show a list of workloads without many details."""
         return self._list_view(self.summary, request, workloads)
 
-    def detail_list(self, request, workloads):
+    def detail_list(self, request, workloads, api=None):
         """Detailed view of a list of workloads ."""
-        return self._list_view(self.detail, request, workloads)
+        return self._list_view(self.detail, request, workloads, api)
 
-    def summary(self, request, workload):
+    def summary(self, request, workload, api=None):
         """Generic, non-detailed view of a workload."""
         return {
             'workload': {
@@ -48,7 +48,7 @@ class ViewBuilder(common.ViewBuilder):
             },
         }
 
-    def restore_summary(self, request, restore):
+    def restore_summary(self, request, restore, api=None):
         """Generic, non-detailed view of a restore."""
         return {
             'restore': {
@@ -57,8 +57,11 @@ class ViewBuilder(common.ViewBuilder):
             },
         }
 
-    def detail(self, request, workload):
+    def detail(self, request, workload, api=None):
         """Detailed view of a single workload."""
+        context = request.environ['workloadmgr.context']
+        if api is not None:
+           workload = api.workload_show(context, workload_id=workload.id)
         return {
             'workload': {
                 'created_at': workload.get('created_at'),
@@ -80,9 +83,9 @@ class ViewBuilder(common.ViewBuilder):
             }
         }
 
-    def _list_view(self, func, request, workloads):
+    def _list_view(self, func, request, workloads, api=None):
         """Provide a view for a list of workloads."""
-        workloads_list = [func(request, workload)['workload'] for workload in workloads]
+        workloads_list = [func(request, workload, api)['workload'] for workload in workloads]
         workloads_links = self._get_collection_links(request,
                                                    workloads,
                                                    self._collection_name)

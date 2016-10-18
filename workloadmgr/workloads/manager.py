@@ -390,15 +390,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             # TODO: Handle number of snapshots by days
             jobschedule = pickle.loads(str(workload.jobschedule))
             if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
-                incrs = jobschedule['retention_policy_value']
+                incrs = int(jobschedule['retention_policy_value'])
             else:
                 jobsperday = int(jobschedule['interval'].split("hr")[0])
-                incrs = jobschedule['retention_policy_value'] * jobsperday
+                incrs = int(jobschedule['retention_policy_value']) * jobsperday
 
             if jobschedule['fullbackup_interval'] == '-1':
                 fulls = 1
             else:
-                fulls = incrs/jobschedule['fullbackup_interval']
+                fulls = incrs/int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
 
             workload_approx_backup_size = \
