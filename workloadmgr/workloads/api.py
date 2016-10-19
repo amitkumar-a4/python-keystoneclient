@@ -589,7 +589,7 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
     
     @autolog.log_method(logger=Logger)
-    def workload_add_scheduler_job(self, jobschedule, workload, context=None):
+    def workload_add_scheduler_job(self, jobschedule, workload, context=context):
         if jobschedule and len(jobschedule): 
             if 'enabled' in jobschedule and jobschedule['enabled']:                                       
                 if hasattr(context, 'user_domain_id'):
