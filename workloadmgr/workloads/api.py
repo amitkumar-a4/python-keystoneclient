@@ -578,7 +578,7 @@ class API(base.Base):
             #                              'retention_policy_type': 'Number of Snapshots to Keep',
             #                              'retention_policy_value': '30'}
             try:
-                self.workload_add_scheduler_job(jobschedule, workload)
+                self.workload_add_scheduler_job(jobschedule, workload, context)
             except Exception as ex:
                 LOG.exception(ex)    
                 
@@ -589,7 +589,7 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
     
     @autolog.log_method(logger=Logger)
-    def workload_add_scheduler_job(self, jobschedule, workload):
+    def workload_add_scheduler_job(self, jobschedule, workload, context=context):
         if jobschedule and len(jobschedule): 
             if 'enabled' in jobschedule and jobschedule['enabled']:                                       
                 if hasattr(context, 'user_domain_id'):
@@ -610,7 +610,9 @@ class API(base.Base):
                                                     kwargs={'workload_id':workload.id,  
                                                             'user_id': workload.user_id, 
                                                             'project_id':workload.project_id,
-                                                            'user_domain_id':user_domain_id})
+                                                            'user_domain_id':user_domain_id,
+                                                            'user':context.user,
+                                                            'tenant':context.tenant})
 
     @autolog.log_method(logger=Logger)
     def workload_modify(self, context, workload_id, workload):
@@ -1256,7 +1258,7 @@ class API(base.Base):
                   raise wlm_exceptions.InvalidState(reason=msg)
            jobschedule = pickle.loads(str(workload['jobschedule']))
            if len(jobschedule) >= 1:
-              self.workload_add_scheduler_job(jobschedule, workload)
+              self.workload_add_scheduler_job(jobschedule, workload, context)
            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + '\' Resume Submitted', workload)
 
     @autolog.log_method(logger=Logger)
