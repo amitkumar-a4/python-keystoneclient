@@ -324,7 +324,7 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
                resource['status'] = 'available'
 
         if file == 'snapshot_db':
-            if resource['status'] == 'uploading':
+            if resource['status'] != 'available':
                resource['status'] = 'error'
                resource['error_msg'] = 'Failed creating workload snapshot: '\
                                        'Snapshot was not uploaded completely.'
