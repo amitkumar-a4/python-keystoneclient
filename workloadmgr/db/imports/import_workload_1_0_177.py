@@ -384,7 +384,7 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
                 if len(resources['jobschedule']) and \
                    pickle.loads(str(resources['jobschedule']))['enabled'] == True:
                    workload_api = workloadAPI.API()
-                   workload_api.workload_add_scheduler_job(pickle.loads(str(resources['jobschedule'])), workload)
+                   workload_api.workload_add_scheduler_job(pickle.loads(str(resources['jobschedule'])), workload, tenantcontext)
 
     except Exception as ex:
         LOG.exception(ex)
