@@ -323,6 +323,12 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
             if resource['status'] == 'locked':
                resource['status'] = 'available'
 
+        if file == 'snapshot_db':
+            if resource['status'] != 'available':
+               resource['status'] = 'error'
+               resource['error_msg'] = 'Failed creating workload snapshot: '\
+                                       'Snapshot was not uploaded completely.'
+
         try:
             # Check if resource already in the database then update.
             param_list = tuple([resource[param] for param in getter_method_params])
