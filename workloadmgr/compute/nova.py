@@ -231,7 +231,7 @@ def _get_tenant_context(context):
         context.user_id = user_id
         if user != 'NA' and not hasattr(context, 'user'):
            context.user = user
-        if project != 'NA' and not hasattr(context, 'tenant'):
+        if tenant != 'NA' and not hasattr(context, 'tenant'):
            context.tenant = tenant
     else:
          try:
