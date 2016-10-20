@@ -1726,6 +1726,7 @@ def configure_host():
     # Python code to configure storage
     try:
         #configure host
+        prev_hostname = socket.gethostname()
         hostname = config_data['guest_name']
         fh, abs_path = mkstemp()
         new_file = open(abs_path,'w')
@@ -1758,7 +1759,13 @@ def configure_host():
         os.chmod('/etc/hosts', 0644)
         command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
         subprocess.call(command, shell=False)
-        
+   
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['tvault_primary_node'] + '/workloadmgr?charset=utf8'
+        engine = create_engine(config_data['sql_connection'])
+        update = models.Service.__table__.update().where(models.Service.__table__.columns.host == prev_hostname).\
+                 values({'host' : socket.gethostname()})
+        engine.execute(update)
+               
         if len(config_data['name_server']):
             fh, abs_path = mkstemp()
             new_file = open(abs_path,'w')
