@@ -973,13 +973,15 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                         workload_approx_backup_size = int(meta['value'])
 
                 if workload_approx_backup_size == 0:
-                    workload_backup_media_size = 10 * 1024 * 1024 * 1024 # default value
+                    workload_backup_media_size = 0
                     for result in glob.iglob(os.path.join(workload_path, 'snapshot_*/snapshot_db')): 
                          with open(result, "r") as snaprecf:
                              snaprec = json.load(snaprecf)
                          if snaprec['snapshot_type'] == "full":
-                             workload_backup_media_size = snaprec['size']
+                             workload_backup_media_size = snaprec['size'] / 1024 / 1024 / 1024
       
+                    # workload_backup_media_size is in GBs
+                    workload_backup_media_size = workload_backup_media_size or 10
                     jobschedule = pickle.loads(str(wjson['jobschedule']))
                     if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
                         incrs = int(jobschedule['retention_policy_value'])
@@ -996,9 +998,9 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                     workload_approx_backup_size = \
                             (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
                              incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
-                    values['totalcommitted'] += workload_approx_backup_size
+                    values['totalcommitted'] += workload_approx_backup_size * 1024 * 1024 * 1024
                 else:
-                    values['totalcommitted'] += workload_approx_backup_size
+                    values['totalcommitted'] += workload_approx_backup_size * 1024 * 1024 * 1024
             except Exception as ex:
                 LOG.exception(ex) 
 
