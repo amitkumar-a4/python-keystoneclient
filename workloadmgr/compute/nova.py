@@ -177,6 +177,8 @@ def _get_tenant_context(context):
     if type(context) is dict:
        user_id = context['user_id']
        tenant_id = context['project_id']
+       user = context.get('user',None)
+       tenant = context.get('tenant',None)
        if 'user_domain_id' in context:
           user_domain_id = context['user_domain_id']
        else:
@@ -206,6 +208,10 @@ def _get_tenant_context(context):
                    user_domain_id = context.user_domain
          else:
               user_domain_id = 'default'
+
+         user = getattr(context, 'user', 'NA')
+         tenant = getattr(context, 'tenant', 'NA')
+
     trust = _get_trusts(user_id, tenant_id)
     if len(trust):
         trust_id = trust[0].value
@@ -223,7 +229,10 @@ def _get_tenant_context(context):
         kclient = client_plugin.client("keystone")
         context.auth_token = kclient.auth_token
         context.user_id = user_id
-        context.tenant = getattr(CONF.keystone_authtoken, "admin_tenant_name", "None")
+        if user != 'NA' and not hasattr(context, 'user'):
+           context.user = user
+        if tenant != 'NA' and not hasattr(context, 'tenant'):
+           context.tenant = tenant
     else:
          try:
             httpclient = client.HTTPClient(
@@ -242,6 +251,10 @@ def _get_tenant_context(context):
             context = wlm_context.RequestContext(
                 user_id=user_id, project_id=tenant_id,
                 is_admin=True, auth_token=httpclient.auth_token)
+            if user != 'NA' and not hasattr(context, 'user'):
+               context.user = user
+            if tenant != 'NA' and not hasattr(context, 'tenant'):
+               context.tenant = tenant
          except Exception:
             with excutils.save_and_reraise_exception():
                 LOG.exception(_("_get_auth_token() failed"))
