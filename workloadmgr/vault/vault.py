@@ -805,7 +805,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         workload_urls = []
         try:
             for name in os.listdir(parent_path):
-                if os.path.isdir(os.path.join(parent_path, name)):
+                if os.path.isdir(os.path.join(parent_path, name)) and name.startswith('workload_'):
                     workload_urls.append(os.path.join(parent_path, name))
         except Exception as ex:
             LOG.exception(ex)
