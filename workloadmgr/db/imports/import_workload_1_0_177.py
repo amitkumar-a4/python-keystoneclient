@@ -199,10 +199,10 @@ def update_workload_metadata(workload_values):
         if 'backup_media_target' not in workload_metadata:
             jobschedule = pickle.loads(str(workload_values['jobschedule']))
             if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
-                incrs = jobschedule['retention_policy_value']
+                incrs = int(jobschedule['retention_policy_value'])
             else:
                 jobsperday = int(jobschedule['interval'].split("hr")[0])
-                incrs = jobschedule['retention_policy_value'] * jobsperday
+                incrs = int(jobschedule['retention_policy_value']) * jobsperday
 
             if jobschedule['fullbackup_interval'] == '-1':
                 fulls = 1
@@ -210,6 +210,8 @@ def update_workload_metadata(workload_values):
                 fulls = incrs / jobschedule['fullbackup_interval']
                 incrs = incrs - fulls
 
+            if workload_backup_media_size.get(workload_values['id'], None) is None:
+                workload_backup_media_size[workload_values['id']] = 1024 * 1024 * 1024
             workload_approx_backup_size = \
                 (fulls * workload_backup_media_size[workload_values['id']] * vault.CONF.workload_full_backup_factor +
                  incrs * workload_backup_media_size[
@@ -318,8 +320,14 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
         # if resource is workload then check the status of workload and
         # set it to available.
         if file == 'workload_db':
-            if resources['status'] == 'locked':
-               resources['status'] = 'available'
+            if resource['status'] == 'locked':
+               resource['status'] = 'available'
+
+        if file == 'snapshot_db':
+            if resource['status'] != 'available':
+               resource['status'] = 'error'
+               resource['error_msg'] = 'Failed creating workload snapshot: '\
+                                       'Snapshot was not uploaded completely.'
 
         try:
             # Check if resource already in the database then update.
@@ -345,16 +353,18 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
         resources_db_list = pickle.load(open(os.path.join(db_dir, file), 'rb'))
 
         for resources in resources_db_list:
+            if resources is None:
+                continue
             if isinstance(resources, list):
                 for resource in resources:
                     #In case if workoad/snapshod updating object values
                     #with their respective tenant id and user id using context
                     if file in ['workload_db', 'snapshot_db']:
-                          tenantcontext = get_context(resource)
+                        tenantcontext = get_context(resource)
                     update_resource_list(tenantcontext, resource)
             else:
                 if file in ['workload_db', 'snapshot_db']:
-                      tenantcontext = get_context(resources)
+                    tenantcontext = get_context(resources)
                 update_resource_list(tenantcontext,resources)
 
         #TODO: Uncomment the code for updating existing resources
@@ -380,7 +390,7 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
                 if len(resources['jobschedule']) and \
                    pickle.loads(str(resources['jobschedule']))['enabled'] == True:
                    workload_api = workloadAPI.API()
-                   workload_api.workload_add_scheduler_job(pickle.loads(str(resources['jobschedule'])), workload)
+                   workload_api.workload_add_scheduler_job(pickle.loads(str(resources['jobschedule'])), workload, tenantcontext)
 
     except Exception as ex:
         LOG.exception(ex)

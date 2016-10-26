@@ -989,8 +989,8 @@ def snapshot_get_all(context, **kwargs):
            date_to = kwargs['date_to']
        else:
             date_to = datetime.now()
-       qs = qs.filter(and_(models.Snapshots.created_at >= func.date_format(func.date(kwargs['date_from']),'%y-%m-%d'),\
-                      models.Snapshots.created_at <= func.date_format(func.date(date_to),'%y-%m-%d')))
+       qs = qs.filter(and_(models.Snapshots.created_at >= func.date_format(kwargs['date_from'],'%y-%m-%dT%H:%i:%s'),\
+                      models.Snapshots.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
 
     if not is_admin_context(context):
        qs = qs.filter_by(project_id=context.project_id)
