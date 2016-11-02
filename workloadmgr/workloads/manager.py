@@ -54,6 +54,7 @@ from workloadmgr.openstack.common import jsonutils
 from workloadmgr.apscheduler.scheduler import Scheduler
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
+from workloadmgr.volume import cinder
 from workloadmgr.vault import vault
 from workloadmgr import utils
 
@@ -367,26 +368,63 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload = self.db.workload_get(context, workload_id)
             vms = self.db.workload_vms_get(context, workload_id)
 
-            # Create swift container for the workload
-            json_wl = jsonutils.dumps(workload)
-            json_wl_vms = jsonutils.dumps(vms)
-            self.db.workload_update(context, 
-                                    workload_id, 
-                                    {
-                                     'host': self.host,
-                                     'status': 'available',
-                                     'availability_zone': self.az,
-                                    })
 
             compute_service = nova.API(production=True)
+            volume_service = cinder.API()
+            workload_backup_media_size = 0
             for vm in vms:
                 compute_service.set_meta_item(context, vm.vm_id,
                                     "workload_id", workload_id)
                 compute_service.set_meta_item(context, vm.vm_id,
                                     "workload_name", workload['display_name'])
 
+                instance = compute_service.get_server_by_id(context, vm.vm_id, admin=False)
+                flavor = compute_service.get_flavor_by_id(context, instance.flavor['id'])
+                workload_backup_media_size += flavor.disk 
+
+                for volume in getattr(instance, 'os-extended-volumes:volumes_attached'):
+                    vol_obj = volume_service.get(context, volume['id'], no_translate=True)
+                    workload_backup_media_size += vol_obj.size
+
+            # calculate approximate size of backup storage needed for this backup job
+            # TODO: Handle number of snapshots by days
+            jobschedule = pickle.loads(str(workload.jobschedule))
+            if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
+                incrs = int(jobschedule['retention_policy_value'])
+            else:
+                jobsperday = int(jobschedule['interval'].split("hr")[0])
+                incrs = int(jobschedule['retention_policy_value']) * jobsperday
+
+            if jobschedule['fullbackup_interval'] == '-1':
+                fulls = 1
+            else:
+                fulls = incrs/int(jobschedule['fullbackup_interval'])
+                incrs = incrs - fulls
+
+            workload_approx_backup_size = \
+                (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
+                 incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
+
+            backup_endpoint = \
+                vault.get_nfs_share_for_workload_by_free_overcommit(
+                    context, 
+                    workload)
+            workload_metadata = {'workload_approx_backup_size': workload_approx_backup_size,
+                                 'backup_media_target': backup_endpoint}
+
+            # Create swift container for the workload
+            json_wl = jsonutils.dumps(workload)
+            json_wl_vms = jsonutils.dumps(vms)
+            self.db.workload_update(context, 
+                                    workload_id, 
+                                    {
+                                        'host': self.host,
+                                        'status': 'available',
+                                        'availability_zone': self.az,
+                                        'metadata': workload_metadata
+                                    })
             workload_utils.upload_workload_db_entry(context, workload_id)
-            
+
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
@@ -414,6 +452,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                   'progress_msg': 'Snapshot of workload is starting',
                                                   'status': 'starting'})
             workload = self.db.workload_get(context, snapshot.workload_id)
+
+            backup_endpoint = self.db.get_metadata_value(workload.metadata,
+                                                         'backup_media_target')
+
+            backup_target = vault.get_backup_target(backup_endpoint)
+
             pause_at_snapshot = CONF.pause_vm_before_snapshot
             for metadata in workload.metadata:
                 for key in metadata:
@@ -478,7 +522,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if not 'root_partition_type' in inst:
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
-                                           {'metadata':{'root_partition_type':inst['root_partition_type']}})
+                                           {'metadata':{'root_partition_type': inst['root_partition_type'],
+                                                        'availability_zone': inst['availability_zone']}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}
@@ -494,7 +539,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_utils.upload_snapshot_db_entry(context, snapshot_id, snapshot_status = 'available')
             
             # upload the data to object store... this function will check if the object store is configured
-            vault.upload_snapshot_metatdata_to_object_store(context, {'workload_id': workload.id, 'workload_name': workload.display_name, 'snapshot_id': snapshot.id})
+            backup_target.upload_snapshot_metatdata_to_object_store(context,
+                {'workload_id': workload.id,
+                 'workload_name': workload.display_name,
+                 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context, 
                                     snapshot_id, 
@@ -565,13 +613,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 
         finally:
             try:
-                vault.purge_snapshot_from_staging_area(context, {'workload_id' : workload.id,
-                                                                 'snapshot_id' : snapshot.id})
+                backup_target.purge_snapshot_from_staging_area(context,
+                    {'workload_id' : workload.id,
+                     'snapshot_id' : snapshot.id})
             except Exception as ex:
                 LOG.exception(ex) 
                                            
             try:
-                vault.purge_staging_area(context)
+                backup_target.purge_staging_area(context)
             except Exception as ex:
                 LOG.exception(ex) 
                 
@@ -583,7 +632,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             
             try:                
                 snapshot = self.db.snapshot_get(context, snapshot_id)
-                if settings.get_settings(context).get('smtp_email_enable') == 'yes' or settings.get_settings(context).get('smtp_email_enable') == '1':
+                if settings.get_settings(context).get('smtp_email_enable') == 'yes' or \
+                   settings.get_settings(context).get('smtp_email_enable') == '1':
                     self.send_email(context,snapshot,'snapshot')
             except Exception as ex:
                 LOG.exception(ex)
@@ -629,11 +679,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
             raise wlm_exceptions.InvalidState(reason=msg)
             
-        LOG.info(_('Deleting the data of workload %s %s %s') % (workload.display_name, 
-                                                                workload.id,
-                                                                workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
-        vault.workload_delete(context, {'workload_id': workload.id,
-                                        'workload_name': workload.display_name,})
+        LOG.info(_('Deleting the data of workload %s %s %s') % 
+                   (workload.display_name, workload.id,
+                    workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
+
+        backup_endpoint = self.db.get_metadata_value(workload.metadata,
+                                                     'backup_media_target')
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        if backup_target is not None:
+            backup_target.workload_delete(context,
+                {'workload_id': workload.id,
+                 'workload_name': workload.display_name,})
         self.workload_reset(context, workload_id)
 
         compute_service = nova.API(production=True)                
@@ -647,11 +704,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
-        if options['type'] == "openstack":
-            return options
-
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
+
+        if options['type'] == "openstack":
+            options['openstack']['instances'] = [] 
+            for inst in snapshotvms:
+                optionsinst = {
+                           'name': inst.vm_name, 'id':inst.vm_id,
+                           'availability_zone': self.db.get_metadata_value(inst.metadata,
+                                                'availability_zone'),
+                          }
+                options['openstack']['instances'].append(optionsinst)
+            return options
+
         options['vmware']['instances'] = [] 
         for inst in snapshotvms:
             optionsinst = {
@@ -711,6 +777,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Restore VMs and all its LUNs from a snapshot
         """
         restore_type = 'restore'
+        restore_user_selected_value = 'Selective Restore'
         try:
             try:
                 import gc
@@ -722,10 +789,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot = self.db.snapshot_get(context, restore.snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
 
+            backup_endpoint = self.db.get_metadata_value(workload.metadata,
+                                                         'backup_media_target')
+
+            backup_target = vault.get_backup_target(backup_endpoint)
+
             context = nova._get_tenant_context(context)
 
-            restore_user_selected_value = 'Selective Restore'
-            vault.purge_workload_from_staging_area(context, {'workload_id': workload.id})            
+            backup_target.purge_workload_from_staging_area(context,
+                {'workload_id': workload.id})            
 
             target_platform = 'vmware'
             if hasattr(restore, 'pickle'):
@@ -956,12 +1028,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })
         finally:
             try:
-                vault.purge_staging_area(context)
+                backup_target.purge_staging_area(context)
             except Exception as ex:
                 LOG.exception(ex)  
             
             try:
-                vault.purge_restore_from_staging_area(context, {'restore_id': restore_id})
+                backup_target.purge_restore_from_staging_area(context, {'restore_id': restore_id})
             except Exception as ex:
                 LOG.exception(ex)             
             
@@ -1008,7 +1080,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             pervmdisks = {}
             snapshot_obj = db.snapshot_get(cntx, snapshot_id)
+            workload_obj = self.db.workload_get(context, snapshot_obj.workload_id)
             snapshotvms = self.db.snapshot_vms_get(context, snapshot_id)
+
             if not FLAGS.vault_storage_type in ("nfs", "local"):
 
                 context_dict = dict([('%s' % key, value)
@@ -1051,31 +1125,37 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             path = result['restore_file_path_'+snapshot_vm_resource.id]
                             pervmdisks[snapshot_vm_resource.vm_id].append(path)
             else:
+                backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
+                                                             'backup_media_target')
+                backup_target = vault.get_backup_target(backup_endpoint)
                 snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type == 'disk':
                         if not snapshot_vm_resource.vm_id in pervmdisks:
                             pervmdisks[snapshot_vm_resource.vm_id] = []
                         vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
-                        pervmdisks[snapshot_vm_resource.vm_id].append(vm_disk_resource_snap.vault_path)
+                        vault_path = os.path.join(backup_target.mount_path,
+                                                  vm_disk_resource_snap.vault_url.lstrip(os.sep))
+                        pervmdisks[snapshot_vm_resource.vm_id].append(vault_path)
             return pervmdisks
 
         try:
             devpaths = {}
             logicalobjects = {}
             snapshot_metadata = {}
-            
+
             head, tail = os.path.split(FLAGS.mountdir + '/')
             fileutils.ensure_tree(head)
 
-            snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-            workload = self.db.workload_get(context, snapshot.workload_id, read_deleted='yes')
+            snapshot = self.db.snapshot_get(context, snapshot_id)
+            workload = self.db.workload_get(context, snapshot.workload_id)
             pervmdisks = _prepare_snapshot_for_mount(context, self.db, snapshot_id)
 
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-                fminstance = virtdriver.snapshot_mount(context, snapshot, pervmdisks,
-                                            mount_vm_id=mount_vm_id)
+                fminstance = virtdriver.snapshot_mount(context, snapshot,
+                                                       pervmdisks,
+                                                       mount_vm_id=mount_vm_id)
                 urls = []
                 for netname, addresses in fminstance.addresses.iteritems():
                     for addr in addresses:
@@ -1089,6 +1169,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                               'urls': json.dumps(urls)
                                            }
                                         })
+                # Add metadata to recovery manager vm
+                try:
+                    compute_service = nova.API(production=True)
+                    compute_service.set_meta_item(context, mount_vm_id,
+                                     "mounted_snapshot_id", snapshot['id'])
+                except:
+                    pass
                 return {"urls": urls}
             elif workload.source_platform == 'vmware': 
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
@@ -1137,6 +1224,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 return "http://" + [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
 
         except Exception as ex:
+            self.db.snapshot_update(context, snapshot['id'],
+                                    {'status': 'available'})
             try:
                 self.snapshot_dismount(context, snapshot['id'])
             except:
@@ -1163,6 +1252,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             virtdriver.snapshot_dismount(context, snapshot, None, mount_vm_id)
             self.db.snapshot_update(context, snapshot_id,
                          {'status': 'available', 'metadata': {}})
+            # Delete metadata to recovery manager vm
+            try:
+                compute_service = nova.API(production=True)
+                compute_service.delete_meta(context, mount_vm_id,
+                                     ["mounted_snapshot_id"])
+            except:
+                pass
         elif workload.source_platform == 'vmware': 
             virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')        
             devpaths_json = self.db.get_metadata_value(snapshot.metadata, 'devpaths')
@@ -1325,7 +1421,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
-                html = html.replace('object.created_at',object.created_at)
+                html = html.replace('object.created_at',str(object.created_at))
                 html = html.replace('vms_html',vms_html)
 
                 
@@ -1363,7 +1459,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 html = html.replace('time_unit',str(time_unit))
                 html = html.replace('object.host',object.host)
                 html = html.replace('object.display_description',object.display_description)
-                html = html.replace('object.created_at',object.created_at)
+                html = html.replace('object.created_at',str(object.created_at))
                 html = html.replace('vms_html',vms_html)
                 
                 if object.status == 'error':

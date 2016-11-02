@@ -7,6 +7,7 @@
 # The following users are already available:
 #  admin/password
 
+import base64
 import os
 import socket
 import fcntl
@@ -59,6 +60,8 @@ TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
 TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
 WLM_USER = 'nova'
+SSL_INSECURE = True
+SSL_VERIFY = False
 
 # Use users.json and roles.json in the local example_conf directory
 aaa = Cork('conf', email_sender='info@triliodata.com', smtp_url='smtp://smtp.magnet.ie')
@@ -274,6 +277,14 @@ def send_keystone_logs(filename):
 def send_tvault_contego_install():
     return static_file('tvault-contego-install.sh', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)    
 
+@bottle.route('/tvault-contego-install.answers')
+def send_tvault_contego_install():
+    return static_file('tvault-contego-install.answers', root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
+
+@bottle.route('/tvault-ansible-scripts.tar.gz')
+def send_ansible_scripts():
+    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz', root='/home/pypi/packages/', mimetype='application/x-gzip', download=True)
+
 @bottle.route('/tvault-horizon-plugin-install.sh')
 def send_tvault_horizon_plugin_install():
     return static_file('tvault-horizon-plugin-install.sh', root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)    
@@ -469,9 +480,9 @@ def _get_session(admin_url=True):
        auth = password.Password(auth_url=auth_url,
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
-                                    project_name=config_data['admin_tenant_name'],
+                                    #project_name=config_data['admin_tenant_name'],
                                     user_domain_id=config_data['domain_name'],
-                                    project_domain_id=config_data['domain_name'],
+                                    domain_id=config_data['domain_name'],
                                     )
     else:
          auth = password.Password(auth_url=auth_url,
@@ -479,7 +490,7 @@ def _get_session(admin_url=True):
                                     password=config_data['admin_password'],
                                     project_name=config_data['admin_tenant_name'],
                                     )
-    sess = session.Session(auth=auth)
+    sess = session.Session(auth=auth, verify=SSL_VERIFY)
     return sess
 
 def _authenticate_with_keystone():
@@ -487,7 +498,7 @@ def _authenticate_with_keystone():
     #test admin url
     try:    
             sess = _get_session() 
-            keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+            keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
             if keystone.version == 'v3':
                tenants = keystone.projects.list()
             else:
@@ -501,6 +512,9 @@ def _authenticate_with_keystone():
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
             config_data['service_tenant_name'] = tenant.name
+            config_data['service_tenant_domain_id'] = 'default'
+            if hasattr(tenant, 'domain_id'):
+               config_data['service_tenant_domain_id'] = tenant.domain_id
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
             
@@ -514,7 +528,7 @@ def _authenticate_with_keystone():
     #test public url
     try:
         sess = _get_session(admin_url=False)
-        keystone = client.Client(session=sess, auth_url=config_data['keystone_public_url'], insecure=True)
+        keystone = client.Client(session=sess, auth_url=config_data['keystone_public_url'], insecure=SSL_INSECURE)
         if keystone.version == 'v3':
             tenants = keystone.projects.list()
         else:
@@ -523,7 +537,7 @@ def _authenticate_with_keystone():
             raise Exception("KeystoneError:Unable to connect to keystone Public URL "+e.message  )
          
     sess = _get_session()
-    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
+    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
 
     configure_mysql()
     configure_rabbitmq()
@@ -562,6 +576,7 @@ def _authenticate_with_keystone():
     config_data['neutron_admin_auth_url'] = config_data['keystone_public_url']
     config_data['neutron_admin_username'] = config_data['admin_username']
     config_data['neutron_admin_password'] = config_data['admin_password']
+    config_data['neutron_admin_tenant_name'] = config_data['admin_tenant_name']
     
     #compute       
     if keystone.version == 'v3':
@@ -632,28 +647,48 @@ def _register_service():
     if config_data['configuration_type'] == 'vmware':
         authenticate_with_keystone()
     
+    sess = _get_session()
+    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
+ 
     if config_data['nodetype'] != 'controller':
-        #nothing to do
+        config_data['triliovault_user_domain_id'] = 'default'
+        wlm_user = None
+        users = keystone.users.list()
+        for user in users:
+            if user.name == 'compute':
+                if hasattr(user, 'domain_id'):
+                    config_data['triliovault_user_domain_id'] = user.domain_id
+            if keystone.version == 'v3':
+                if user.name == config_data['workloadmgr_user']:
+                    wlm_user = user
+            else:
+                if user.name == config_data['workloadmgr_user'] and \
+                    user.tenantId == config_data['service_tenant_id']:
+                    wlm_user = user
+
+        if wlm_user is None:
+            raise Exception("Trilio Vault Appliance controller node may not have been configured. Cannot find 'triliovault' user")
+
+        config_data['cloud_unique_id'] = wlm_user.id
         return {'status':'Success'}
     
    
-    sess = _get_session()
-    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=True)
- 
     if config_data['configuration_type'] == 'openstack':
         #create user
         try:
+            config_data['triliovault_user_domain_id'] = 'default'
             wlm_user = None
             users = keystone.users.list()
             for user in users:
+                if user.name == 'compute':
+                   if hasattr(user, 'domain_id'):
+                      config_data['triliovault_user_domain_id'] = user.domain_id
                 if keystone.version == 'v3':
                    if user.name == config_data['workloadmgr_user']:
                       wlm_user = user
-                      break
                 else:
                      if user.name == config_data['workloadmgr_user'] and user.tenantId == config_data['service_tenant_id']:
                         wlm_user = user
-                        break 
                 
             admin_role = None
             roles = keystone.roles.list()
@@ -682,7 +717,7 @@ def _register_service():
                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
                                                     password=config_data['workloadmgr_user_password'],
                                                     email='workloadmgr@triliodata.com',
-                                                    domain=config_data['domain_name'],
+                                                    domain=config_data['triliovault_user_domain_id'],
                                                     default_project=config_data['service_tenant_id'],
                                                     enabled=True)
                    keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
@@ -694,6 +729,8 @@ def _register_service():
                                                  tenant_id=config_data['service_tenant_id'],
                                                  enabled=True)
                      keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+
+            config_data['cloud_unique_id'] = wlm_user.id
 
         except Exception as exception:
             bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -739,7 +776,8 @@ def _register_workloadtypes():
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
                                tenant_id=config_data['admin_tenant_id'],
-                               insecure=True,
+                               domain_name=config_data['domain_name'],
+                               insecure=SSL_INSECURE,
                                )
         workload_types = wlm.workload_types.list()
         
@@ -841,11 +879,12 @@ def _register_workloadtypes():
 
 def _workloads_import():
     if config_data['nodetype'] == 'controller':
-        if config_data['import_workloads'] == 'on':
+        if config_data['workloads_import'] is True:
             wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 
-                                   tenant_id=config_data['admin_tenant_id'])            
+                                   tenant_id=config_data['admin_tenant_id'],
+                                   domain_name=config_data['domain_name'])            
             wlm.workloads.importworkloads()
 
     return {'status':'Success'}
@@ -1656,6 +1695,8 @@ def configure_form_openstack():
     timezone = get_localzone().zone
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
+    if 'storage_nfs_options' not in config_data:
+       config_data['storage_nfs_options'] = 'nolock'
     roles = ['_member_','Member','member']
     config_data['roles'] = roles
     if 'trustee_role' not in config_data:
@@ -1685,6 +1726,7 @@ def configure_host():
     # Python code to configure storage
     try:
         #configure host
+        prev_hostname = socket.gethostname()
         hostname = config_data['guest_name']
         fh, abs_path = mkstemp()
         new_file = open(abs_path,'w')
@@ -1717,7 +1759,13 @@ def configure_host():
         os.chmod('/etc/hosts', 0644)
         command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
         subprocess.call(command, shell=False)
-        
+   
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+        engine = create_engine(config_data['sql_connection'])
+        update = models.Service.__table__.update().where(models.Service.__table__.columns.host == prev_hostname).\
+                 values({'host' : socket.gethostname()})
+        engine.execute(update)
+               
         if len(config_data['name_server']):
             fh, abs_path = mkstemp()
             new_file = open(abs_path,'w')
@@ -1745,63 +1793,97 @@ def configure_host():
                 subprocess.call(command, shell=False)                 
             except:
                 pass
-        try:
-            command = ['sudo', 'umount', '/var/triliovault']
-            subprocess.call(command, shell=False)
-        except Exception as exception:
-            pass
+
+        def cleanup_mount(path):
+            try:
+                command = ['sudo', 'umount', path]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass
         
-        try:
-            command = ['sudo', 'umount', '/var/triliovault']
-            subprocess.call(command, shell=False)
-        except Exception as exception:
-            pass           
+            try:
+                command = ['sudo', 'umount', path]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass           
         
-        try:
-            command = ['sudo', 'umount', '-l', '/var/triliovault']
+            try:
+                command = ['sudo', 'umount', '-l', path]
+                subprocess.call(command, shell=False)
+            except Exception as exception:
+                pass                
+
+        def mount_share(mountpath, nfsshare, nfsoptions):
+            with open('/proc/mounts','r') as procfile:
+                mounts = [{line.split()[1]:line.split()[0]}
+                          for line in procfile.readlines() if line.split()[1] == mountpath]
+            setting_str = nfsshare+ \
+                              '        %s        nfs     %s  0       0\n' % (mountpath, nfsoptions)
+            if len(mounts) == 0 or mounts[0].get(mountpath, None) != nfsshare:
+                command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', nfsoptions, nfsshare, mountpath]
+                subprocess.check_call(command, shell=False)
+            else:
+                found = 0
+                with open('/etc/fstab', 'r') as ins:
+                    for line in ins:
+                        if line == setting_str:
+                           found = 1
+                           break
+                if found == 0:
+                    fs_file = open('/etc/fstab', 'a')
+                    fs_file.write(setting_str)
+                    fs_file.close()
+
+                try:
+                    temp_file_name = os.path.join(mountpath, str(uuid.uuid4()) + '_test.txt')
+                    command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
+                    subprocess.check_call(command, shell=False)
+                    command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
+                    subprocess.check_call(command, shell=True)
+                    command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
+                    subprocess.check_call(command, shell=True)
+                    command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                    subprocess.check_call(command, shell=False)
+                except Exception as exception:
+                    command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
+                    subprocess.check_call(command, shell=False)
+                    raise Exception("Failed to verify R/W permissions of the NFS export: " + nfsshare)
+
+        if os.path.exists(config_data['vault_data_directory_old']) and \
+            os.path.ismount(config_data['vault_data_directory_old']):
+            cleanup_mount(config_data['vault_data_directory_old'])
+
+        if os.path.exists(config_data['vault_data_directory']):
+            for d in os.listdir(config_data['vault_data_directory']):
+                if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
+                    cleanup_mount(os.path.join(config_data['vault_data_directory'], d))
+
+        nfsoptions = config_data['storage_nfs_options']
+        for idx, nfsshare in enumerate(str.split(config_data['storage_nfs_export'], ',')):
+            replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(nfsshare, ':')[0])
+            command = ['sudo', 'service', 'rpcbind', 'restart']
             subprocess.call(command, shell=False)
-        except Exception as exception:
-            pass                
+            base64encode = base64.b64encode(nfsshare)
 
-        #mount nfs export
-        if not os.path.isdir('/var/triliovault'):
-           command = ['sudo', 'mkdir', '/var/triliovault']
-           subprocess.call(command, shell=False)
-           os.chmod('/var/triliovault',0777)
+            mountpath = os.path.join(config_data['vault_data_directory'], base64encode)
+            if not os.path.isdir(mountpath):
+                command = ['sudo', 'mkdir', '-p', mountpath]
+                subprocess.call(command, shell=False)
 
-        replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(config_data['storage_nfs_export'], ':')[0])
-        command = ['sudo', 'service', 'rpcbind', 'restart']
-        subprocess.call(command, shell=False)            
-        command = ['timeout', '-sKILL', '30' , 'sudo', 'mount', '-o', 'nolock', config_data['storage_nfs_export'], '/var/triliovault']
-        subprocess.check_call(command, shell=False) 
-        setting_str = config_data['storage_nfs_export']+ \
-                      '        /var/triliovault        nfs     rw,nofail,auto  0       0\n'
-        found = 0
-        with open('/etc/fstab', 'r') as ins:
-             for line in ins:
-                 if line == setting_str:
-                    found = 1
-                    break
-        if found == 0:
-           fs_file = open('/etc/fstab', 'a')
-           fs_file.write(setting_str)
-           fs_file.close()
+            # make sure we have right permissions
+            os.chmod(mountpath, 0777)
+            mount_share(mountpath, nfsshare, nfsoptions)
+            """
+            if idx == 0:
+                command = ['timeout', '-sKILL', '30' ,
+                           'sudo', 'mount',
+                           '--bind', mountpath,
+                           config_data['vault_data_directory_old']]
+                subprocess.check_call(command, shell=False)
+                mount_share(config_data['vault_data_directory_old'], nfsshare)
+            """
 
-        try:
-            temp_file_name = '/var/triliovault/' + str(uuid.uuid4()) + '_test.txt'
-            command = ['sudo', '-u', WLM_USER, 'touch', temp_file_name]
-            subprocess.check_call(command, shell=False)
-            command = 'echo Test | sudo -u '+WLM_USER+' tee '+temp_file_name
-            subprocess.check_call(command, shell=True)
-            command = 'sudo -u '+WLM_USER+' cat '+temp_file_name
-            subprocess.check_call(command, shell=True)
-            command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
-            subprocess.check_call(command, shell=False)
-        except Exception as exception:
-            command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
-            subprocess.check_call(command, shell=False)
-            raise Exception("Failed to verify R/W permissions of the NFS export: " + config_data['storage_nfs_export'])                
-            
+
         if config_data['ntp_enabled'] != 'off' and config_data['ntp_enabled'] != 'False':
             ntp_setup()
     except Exception as exception:
@@ -1812,6 +1894,7 @@ def configure_host():
             return bottle.HTTPResponse(status=500,body="Error")
     time.sleep(1)
     return {'status':'Success'}
+
 
 @bottle.route('/authenticate_with_vcenter')
 @authorize()
@@ -2017,6 +2100,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_production_url = ', 'neutron_production_url = ' + config_data['neutron_production_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_username = ', 'neutron_admin_username = ' + config_data['neutron_admin_username'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_password = ', 'neutron_admin_password = ' + config_data['neutron_admin_password'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_tenant_name = ', 'neutron_admin_tenant_name = ' + config_data['neutron_admin_tenant_name'])
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_admin_auth_url = ', 'nova_admin_auth_url = ' + config_data['nova_admin_auth_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'nova_production_endpoint_template = ', 'nova_production_endpoint_template = ' + config_data['nova_production_endpoint_template'])
@@ -2027,10 +2111,13 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cinder_production_endpoint_template = ', 'cinder_production_endpoint_template = ' + config_data['cinder_production_endpoint_template'])
         
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['vault_swift_url'])
-        
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = nfs')
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory = ', 'vault_data_directory = ' + config_data['vault_data_directory'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_data_directory_old = ', 'vault_data_directory_old = ' + config_data['vault_data_directory_old'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = ' + config_data['storage_nfs_export'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_options = ', 'vault_storage_nfs_options = ' + config_data['storage_nfs_options'])
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-s')
@@ -2073,8 +2160,8 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
                      'auth_uri = ' + config_data['keystone_public_url'],
                      starts_with=True)
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_name = ',
-                     'project_name = ' + config_data['service_tenant_name'],
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_tenant_name = ',
+                     'admin_tenant_name = ' + config_data['service_tenant_name'],
                      starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' + config_data.get('trustee_role', '_member_'),
@@ -2082,6 +2169,18 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
                      'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
                      starts_with=True)        
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'domain_name = ',
+                     'domain_name = ' + config_data.get('domain_name'),
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'triliovault_user_domain_id = ',
+                     'triliovault_user_domain_id = ' + config_data['triliovault_user_domain_id'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'user_domain_id = ',
+                     'user_domain_id = ' + config_data['triliovault_user_domain_id'],
+                     starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_domain_id = ',
+                     'project_domain_id = ' + config_data['service_tenant_domain_id'],
+                     starts_with=True)
 
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
@@ -2090,6 +2189,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user = ', 'admin_user = ' + config_data['workloadmgr_user'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_password = ', 'admin_password = ' + config_data['workloadmgr_user_password'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'admin_tenant_name = ', 'admin_tenant_name = ' + config_data['service_tenant_name'])
+        replace_line('/etc/workloadmgr/api-paste.ini', 'admin_user_domain_id = ', 'admin_user_domain_id = ' + config_data['triliovault_user_domain_id'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'insecure = ', 'insecure = True')
         
     except Exception as exception:
@@ -2428,8 +2528,8 @@ def configure_vmware():
         config_data['workloadmgr_user'] = config_data['vcenter_username']
         config_data['workloadmgr_user_password'] = config_data['vcenter_password']
         
-        if 'import-workloads' in config_inputs:
-            config_data['import_workloads'] = config_inputs['import-workloads']
+        if 'workloads-import' in config_inputs:
+            config_data['workloads_import'] = config_inputs['workloads-import']
         else:
             config_data['import_workloads'] = 'off'
         bottle.redirect("/task_status_vmware")
@@ -2500,7 +2600,13 @@ def configure_openstack():
         config_data['workloadmgr_user'] = 'triliovault'
         config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
 
+        config_data['vault_data_directory'] = '/var/triliovault-mounts'
+        config_data['vault_data_directory_old'] = '/var/triliovault'
         config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
+        if 'storage-nfs-options' in config_inputs:
+           config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
+        else:
+             config_data['storage_nfs_options'] = 'nolock'
         
         config_data['swift_auth_version'] = ''
         config_data['swift_auth_url'] = ''
@@ -2509,6 +2615,7 @@ def configure_openstack():
         config_data['swift_tenantname'] = ''
         config_data['swift_container_prefix'] = '' #config_inputs['swift-container-prefix'].strip()        
         config_data['swift_url_template'] = '' #config_inputs['swift-url-template'].strip()
+        config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         
         bottle.redirect("/task_status_openstack")
     except Exception as exception:
@@ -2575,11 +2682,125 @@ def reinitialize():
 
     bottle.redirect("/home")
 
-    
+
+@bottle.route('/validate_keystone_url')
+@authorize()
+def validate_keystone_url():
+    import urllib
+    # Validate keystone url
+    for i in range(0,1):
+        try:
+            urllib.urlopen(bottle.request.query['url']).read()
+            time.sleep(1)
+            return {'status':'Success'}            
+        except Exception as exception:
+            pass    
+    try:
+        urllib.urlopen(bottle.request.query['url']).read()
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+    time.sleep(1)
+
+    return {'status':'Success'}        
+
+
+@bottle.route('/validate_keystone_credentials')
+@authorize()
+def validate_keystone_credentials():
+
+    def _get_keystone_session(auth_url):
+        if 'v3' in auth_url:
+            auth = password.Password(auth_url=auth_url,
+                                    username=admin_username,
+                                    password=admin_password,
+                                    #project_name=project_name,
+                                    user_domain_id=domain_id,
+                                    domain_id=domain_id
+                                    )
+        else:
+            auth = password.Password(auth_url=auth_url,
+                                    username=admin_username,
+                                    password=admin_password,
+                                    project_name=project_name
+                                    )
+        sess = session.Session(auth=auth, verify=SSL_VERIFY)
+        return sess
+
+    admin_username = bottle.request.query['username']
+    admin_password = bottle.request.query['password']
+    project_name = bottle.request.query['project_name']
+    admin_url = bottle.request.query['admin_url']
+    public_url = bottle.request.query['public_url']
+    domain_id = bottle.request.query['domain_id']
+
+    #test public url
+    try:
+        sess = _get_keystone_session(public_url)
+        keystone = client.Client(session=sess, auth_url=public_url, insecure=SSL_INSECURE)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
+    try:
+        sess = _get_keystone_session(admin_url)
+        keystone = client.Client(session=sess, auth_url=admin_url, insecure=SSL_INSECURE)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
+    # populate roles list
+    try:
+        roles = [role.name for role in keystone.roles.list()]
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
+    return {'status':'Success', 'roles': roles}
+
+
+@bottle.route('/validate_nfs_share')
+@authorize()
+def validate_nfs_share():
+    try:
+        from workloadmgr import utils
+        nfsshare = bottle.request.query['nfsshare']
+        nfsserver = nfsshare.split(":")[0]
+        sharepath = nfsshare.split(":")[1]
+        rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
+
+        for i in rpcinfo[0].split("\n")[1:]:
+            if len(i.split()) and i.split()[3] == 'mountd':
+                mounts = utils.execute("showmount", "-e", "--no-headers", nfsserver)
+                if sharepath not in mounts[0]:
+                    return bottle.HTTPResponse(status=500,
+                        body=str("'%s' is not found in %s export list" % (nfsshare, nfsserver)))
+                return {'status': 'Success'}
+        return bottle.HTTPResponse(status=500,
+            body=str("NFS Daemon is not running on the server '%s'" % nfsserver))
+
+    except Exception as exception:
+        body=str("NFS Daemon is not running on the server '%s'" % nfsserver)
+        return bottle.HTTPResponse(status=500, body=body)
+
+
 def findXmlSection(dom, sectionName):
     sections = dom.getElementsByTagName(sectionName)
     return sections[0]
  
+
 def getPropertyMap(ovfEnv):
     dom = parseString(ovfEnv)
     section = findXmlSection(dom, "PropertySection")
@@ -2590,6 +2811,7 @@ def getPropertyMap(ovfEnv):
         propertyMap[key] = value
     dom.unlink()
     return propertyMap    
+
 
 def set_network_interfaces(propertyMap):
     
@@ -2711,7 +2933,6 @@ def main():
         except Exception as ex:
             pass
         
-        time.sleep(10)
         command = ['sudo', 'rabbitmqctl', 'change_password', 'guest', TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 

@@ -57,7 +57,7 @@ class Scheduler(object):
 
         # Set general options
         config = combine_opts(gconfig, 'apscheduler.', options)
-        self.misfire_grace_time = int(config.pop('misfire_grace_time', 30))
+        self.misfire_grace_time = int(config.pop('misfire_grace_time', 1800))
         self.coalesce = asbool(config.pop('coalesce', True))
         self.daemonic = asbool(config.pop('daemonic', True))
         self.standalone = asbool(config.pop('standalone', False))
@@ -251,7 +251,11 @@ class Scheduler(object):
                 store = self._jobstores[jobstore]
             except KeyError:
                 raise KeyError('No such job store: %s' % jobstore)
-            store.add_job(job)
+            try:
+                store.add_job(job)
+            except:
+                   #Retry Mysql going away
+                   store.add_job(job)
         finally:
             self._jobstores_lock.release()
 
@@ -363,14 +367,8 @@ class Scheduler(object):
             the job is still allowed to be run
         :rtype: :class:`~apscheduler.job.Job`
         """
-        try:
-            trigger = WorkloadMgrTrigger(jobschedule)
-            return self.add_job(trigger, func, args, kwargs, **options)
-        except Exception as ex:
-            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')  
-            logger.exception(ex)
-            trigger = WorkloadMgrTrigger(jobschedule)
-            return self.add_job(trigger, func, args, kwargs, **options)            
+        trigger = WorkloadMgrTrigger(jobschedule)
+        return self.add_job(trigger, func, args, kwargs, **options)
 
     def add_cron_job(self, func, year=None, month=None, day=None, week=None,
                      day_of_week=None, hour=None, minute=None, second=None,

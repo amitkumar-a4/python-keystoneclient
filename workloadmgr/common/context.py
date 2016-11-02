@@ -178,6 +178,9 @@ class RequestContext(context.RequestContext):
             pass
 
         trustee_user_domain = 'default'
+        if 'triliovault_user_domain_id' in cfg.CONF:
+           trustee_user_domain = cfg.CONF.triliovault_user_domain_id
+
         if 'user_domain_id' in cfg.CONF.keystone_authtoken:
             trustee_user_domain = cfg.CONF.keystone_authtoken.user_domain_id
 

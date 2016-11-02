@@ -62,17 +62,19 @@ def get_vms(cntx, workload_id):
         vm_hypervisor = None
        
         vm = {
-              'vm_id' : vm_instance.id,
-              'vm_name' : vm_instance.name,
-              'vm_metadata' : vm_instance.metadata,
-              'vm_flavor_id' : vm_instance.flavor['id'],
+              'vm_id': vm_instance.id,
+              'vm_name': vm_instance.name,
+              'vm_metadata': vm_instance.metadata,
+              'vm_flavor_id': vm_instance.flavor['id'],
               'hostname': vm_instance.name,
-              'vm_power_state' : vm_instance.__dict__['OS-EXT-STS:power_state'],
-              'hypervisor_hostname' : None,
-              'hypervisor_type' :  "QEMU"
+              'vm_power_state': vm_instance.__dict__.get('OS-EXT-STS:power_state',
+                                                         vm_instance.__dict__.get('status', None)),
+              'hypervisor_hostname': None,
+              'hypervisor_type':  "QEMU",
+              'availability_zone': vm_instance.__dict__.get('OS-EXT-AZ:availability_zone', None)
              }
 
-        if vm_instance.key_name and not vm_instance.key_name in keypairs:
+        if hasattr(vm_instance,'key_name') and vm_instance.key_name and not vm_instance.key_name in keypairs:
             try:
                 keypair = compute_service.get_keypair_by_name(cntx,
                                                   vm_instance.key_name)
@@ -82,7 +84,7 @@ def get_vms(cntx, workload_id):
             except:
                 pass
 
-        if vm_instance.key_name and vm_instance.key_name in keypairs:
+        if hasattr(vm_instance,'key_name') and vm_instance.key_name and vm_instance.key_name in keypairs:
             vm['vm_metadata']['key_name'] = vm_instance.key_name
             vm['vm_metadata']['key_data'] = keypairs[vm_instance.key_name]
 

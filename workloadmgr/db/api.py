@@ -128,21 +128,9 @@ def workload_get_all(context, **kwargs):
     """Get all workloads."""
     return IMPL.workload_get_all(context, **kwargs)
 
-def workload_get_all_by_admin(context, **kwargs):
-    """Get all workloads of all the projects."""
-    return IMPL.workload_get_all_by_admin(context, **kwargs)    
-
-def workload_get_all_by_host(context, host):
-    """Get all workloads belonging to a host."""
-    return IMPL.workload_get_all_by_host(context, host)
-
 def workload_create(context, values):
     """Create a workload from the values dictionary."""
     return IMPL.workload_create(context, values)
-
-def workload_get_all_by_project(context, project_id):
-    """Get all workloads belonging to a project."""
-    return IMPL.workload_get_all_by_project(context, project_id)
 
 def workload_update(context, workload_id, values, purge_metadata=False):
     """
@@ -164,8 +152,14 @@ def workload_vms_get(context, workload_id, **kwargs):
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     return IMPL.workload_vm_get_by_id(context, vm_id, **kwargs)
 
+def workload_vm_get(context, id):
+    return IMPL.workload_vm_get(context, id)
+
 def workload_vms_delete(context, vm_id, workload_id):
     return IMPL.workload_vms_delete(context, vm_id, workload_id)
+
+def workload_vms_update(context, id, values, purge_metadata=False):
+    return IMPL.workload_vms_update(context, id, values, purge_metadata)
 
 def snapshot_mark_incomplete_as_error(context, host):
     return IMPL.snapshot_mark_incomplete_as_error(context, host)
@@ -195,11 +189,8 @@ def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0, proces
 def snapshot_get_running_snapshots_by_host(context, **kwargs):
     return IMPL.snapshot_get_running_snapshots_by_host(context, **kwargs)    
     
-def snapshot_get_all(context, workload_id=None, **kwargs):
-    return IMPL.snapshot_get_all(context, workload_id, **kwargs)   
-    
-def snapshot_get_all_by_host(context, host=None, **kwargs):
-    return IMPL.snapshot_get_all_by_host(context, host, **kwargs)
+def snapshot_get_all(context, **kwargs):
+    return IMPL.snapshot_get_all(context, **kwargs)   
     
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
     """Get all snapshots belonging to a workload."""

@@ -846,7 +846,12 @@ class PrepareBackupImage(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
 
         snapshot_obj = db.snapshot_get(cntx, snapshot_id)
+        workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         snapshot_vm_resource = db.snapshot_vm_resource_get(cntx, vm_resource_id)
+
+        backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
+                                                     'backup_media_target')
+        backup_target = vault.get_backup_target(backup_endpoint)
 
         snapshot_vm_resource_object_store_transfer_time =\
               workload_utils.download_snapshot_vm_resource_from_object_store(cntx,
@@ -874,11 +879,13 @@ class PrepareBackupImage(task.Task):
                                 + disk_filename_extention
         restored_file_path = restored_file_path.replace(" ", "")            
 
-        image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap.vault_path)
+        vault_path = os.path.join(backup_target.mount_path,
+                                  vm_disk_resource_snap.vault_path)
+        image_attr = qemuimages.qemu_img_info(vault_path)
         if disk_format == 'qcow2' and image_attr.file_format == 'raw':
-            qemuimages.convert_image(vm_disk_resource_snap.vault_path, restored_file_path, 'qcow2')
+            qemuimages.convert_image(vault_path, restored_file_path, 'qcow2')
         else:
-            shutil.copyfile(vm_disk_resource_snap.vault_path, restored_file_path)
+            shutil.copyfile(vault_path, restored_file_path)
 
         while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
             vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx,
@@ -889,11 +896,13 @@ class PrepareBackupImage(task.Task):
                                             '_' + snapshot_vm_resource_backing.resource_name + '.' \
                                             + disk_filename_extention
             restored_file_path_backing = restored_file_path_backing.replace(" ", "")
-            image_attr = qemuimages.qemu_img_info(vm_disk_resource_snap_backing.vault_path)
+            vault_path = os.path.join(backup_target.mount_path,
+                                      vm_disk_resource_snap_backing.vault_path)
+            image_attr = qemuimages.qemu_img_info(vault_path)
             if disk_format == 'qcow2' and image_attr.file_format == 'raw':
-                qemuimages.convert_image(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing, 'qcow2')
+                qemuimages.convert_image(vault_path, restored_file_path_backing, 'qcow2')
             else:
-                shutil.copyfile(vm_disk_resource_snap_backing.vault_path, restored_file_path_backing)
+                shutil.copyfile(vault_path, restored_file_path_backing)
   
             #rebase
             image_info = qemuimages.qemu_img_info(restored_file_path)

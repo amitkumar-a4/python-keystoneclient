@@ -48,6 +48,7 @@
                         <br>
                         <div class="well">
                             <b>Download <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a> and run as sudo...</b><br>
+                            <b>Download <a href="/tvault-contego-install.answers">tvault-contego-install.answers</a></b><br>
                         </div>                    
                     </li>
                    
@@ -86,13 +87,13 @@
                         </div>                    
                     </li>
                
-                    <li>Horizon Dashboard on Appliance
+                    <!--li>Horizon Dashboard on Appliance
                         <br>
                         <br>
                         <div class="well">
                         	<script>document.write('<a href="http://' + window.location.host + ':3001" target="_blank"> http://floating-ipaddress-of-tvault-vm:3001 </a>')</script>
                         </div>
-                    </li>
+                    </li-->
 
                     <!-- Enable deb and rpm packages later on 
                     <li>Horizon Dashboard Plugin</li>
@@ -115,6 +116,16 @@
                         <script>document.write("pip install http://" + window.location.host + ":8081/packages/python-workloadmgrclient-")</script>{{version}}<script>document.write(".tar.gz")</script>
                     </div>
                 </ol>                
+                
+                <h2>Ansible Scripts</h2>
+                <ol>
+                    <div class="well">
+                        <b>Download Ansible Scripts <a href="/tvault-ansible-scripts.tar.gz">tvault-ansible-scripts-{{version}}.tar.gz</a></b><br>
+                         <br>
+                    </div>
+                </ol>
+
+
                 <h2>Support</h2>
                 <ol>
                     <div class="well"><a>support@triliodata.com</a>

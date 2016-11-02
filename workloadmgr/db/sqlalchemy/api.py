@@ -6,6 +6,7 @@
 """Implementation of SQLAlchemy backend."""
 
 from datetime import datetime, timedelta
+import os
 import uuid
 import warnings
 import threading
@@ -136,7 +137,6 @@ def model_query(context, *args, **kwargs):
     project_only = kwargs.get('project_only')
 
     query = session.query(*args)
-
     if read_deleted == 'no':
         query = query.filter_by(deleted=False)
     elif read_deleted == 'yes':
@@ -145,7 +145,6 @@ def model_query(context, *args, **kwargs):
         query = query.filter_by(deleted=True)
     else:
         raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
-
     if context:
         if project_only and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
@@ -552,61 +551,46 @@ def workload_update(context, id, values, purge_metadata=False):
 
 @require_context
 def workload_get_all(context, **kwargs):
-        if 'page_number' in kwargs:
-            page_size = setting_get(context,'page_size')
-            return model_query( context, models.Workloads, **kwargs).\
-                                    options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                    filter_by(project_id=context.project_id).\
-                                    order_by(models.Workloads.created_at.desc()).limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
+        qs =  model_query( context, models.Workloads, **kwargs).\
+                                options(sa_orm.joinedload(models.Workloads.metadata))
+
+        if is_admin_context(context):
+           if 'nfs_share' in kwargs and kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
+              qs = qs.filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),\
+                             models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']]))))
+           else:
+                if 'dashboard_item' in kwargs:
+                   if kwargs.get('dashboard_item') ==  'activities':
+                      if 'time_in_minutes' in kwargs:
+                          time_in_minutes = int(kwargs.get('time_in_minutes'))
+                      else:
+                           time_in_minutes = 0
+                      time_delta = ((time_in_minutes / 60) / 24) * -1
+                      qs = model_query( context,
+                                 models.Workloads.id,
+                                 models.Workloads.deleted,
+                                 models.Workloads.deleted_at,
+                                 models.Workloads.display_name,
+                                 models.Workloads.status,
+                                 models.Workloads.created_at,
+                                 models.Workloads.user_id,
+                                 models.Workloads.project_id,
+                                 **kwargs). \
+                                 filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
+                                 models.Workloads.deleted_at > func.adddate(func.now(), time_delta)))
+           if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:   
+               qs = qs.filter_by(project_id=context.project_id)
         else:
-            if not is_admin_context(context):
-                return workload_get_all_by_project(context, context.project_id)
-            else:
-                return model_query( context, models.Workloads, **kwargs).\
-                                    options(sa_orm.joinedload(models.Workloads.metadata)).\
-                                    filter_by(project_id=context.project_id).\
-                                    order_by(models.Workloads.created_at.desc()).all()
+             qs = qs.filter_by(project_id=context.project_id)
 
+        qs = qs.order_by(models.Workloads.created_at.desc())
 
-@require_admin_context
-def workload_get_all_by_host(context, host):
-    session = get_session()
-    try:
-        query = session.query(models.Workloads)\
-                       .options(sa_orm.joinedload(models.Workloads.metadata))\
-                       .filter_by(host=host)
+        if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
+           page_size = setting_get(context,'page_size')
+           return qs.limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
+        else:
+             return qs.all()
 
-        #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query.all()
-
-    except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsNotFound()
-    
-    return workloads
-
-@require_context
-def workload_get_all_by_project(context, project_id):
-    authorize_project_context(context, project_id)    
-    session = get_session()
-    try:
-        query = session.query(models.Workloads)\
-                       .options(sa_orm.joinedload(models.Workloads.metadata))\
-                       .filter_by(project_id=project_id)
-
-        #TODO(gbasava): filter out deleted workloads if context disallows it
-        workloads = query.all()
-
-    except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadsNotFound() 
-    
-    return workloads
-
-@require_admin_context
-def workload_get_all_by_admin(context, **kwargs):           
-    return model_query( context, models.Workloads, **kwargs).\
-                            options(sa_orm.joinedload(models.Workloads.metadata)).\
-                            order_by(models.Workloads.created_at.desc()).all()
-    
 @require_context
 def _workload_get(context, id, session, **kwargs):
     try:
@@ -993,38 +977,28 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     return result
 
 @require_context
-def snapshot_get_all(context, workload_id=None, **kwargs):
+def snapshot_get_all(context, **kwargs):
+    qs = model_query(context, models.Snapshots, **kwargs).\
+                    options(sa_orm.joinedload(models.Snapshots.metadata))
+    if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':  
+       qs = qs.filter_by(workload_id=kwargs['workload_id'])
+    if 'host' in kwargs and kwargs['host'] is not None and kwargs['host'] != '':
+       qs = qs.filter(models.Snapshots.host == kwargs['host'])
+    if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
+       if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
+           date_to = kwargs['date_to']
+       else:
+            date_to = datetime.now()
+       qs = qs.filter(and_(models.Snapshots.created_at >= func.date_format(kwargs['date_from'],'%y-%m-%dT%H:%i:%s'),\
+                      models.Snapshots.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
+
     if not is_admin_context(context):
-        if workload_id:
-            return snapshot_get_all_by_workload(context, workload_id, **kwargs)
-        else:
-            return snapshot_get_all_by_project(context, context.project_id, **kwargs)
-    if workload_id == None:
-        return model_query(context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            order_by(models.Snapshots.created_at.desc()).all()        
+       qs = qs.filter_by(project_id=context.project_id)
     else:
-        return model_query(context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            filter_by(workload_id=workload_id).\
-                            order_by(models.Snapshots.created_at.desc()).all()   
-    return result
+         if 'get_all' in kwargs and kwargs['get_all'] is not True:
+            qs = qs.filter_by(project_id=context.project_id)
+    return qs.order_by(models.Snapshots.created_at.desc()).all() 
 
-@require_context
-def snapshot_get_all_by_host(context, host, **kwargs):
-    if is_admin_context(context) is not True:
-        raise exception.AdminRequired()
-
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
-    result = model_query(context, models.Snapshots, **kwargs).\
-                        options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                        filter(models.Snapshots.host == host).\
-                        order_by(models.Snapshots.created_at.desc()).all()
-    if not result:
-        raise exception.SnapshotsOfHostNotFound(host=host)
-    return result
-    
 @require_context                            
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
     if kwargs.get('session') == None:
@@ -1080,6 +1054,13 @@ def snapshot_update(context, snapshot_id, values, purge_metadata=False):
 @require_context
 def snapshot_type_time_size_update(context, snapshot_id):
     snapshot = snapshot_get(context, snapshot_id, read_deleted='yes')
+    workload = workload_get(context, snapshot['workload_id'])
+
+    backup_endpoint = get_metadata_value(workload.metadata,
+                                         'backup_media_target')
+
+    backup_target = vault.get_backup_target(backup_endpoint)
+
     snapshot_type_full = False
     snapshot_type_incremental = False
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
@@ -1095,6 +1076,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
         time_taken = time_taken + snapshot_vm_resource.time_taken
+
         #update size
         if snapshot_vm_resource.status != 'deleted':
             disk_type = get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
@@ -1102,38 +1084,45 @@ def snapshot_type_time_size_update(context, snapshot_id):
             snapshot_vm_resource_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 vm_disk_resource_snap_restore_size = 0
-                if vm_disk_resource_snap.vault_path:
-                    vm_disk_resource_snap_size = vault.get_size(vm_disk_resource_snap.vault_path)
-                    if vm_disk_resource_snap_size == 0:
-                        vm_disk_resource_snap_size = vm_disk_resource_snap.size
+
+                if vm_disk_resource_snap.vault_url is None:
+                    continue
+
+                resource_snap_path = os.path.join(backup_target.mount_path,
+                                                  vm_disk_resource_snap.vault_url.strip(os.sep))
+                vm_disk_resource_snap_size = backup_target.get_object_size(resource_snap_path)
+                if vm_disk_resource_snap_size == 0:
+                    vm_disk_resource_snap_size = vm_disk_resource_snap.size
                     
-                    disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-                    if disk_format == 'vmdk':
-                        vm_disk_resource_snap_restore_size = vault.get_restore_size(vm_disk_resource_snap.vault_path,
-                                                                                    disk_format, disk_type)
-                    else:
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                        while vm_disk_resource_snap_backing_id:
-                            vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
+                if disk_format == 'vmdk':
+                    vault_path = os.path.join(backup_target.mount_path, 
+                                              vm_disk_resource_snap.vault_url.strip(os.sep))
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
+                                                                                disk_format, disk_type)
+                else:
+                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
+                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
+                    while vm_disk_resource_snap_backing_id:
+                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+
+                #For vmdk   
+                if vm_disk_resource_snap_restore_size == 0:
+                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
+                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
+                    while vm_disk_resource_snap_backing_id:
+                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                        if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
-                                                
-                    #For vmdk   
-                    if vm_disk_resource_snap_restore_size == 0:
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                        while vm_disk_resource_snap_backing_id:
-                            vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                            if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
-                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                            else:
-                                vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
-                            vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                        else:
+                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
+                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
                                 
-                    vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
-                                                                                     'restore_size' : vm_disk_resource_snap_restore_size}) 
-                    snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
+                vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
+                                                                                 'restore_size' : vm_disk_resource_snap_restore_size}) 
+                snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
                     
             vm_disk_resource_snap_top = vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
             snapshot_vm_resource_restore_size = vm_disk_resource_snap_top.restore_size
@@ -1141,8 +1130,8 @@ def snapshot_type_time_size_update(context, snapshot_id):
                                                                            'restore_size' : snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
             snapshot_restore_size = snapshot_restore_size + snapshot_vm_resource_restore_size
-    
-        
+
+
     snapshot_vms= snapshot_vms_get(context, snapshot_id)
     snapshot_data_transfer_time = 0
     snapshot_object_store_transfer_time = 0
@@ -1168,16 +1157,11 @@ def snapshot_type_time_size_update(context, snapshot_id):
         snapshot_data_transfer_time += snapshot_vm_data_transfer_time        
         snapshot_object_store_transfer_time += snapshot_vm_object_store_transfer_time
 
-                
-               
-    
     if snapshot.finished_at:
         time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
     else:
         time_taken = max(time_taken, int((timeutils.utcnow() - snapshot.created_at).total_seconds()))
-        
-    
-        
+
     if snapshot_type_full and snapshot_type_incremental:
         snapshot_type = 'mixed'
     elif snapshot_type_incremental:
@@ -1881,7 +1865,7 @@ def _vm_network_resource_snap_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata, session):
+def _vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata, session):
     
     metadata = values.pop('metadata', {})
     
@@ -1901,7 +1885,7 @@ def _vm_network_resource_snap_update(context, values, vm_network_resource_snap_i
 @require_context
 def vm_network_resource_snap_create(context, values):
     session = get_session()
-    return _vm_network_resource_snap_update(context, values, None, False, session)
+    return _vm_network_resource_snap_update(context, None, values, False, session)
 
 @require_context
 def vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata = False):
@@ -2257,7 +2241,38 @@ def restore_get_all(context, snapshot_id=None, **kwargs):
             return restore_get_all_by_project(context, context.project_id, **kwargs)
         
     if snapshot_id == None:
-        return model_query(context, models.Restores, **kwargs).\
+        if 'dashboard_item' in kwargs:
+            if kwargs.get('dashboard_item') == 'activities':
+                if 'time_in_minutes' in kwargs:
+                    time_in_minutes = int(kwargs.get('time_in_minutes'))
+                else:
+                    time_in_minutes = 0
+                time_delta = ((time_in_minutes / 60) / 24) * -1
+                result = \
+                    model_query(context,
+                        models.Restores.id,
+                        models.Restores.deleted,
+                        models.Restores.deleted_at,
+                        models.Restores.display_name,
+                        models.Restores.status,
+                        models.Restores.created_at,
+                        models.Restores.user_id,
+                        models.Restores.project_id,
+                        (models.Snapshots.display_name).label('snapshot_name'),
+                        (models.Snapshots.created_at).label('snapshot_created_at'),
+                        (models.Workloads.display_name).label('workload_name'),
+                        (models.Workloads.created_at).label('workload_created_at'),
+                        **kwargs). \
+                    filter(or_(models.Restores.created_at > func.adddate(func.now(), time_delta),
+                               models.Restores.deleted_at > func.adddate(func.now(), time_delta))). \
+                    outerjoin(models.Snapshots,
+                            models.Restores.snapshot_id == models.Snapshots.id). \
+                    outerjoin(models.Workloads,
+                            models.Snapshots.workload_id == models.Workloads.id). \
+                    order_by(models.Restores.created_at.desc()).all()
+                return result
+        else:
+            return model_query(context, models.Restores, **kwargs).\
                             options(sa_orm.joinedload(models.Restores.metadata)).\
                             order_by(models.Restores.created_at.desc()).all()        
     else:
@@ -3204,8 +3219,3 @@ def purge_workload(context, id):
 
     except Exception as ex:
         LOG.exception(ex)
-        
-    
-        
-            
-        

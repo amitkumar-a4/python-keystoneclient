@@ -88,7 +88,7 @@ class WorkloadMgrException(Exception):
     with the keyword arguments provided to the constructor.
 
     """
-    message = _("Error: %(reason)%s")
+    message = _("Error: %(reason)s")
     code = 500
     headers = {}
     safe = False
@@ -160,13 +160,14 @@ class AuthorizationFailure(WorkloadMgrException):
 class MissingCredentialError(WorkloadMgrException):
     msg_fmt = _("Missing required credential: %(required)s")
 
-
 class InvalidSnapshot(Invalid):
     message = _("Invalid snapshot") + ": %(reason)s"
 
+class InvalidWorkload(Invalid):
+    message = _("Invalid workload") + ": %(reason)s"
 
 class InvalidRequest(Invalid):
-    message = _("The request is invalid.")
+    message = _("The request is invalid. %(reason)s")
 
 
 class InvalidResults(Invalid):
@@ -371,7 +372,7 @@ class WorkloadVMNotFound(NotFound):
     message = _("WorkloadVM %(workload_vm_id)s could not be found.")
     
 class SnapshotsOfHostNotFound(NotFound):
-    message = _("Snapshots for host: %(host) could not be found.")
+    message = _("Snapshots for host: %(host)s could not be found.")
 
 
 class SnapshotsNotFound(NotFound):
@@ -501,4 +502,19 @@ class InvalidLicense(Invalid):
     pass
 
 class InternalError(Invalid):
+    pass
+
+class TransferNotFound(NotFound):
+    message = _("Transfer %(transfer_id)s could not be found.")
+
+class TransferNotAllowed(Invalid):
+    message = _("Transfer %(workload_id)s is not allowed within the same cloud.")
+
+class MediaNotSupported(Invalid):
+    message = _("Transfer %(media)s is not allowed within the same cloud.")
+
+class BackupTargetOffline(Invalid):
+    message = _("Backup %(endpoint)s is offline. Cannot be accessed")
+
+class InvalidNFSMountPoint(Invalid):
     pass

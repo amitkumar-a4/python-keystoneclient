@@ -233,31 +233,20 @@ class WorkloadMgrsController(wsgi.Controller):
             all_workloads = None
             #Get value of query parameter 'all_workloads'
             page_number = None
+            nfs_share = None
             if ('QUERY_STRING' in req.environ):                
                 var = parse_qs(req.environ['QUERY_STRING'])
                 all_workloads = var.get('all_workloads',[''])[0]
                 all_workloads = bool(escape(all_workloads))
                 page_number = var.get('page_number',[''])[0]
-            
-            workloads_all = None
-            if all_workloads is True:                            
-                workloads_all = self.workload_api.workload_get_all_by_admin(context)
-            else:
-                if page_number:
-                    workloads_all = self.workload_api.workload_get_all(context,search_opts={'page_number':page_number})
-                else:
-                    workloads_all = self.workload_api.workload_get_all(context)
+                nfs_share = var.get('nfs_share',[''])[0]
+            workloads_all = self.workload_api.workload_get_all(context,search_opts={'page_number':page_number,\
+                            'nfs_share':nfs_share, 'all_workloads':all_workloads})
             limited_list = common.limited(workloads_all, req)
-            #TODO(giri): implement the search_opts to specify the filters
-            workloads = []
-            for workload in limited_list:
-                if workload['deleted'] == False:
-                    workloads.append(workload)
-
             if is_detail:
-                workloads = self._view_builder.detail_list(req, workloads)
+                workloads = self._view_builder.detail_list(req, workloads_all, self.workload_api)
             else:
-                workloads = self._view_builder.summary_list(req, workloads)
+                workloads = self._view_builder.summary_list(req, workloads_all)
             return workloads
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
@@ -665,12 +654,12 @@ class WorkloadMgrsController(wsgi.Controller):
     def get_storage_usage(self, req):
         try:
             context = req.environ['workloadmgr.context']
-            storage_usage = {'total': 0, 'full': 0, 'incremental': 0}
+            storages_usage = {'storage_usage': [{'total': 0, 'full': 0, 'incremental': 0}]}
             try:
-                storage_usage = self.workload_api.get_storage_usage(context)
+                storages_usage = self.workload_api.get_storage_usage(context)
             except Exception as ex:
                 LOG.exception(ex)
-            return storage_usage
+            return storages_usage
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
