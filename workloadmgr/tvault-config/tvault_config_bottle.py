@@ -496,17 +496,16 @@ def _get_session(admin_url=True):
 def _authenticate_with_keystone():
     # Authenticate with Keystone
     #test admin url
-    try:    
-            sess = _get_session() 
-            keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
-            if keystone.version == 'v3':
-               tenants = keystone.projects.list()
-            else:
-                 tenants = keystone.tenants.list()
+    try:
+        sess = _get_session() 
+        keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
+        if keystone.version == 'v3':
+            tenants = keystone.projects.list()
+        else:
+            tenants = keystone.tenants.list()
 
     except Exception as e:
            raise Exception( "KeystoneError:Unable to connect to keystone Admin URL "+e.message  )
-                     
 
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
@@ -524,7 +523,6 @@ def _authenticate_with_keystone():
         else:
             raise Exception('No service tenant found')
     
-
     #test public url
     try:
         sess = _get_session(admin_url=False)
@@ -586,13 +584,14 @@ def _authenticate_with_keystone():
         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
                                                      region=config_data['region_name']).publicurl
 
+  
+    def _get_service_endpoint(public_url):
+        comps = compute_public_url.split("/")
+        return "%s//%s/%s/%(project_id)s" % (comps[0], comps[2], comps[3]) 
 
-    if len(compute_public_url.split("/")) <= 4:
-        config_data['nova_production_endpoint_template'] = compute_public_url.strip('/') + '/%(project_id)s'
-    else:
-        config_data['nova_production_endpoint_template'] = compute_public_url.replace(
-                                                            compute_public_url.split("/")[-1], 
-                                                            '%(project_id)s')  
+    config_data['nova_production_endpoint_template'] = \
+        _get_sevice_endpoint(compute_public_url)
+
     config_data['nova_admin_auth_url'] = config_data['keystone_public_url']
     config_data['nova_admin_username'] = config_data['admin_username']
     config_data['nova_admin_password'] = config_data['admin_password']
@@ -607,12 +606,9 @@ def _authenticate_with_keystone():
             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
                                                         region=config_data['region_name']).publicurl
 
-        if len(compute_public_url.split("/")) <= 4:
-            config_data['cinder_production_endpoint_template'] = volume_public_url.strip('/') + '/%(project_id)s'
-        else:
-            config_data['cinder_production_endpoint_template'] = volume_public_url.replace(
-                                                                volume_public_url.split("/")[-1], 
-                                                                '%(project_id)s')
+        config_data['cinder_production_endpoint_template'] = \
+            _get_service_endpoint(volume_public_url)
+
     except Exception as exception:
         #cinder is optional
         config_data['cinder_production_endpoint_template'] = ''
@@ -626,12 +622,11 @@ def _authenticate_with_keystone():
             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
                                                         region=config_data['region_name']).publicurl
 
-        config_data['vault_swift_url']  =  object_public_url.replace(
-                                                                object_public_url.split("/")[-1], 
-                                                                'AUTH_') 
+        config_data['vault_swift_url'] = object_public_url.replace(
+                                             object_public_url.split("/")[-1], 'AUTH_') 
     except Exception as exception:
         #swift is not configured
-        config_data['vault_swift_url']  =  ''
+        config_data['vault_swift_url'] = ''
     
     #workloadmanager
     if  config_data['nodetype'] == 'controller':
@@ -641,10 +636,10 @@ def _authenticate_with_keystone():
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD           
     else:
         if keystone.version == 'v3':
-           wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
+            wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
                                                     region=config_data['region_name'], interface='public').url
         else:
-             wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
+            wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id, 
                                                       region=config_data['region_name']).publicurl
         parse_result = urlparse(wlm_public_url)
         
