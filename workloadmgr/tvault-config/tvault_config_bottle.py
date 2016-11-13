@@ -578,14 +578,19 @@ def _authenticate_with_keystone():
     config_data['neutron_admin_password'] = config_data['admin_password']
     config_data['neutron_admin_tenant_name'] = config_data['admin_tenant_name']
     
-    #compute       
+    #compute
     if keystone.version == 'v3':
-       compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
-                                                    region=config_data['region_name'], interface='public').url
+        compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
+                                                     region=config_data['region_name'], interface='public').url
     else:
-         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
-                                                      region=config_data['region_name']).publicurl
-    config_data['nova_production_endpoint_template']  =  compute_public_url.replace(
+        compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
+                                                     region=config_data['region_name']).publicurl
+
+
+    if len(compute_public_url.split("/")) <= 4:
+        config_data['nova_production_endpoint_template'] = compute_public_url.strip('/') + '/%(project_id)s'
+    else:
+        config_data['nova_production_endpoint_template'] = compute_public_url.replace(
                                                             compute_public_url.split("/")[-1], 
                                                             '%(project_id)s')  
     config_data['nova_admin_auth_url'] = config_data['keystone_public_url']
@@ -596,12 +601,16 @@ def _authenticate_with_keystone():
     try:
         #volume
         if keystone.version == 'v3':
-           volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id, 
+            volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
                                                        region=config_data['region_name'], interface='public').url
         else:
-             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id, 
-                                                         region=config_data['region_name']).publicurl
-        config_data['cinder_production_endpoint_template']  =  volume_public_url.replace(
+            volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
+                                                        region=config_data['region_name']).publicurl
+
+        if len(compute_public_url.split("/")) <= 4:
+            config_data['cinder_production_endpoint_template'] = volume_public_url.strip('/') + '/%(project_id)s'
+        else:
+            config_data['cinder_production_endpoint_template'] = volume_public_url.replace(
                                                                 volume_public_url.split("/")[-1], 
                                                                 '%(project_id)s')
     except Exception as exception:
@@ -611,11 +620,12 @@ def _authenticate_with_keystone():
     try:        
         #object
         if keystone.version == 'v3':
-           object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
+            object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
                                                        region=config_data['region_name'], interface='public').url
         else:
-             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                         region=config_data['region_name']).publicurl
+            object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
+                                                        region=config_data['region_name']).publicurl
+
         config_data['vault_swift_url']  =  object_public_url.replace(
                                                                 object_public_url.split("/")[-1], 
                                                                 'AUTH_') 
@@ -680,7 +690,7 @@ def _register_service():
             wlm_user = None
             users = keystone.users.list()
             for user in users:
-                if user.name == 'compute':
+                if user.name in ('compute', 'nova'):
                    if hasattr(user, 'domain_id'):
                       config_data['triliovault_user_domain_id'] = user.domain_id
                 if keystone.version == 'v3':
