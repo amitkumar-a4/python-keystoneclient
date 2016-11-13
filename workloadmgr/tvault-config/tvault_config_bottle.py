@@ -1765,7 +1765,7 @@ def configure_host():
         command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
         subprocess.call(command, shell=False)
    
-        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['tvault_primary_node'] + '/workloadmgr?charset=utf8'
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         engine = create_engine(config_data['sql_connection'])
         update = models.Service.__table__.update().where(models.Service.__table__.columns.host == prev_hostname).\
                  values({'host' : socket.gethostname()})
