@@ -586,11 +586,11 @@ def _authenticate_with_keystone():
 
   
     def _get_service_endpoint(public_url):
-        comps = compute_public_url.split("/")
-        return "%s//%s/%s/%(project_id)s" % (comps[0], comps[2], comps[3]) 
+        comps = public_url.split("/")
+        return "%s//%s/%s" % (comps[0], comps[2], comps[3]) + "/%(project_id)s"
 
     config_data['nova_production_endpoint_template'] = \
-        _get_sevice_endpoint(compute_public_url)
+        _get_service_endpoint(compute_public_url)
 
     config_data['nova_admin_auth_url'] = config_data['keystone_public_url']
     config_data['nova_admin_username'] = config_data['admin_username']
