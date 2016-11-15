@@ -1098,3 +1098,13 @@ class API(base.Base):
         """
         client = kwargs['client']
         return client.contego.testbubble_reboot_instance(server=server, params=params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def vast_commit_image(self, context, server, params, **kwargs):
+        """
+        Commit snapshot image for instance.
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        client = kwargs['client']
+        return client.contego.vast_commit_image(server=server, params=params)

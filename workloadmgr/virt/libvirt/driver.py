@@ -598,6 +598,7 @@ class LibvirtDriver(driver.ComputeDriver):
                             raise Exception("Data transfer failed - " + line)
                          if 'Completed' in line:
                             operation_completed = True
+                            open(progress_tracking_file_path, 'w').close()
                             return True
               except nova_unauthorized as ex:
                      LOG.exception(ex)
@@ -1057,24 +1058,12 @@ class LibvirtDriver(driver.ComputeDriver):
     def post_restore_vm(self, cntx, db, instance, restore):
         pass
 
+
     @autolog.log_method(Logger, 'libvirt.driver.apply_retention_policy')
     def apply_retention_policy(self, cntx, db,  instances, snapshot):
-
-        def _commit_image(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing):
-            vault_path = os.path.join(backup_target.mount_path,
-                                      vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
-            image_info = qemuimages.qemu_img_info(vault_path)
-            backing_vault_path = os.path.join(backup_target.mount_path,
-                                              vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
-            image_backing_info = qemuimages.qemu_img_info(backing_vault_path)
-            #increase the size of the base image
-            if image_backing_info.virtual_size < image_info.virtual_size :
-                qemuimages.resize_image(backing_vault_path, image_info.virtual_size)  
-            qemuimages.commit_qcow2(vault_path, True)
-            os.remove(vault_path)
-            db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
             
         try:
+            compute_service = nova.API(production=True)
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = \
                 workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
 
@@ -1101,7 +1090,6 @@ class LibvirtDriver(driver.ComputeDriver):
                     for snapshot_vm_resource in snapshot_vm_resources:
                         if snapshot_vm_resource.resource_type != 'disk':
                             continue
-                        
                         vm_disk_resource_snap = vm_disk_resource_snap_to_commit = db.vm_disk_resource_snap_get_bottom(cntx, 
                                                                                                     snapshot_vm_resource.id)
                         if vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
@@ -1109,7 +1097,32 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                 vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)                        
                             if vm_disk_resource_snap_to_commit_backing.snapshot_vm_resource_id != \
                                                                 vm_disk_resource_snap_to_commit.snapshot_vm_resource_id:
-                                _commit_image(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing)
+                                vault_path = os.path.join(backup_target.mount_path,
+                                                     vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
+                                backing_vault_path = os.path.join(backup_target.mount_path,
+                                               vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
+                                metadata ={
+                                          'resource_id': vm_disk_resource_snap_to_commit.id,
+                                          'backend_endpoint':backup_endpoint ,
+                                          'snapshot_id': snapshot_to_commit.id
+                                          }
+                                status = {'result': 'retry'}
+                                while status['result'] == 'retry':
+                                    status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                                                  cntx, snapshot_vm_resource['vm_id'],
+                                                                  {'vault_path': vault_path,
+                                                                   'backing_vault_path': backing_vault_path,
+                                                                   'metadata': metadata
+                                                                  })
+                                    if status['result'] == 'retry':
+                                       LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
+                                       time.sleep(60)
+
+                                self._wait_for_remote_nova_process(cntx, compute_service,
+                                           metadata,
+                                           snapshot_vm_resource['vm_id'],
+                                           backup_endpoint)
+                                db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
                                 vm_disk_resource_snap_to_commit = vm_disk_resource_snap_to_commit_backing
                                 while vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                                     if vm_disk_resource_snap_to_commit.snapshot_vm_resource_id == \
@@ -1117,7 +1130,31 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                 vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id):
                                             vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
                                                                 vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
-                                            _commit_image(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing)
+                                            vault_path = os.path.join(backup_target.mount_path,
+                                                     vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
+                                            backing_vault_path = os.path.join(backup_target.mount_path,
+                                                     vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
+                                            metadata ={
+                                                       'resource_id': vm_disk_resource_snap_to_commit.id,
+                                                       'backend_endpoint':backup_endpoint ,
+                                                       'snapshot_id': snapshot_to_commit.id
+                                                      }
+                                            status = {'result': 'retry'}
+                                            while status['result'] == 'retry':
+                                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                                                               cntx, snapshot_vm_resource['vm_id'],
+                                                                               {'vault_path': vault_path,
+                                                                                'backing_vault_path': backing_vault_path,
+                                                                                'metadata': metadata
+                                                                                })
+                                                if status['result'] == 'retry':
+                                                   LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
+                                                   time.sleep(60)
+                                            self._wait_for_remote_nova_process(cntx, compute_service,
+                                                                               metadata,
+                                                                               snapshot_vm_resource['vm_id'],
+                                                                               backup_endpoint)
+                                            db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
                                             vm_disk_resource_snap_to_commit =  vm_disk_resource_snap_to_commit_backing
                                     else:
                                         break
