@@ -1106,18 +1106,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                           'backend_endpoint':backup_endpoint ,
                                           'snapshot_id': snapshot_to_commit.id
                                           }
-                                status = {'result': 'retry'}
-                                while status['result'] == 'retry':
-                                    status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
-                                                                  cntx, snapshot_vm_resource['vm_id'],
-                                                                  {'vault_path': vault_path,
-                                                                   'backing_vault_path': backing_vault_path,
-                                                                   'metadata': metadata
-                                                                  })
-                                    if status['result'] == 'retry':
-                                       LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
-                                       time.sleep(60)
-
+                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                                             cntx, snapshot_vm_resource['vm_id'],
+                                                             {'vault_path': vault_path,
+                                                              'backing_vault_path': backing_vault_path,
+                                                              'metadata': metadata
+                                                             })
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                            metadata,
                                            snapshot_vm_resource['vm_id'],
@@ -1139,17 +1133,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                                        'backend_endpoint':backup_endpoint ,
                                                        'snapshot_id': snapshot_to_commit.id
                                                       }
-                                            status = {'result': 'retry'}
-                                            while status['result'] == 'retry':
-                                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
-                                                                               cntx, snapshot_vm_resource['vm_id'],
-                                                                               {'vault_path': vault_path,
-                                                                                'backing_vault_path': backing_vault_path,
-                                                                                'metadata': metadata
-                                                                                })
-                                                if status['result'] == 'retry':
-                                                   LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry'))
-                                                   time.sleep(60)
+                                            status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                                                          cntx, snapshot_vm_resource['vm_id'],
+                                                                          {'vault_path': vault_path,
+                                                                           'backing_vault_path': backing_vault_path,
+                                                                           'metadata': metadata
+                                                                          })
                                             self._wait_for_remote_nova_process(cntx, compute_service,
                                                                                metadata,
                                                                                snapshot_vm_resource['vm_id'],
