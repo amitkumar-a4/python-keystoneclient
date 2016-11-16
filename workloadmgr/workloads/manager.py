@@ -1082,6 +1082,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot_obj = db.snapshot_get(cntx, snapshot_id)
             workload_obj = self.db.workload_get(context, snapshot_obj.workload_id)
             snapshotvms = self.db.snapshot_vms_get(context, snapshot_id)
+            for vm in snapshotvms:
+                pervmdisks[vm.vm_id] = {'vm_name': vm.vm_name,
+                                        'vault_path': [] }
 
             if not FLAGS.vault_storage_type in ("nfs", "local"):
 
@@ -1131,12 +1134,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type == 'disk':
-                        if not snapshot_vm_resource.vm_id in pervmdisks:
-                            pervmdisks[snapshot_vm_resource.vm_id] = []
                         vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
                         vault_path = os.path.join(backup_target.mount_path,
                                                   vm_disk_resource_snap.vault_url.lstrip(os.sep))
-                        pervmdisks[snapshot_vm_resource.vm_id].append(vault_path)
+                        pervmdisks[snapshot_vm_resource.vm_id]['vault_path'].append(vault_path)
             return pervmdisks
 
         try:
