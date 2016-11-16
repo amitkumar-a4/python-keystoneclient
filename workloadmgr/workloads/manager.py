@@ -397,6 +397,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             if jobschedule['fullbackup_interval'] == '-1':
                 fulls = 1
+            if jobschedule['fullbackup_interval'] == '0':
+                fulls = incrs
+                incrs = 0
             else:
                 fulls = incrs/int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
