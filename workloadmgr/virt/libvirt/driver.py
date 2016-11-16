@@ -598,7 +598,6 @@ class LibvirtDriver(driver.ComputeDriver):
                             raise Exception("Data transfer failed - " + line)
                          if 'Completed' in line:
                             operation_completed = True
-                            open(progress_tracking_file_path, 'w').close()
                             return True
               except nova_unauthorized as ex:
                      LOG.exception(ex)
@@ -1116,6 +1115,13 @@ class LibvirtDriver(driver.ComputeDriver):
                                            metadata,
                                            snapshot_vm_resource['vm_id'],
                                            backup_endpoint)
+
+                                #Cleaning the content of progress tracker file as same
+                                #file will get used in other calls as well.
+                                backup_target = vault.get_backup_target(backup_endpoint)
+                                progress_tracking_file_path = backup_target.get_progress_tracker_path(metadata)
+                                open(progress_tracking_file_path, 'w').close()
+
                                 db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
                                 vm_disk_resource_snap_to_commit = vm_disk_resource_snap_to_commit_backing
                                 while vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
@@ -1143,6 +1149,13 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                metadata,
                                                                                snapshot_vm_resource['vm_id'],
                                                                                backup_endpoint)
+
+                                            #Cleaning the content of progress tracker file as same 
+                                            #file will get used in other calls as well.
+                                            backup_target = vault.get_backup_target(backup_endpoint)
+                                            progress_tracking_file_path = backup_target.get_progress_tracker_path(metadata)
+                                            open(progress_tracking_file_path, 'w').close()
+
                                             db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
                                             vm_disk_resource_snap_to_commit =  vm_disk_resource_snap_to_commit_backing
                                     else:
