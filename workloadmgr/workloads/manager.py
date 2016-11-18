@@ -526,7 +526,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
                                            {'metadata':{'root_partition_type': inst['root_partition_type'],
-                                                        'availability_zone': inst['availability_zone']}})
+                                                        'availability_zone': inst['availability_zone'],
+                                                        'vm_metadata': json.dumps(inst['vm_metadata'])}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}

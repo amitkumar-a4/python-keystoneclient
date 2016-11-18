@@ -137,6 +137,9 @@ class RestoreWorkflow(object):
             self._flow.add(pre_poweron)
 
         #linear poweron VMs
+        self._flow.add(vmtasks.LinearSetVMsMetadata(self._store['instances']))
+
+        #linear poweron VMs
         self._flow.add(vmtasks.LinearPowerOnVMs(self._store['instances']))
         
         if post_poweron:
