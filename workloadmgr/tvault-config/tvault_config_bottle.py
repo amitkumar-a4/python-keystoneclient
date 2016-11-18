@@ -654,6 +654,7 @@ def _register_service():
         users = keystone.users.list()
         if keystone.version == 'v3':
             users += keystone.users.list(domain="default")
+        return users
  
     if config_data['nodetype'] != 'controller':
         config_data['triliovault_user_domain_id'] = 'default'
