@@ -27,6 +27,26 @@ function setRequired(val) {
 function findForm() {
   setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
   setRequired($("#configure_openstack input[name='keystone-public-url']").val())
+  obj = $("#configure_openstack input[name='swift-auth-version']")
+  setSwiftRequired(obj.attr('checked'), obj.val())
+}
+function setSwiftRequired(checked, val) {
+     if(checked==true && val=='TEMPAUTH') {
+        $('[name="swift-auth-url"]').attr("required", "true");
+        $('[name="swift-username"]').attr("required", "true");
+        $('[name="swift-password"]').attr("required", "true");
+        $('#swift-auth-url-div').toggle(true)
+        $('#swift-username-div').toggle(true)
+        $('#swift-password-div').toggle(true)
+     }
+     if(val != 'TEMPAUTH') {
+        $('#swift-auth-url-div').toggle(false)
+        $('#swift-username-div').toggle(false)
+        $('#swift-password-div').toggle(false)
+        $('[name="swift-auth-url"]').removeAttr('required')
+        $('[name="swift-username"]').removeAttr('required')
+        $('[name="swift-password"]').removeAttr('required')
+     }
 }
 </script>
 </head>
@@ -160,7 +180,7 @@ function findForm() {
 					%else:
 						<option value="{{tz}}">{{tz}}</option>
 					%end
-				%end
+	            %end
 	         </select>
 	        </div>
 	      </div>
@@ -173,7 +193,7 @@ function findForm() {
 		<div class="panel-heading">
 		  <h4 class="panel-title">
 			<a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree">
-			  Storage
+			  NFS Storage
 			</a>
 		  </h4>
 		</div>
@@ -194,30 +214,79 @@ function findForm() {
 	  </div>
 	</div>
 
-	<div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel4">
-		<div class="panel-heading">
-		  <h4 class="panel-title">
-			<a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
-		  </h4>
+        <div class="panel-group" id="accordion">
+		  <div class="panel panel-default" id="panel5">
+		    <div class="panel-heading">
+		      <h4 class="panel-title">
+		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
+		          Swift Object Storage
+		        </a>
+		      </h4>
+		    </div>
+		    <div id="collapseFive" class="panel-collapse collapse in">
+		    <div class="panel-body">
+                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
+                    <input name = "swift-auth-version" type="radio"  value="NONE" >  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE" >  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" checked>  TEMPAUTH <br> <br>                       
+                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
+                    <input name = "swift-auth-version" type="radio"  value="NONE" >  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE" checked>  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" >  TEMPAUTH <br> <br>                                
+                %else:
+                    <input name = "swift-auth-version" type="radio"  value="NONE" checked onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
+                %end  
+                <div class="input-group" id="swift-auth-url-div">
+                    <label class="input-group-addon">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
+                </div><br>
+                <div class="input-group" id="swift-username-div">
+                    <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                </div><br>
+                <div class="input-group" id="swift-password-div">
+                    <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                    <input name="swift-password" type="password" class="form-control"> <br>
+                </div><br>
+	 	</div>
 		</div>
-		<div id="collapseFour" class="panel-collapse collapse in">
-		  <div class="panel-body">
-	              <div class="form-group">
-			%if 'workloads_import' in locals() and workloads_import == 'on':
-				<input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
-			%else:
-				<input name="workloads-import" id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
-			%end
-	              </div>
-	              <br />
-		  </div>
-		</div>
-	  </div>
-	</div>
+	      </div>
+        </div>
 
-	<!-- Swift is not yet supported
-	<div class="panel-group" id="accordion">
+        <div class="panel-group" id="accordion">
+          <div class="panel panel-default" id="panel4">
+                <div class="panel-heading">
+                  <h4 class="panel-title">
+                        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
+                  </h4>
+                </div>
+                <div id="collapseFour" class="panel-collapse collapse in">
+                  <div class="panel-body">
+                      <div class="form-group">
+                        %if 'workloads_import' in locals() and workloads_import == 'on':
+                                <input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+                        %else:
+                        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
+                  </h4>
+                </div>
+                <div id="collapseFour" class="panel-collapse collapse in">
+                  <div class="panel-body">
+                      <div class="form-group">
+                        %if 'workloads_import' in locals() and workloads_import == 'on':
+                                <input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+                        %else:
+                                <input name="workloads-import" id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+                        %end
+                      </div>
+                      <br />
+                  </div>
+                </div>
+          </div>
+        </div>
+
+	<!--div class="panel-group" id="accordion">
 	  <div class="panel panel-default" id="panel5">
 		<div class="panel-heading">
 		  <h4 class="panel-title">
@@ -239,8 +308,7 @@ function findForm() {
 		  </div>
 		</div>
 	  </div>
-	</div>
-	Swift is not yet supported -->
+	</div-->
     
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
   </form>
@@ -288,15 +356,7 @@ function validate_keystone_url(url, inputelement) {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
              $(spinelement[0]).addClass("hidden")
             },
-            error: function(result) {
-             $($(inputelement).parent()[0]).addClass("has-error")
-             $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
-             $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
-            },
-            success: function(result) {
-             $($(inputelement).parent()[0]).addClass("has-success")
-            }
-    });
+   })
 }
 
 function validate_keystone_credentials(inputelement) {
