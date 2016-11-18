@@ -654,6 +654,7 @@ def _register_service():
         users = keystone.users.list()
         if keystone.version == 'v3':
             users += keystone.users.list(domain="default")
+        users = list(set(users))
         return users
  
     if config_data['nodetype'] != 'controller':
