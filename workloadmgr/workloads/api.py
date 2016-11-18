@@ -121,6 +121,7 @@ def _snapshot_create_callback(*args, **kwargs):
                        'fullbackup_interval' in jobscheduler and \
                        jobscheduler['fullbackup_interval'] or "-1"
 
+        snapshot_type = "incremental"
         if int(jobscheduler['fullbackup_interval']) == 0:
             snapshot_type = "full"
         elif int(jobscheduler['fullbackup_interval']) < 0:
