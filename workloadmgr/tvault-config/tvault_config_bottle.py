@@ -654,7 +654,8 @@ def _register_service():
         users = keystone.users.list()
         if keystone.version == 'v3':
             users += keystone.users.list(domain="default")
-        users = list(set(users))
+        seen = set()
+        users = [x for x in users if x.id not in seen and not seen.add(x.id)]
         return users
  
     if config_data['nodetype'] != 'controller':
