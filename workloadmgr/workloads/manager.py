@@ -432,7 +432,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
                                       {'status': 'error',
-                                       'fail_reason': unicode(err)})
+                                       'error_msg': str(err)})
 
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
