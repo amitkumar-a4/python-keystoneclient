@@ -1007,7 +1007,8 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     def getKey(item):
         item['free'] = item['capacity'] - item['totalcommitted']
-        return item['capacity'] - item['totalcommitted']
+        return min(item['capacity'] - item['totalcommitted'],
+                   item['capacity'] - item['used'])
 
     sortedlist = sorted(shares.values(), reverse=True, key=getKey)
 

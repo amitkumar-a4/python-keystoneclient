@@ -395,8 +395,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 jobsperday = int(jobschedule['interval'].split("hr")[0])
                 incrs = int(jobschedule['retention_policy_value']) * jobsperday
 
-            if jobschedule['fullbackup_interval'] == '-1':
+            if int(jobschedule['fullbackup_interval']) == -1:
                 fulls = 1
+            if int(jobschedule['fullbackup_interval']) == 0:
+                fulls = incrs
             else:
                 fulls = incrs/int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
