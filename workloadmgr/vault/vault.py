@@ -857,6 +857,7 @@ triliovault_backup_targets = {}
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
     for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
+        backup_target = backup_target.strip()
         backend = NfsTrilioVaultBackupTarget(backup_target)
         triliovault_backup_targets[backup_target] = backend
         backend.mount_backup_target()

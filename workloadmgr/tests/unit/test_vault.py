@@ -45,12 +45,14 @@ class BaseVaultTestCase(test.TestCase):
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
+
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
+
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import API
         self.workloadAPI = API()
@@ -70,11 +72,14 @@ class BaseVaultTestCase(test.TestCase):
     def test_get_capacities_utilizations(self):
         import workloadmgr.vault.vault
         with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
-                          'get_total_capacity', return_value=None) as mock_method:
+                          'is_online', return_value=True) as mock_method1, \
+             patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                          'get_total_capacity', return_value=None) as mock_method2,\
+             patch.object(subprocess, 'check_call', return_value=True) as mock_method3:
 
-            values = [{'server1:nfsshare1': [1099511627776, 10737418240],}.values()[0],
-                      {'server2:nfsshare2': [1099511627776, 5 * 10737418240],}.values()[0],
-                      {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
+                 values = [{'server1:nfsshare1': [1099511627776, 10737418240],}.values()[0],
+                           {'server2:nfsshare2': [1099511627776, 5 * 10737418240],}.values()[0],
+                           {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
-            mock_method.side_effect = values
-            workloadmgr.vault.vault.get_capacities_utilizations(self.context)
+                 mock_method1.side_effect = values
+                 workloadmgr.vault.vault.get_capacities_utilizations(self.context)
