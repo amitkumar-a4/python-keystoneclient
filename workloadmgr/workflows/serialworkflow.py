@@ -66,8 +66,8 @@ def get_vms(cntx, workload_id):
               'vm_metadata': vm_instance.metadata,
               'vm_flavor_id': vm_instance.flavor['id'],
               'hostname': vm_instance.name,
-              'vm_power_state': vm_instance.__dict__.get('OS-EXT-STS:power_state',
-                                                         vm_instance.__dict__.get('status', None)),
+              'vm_power_state': getattr(vm_instance, 'OS-EXT-STS:power_state') or \
+                                        getattr(vm_instance, 'status'),
               'hypervisor_hostname': None,
               'hypervisor_type':  "QEMU",
               'availability_zone': vm_instance.__dict__.get('OS-EXT-AZ:availability_zone', None)
