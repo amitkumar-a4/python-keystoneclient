@@ -127,6 +127,9 @@ def get_workflow_class(context, workload_type_id, restore=False):
                 workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
             else:
                 workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
+        else:
+            kwargs = {'workload_type_id': workload_type_id}
+            raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
                       
     parts = workflow_class_name.split('.')
     module = ".".join(parts[:-1])
@@ -399,6 +402,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 fulls = 1
             if int(jobschedule['fullbackup_interval']) == 0:
                 fulls = incrs
+                incrs = 0
             else:
                 fulls = incrs/int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
@@ -445,7 +449,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 gc.collect()
             except Exception as ex:
                 LOG.exception(ex)  
-                
+
             context = nova._get_tenant_context(context)
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
@@ -491,12 +495,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'progress_percent': 0, 
                                      'progress_msg': 'Initializing Snapshot Workflow',
                                      'status': 'executing'
-                                    })       
+                                    })
             workflow.initflow()
             workflow.execute()
 
             self.db.snapshot_type_time_size_update(context, snapshot_id)               
             # Update vms of the workload
+            hostnames = []
             if  'instances' in workflow._store and workflow._store['instances']:
                 compute_service = nova.API(production=True)                
                 for vm in self.db.workload_vms_get(context, workload.id):
@@ -517,15 +522,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     compute_service.set_meta_item(context, vm.vm_id,
                                                   "workload_name", workload.display_name)
             
-            hostnames = []
-            for inst in workflow._store['instances']:
-                hostnames.append(inst['hostname'])
+                for inst in workflow._store['instances']:
+                    hostnames.append(inst['hostname'])
 
-                if not 'root_partition_type' in inst:
-                    inst['root_partition_type'] = "Linux"
-                self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
-                                           {'metadata':{'root_partition_type': inst['root_partition_type'],
-                                                        'availability_zone': inst['availability_zone']}})
+                    if not 'root_partition_type' in inst:
+                        inst['root_partition_type'] = "Linux"
+                    self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
+                                               {'metadata':{'root_partition_type': inst['root_partition_type'],
+                                                            'availability_zone': inst['availability_zone']}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}
@@ -1501,6 +1505,3 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             LOG.exception(ex)
             pass
-                
-               
-     

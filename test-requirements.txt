@@ -28,3 +28,4 @@ python-cinderclient==1.5.0
 IPy
 pymongo
 oslo_cache
+bunch

@@ -23,6 +23,7 @@ def create_workload(ctxt,
                     workload_type_id='test_workload_type',
                     availability_zone='nova',
                     jobschedule='test_jobschedule',
+                    instances=[],
                     **kwargs):
     """Create a workload object in the DB."""
     workload_type = db.workload_type_get(ctxt, workload_type_id)
@@ -39,7 +40,18 @@ def create_workload(ctxt,
     workload['jobschedule'] = jobschedule
     for key in kwargs:
         workload[key] = kwargs[key]
-    return db.workload_create(ctxt, workload)
+
+    workload = db.workload_create(ctxt, workload)
+
+    for instance in instances:
+         values = {'workload_id': workload.id,
+                   'vm_id': instance['instance-id'],
+                   'vm_name': instance['instance-name'],
+                   'status': 'available',
+                   'metadata': instance.get('metadata', {})}
+         vm = db.workload_vms_create(ctxt, values)
+
+    return workload
 
 
 def create_workload_type(ctxt,
