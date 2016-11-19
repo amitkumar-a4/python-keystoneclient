@@ -15,4 +15,4 @@ def set_defaults(conf):
     conf.set_default('verbose', True)
     conf.set_default('connection', 'sqlite://', group='database')
     conf.set_default('sqlite_synchronous', False)
-    conf.set_default('policy_file', 'workloadmgr/tests/policy.json')
+    conf.set_default('policy_file', 'workloadmgr/tests/unit/policy.json')

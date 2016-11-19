@@ -1,3 +1,4 @@
+'''
 import subprocess
 import os
 import re
@@ -721,3 +722,4 @@ if os.path.isfile(listfile):
     os.remove(listfile)
 if os.path.isfile(mntlist):
     os.remove(mntlist)
+'''

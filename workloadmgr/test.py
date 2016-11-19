@@ -33,12 +33,12 @@ import uuid
 
 import fixtures
 import mox
-from oslo.config import cfg
 import stubout
 import testtools
 import sqlalchemy as sa
 
 from taskflow.persistence.backends import impl_sqlalchemy
+from oslo.config import cfg
 
 #from workloadmgr.common import config  # Need to register global_opts
 from workloadmgr.db import migration
@@ -46,7 +46,7 @@ from workloadmgr.openstack.common.db.sqlalchemy import session
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import service
-from workloadmgr.tests import conf_fixture
+from workloadmgr.tests.unit import conf_fixture
 
 
 test_opts = [
