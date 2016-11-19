@@ -52,6 +52,7 @@ class BaseWorkloadTestCase(test.TestCase):
         self.context.user_id = 'fake'
         self.context.project_id = 'fake'
         self.context.tenant_id = 'fake'
+        self.is_admin = False
         self.workload_params = {
             'status': 'creating',
             'jobschedule': pickle.dumps({'start_date': '06/05/2014',
@@ -390,3 +391,67 @@ class BaseWorkloadTestCase(test.TestCase):
     def test_create_workload_with_invalid_workload_type(self):
         """Test workload can be created and deleted."""
         pass
+
+    @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
+    @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.initflow')
+    @patch('workloadmgr.compute.nova.API.get_servers')
+    def test_workload_snapshot(self, mock_get_servers, m1, m2):
+        """Test workload can be created and deleted."""
+        import workloadmgr.vault.vault
+        import workloadmgr.compute.nova
+        import workloadmgr.workloads.manager
+
+        mock_get_servers.return_value = []
+        self.workload_params = {
+            'status': 'creating',
+            'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '10',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}),
+            'host': CONF.host,}
+        with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                          'is_mounted', return_value=True) as mock_method1:
+            with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                              'get_total_capacity', return_value=None) as mock_method2:
+                with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
+                                  'workload_reset', return_value=None) as mock_method3:
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server2:nfsshare2': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
+
+                        mock_method2.side_effect = values
+
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                         display_name='Serial',
+                                                         display_description='this is a test workload_type',
+                                                         status='available',
+                                                         is_public=True,
+                                                         metadata=None)
+
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            workload_type_id=workload_type.id,
+                            **self.workload_params)
+                        workload_id = workload['id']
+                        self.workload.workload_create(self.context, workload_id)
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
