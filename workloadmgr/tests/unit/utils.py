@@ -3,6 +3,7 @@
 #    Copyright 2014 Trilio Data, Inc
 
 
+import cPickle as pickle
 import os
 import six
 
@@ -88,6 +89,32 @@ def create_snapshot(ctxt,
     snapshot['display_description'] = display_description
     snapshot['snapshot_type'] = snapshot_type
     return db.snapshot_create(ctxt, snapshot)
+
+def create_restore(ctxt,
+                   snapshot_id,
+                   display_name='test_restore',
+                   display_description='this is a test snapshot',
+                   options=[]):
+    snapshot = db.snapshot_get(ctxt, snapshot_id)
+    values = {'user_id': ctxt.user_id,
+              'project_id': ctxt.project_id,
+              'snapshot_id': snapshot_id,
+              'restore_type': "restore",
+              'display_name': display_name,
+              'display_description': display_description,
+              'pickle': pickle.dumps(options, 0),
+              'host':'',                   
+              'status': 'restoring',}
+    restore = db.restore_create(ctxt, values)
+
+    db.restore_update(ctxt, 
+                      restore.id, 
+                      {'progress_percent': 0, 
+                       'progress_msg': 'Restore operation is scheduled',
+                       'status': 'restoring'
+                      })
+    return restore
+
 
 class Resource(object):
     """Base class for OpenStack resources (tenant, user, etc.).

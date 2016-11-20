@@ -37,6 +37,47 @@ def get_instances():
     return instances
 
 
+def get_restore_options():
+    return { u'description': u'Restore one day old snapshot',
+             u'name': u'TestRestore',
+             u'oneclickrestore': False,
+             u'openstack': {u'instances': [{u'flavor': {u'disk': 1,
+                                                        u'ephemeral': 0,
+                                                        u'ram': 512,
+                                                        u'swap': u'',
+                                                        u'vcpus': 1},
+                                            u'id': u'd4e6e988-21ca-497e-940a-7b2f36426797',
+                                            u'include': True,
+                                            u'name': u'vm-4',
+                                            u'vdisks': [{u'id': u'b07c8751-f475-4f4c-94e7-72733f256b0b',
+                                                         u'new_volume_type': u'ceph'}]},
+                                           {u'flavor': {u'disk': 1,
+                                                        u'ephemeral': 0,
+                                                        u'ram': 512,
+                                                        u'swap': u'',
+                                                        u'vcpus': 1},
+                                            u'id': u'9634ba8c-8d4f-49cb-9b6f-6b915c09fe42',
+                                            u'include': True,
+                                            u'name': u'vm-2',
+                                            u'vdisks': []},
+                                           {u'flavor': {u'disk': 1,
+                                                        u'ephemeral': 0,
+                                                        u'ram': 512,
+                                                        u'swap': u'',
+                                                        u'vcpus': 1},
+                                            u'id': u'1b3a8734-b476-49f9-a959-ea909026b25f',
+                                            u'include': True,
+                                            u'name': u'vm-3',
+                                            u'vdisks': []}],
+                            u'networks_mapping': {u'networks': [{u'snapshot_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
+                                                                                       u'subnet': {u'id': u'40eeba1b-0803-469c-b4c9-dadb2070f2c8'}},
+                                                                 u'target_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
+                                                                                     u'name': u'private',
+                                                                                     u'subnet': {u'id': u'40eeba1b-0803-469c-b4c9-dadb2070f2c8'}}}]}},
+             u'type': u'openstack',
+             u'zone': u'nova'}
+
+
 def get_vms(cntx, admin=False):
     vms = []
     vms.append(bunchify({'OS-EXT-STS:task_state': None, 'addresses': {u'private': [{u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:12:2a:d8', u'version': 4, u'addr': u'10.0.0.18', u'OS-EXT-IPS:type': u'fixed'}]}, 'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/servers/4f92587b-cf3a-462a-89d4-0f5634293477', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/servers/4f92587b-cf3a-462a-89d4-0f5634293477', u'rel': u'bookmark'}], 'image': u'', 'manager': 'servermanager', 'OS-EXT-STS:vm_state': u'active', 'OS-EXT-SRV-ATTR:instance_name': u'instance-00000010', 'OS-SRV-USG:launched_at': u'2016-11-29T03:00:46.000000', 'flavor': {u'id': u'42', u'links': [{u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'bookmark'}]}, 'id': u'4f92587b-cf3a-462a-89d4-0f5634293477', 'security_groups': [{u'name': u'default'}], 'user_id': u'e6e3159d1d3d4622befa70dd745af289', 'OS-DCF:diskConfig': u'MANUAL', 'accessIPv4': u'', 'accessIPv6': u'', 'progress': 0, 'OS-EXT-STS:power_state': 1, 'OS-EXT-AZ:availability_zone': u'nova', 'config_drive': u'', 'status': u'ACTIVE', 'updated': u'2016-11-29T03:02:24Z', 'hostId': u'39f3f43d9ec6267bcc27b25e56ef12707c469b9c50cdcaf0813f2452', 'OS-EXT-SRV-ATTR:host': u'kilocontroller', 'OS-SRV-USG:terminated_at': None, 'key_name': u'kilocontroller', 'OS-EXT-SRV-ATTR:hypervisor_hostname': u'kilocontroller', 'name': u'bootvol', 'created': u'2016-11-29T03:00:37Z', 'tenant_id': u'000d038df75743a88cefaacd9b704b94', 'os-extended-volumes:volumes_attached': [{u'id': u'c16006a6-60fe-4046-9eb0-35e37fe3e3f4'}], '_info': {u'OS-EXT-STS:task_state': None, u'addresses': {u'private': [{u'OS-EXT-IPS-MAC:mac_addr': u'fa:16:3e:12:2a:d8', u'version': 4, u'addr': u'10.0.0.18', u'OS-EXT-IPS:type': u'fixed'}]}, u'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/servers/4f92587b-cf3a-462a-89d4-0f5634293477', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/servers/4f92587b-cf3a-462a-89d4-0f5634293477', u'rel': u'bookmark'}], u'image': u'', u'OS-EXT-STS:vm_state': u'active', u'OS-EXT-SRV-ATTR:instance_name': u'instance-00000010', u'OS-SRV-USG:launched_at': u'2016-11-29T03:00:46.000000', u'flavor': {u'id': u'42', u'links': [{u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'bookmark'}]}, u'id': u'4f92587b-cf3a-462a-89d4-0f5634293477', u'security_groups': [{u'name': u'default'}], u'user_id': u'e6e3159d1d3d4622befa70dd745af289', u'OS-DCF:diskConfig': u'MANUAL', u'accessIPv4': u'', u'accessIPv6': u'', u'progress': 0, u'OS-EXT-STS:power_state': 1, u'OS-EXT-AZ:availability_zone': u'nova', u'config_drive': u'', u'status': u'ACTIVE', u'updated': u'2016-11-29T03:02:24Z', u'hostId': u'39f3f43d9ec6267bcc27b25e56ef12707c469b9c50cdcaf0813f2452', u'OS-EXT-SRV-ATTR:host': u'kilocontroller', u'OS-SRV-USG:terminated_at': None, u'key_name': u'kilocontroller', u'OS-EXT-SRV-ATTR:hypervisor_hostname': u'kilocontroller', u'name': u'bootvol', u'created': u'2016-11-29T03:00:37Z', u'tenant_id': u'000d038df75743a88cefaacd9b704b94', u'os-extended-volumes:volumes_attached': [{u'id': u'c16006a6-60fe-4046-9eb0-35e37fe3e3f4'}], u'metadata': {}}, 'metadata': {}, '_loaded': True}))
@@ -61,14 +102,22 @@ def get_server_by_id(context, vm_id, admin=False):
             return vm
     return None
 
-def get_flavor_by_id(context, id):
+def get_flavors(context):
     flavors = {}
 
-    flavors['1'] = bunchify({'name': u'm1.tiny', 'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'bookmark'}], 'ram': 512, 'vcpus': 1, 'id': u'1', 'OS-FLV-DISABLED:disabled': False, 'manager': 'FlavorManager', 'swap': u'', 'os-flavor-access:is_public': True, 'rxtx_factor': 1.0, '_info': {u'name': u'm1.tiny', u'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'bookmark'}], u'ram': 512, u'OS-FLV-DISABLED:disabled': False, u'vcpus': 1, u'swap': u'', u'os-flavor-access:is_public': True, u'rxtx_factor': 1.0, u'OS-FLV-EXT-DATA:ephemeral': 0, u'disk': 1, u'id': u'1'}, 'disk': 1, 'OS-FLV-EXT-DATA:ephemeral': 0, '_loaded': True})
+    flavors['1'] = bunchify({'name': u'm1.tiny', 'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'bookmark'}], 'ram': 512, 'vcpus': 1, 'id': u'1', 'OS-FLV-DISABLED:disabled': False, 'manager': 'FlavorManager', 'swap': u'0', 'os-flavor-access:is_public': True, 'rxtx_factor': 1.0, '_info': {u'name': u'm1.tiny', u'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/1', u'rel': u'bookmark'}], u'ram': 512, u'OS-FLV-DISABLED:disabled': False, u'vcpus': 1, u'swap': u'0', u'os-flavor-access:is_public': True, u'rxtx_factor': 1.0, u'OS-FLV-EXT-DATA:ephemeral': 0, u'disk': 1, u'id': u'1'}, 'disk': 1, 'ephemeral': 0, 'OS-FLV-EXT-DATA:ephemeral': 0, '_loaded': True})
 
-    flavors['42'] = bunchify({'name': u'm1.tiny', 'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'bookmark'}], 'ram': 8192, 'vcpus': 4, 'id': u'42', 'OS-FLV-DISABLED:disabled': False, 'manager': 'FlavorManager', 'swap': u'', 'os-flavor-access:is_public': True, 'rxtx_factor': 1.0, '_info': {u'name': u'm1.medium', u'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'bookmark'}], u'ram': 8192, u'OS-FLV-DISABLED:disabled': False, u'vcpus': 4, u'swap': u'', u'os-flavor-access:is_public': True, u'rxtx_factor': 1.0, u'OS-FLV-EXT-DATA:ephemeral': 0, u'disk': 40, u'id': u'1'}, 'disk': 40, 'OS-FLV-EXT-DATA:ephemeral': 0, '_loaded': True})
+    flavors['42'] = bunchify({'name': u'm1.tiny', 'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'bookmark'}], 'ram': 8192, 'vcpus': 4, 'id': u'42', 'OS-FLV-DISABLED:disabled': False, 'manager': 'FlavorManager', 'swap': u'0', 'os-flavor-access:is_public': True, 'rxtx_factor': 1.0, '_info': {u'name': u'm1.medium', u'links': [{u'href': u'http://192.168.1.106:8774/v2/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'self'}, {u'href': u'http://192.168.1.106:8774/000d038df75743a88cefaacd9b704b94/flavors/42', u'rel': u'bookmark'}], u'ram': 8192, u'OS-FLV-DISABLED:disabled': False, u'vcpus': 4, u'swap': u'0', u'os-flavor-access:is_public': True, u'rxtx_factor': 1.0, u'OS-FLV-EXT-DATA:ephemeral': 0, u'disk': 40, u'id': u'1'}, 'disk': 40, 'ephemeral': 0, 'OS-FLV-EXT-DATA:ephemeral': 0, '_loaded': True})
+ 
+    return flavors
 
-    return flavors[id]
+
+def get_flavor_by_id(context, id):
+    return get_flavors(context)[id]
+
+
+def get_flavors_for_test(context):
+    return get_flavors(context).values()
 
 
 def get_volume_id(context, id, no_translate=True):
@@ -108,7 +157,7 @@ class BaseWorkloadTestCase(test.TestCase):
         self.context.user_id = 'fake'
         self.context.project_id = 'fake'
         self.context.tenant_id = 'fake'
-        self.is_admin = False
+        self.context.is_admin = False
         self.workload_params = {
             'status': 'creating',
             'instances': [],
@@ -766,6 +815,7 @@ class BaseWorkloadTestCase(test.TestCase):
                                                                status='creating')
                         self.workload.workload_snapshot(self.context, snapshot['id'])
                         snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
                         self.assertEqual(snapshot.display_name, 'test_snapshot')
                         self.assertEqual(snapshot.status, 'available')
 
@@ -782,3 +832,293 @@ class BaseWorkloadTestCase(test.TestCase):
                         self.assertEqual(upload_snapshot_mock.call_count, 5)
                         self.assertEqual(post_snapshot_mock.call_count, 5)
                         self.assertEqual(apply_retention_policy.call_count, 1)
+  
+                        # check all database records before deleting snapshots and workloads
+
+    @patch('workloadmgr.workflows.vmtasks_openstack.apply_retention_policy')
+    @patch('workloadmgr.workflows.vmtasks_openstack.post_snapshot')
+    @patch('workloadmgr.workflows.vmtasks_openstack.upload_snapshot')
+    @patch('workloadmgr.workflows.vmtasks_openstack.get_snapshot_data_size',
+           return_value = {'vm_data_size': 1024 * 1024 * 1024 * 5})
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.thaw_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.freeze_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_security_groups')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_flavors')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_networks')
+    @patch('workloadmgr.workflows.vmtasks_openstack.pre_snapshot_vm')
+    @patch('workloadmgr.volume.cinder.API.get')
+    @patch('workloadmgr.compute.nova.API.get_flavor_by_id')
+    @patch('workloadmgr.compute.nova.API.get_server_by_id')
+    @patch('workloadmgr.compute.nova.API.delete_meta')
+    @patch('workloadmgr.compute.nova.API.set_meta_item')
+    @patch('workloadmgr.compute.nova.API.get_servers')
+    def test_workload_with_multiple_vms_snapshot_workflow_execute_incr(
+        self, mock_get_servers,
+        set_meta_item_mock,
+        delete_meta_mock,
+        get_server_by_id_mock,
+        get_flavor_by_id_mock,
+        get_volume_mock,
+        pre_snapshot_vm_mock,
+        snapshot_vm_networks_mock,
+        snapshot_vm_security_groups,
+        snapshot_flavors_mock,
+        freeze_vm_mock,
+        thaw_vm_mock,
+        snapshot_vm_mock,
+        get_snapshot_data_size_mock,
+        upload_snapshot_mock,
+        post_snapshot_mock,
+        apply_retention_policy):
+
+        """Test workload can be created and deleted."""
+        import workloadmgr.vault.vault
+        import workloadmgr.compute.nova
+        import workloadmgr.workloads.manager
+
+        mock_get_servers.side_effect = get_vms
+        get_server_by_id_mock.side_effect = get_server_by_id
+        get_flavor_by_id_mock.side_effect = get_flavor_by_id
+        get_volume_mock.side_effect = get_volume_id
+        self.workload_params = {
+            'status': 'creating',
+            'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '10',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}),
+            'host': CONF.host,}
+        with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                          'is_mounted', return_value=True) as mock_method1:
+            with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                              'get_total_capacity', return_value=None) as mock_method2:
+                with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
+                                  'workload_reset', return_value=None) as mock_method3:
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server2:nfsshare2': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
+
+                        mock_method2.side_effect = values
+
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                         display_name='Serial',
+                                                         display_description='this is a test workload_type',
+                                                         status='available',
+                                                         is_public=True,
+                                                         metadata=None)
+
+                        self.workload_params['instances'] = get_instances()
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            **self.workload_params)
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            workload_type_id=workload_type.id,
+                            **self.workload_params)
+                        workload_id = workload['id']
+                        self.workload.workload_create(self.context, workload_id)
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
+
+                        self.assertEqual(set_meta_item_mock.call_count, 20)
+                        self.assertEqual(delete_meta_mock.call_count, 5)
+                        self.assertEqual(pre_snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_networks_mock.call_count, 1)
+                        self.assertEqual(snapshot_vm_security_groups.call_count, 1)
+                        self.assertEqual(snapshot_flavors_mock.call_count, 1)
+                        self.assertEqual(freeze_vm_mock.call_count, 5)
+                        self.assertEqual(thaw_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(get_snapshot_data_size_mock.call_count, 5)
+                        self.assertEqual(upload_snapshot_mock.call_count, 5)
+                        self.assertEqual(post_snapshot_mock.call_count, 5)
+                        self.assertEqual(apply_retention_policy.call_count, 1)
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
+  
+                        # check all database records before deleting snapshots and workloads
+
+    @patch('workloadmgr.workflows.vmtasks_openstack.post_restore_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.restore_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.restore_keypairs')
+    @patch('workloadmgr.workflows.vmtasks_openstack.pre_restore_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.apply_retention_policy')
+    @patch('workloadmgr.workflows.vmtasks_openstack.post_snapshot')
+    @patch('workloadmgr.workflows.vmtasks_openstack.upload_snapshot')
+    @patch('workloadmgr.workflows.vmtasks_openstack.get_snapshot_data_size',
+           return_value = {'vm_data_size': 1024 * 1024 * 1024 * 5})
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.thaw_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.freeze_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_security_groups')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_flavors')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_networks')
+    @patch('workloadmgr.workflows.vmtasks_openstack.pre_snapshot_vm')
+    @patch('workloadmgr.volume.cinder.API.get')
+    @patch('workloadmgr.compute.nova.API.get_flavors')
+    @patch('workloadmgr.compute.nova.API.get_flavor_by_id')
+    @patch('workloadmgr.compute.nova.API.get_server_by_id')
+    @patch('workloadmgr.compute.nova.API.delete_meta')
+    @patch('workloadmgr.compute.nova.API.set_meta_item')
+    @patch('workloadmgr.compute.nova.API.get_servers')
+    def test_workload_with_multiple_vms_restore_workflow_execute(
+        self, mock_get_servers,
+        set_meta_item_mock,
+        delete_meta_mock,
+        get_server_by_id_mock,
+        get_flavor_by_id_mock,
+        get_flavors_mock,
+        get_volume_mock,
+        pre_snapshot_vm_mock,
+        snapshot_vm_networks_mock,
+        snapshot_vm_security_groups,
+        snapshot_flavors_mock,
+        freeze_vm_mock,
+        thaw_vm_mock,
+        snapshot_vm_mock,
+        get_snapshot_data_size_mock,
+        upload_snapshot_mock,
+        post_snapshot_mock,
+        apply_retention_policy,
+        pre_restore_vm_mock,
+        restore_keypairs_mock,
+        restore_vm_mock,
+        post_restore_vm_mock):
+
+        """Test workload can be created and deleted."""
+        import workloadmgr.vault.vault
+        import workloadmgr.compute.nova
+        import workloadmgr.workloads.manager
+
+        mock_get_servers.side_effect = get_vms
+        get_server_by_id_mock.side_effect = get_server_by_id
+        get_flavor_by_id_mock.side_effect = get_flavor_by_id
+        get_volume_mock.side_effect = get_volume_id
+        get_flavors_mock.side_effect = get_flavors_for_test
+        self.workload_params = {
+            'status': 'creating',
+            'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '10',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}),
+            'host': CONF.host,}
+        with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                          'is_mounted', return_value=True) as mock_method1:
+            with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                              'get_total_capacity', return_value=None) as mock_method2:
+                with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
+                                  'workload_reset', return_value=None) as mock_method3:
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server2:nfsshare2': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
+
+                        mock_method2.side_effect = values
+
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                         display_name='Serial',
+                                                         display_description='this is a test workload_type',
+                                                         status='available',
+                                                         is_public=True,
+                                                         metadata=None)
+
+                        self.workload_params['instances'] = get_instances()
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            **self.workload_params)
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            workload_type_id=workload_type.id,
+                            **self.workload_params)
+                        workload_id = workload['id']
+                        self.workload.workload_create(self.context, workload_id)
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
+
+                        self.assertEqual(set_meta_item_mock.call_count, 20)
+                        self.assertEqual(delete_meta_mock.call_count, 5)
+                        self.assertEqual(pre_snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_networks_mock.call_count, 1)
+                        self.assertEqual(snapshot_vm_security_groups.call_count, 1)
+                        self.assertEqual(snapshot_flavors_mock.call_count, 1)
+                        self.assertEqual(freeze_vm_mock.call_count, 5)
+                        self.assertEqual(thaw_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(get_snapshot_data_size_mock.call_count, 5)
+                        self.assertEqual(upload_snapshot_mock.call_count, 5)
+                        self.assertEqual(post_snapshot_mock.call_count, 5)
+                        self.assertEqual(apply_retention_policy.call_count, 1)
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
+  
+                        options = get_restore_options()
+                        restore = tests_utils.create_restore(self.context,
+                                                              snapshot['id'],
+                                                              display_name='test_snapshot',
+                                                              display_description='this is a test snapshot',
+                                                              options=options)
+                        restore_id = restore['id']
+                        self.workload.snapshot_restore(self.context, restore_id)
+                        restore = self.db.restore_get(self.context, restore['id'])
+                        self.assertEqual(restore.status, 'available')
