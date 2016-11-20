@@ -951,7 +951,7 @@ def pre_restore_vm(cntx, db, instance, restore):
 
 
 @synchronized(lock)
-@autolog.log_method(Logger, 'vmtasks_openstack.restore_networks')
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_networks')
 def restore_vm_networks(cntx, db, restore):
     """
     Restore the networking configuration of VMs of the snapshot

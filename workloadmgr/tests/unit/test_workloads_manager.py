@@ -72,6 +72,7 @@ def get_restore_options():
                             u'networks_mapping': {u'networks': [{u'snapshot_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
                                                                                        u'subnet': {u'id': u'40eeba1b-0803-469c-b4c9-dadb2070f2c8'}},
                                                                  u'target_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
+                                                                 u'target_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
                                                                                      u'name': u'private',
                                                                                      u'subnet': {u'id': u'40eeba1b-0803-469c-b4c9-dadb2070f2c8'}}}]}},
              u'type': u'openstack',
@@ -143,6 +144,7 @@ class BaseWorkloadTestCase(test.TestCase):
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
+        patch('sys.stderr').start()
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
         self.MockMethod = self.is_online_patch.start()
@@ -567,10 +569,11 @@ class BaseWorkloadTestCase(test.TestCase):
         """Test workload can be created and deleted."""
         pass
 
+    @patch('sys.stderr')
     @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
     @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.initflow')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def test_workload_snapshot(self, mock_get_servers, m1, m2):
+    def test_workload_snapshot(self, mock_get_servers, m1, m2, m3):
         """Test workload can be created and deleted."""
         import workloadmgr.vault.vault
         import workloadmgr.compute.nova
@@ -1100,6 +1103,20 @@ class BaseWorkloadTestCase(test.TestCase):
                         self.assertEqual(post_snapshot_mock.call_count, 5)
                         self.assertEqual(apply_retention_policy.call_count, 1)
 
+                        set_meta_item_mock.reset_mock()
+                        delete_meta_mock.reset_mock()
+                        pre_snapshot_vm_mock.reset_mock()
+                        snapshot_vm_networks_mock.reset_mock()
+                        snapshot_vm_security_groups.reset_mock()
+                        snapshot_flavors_mock.reset_mock()
+                        freeze_vm_mock.reset_mock()
+                        thaw_vm_mock.reset_mock()
+                        snapshot_vm_mock.reset_mock()
+                        get_snapshot_data_size_mock.reset_mock()
+                        upload_snapshot_mock.reset_mock()
+                        post_snapshot_mock.reset_mock()
+                        apply_retention_policy.reset_mock()
+
                         snapshot = tests_utils.create_snapshot(self.context,
                                                                workload_id,
                                                                display_name='test_snapshot',
@@ -1107,6 +1124,21 @@ class BaseWorkloadTestCase(test.TestCase):
                                                                snapshot_type='full',
                                                                status='creating')
                         self.workload.workload_snapshot(self.context, snapshot['id'])
+
+                        self.assertEqual(set_meta_item_mock.call_count, 10)
+                        self.assertEqual(delete_meta_mock.call_count, 5)
+                        self.assertEqual(pre_snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_networks_mock.call_count, 1)
+                        self.assertEqual(snapshot_vm_security_groups.call_count, 1)
+                        self.assertEqual(snapshot_flavors_mock.call_count, 1)
+                        self.assertEqual(freeze_vm_mock.call_count, 5)
+                        self.assertEqual(thaw_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(get_snapshot_data_size_mock.call_count, 5)
+                        self.assertEqual(upload_snapshot_mock.call_count, 5)
+                        self.assertEqual(post_snapshot_mock.call_count, 5)
+                        self.assertEqual(apply_retention_policy.call_count, 1)
+
                         snapshot = self.db.snapshot_get(self.context, snapshot['id'])
 
                         self.assertEqual(snapshot.display_name, 'test_snapshot')
@@ -1122,3 +1154,195 @@ class BaseWorkloadTestCase(test.TestCase):
                         self.workload.snapshot_restore(self.context, restore_id)
                         restore = self.db.restore_get(self.context, restore['id'])
                         self.assertEqual(restore.status, 'available')
+
+                        self.assertEqual(pre_restore_vm_mock.call_count, 5)
+                        self.assertEqual(restore_keypairs_mock.call_count, 1)
+                        self.assertEqual(restore_vm_mock.call_count, 5)
+                        self.assertEqual(post_restore_vm_mock.call_count, 5)
+
+    @patch('workloadmgr.workflows.vmtasks_openstack.post_restore_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.restore_vm_networks')
+    @patch('workloadmgr.workflows.vmtasks_openstack.restore_keypairs')
+    @patch('workloadmgr.workflows.vmtasks_openstack.pre_restore_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.apply_retention_policy')
+    @patch('workloadmgr.workflows.vmtasks_openstack.post_snapshot')
+    @patch('workloadmgr.workflows.vmtasks_openstack.upload_snapshot')
+    @patch('workloadmgr.workflows.vmtasks_openstack.get_snapshot_data_size',
+           return_value = {'vm_data_size': 1024 * 1024 * 1024 * 5})
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.thaw_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.freeze_vm')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_security_groups')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_flavors')
+    @patch('workloadmgr.workflows.vmtasks_openstack.snapshot_vm_networks')
+    @patch('workloadmgr.workflows.vmtasks_openstack.pre_snapshot_vm')
+    @patch('workloadmgr.volume.cinder.API.get')
+    @patch('workloadmgr.compute.nova.API.get_flavors')
+    @patch('workloadmgr.compute.nova.API.get_flavor_by_id')
+    @patch('workloadmgr.compute.nova.API.get_server_by_id')
+    @patch('workloadmgr.compute.nova.API.delete_meta')
+    @patch('workloadmgr.compute.nova.API.set_meta_item')
+    @patch('workloadmgr.compute.nova.API.get_servers')
+    def test_workload_with_multiple_vms_restore_workflow_execute_restore_vm_flow(
+        self, mock_get_servers,
+        set_meta_item_mock,
+        delete_meta_mock,
+        get_server_by_id_mock,
+        get_flavor_by_id_mock,
+        get_flavors_mock,
+        get_volume_mock,
+        pre_snapshot_vm_mock,
+        snapshot_vm_networks_mock,
+        snapshot_vm_security_groups,
+        snapshot_flavors_mock,
+        freeze_vm_mock,
+        thaw_vm_mock,
+        snapshot_vm_mock,
+        get_snapshot_data_size_mock,
+        upload_snapshot_mock,
+        post_snapshot_mock,
+        apply_retention_policy,
+        pre_restore_vm_mock,
+        restore_keypairs_mock,
+        restore_vm_networks_mock,
+        post_restore_vm_mock):
+
+        """Test workload can be created and deleted."""
+        import workloadmgr.vault.vault
+        import workloadmgr.compute.nova
+        import workloadmgr.workloads.manager
+
+        mock_get_servers.side_effect = get_vms
+        get_server_by_id_mock.side_effect = get_server_by_id
+        get_flavor_by_id_mock.side_effect = get_flavor_by_id
+        get_volume_mock.side_effect = get_volume_id
+        get_flavors_mock.side_effect = get_flavors_for_test
+        self.workload_params = {
+            'status': 'creating',
+            'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '10',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}),
+            'host': CONF.host,}
+        with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                          'is_mounted', return_value=True) as mock_method1:
+            with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                              'get_total_capacity', return_value=None) as mock_method2:
+                with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
+                                  'workload_reset', return_value=None) as mock_method3:
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server2:nfsshare2': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
+
+                        mock_method2.side_effect = values
+
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                         display_name='Serial',
+                                                         display_description='this is a test workload_type',
+                                                         status='available',
+                                                         is_public=True,
+                                                         metadata=None)
+
+                        self.workload_params['instances'] = get_instances()
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            **self.workload_params)
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            workload_type_id=workload_type.id,
+                            **self.workload_params)
+                        workload_id = workload['id']
+                        self.workload.workload_create(self.context, workload_id)
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
+
+                        self.assertEqual(set_meta_item_mock.call_count, 20)
+                        self.assertEqual(delete_meta_mock.call_count, 5)
+                        self.assertEqual(pre_snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_networks_mock.call_count, 1)
+                        self.assertEqual(snapshot_vm_security_groups.call_count, 1)
+                        self.assertEqual(snapshot_flavors_mock.call_count, 1)
+                        self.assertEqual(freeze_vm_mock.call_count, 5)
+                        self.assertEqual(thaw_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(get_snapshot_data_size_mock.call_count, 5)
+                        self.assertEqual(upload_snapshot_mock.call_count, 5)
+                        self.assertEqual(post_snapshot_mock.call_count, 5)
+                        self.assertEqual(apply_retention_policy.call_count, 1)
+
+                        set_meta_item_mock.reset_mock()
+                        delete_meta_mock.reset_mock()
+                        pre_snapshot_vm_mock.reset_mock()
+                        snapshot_vm_networks_mock.reset_mock()
+                        snapshot_vm_security_groups.reset_mock()
+                        snapshot_flavors_mock.reset_mock()
+                        freeze_vm_mock.reset_mock()
+                        thaw_vm_mock.reset_mock()
+                        snapshot_vm_mock.reset_mock()
+                        get_snapshot_data_size_mock.reset_mock()
+                        upload_snapshot_mock.reset_mock()
+                        post_snapshot_mock.reset_mock()
+                        apply_retention_policy.reset_mock()
+
+                        snapshot = tests_utils.create_snapshot(self.context,
+                                                               workload_id,
+                                                               display_name='test_snapshot',
+                                                               display_description='this is a test snapshot',
+                                                               snapshot_type='full',
+                                                               status='creating')
+                        self.workload.workload_snapshot(self.context, snapshot['id'])
+
+                        self.assertEqual(set_meta_item_mock.call_count, 10)
+                        self.assertEqual(delete_meta_mock.call_count, 5)
+                        self.assertEqual(pre_snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_networks_mock.call_count, 1)
+                        self.assertEqual(snapshot_vm_security_groups.call_count, 1)
+                        self.assertEqual(snapshot_flavors_mock.call_count, 1)
+                        self.assertEqual(freeze_vm_mock.call_count, 5)
+                        self.assertEqual(thaw_vm_mock.call_count, 5)
+                        self.assertEqual(snapshot_vm_mock.call_count, 5)
+                        self.assertEqual(get_snapshot_data_size_mock.call_count, 5)
+                        self.assertEqual(upload_snapshot_mock.call_count, 5)
+                        self.assertEqual(post_snapshot_mock.call_count, 5)
+                        self.assertEqual(apply_retention_policy.call_count, 1)
+
+                        snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+
+                        self.assertEqual(snapshot.display_name, 'test_snapshot')
+                        self.assertEqual(snapshot.status, 'available')
+  
+                        options = get_restore_options()
+                        restore = tests_utils.create_restore(self.context,
+                                                              snapshot['id'],
+                                                              display_name='test_snapshot',
+                                                              display_description='this is a test snapshot',
+                                                              options=options)
+                        restore_id = restore['id']
+                        self.workload.snapshot_restore(self.context, restore_id)
+                        restore = self.db.restore_get(self.context, restore['id'])
+                        self.assertEqual(restore.status, 'available')
+
+                        self.assertEqual(pre_restore_vm_mock.call_count, 5)
+                        self.assertEqual(restore_keypairs_mock.call_count, 1)
+                        self.assertEqual(restore_vm_mock.call_count, 5)

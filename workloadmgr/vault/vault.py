@@ -876,7 +876,7 @@ def get_backup_target(backup_endpoint):
 def get_settings_backup_target():
     settings_path = os.path.join(CONF.cloud_unique_id,"settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
-        get_backup_target(backup_endpoint)
+        get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
         if backup_target.object_exists(settings_path):
             return backup_target
