@@ -72,7 +72,6 @@ def get_restore_options():
                             u'networks_mapping': {u'networks': [{u'snapshot_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
                                                                                        u'subnet': {u'id': u'40eeba1b-0803-469c-b4c9-dadb2070f2c8'}},
                                                                  u'target_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
-                                                                 u'target_network': {u'id': u'b5eef466-1af0-4e5b-a725-54b385e7c42e',
                                                                                      u'name': u'private',
                                                                                      u'subnet': {u'id': u'40eeba1b-0803-469c-b4c9-dadb2070f2c8'}}}]}},
              u'type': u'openstack',
