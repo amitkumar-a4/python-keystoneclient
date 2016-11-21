@@ -315,7 +315,6 @@ class BaseVaultTestCase(test.TestCase):
         #print_workloads(totalworkloads, shares, workloads_by_share=True)
 
         '''
-        import pdb;pdb.set_trace()
         for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
             backup_target = workloadmgr.vault.vault.get_backup_target(share)
             shutil.rmtree(backup_target.mount_path)
