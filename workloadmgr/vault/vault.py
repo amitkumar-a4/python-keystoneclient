@@ -864,6 +864,7 @@ def mount_backup_media():
 
 
 def get_backup_target(backup_endpoint):
+    backup_endpoint = backup_endpoint.strip()
     backup_target = triliovault_backup_targets.get(backup_endpoint, None)
     
     if backup_target is None:

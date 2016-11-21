@@ -414,9 +414,9 @@ class BaseVaultTestCase(test.TestCase):
                 if meta['key'] == 'backup_media_target':
                     tgts.append(meta['value'])
 
-        self.assertEqual(set(tgts) == set(['server1:nfsshare1',
-                                           'server2:nfsshare2',
-                                           'server3:nfsshare3']))
+        self.assertEqual(set(tgts), set(['server1:nfsshare1',
+                                         'server2:nfsshare2',
+                                         'server3:nfsshare3']))
 
         delete_workload(workloads.pop())
 
@@ -430,9 +430,9 @@ class BaseVaultTestCase(test.TestCase):
                 if meta['key'] == 'backup_media_target':
                     tgts.append(meta['value'])
 
-        self.assertEqual(set(tgts) == set(['server1:nfsshare1',
-                                           'server2:nfsshare2',
-                                           'server3:nfsshare3']))
+        self.assertEqual(set(tgts), set(['server1:nfsshare1',
+                                         'server2:nfsshare2',
+                                         'server3:nfsshare3']))
 
         for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
             backup_target = workloadmgr.vault.vault.get_backup_target(share)
