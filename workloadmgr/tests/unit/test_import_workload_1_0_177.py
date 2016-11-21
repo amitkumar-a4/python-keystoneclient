@@ -100,6 +100,7 @@ class BaseVaultTestCase(test.TestCase):
             workload = {
                         'id': str(uuid.uuid4()),
                         'size': size,
+                        'error_msg': '',
                         'user_id': self.context.user_id,
                         'tenant_id': self.context.tenant_id,
                         'status': 'creating',

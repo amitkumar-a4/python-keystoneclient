@@ -161,6 +161,7 @@ class BaseWorkloadTestCase(test.TestCase):
         self.context.is_admin = False
         self.workload_params = {
             'status': 'creating',
+            'error_msg': '',
             'instances': [],
             'jobschedule': pickle.dumps({'start_date': '06/05/2014',
                             'end_date': '07/05/2015',

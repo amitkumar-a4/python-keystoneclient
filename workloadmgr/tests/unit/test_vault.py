@@ -128,6 +128,7 @@ class BaseVaultTestCase(test.TestCase):
             workload = {
                         'id': str(uuid.uuid4()),
                         'size': size,
+                        'error_msg': '',
                         'status': 'creating',
                         'instances': [],
                         'jobschedule': pickle.dumps({'start_date': '06/05/2014',
