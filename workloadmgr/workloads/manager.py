@@ -400,7 +400,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             if int(jobschedule['fullbackup_interval']) == -1:
                 fulls = 1
-            if int(jobschedule['fullbackup_interval']) == 0:
+            elif int(jobschedule['fullbackup_interval']) == 0:
                 fulls = incrs
                 incrs = 0
             else:

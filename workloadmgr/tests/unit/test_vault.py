@@ -4,8 +4,11 @@
 # All Rights Reserved.
 import __builtin__
 import contextlib
+import cPickle as pickle
 import datetime
+import json
 import os
+import random
 import sys
 import shutil
 import socket
@@ -20,6 +23,7 @@ from mox import IsA
 from mox import IgnoreArg
 from mox import In
 import StringIO
+import uuid
 
 from oslo.config import cfg
 
@@ -81,7 +85,7 @@ class BaseVaultTestCase(test.TestCase):
                            {'server2:nfsshare2': [1099511627776, 5 * 10737418240],}.values()[0],
                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
-                 mock_method1.side_effect = values
+                 mock_method2.side_effect = values
                  workloadmgr.vault.vault.get_capacities_utilizations(self.context)
 
     def test_get_settings_backup_target(self):
@@ -96,27 +100,30 @@ class BaseVaultTestCase(test.TestCase):
                            {'server2:nfsshare2': [1099511627776, 5 * 10737418240],}.values()[0],
                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
-                 mock_method1.side_effect = values
+                 mock_method2.side_effect = values
 
                  settings_backup = workloadmgr.vault.vault.get_settings_backup_target()
                  self.assertEqual(settings_backup.backup_endpoint, 'server3:nfsshare3')
 
     @patch('subprocess.check_call')
-    @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.get_total_capacity')
     @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
-    def test_get_nfs_share_for_workload_by_free_overcommit(context, mock_method1,
-                                                           mock_method2, mock_method3):
+    def test_get_nfs_share_for_workload_by_free_overcommit(self, mock_method1,
+                                                           mock_method3):
+
+        import workloadmgr.vault.vault
 
         values = [{'server1:nfsshare1': [1099511627776, 10737418240],}.values()[0],
                    {'server2:nfsshare2': [1099511627776, 5 * 10737418240],}.values()[0],
                    {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
-        mock_method2.side_effect = values
         mock_method1.return_value = True
         mock_method3.return_value = True
 
-        def create_workload(size, noofsnapshots):
+        @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.get_total_capacity')
+        def create_workload(size, noofsnapshots, mock_method2):
             """ create a json file on the NFS share """
+            mock_method2.return_value = None
+            mock_method2.side_effect = values
             workload = {
                         'id': str(uuid.uuid4()),
                         'size': size,
@@ -126,14 +133,14 @@ class BaseVaultTestCase(test.TestCase):
                                         'end_date': '07/05/2015',
                                         'interval': '1 hr',
                                         'start_time': '2:30 PM',
-                                        'fullbackup_interval': -1,
+                                        'fullbackup_interval': '-1',
                                         'retention_policy_type': 'Number of Snapshots to Keep',
                                         'retention_policy_value': str(noofsnapshots)}),
                         'metadata': {'workload_approx_backup_size': 1024}
                        }
 
             workload_backup_media_size = size
-            jobschedule = workload['jobschedule']
+            jobschedule = pickle.loads(workload['jobschedule'])
             if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
                 incrs = int(jobschedule['retention_policy_value'])
             else:
@@ -142,7 +149,7 @@ class BaseVaultTestCase(test.TestCase):
 
             if int(jobschedule['fullbackup_interval']) == -1:
                 fulls = 1
-            if int(jobschedule['fullbackup_interval']) == 0:
+            elif int(jobschedule['fullbackup_interval']) == 0:
                 fulls = incrs
                 incrs = 0
             else:
@@ -153,13 +160,16 @@ class BaseVaultTestCase(test.TestCase):
                 (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
                  incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
 
+            workload_metadata = [{'key': 'workload_approx_backup_size', 'value': workload_approx_backup_size}]
+            workload['metadata'] = workload_metadata
             backup_endpoint = workloadmgr.vault.vault.get_nfs_share_for_workload_by_free_overcommit(self.context, workload)
-            workload_metadata = {'workload_approx_backup_size': workload_approx_backup_size,
-                                 'backup_media_target': backup_endpoint}
+            workload_metadata = [{'key': 'workload_approx_backup_size', 'value': workload_approx_backup_size},
+                                 {'key': 'backup_media_target', 'value': backup_endpoint}]
             workload['metadata'] = workload_metadata
 
             # write json here
-            workload_path = os.path.join(backup_endpoint.mount_path, "workload_" + workload['id'])
+            backup_target = workloadmgr.vault.vault.get_backup_target(backup_endpoint)
+            workload_path = os.path.join(backup_target.mount_path, "workload_" + workload['id'])
             os.mkdir(workload_path)
             workload_json_file = os.path.join(workload_path, "workload_db")
             with open(workload_json_file, "w") as f:
@@ -168,16 +178,24 @@ class BaseVaultTestCase(test.TestCase):
             return workload
 
         def delete_workload(workload):
-            workload_path = os.path.join(workload['nfsshare'],
-                                         'workload_' + workload['id'])
+            for meta in workload['metadata']:
+                if meta['key'] == 'backup_media_target':
+                    backup_endpoint = meta['value']
+            backup_target = workloadmgr.vault.vault.get_backup_target(backup_endpoint)
+            workload_path = os.path.join(backup_target.mount_path,
+                                         "workload_" + workload['id'])
             shutil.rmtree(workload_path) 
 
         def create_snapshot(workload, full=False):
             """ create a sparse file
                 adjust number of snapshots based on retention policy
             """
+
             snapname = "snapshot_" + str(uuid.uuid4())
-            backup_target = workloadmgr.vault.vault.get_backup_target(workworkload['metadata']['backup_media_target'])
+            for meta in workload['metadata']:
+                if meta['key'] == 'backup_media_target':
+                    backup_endpoint = meta['value']
+            backup_target = workloadmgr.vault.vault.get_backup_target(backup_endpoint)
             workload_path = os.path.join(backup_target.mount_path, "workload_" + workload['id'])
             snap_path = os.path.join(workload_path, snapname)
 
@@ -197,15 +215,15 @@ class BaseVaultTestCase(test.TestCase):
                     continue
                 snaps.append(snap)
 
-            if len(snaps) >= workload['noofsnapshots']:
+            if len(snaps) >= pickle.loads(workload['jobschedule'])['retention_policy_value']:
                 os.remove(os.path.join(workload_path, snaps[0]))
 
             return snap_path
 
-        import pdb;pdb.set_trace()
         workloads = []
+        totalworkloads = []
         for i in range(200):
-            workload = create_workload(1024 * 1024 * 1024 * random.randint(1, 100),
+            workload = create_workload(random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
 
@@ -215,75 +233,70 @@ class BaseVaultTestCase(test.TestCase):
 
         workloads = []
         for i in range(200):
-            workload = create_workload(1024 * 1024 * 1024 * random.randint(1, 100),
+            workload = create_workload(random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
 
         for w in workloads:
-            create_snapshot(w, shares, full=True)
+            create_snapshot(w, full=True)
 
         workloads = []
-        print_usage("After creating 200 workloads and full snapshots", shares)
+        print ("After creating 200 workloads and full snapshots")
         for i in range(200):
-            workload = create_workload(shares,
-                                       1024 * 1024 * 1024 * random.randint(1, 100),
-                                       random.randint(10, 50),
-                                       placementalgo)
+            workload = create_workload( random.randint(1, 100),
+                                       random.randint(10, 50))
             workloads.append(workload)
 
         totalworkloads += workloads
 
 
         for w in workloads:
-            create_snapshot(w, shares, full=True)
+            create_snapshot(w, full=True)
 
-        print_usage("After creating addtional 100 workloads and full snapshots", shares)
+        print ("After creating addtional 100 workloads and full snapshots")
 
         for i in range(100):
             for w in totalworkloads:
-                create_snapshot(w, shares)
+                create_snapshot(w)
 
-        print_usage("After create 100 incrementals on each workload", shares)
+        print ("After create 100 incrementals on each workload")
 
         workloads = []
         for i in range(500):
-            workload = create_workload(shares,
-                                       1024 * 1024 * 1024 * random.randint(1, 100),
-                                       random.randint(10, 50),
-                                       placementalgo)
+            workload = create_workload(random.randint(1, 100),
+                                       random.randint(10, 50))
             workloads.append(workload)
         for w in workloads:
-            create_snapshot(w, shares, full=True)
+            create_snapshot(w, full=True)
 
-        print_usage("Creating additional 500 workloads and a full snapshot", shares)
+        print ("Creating additional 500 workloads and a full snapshot")
 
         # delete latest workloads
         for w in workloads:
             delete_workload(w)
 
-        print_usage("After deleting latest 500 workloads and a full snapshot", shares)
+        print ("After deleting latest 500 workloads and a full snapshot")
 
         workloads = []
         for i in range(500):
-            workload = create_workload(shares,
-                                       1024 * 1024 * 1024 * random.randint(1, 100),
-                                       random.randint(10, 50),
-                                       placementalgo)
+            workload = create_workload(random.randint(1, 100),
+                                       random.randint(10, 50))
             workloads.append(workload)
         totalworkloads += workloads
         for w in workloads:
-            create_snapshot(w, shares, full=True)
+            create_snapshot(w, full=True)
 
-        print_usage("After recreating additional 500 workloads and a full snapshot", shares)
+        '''
+        print ("After recreating additional 500 workloads and a full snapshot")
 
         # add few more NFS shares
         shares += create_multiple_shares()
-        print_usage("After adding few more shares", shares)
+        print ("After adding few more shares", shares)
 
         workloads = []
         for i in range(1000):
             workload = create_workload(shares,
-                                       1024 * 1024 * 1024 * random.randint(1, 100),
+                                       random.randint(1, 100),
                                        random.randint(10, 50),
                                        placementalgo)
             workloads.append(workload)
@@ -292,14 +305,17 @@ class BaseVaultTestCase(test.TestCase):
             create_snapshot(w, shares, full=True)
         totalworkloads += workloads
 
-        print_usage("After adding workloads and a full snapshot", shares)
+        print ("After adding workloads and a full snapshot", shares)
 
         for i in range(100):
             for w in totalworkloads:
                 create_snapshot(w, shares)
 
-        print_usage("After create 100 incrementals on each workload", shares)
+        print ("After create 100 incrementals on each workload", shares)
         #print_workloads(totalworkloads, shares, workloads_by_share=True)
 
-        for s in shares:
-            shutil.rmtree(s['share'])
+        '''
+        import pdb;pdb.set_trace()
+        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
+            backup_target = workloadmgr.vault.vault.get_backup_target(share)
+            shutil.rmtree(backup_target.mount_path)
