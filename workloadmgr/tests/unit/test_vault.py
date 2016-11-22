@@ -237,7 +237,7 @@ class BaseVaultTestCase(test.TestCase):
 
         workloads = []
         totalworkloads = []
-        for i in range(200):
+        for i in range(2):
             workload = create_workload(random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
@@ -247,7 +247,7 @@ class BaseVaultTestCase(test.TestCase):
             create_snapshot(w, full=True)
 
         workloads = []
-        for i in range(200):
+        for i in range(2):
             workload = create_workload(random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
@@ -256,7 +256,7 @@ class BaseVaultTestCase(test.TestCase):
             create_snapshot(w, full=True)
 
         workloads = []
-        for i in range(200):
+        for i in range(2):
             workload = create_workload( random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
@@ -268,19 +268,18 @@ class BaseVaultTestCase(test.TestCase):
             create_snapshot(w, full=True)
 
 
-        for i in range(100):
+        for i in range(1):
             for w in totalworkloads:
                 create_snapshot(w)
 
 
         workloads = []
-        for i in range(500):
+        for i in range(5):
             workload = create_workload(random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
         for w in workloads:
             create_snapshot(w, full=True)
-
 
         # delete latest workloads
         for w in workloads:
@@ -288,7 +287,7 @@ class BaseVaultTestCase(test.TestCase):
 
 
         workloads = []
-        for i in range(500):
+        for i in range(5):
             workload = create_workload(random.randint(1, 100),
                                        random.randint(10, 50))
             workloads.append(workload)
@@ -299,35 +298,6 @@ class BaseVaultTestCase(test.TestCase):
         for w in workloads:
             delete_workload(w)
 
-        '''
-        print ("After recreating additional 500 workloads and a full snapshot")
-
-        # add few more NFS shares
-        shares += create_multiple_shares()
-        print ("After adding few more shares", shares)
-
-        workloads = []
-        for i in range(1000):
-            workload = create_workload(shares,
-                                       random.randint(1, 100),
-                                       random.randint(10, 50),
-                                       placementalgo)
-            workloads.append(workload)
-
-        for w in workloads:
-            create_snapshot(w, shares, full=True)
-        totalworkloads += workloads
-
-        print ("After adding workloads and a full snapshot", shares)
-
-        for i in range(100):
-            for w in totalworkloads:
-                create_snapshot(w, shares)
-
-        print ("After create 100 incrementals on each workload", shares)
-        #print_workloads(totalworkloads, shares, workloads_by_share=True)
-
-        '''
         for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
             backup_target = workloadmgr.vault.vault.get_backup_target(share)
             shutil.rmtree(backup_target.mount_path)
