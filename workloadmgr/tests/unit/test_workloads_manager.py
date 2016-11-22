@@ -232,7 +232,7 @@ class BaseWorkloadTestCase(test.TestCase):
                     self.assertEqual(workload_id, self.db.workload_get(self.context, workload_id).id)
 
                     backup_target = None
-                    for meta in workload['metadata':
+                    for meta in workload['metadata']:
                         if meta['key'] == 'backup_media_target':
                             backup_target = workloadmgr.vault.vault.get_backup_target(meta['value'])
                     self.assertNotEqual(backup_target, None)
