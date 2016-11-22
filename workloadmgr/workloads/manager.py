@@ -1182,6 +1182,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     compute_service = nova.API(production=True)
                     compute_service.set_meta_item(context, mount_vm_id,
                                      "mounted_snapshot_id", snapshot['id'])
+                    compute_service.set_meta_item(context, mount_vm_id,
+                                     "mounted_snapshot__url",
+                                     "/project/workloads/snapshots/%s/detail" % 
+                                     snapshot['id'])
                 except:
                     pass
                 return {"urls": urls}
