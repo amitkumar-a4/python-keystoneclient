@@ -25,6 +25,12 @@ function redirectToConf(xmlhttp)
 }
 function loadXMLDoc(url, callback)
 {
+        if (document.getElementById("authenticate_with_swift") == null && url == 'authenticate_with_swift') {
+           return
+        }
+        if (document.getElementById("start_swift_service") == null && url == 'start_swift_service') {
+           return
+        }
         flag = $('#'+url).css('display')
         if (flag == 'block')
         {
@@ -83,7 +89,23 @@ function taskfunction()
 	      {
 		    return redirectToConf(xmlhttp);	
 			
-	      }
+	      }  
+
+                 loadXMLDoc("authenticate_with_swift", function() {
+                 document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-refresh");
+                      if (xmlhttp.readyState != 4) return;
+                 document.getElementById("authenticate_with_swift").children[0].classList.remove("glyphicon-refresh");
+                      if (xmlhttp.readyState != 4) return;
+                 if (xmlhttp.readyState==4 && xmlhttp.status==200)
+                      {
+                         document.getElementById("authenticate_with_swift").classList.add("list-group-item-success");
+                         document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-ok");
+                      }
+                 else
+                      {
+                         return redirectToConf(xmlhttp);
+                      }
+                
 		  // Call register_service api
 		  loadXMLDoc("register_service", function() {
 			
@@ -141,6 +163,20 @@ function taskfunction()
 		              {
 						 return redirectToConf(xmlhttp);	
 		              }
+                              loadXMLDoc("start_swift_service",function() {
+                                       document.getElementById("start_swift_service").children[0].classList.add("glyphicon-refresh");
+                                       if (xmlhttp.readyState != 4) return;
+                                       document.getElementById("start_swift_service").children[0].classList.remove("glyphicon-refresh");
+                                       if (xmlhttp.readyState==4 && xmlhttp.status==200)
+                                       {
+                                          document.getElementById("start_swift_service").classList.add("list-group-item-success");
+                                          document.getElementById("start_swift_service").children[0].classList.add("glyphicon-ok");
+                                       }
+                                       else
+                                       {
+                                          return redirectToConf(xmlhttp);
+                                       }
+
 		              // Call start_api
 		              loadXMLDoc("start_api",function() {
 		   	   	         document.getElementById("start_api").children[0].classList.add("glyphicon-refresh");
@@ -181,8 +217,9 @@ function taskfunction()
 		                       }
 		                       else
 		                       {
-								  return redirectToConf(xmlhttp);	
+				          return redirectToConf(xmlhttp);	
 		                       }
+
 		                       loadXMLDoc("register_workloadtypes",function() {
 		   	   	                  document.getElementById("register_workloadtypes").children[0].classList.add("glyphicon-refresh");
 		      	                  if (xmlhttp.readyState != 4) return;
@@ -215,7 +252,8 @@ function taskfunction()
                                           } else {
 		                             document.getElementById("final_status").innerHTML = ntp_note+'<b>Congratulations !!!. Configuration successfully completed. Install tvault-contego and horizon plugin to complete TrilioVault installation </a> </b>';
                                           }
-		                    });
+                                       });
+                                     });
 		                 });
 		              });
 		           });
@@ -224,6 +262,7 @@ function taskfunction()
 		  });
 	     });
 	 });
+       });
     });
 }
 
@@ -263,6 +302,14 @@ $( document ).ready(function() {
                 Configuring tVault host</li>
     <li id="authenticate_with_keystone" class="list-group-item"><span class="glyphicon"></span>
                 Authenticating with keystone</li>
+    %if 'swift_auth_url' in locals() and len(locals()['swift_auth_url']) > 0:
+    <li id="authenticate_with_swift" class="list-group-item"><span class="glyphicon"></span>
+                Authenticating with Swift Object Store</li>
+    %else:
+    <li id="authenticate_with_swift" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+           Authenticating with Swift Object Store</li>
+    %end
+
     <li id="register_service" class="list-group-item"><span class="glyphicon"></span>
                 Registering tVault service with keystone</li>
     <li id="configure_api" class="list-group-item"><span class="glyphicon"></span>
@@ -271,12 +318,21 @@ $( document ).ready(function() {
                 Configuring tVault scheduler service </li>
     <li id="configure_service" class="list-group-item"><span class="glyphicon"></span>
                 Configuring tVault service </li>
+
+    %if 'swift_auth_url' in locals() and len(locals()['swift_auth_url']) > 0:
+    <li id="start_swift_service" class="list-group-item"><span class="glyphicon"></span>
+               Starting swift mount service</li>
+    %else:
+    <li id="start_swift_service" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+             Starting swift mount service</li>
+    %end
     <li id="start_api" class="list-group-item"><span class="glyphicon"></span>
                 Starting tVault API service</li>
     <li id="start_scheduler" class="list-group-item"><span class="glyphicon"></span>
                 Starting tVault scheduler service</li>
     <li id="start_service" class="list-group-item"><span class="glyphicon"></span>
                 Starting tVault service</li>
+
     <li id="register_workloadtypes" class="list-group-item"><span class="glyphicon"></span>
                 Registering workload types</li>
     %if 'workloads_import' in locals() and locals()['workloads_import'] is True:

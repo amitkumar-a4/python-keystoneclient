@@ -371,7 +371,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload = self.db.workload_get(context, workload_id)
             vms = self.db.workload_vms_get(context, workload_id)
 
-
             compute_service = nova.API(production=True)
             volume_service = cinder.API()
             workload_backup_media_size = 0
@@ -1093,7 +1092,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 pervmdisks[vm.vm_id] = {'vm_name': vm.vm_name,
                                         'vault_path': [] }
 
-            if not FLAGS.vault_storage_type in ("nfs", "local"):
+            if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
 
                 context_dict = dict([('%s' % key, value)
                                       for (key, value) in cntx.to_dict().iteritems()])            
@@ -1313,7 +1312,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     # always cleanup as much as possible
                     LOG.exception(ex)
                     pass
-            if not FLAGS.vault_storage_type in ("nfs", "local"):
+            if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
                 for vmid, paths in devpaths.iteritems():
                     try:
                         os.remove(paths.keys()[0])

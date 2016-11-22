@@ -122,6 +122,12 @@ class PrepareBackupImage(task.Task):
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
         resource_snap_path = os.path.join(backup_target.mount_path,
                                           vm_disk_resource_snap.vault_url.strip(os.sep))
+        try:
+            os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
+                                   'snapshot_'+snapshot_obj.id))
+            os.listdir(os.path.split(resource_snap_path)[0])
+        except:
+               pass
         image_info = qemuimages.qemu_img_info(resource_snap_path)
         
         if snapshot_vm_resource.resource_name == 'vda' and \
