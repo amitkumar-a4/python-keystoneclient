@@ -24,6 +24,7 @@ from workloadmgr import exception
 from workloadmgr import test
 from workloadmgr.tests.unit import utils as tests_utils
 from workloadmgr.openstack.common import importutils
+from workloadmgr.openstack.common import fileutils
 #from workloadmgr.workloads.api import API
 
 CONF = cfg.CONF
@@ -144,8 +145,11 @@ class BaseWorkloadTestCase(test.TestCase):
 
         patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
         patch('sys.stderr').start()
+        patch('workloadmgr.autolog.log_method').start()
+
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
+
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.MockMethod.return_value = True
@@ -175,6 +179,12 @@ class BaseWorkloadTestCase(test.TestCase):
     def tearDown(self):
         self.is_online_patch.stop()
         self.subprocess_patch.stop()
+
+        import workloadmgr.vault.vault
+        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
+            backup_target = workloadmgr.vault.vault.get_backup_target(share)
+            shutil.rmtree(backup_target.mount_path)
+            fileutils.ensure_tree(backup_target.mount_path)
         super(BaseWorkloadTestCase, self).tearDown()
 
     def test_create_delete_workload(self):
@@ -221,13 +231,21 @@ class BaseWorkloadTestCase(test.TestCase):
                     expected['status'] = 'available'
                     self.assertEqual(workload_id, self.db.workload_get(self.context, workload_id).id)
 
+                    backup_target = None
+                    for meta in workload['metadata':
+                        if meta['key'] == 'backup_media_target':
+                            backup_target = workloadmgr.vault.vault.get_backup_target(meta['value'])
+                    self.assertNotEqual(backup_target, None)
+                    workload_path = os.path.join(backup_target.mount_path, "workload_" + workload['id'])
+
+                    self.assertTrue(os.path.exists(workload_path))
+
                     self.workload.workload_delete(self.context, workload_id)
-                    #workload = db.workload_get(self.context, workload_id)
-                    #self.assertEqual(workload['status'], 'deleted')
                     self.assertRaises(exception.NotFound,
                                       db.workload_get,
                                       self.context,
                                       workload_id)
+                    self.assertFalse(os.path.exists(workload_path))
 
 
     @patch('workloadmgr.volume.cinder.API.get')

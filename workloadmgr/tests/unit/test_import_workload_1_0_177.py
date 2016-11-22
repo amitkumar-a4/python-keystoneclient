@@ -50,6 +50,7 @@ class BaseVaultTestCase(test.TestCase):
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
+        patch('sys.stderr').start()
 
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
@@ -71,6 +72,13 @@ class BaseVaultTestCase(test.TestCase):
     def tearDown(self):
         self.is_online_patch.stop()
         self.subprocess_patch.stop()
+
+        import workloadmgr.vault.vault
+        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
+            backup_target = workloadmgr.vault.vault.get_backup_target(share)
+            shutil.rmtree(backup_target.mount_path)
+            fileutils.ensure_tree(backup_target.mount_path)
+
         super(BaseVaultTestCase, self).tearDown()
 
     @patch('subprocess.check_call')
@@ -256,8 +264,3 @@ class BaseVaultTestCase(test.TestCase):
         # delete latest workloads
         for w in workloads:
             delete_workload(w)
-
-        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
-            backup_target = workloadmgr.vault.vault.get_backup_target(share)
-            shutil.rmtree(backup_target.mount_path)
-            fileutils.ensure_tree(backup_target.mount_path)

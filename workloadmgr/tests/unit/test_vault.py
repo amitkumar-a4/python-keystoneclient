@@ -50,6 +50,7 @@ class BaseVaultTestCase(test.TestCase):
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
+        patch('sys.stderr').start()
 
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
@@ -68,6 +69,13 @@ class BaseVaultTestCase(test.TestCase):
     def tearDown(self):
         self.is_online_patch.stop()
         self.subprocess_patch.stop()
+
+        import workloadmgr.vault.vault
+        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
+            backup_target = workloadmgr.vault.vault.get_backup_target(share)
+            shutil.rmtree(backup_target.mount_path)
+            fileutils.ensure_tree(backup_target.mount_path)
+
         super(BaseVaultTestCase, self).tearDown()
 
     def test_mount_backup_media(self):
@@ -103,6 +111,11 @@ class BaseVaultTestCase(test.TestCase):
 
                  mock_method2.side_effect = values
 
+                 backup_target = workloadmgr.vault.vault.get_backup_target('server3:nfsshare3')
+                 fileutils.ensure_tree(os.path.join(backup_target.mount_path, CONF.cloud_unique_id))
+                 with open(os.path.join(backup_target.mount_path,
+                                        CONF.cloud_unique_id, "settings_db"), "w") as f:
+                      f.write(json.dumps([]))
                  settings_backup = workloadmgr.vault.vault.get_settings_backup_target()
                  self.assertEqual(settings_backup.backup_endpoint, 'server3:nfsshare3')
 
@@ -411,9 +424,10 @@ class BaseVaultTestCase(test.TestCase):
         totalworkloads += workloads
         tgts = []
         for w in workloads:
-            for meta in workload['metadata']:
+            for meta in w['metadata']:
                 if meta['key'] == 'backup_media_target':
                     tgts.append(meta['value'])
+                    break
 
         self.assertEqual(set(tgts), set(['server1:nfsshare1',
                                          'server2:nfsshare2',
@@ -427,7 +441,7 @@ class BaseVaultTestCase(test.TestCase):
 
         tgts = []
         for w in workloads:
-            for meta in workload['metadata']:
+            for meta in w['metadata']:
                 if meta['key'] == 'backup_media_target':
                     tgts.append(meta['value'])
 
