@@ -901,7 +901,7 @@ class BaseWorkloadTestCase(test.TestCase):
                                                                workload_id,
                                                                display_name='test_snapshot',
                                                                display_description='this is a test snapshot',
-                                                               snapshot_type='full',
+                                                               snapshot_type='incr',
                                                                status='creating')
                         self.workload.workload_snapshot(self.context, snapshot['id'])
                         snapshot = self.db.snapshot_get(self.context, snapshot['id'])

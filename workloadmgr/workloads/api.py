@@ -491,6 +491,7 @@ class API(base.Base):
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
+            workload = None
             #TODO(giri): optimize this lookup
 
             if len(instances) == 0:
@@ -590,7 +591,7 @@ class API(base.Base):
                self.db.workload_update(context, workload['id'],
                                       {'status': 'error',
                                        'error_msg': str(ex.message)})
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+            raise
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload, context=context):
@@ -2326,5 +2327,3 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
-
-
