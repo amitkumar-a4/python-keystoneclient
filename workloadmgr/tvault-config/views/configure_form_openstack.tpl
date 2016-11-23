@@ -27,11 +27,11 @@ function setRequired(val) {
 function findForm() {
   setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
   setRequired($("#configure_openstack input[name='keystone-public-url']").val())
-  obj = $("#configure_openstack input[name='swift-auth-version']")
+  obj = $("#configure_openstack input[name='swift-auth-version']:checked")
   setSwiftRequired(obj.attr('checked'), obj.val())
 }
 function setSwiftRequired(checked, val) {
-     if(checked==true && val=='TEMPAUTH') {
+     if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
         $('[name="swift-username"]').attr("required", "true");
         $('[name="swift-password"]').attr("required", "true");
@@ -47,6 +47,15 @@ function setSwiftRequired(checked, val) {
         $('[name="swift-username"]').removeAttr('required')
         $('[name="swift-password"]').removeAttr('required')
      }
+     if(val == 'TEMPAUTH' || val == 'KEYSTONE') {
+       $('[name="storage-nfs-export"]').removeAttr('required')
+       $('[name="storage-nfs-options"]').removeAttr('required')        
+     }
+     else {
+       $('[name="storage-nfs-export"]').attr("required", "true");
+       $('[name="storage-nfs-options"]').attr("required", "true");
+     }
+
 }
 </script>
 </head>
@@ -225,30 +234,34 @@ function setSwiftRequired(checked, val) {
 		    </div>
 		    <div id="collapseFive" class="panel-collapse collapse in">
 		    <div class="panel-body">
+                    <div class="input-group">
                 %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
-                    <input name = "swift-auth-version" type="radio"  value="NONE" >  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE" >  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" checked>  TEMPAUTH <br> <br>                       
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
                 %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
-                    <input name = "swift-auth-version" type="radio"  value="NONE" >  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE" checked>  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" >  TEMPAUTH <br> <br>                                
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
                 %else:
-                    <input name = "swift-auth-version" type="radio"  value="NONE" checked onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
-                %end  
+                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="NONE" checked onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
+                %end 
+                     <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
+                </div>
                 <div class="input-group" id="swift-auth-url-div">
-                    <label class="input-group-addon">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                     <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
                 </div><br>
                 <div class="input-group" id="swift-username-div">
-                    <label class="input-group-addon">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                     <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
                 </div><br>
                 <div class="input-group" id="swift-password-div">
-                    <label class="input-group-addon">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-                    <input name="swift-password" type="password" class="form-control"> <br>
+                    <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                    <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
+                    <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                 </div><br>
 	 	</div>
 		</div>
@@ -398,6 +411,43 @@ function validate_keystone_credentials(inputelement) {
                options += "<option value="+ value +" selected>"+ value + "</option>"
            });
            document.getElementsByName("trustee-role")[0].innerHTML = options
+        }
+    });
+}
+
+function validate_swift_credentials(inputelement) {
+    public_url = $('[name="keystone-public-url"]')[0].value
+    project_name = $('[name="admin-tenant-name"]')[0].value
+    username = $('[name="admin-username"]')[0].value
+    password = $('[name="admin-password"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
+    swift_auth_url = $('[name="swift-auth-url"]')[0].value
+    swift_username = $('[name="swift-username"]')[0].value
+    swift_password = $('[name="swift-password"]')[0].value
+    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+    swift_auth_version = obj.val()
+    $.ajax({
+        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
+              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
         }
     });
 }
