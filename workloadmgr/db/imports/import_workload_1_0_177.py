@@ -206,8 +206,11 @@ def update_workload_metadata(workload_values):
 
             if jobschedule['fullbackup_interval'] == '-1':
                 fulls = 1
+            elif jobschedule['fullbackup_interval'] == '0':
+                fulls = incrs
+                incrs = 0
             else:
-                fulls = incrs / jobschedule['fullbackup_interval']
+                fulls = incrs / int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
 
             if workload_backup_media_size.get(workload_values['id'], None) is None:
