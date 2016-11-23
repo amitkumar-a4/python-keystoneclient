@@ -754,12 +754,15 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         """
         List of workload transfers on this particular backup media
         """
-        workload_transfers_directory = get_workload_transfers_directory()
+        workload_transfers_directory = self.get_workload_transfers_directory()
+        transfers = []
         if workload_transfers_directory:
             pattern = os.path.join(workload_transfers_directory, "*")
-            return glob.glob(pattern)
-        else:
-            return None
+            for transfer_file in glob.glob(pattern):
+                tran = json.loads(self.get_object(transfer_file))
+                transfers.append(tran)
+
+        return transfers
 
     @autolog.log_method(logger=Logger) 
     def transfers_delete(self, context, transfers_metadata):
@@ -767,7 +770,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         List of workload transfers on this particular backup media
         """
         try:
-            transfer_path  = get_workload_transfers_path(transfers_metadata)
+            transfer_path  = self.get_workload_transfers_path(transfers_metadata)
             if isfile(transfer_path):
                 os.remove(transfer_path)
         except Exception as ex:
@@ -847,7 +850,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                 metadata['user_id'] = context.user_id
                 metadata['project_id'] = context.project_id
 
-                self.put_object(pathname, metadata)
+                self.put_object(pathname, json.dumps(metadata))
 
             for snap in glob.glob(os.path.join(workload_path, "snapshot_*")):
                 _update_metadata_file(os.path.join(snap, "snapshot_db"))
@@ -1016,7 +1019,17 @@ def get_workloads(context):
         workloads += backup_target.get_workloads(context)
 
     return workloads
-        
+
+def get_all_workload_transfers(context):
+    transfers = []
+
+    for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+        get_backup_target(backup_endpoint)
+
+    for endpoint, backup_target in triliovault_backup_targets.iteritems():
+        transfers += backup_target.get_all_workload_transfers()
+
+    return transfers
 
 def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     """
