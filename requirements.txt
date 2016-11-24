@@ -11,6 +11,8 @@ lockfile>=0.8
 lxml>=2.3
 netaddr
 oslo.config==1.9.3
+oslo.log==3.5.0
+oslo.messaging==1.8.3
 paramiko>=1.8.0
 Paste
 PasteDeploy>=1.5.0
