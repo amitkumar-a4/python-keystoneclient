@@ -879,6 +879,22 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         subprocess.check_call(command, shell=False)
 
     @autolog.log_method(logger=Logger)
+    def snapshot_delete(self, context, snapshot_metadata):
+        try:
+            snapshot_path = self.get_snapshot_path(snapshot_metadata)
+            retry = 0
+            while os.path.isdir(snapshot_path):
+               try:
+                   shutil.rmtree(snapshot_path)
+               except:
+                       pass
+               retry += 1
+               if retry >= 5:
+                  break
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
     def get_total_capacity(self, context):
         """
         return total capacity of the backup target and
@@ -893,9 +909,6 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
             if stderr != '':
                 msg = _('Could not execute df command successfully. Error %s'), (stderr)
                 raise exception.ErrorOccurred(reason=msg)
-
-            # Filesystem     1K-blocks      Used Available Use% Mounted on
-            # /dev/sda1      464076568 248065008 192431096  57% /
 
             fields = stdout.split('\n')[0].split()
             values = stdout.split('\n')[1].split()

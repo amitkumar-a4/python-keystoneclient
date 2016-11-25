@@ -26,7 +26,7 @@ except ImportError:
     from nova.openstack.common import log as logging
 
 _DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-FUSE_USER = "nova"
+FUSE_USER = "root"
 
 common_cli_opts = [
     cfg.BoolOpt('debug',
@@ -351,7 +351,8 @@ class TrilioVault(Operations):
             d['st_nlink'] = 1
             d['st_mode'] = 33261
             d['st_size'] = int(st['headers']['content-length'])
-            if d['st_size'] == 0:
+            if (d['st_size'] == 0 and container == '') or (d['st_size'] == 0 and prefix is None) or \
+                (d['st_size'] == 0 and prefix == ''):
                d['st_nlink'] = 3
                d['st_size'] = 4096
                d['st_mode'] = 16893

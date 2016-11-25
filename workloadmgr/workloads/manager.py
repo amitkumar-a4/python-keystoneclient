@@ -1083,7 +1083,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload_obj = self.db.workload_get(context, snapshot_obj.workload_id)
             snapshotvms = self.db.snapshot_vms_get(context, snapshot_id)
 
-            if not FLAGS.vault_storage_type in ("nfs", "local"):
+            if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
 
                 context_dict = dict([('%s' % key, value)
                                       for (key, value) in cntx.to_dict().iteritems()])            
@@ -1301,7 +1301,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     # always cleanup as much as possible
                     LOG.exception(ex)
                     pass
-            if not FLAGS.vault_storage_type in ("nfs", "local"):
+            if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
                 for vmid, paths in devpaths.iteritems():
                     try:
                         os.remove(paths.keys()[0])
