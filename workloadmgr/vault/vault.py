@@ -864,19 +864,34 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
 
     @autolog.log_method(logger=Logger)
-    def mount_backup_target(self, old_share=False):
-        command = ['sudo', 'service', 'tvault-swift', 'restart']
-        #subprocess.check_call(command, shell=False)
+    def mount_backup_target(self, old_share=False): 
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'start']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
 
     @autolog.log_method(logger=Logger)
     def is_online(self):
-        status = True
+        status = False
+        stdout, stderr = utils.execute('sudo', 'service', 'tvault-swift', 'status', run_as_root=False)
+        if 'running' in stdout:
+            stdout, stderr = utils.execute('stat', '-f', self.mount_path)
+            if stderr != '':
+                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                raise exception.ErrorOccurred(reason=msg)
+            file_type = stdout.split('\n')[1].split('Type: ')[1] 
+            if file_type == 'fuseblk':
+               status = True
         return status
 
     @autolog.log_method(logger=Logger)
     def umount_backup_target(self):
-        command = ['sudo', 'service', 'tvault-swift', 'stop']
-        subprocess.check_call(command, shell=False)
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
 
     @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_metadata):
@@ -904,27 +919,16 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         total_utilization = 1
         try:
             mountpath = self.mount_path
-            nfsshare = self.backup_endpoint
-            stdout, stderr = utils.execute('df', mountpath)
+            stdout, stderr = utils.execute('stat', '-f', mountpath)
             if stderr != '':
-                msg = _('Could not execute df command successfully. Error %s'), (stderr)
+                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
                 raise exception.ErrorOccurred(reason=msg)
-
-            fields = stdout.split('\n')[0].split()
-            values = stdout.split('\n')[1].split()
-
-            total_capacity = int(values[1]) * 1024
-            total_utilization = int(values[2]) * 1024
-
+            total_capacity = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[2])
             try:
-                stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=False)
-                if stderr != '':
-                    msg = _('Could not execute du command successfully. Error %s'), (stderr)
-                    raise exception.ErrorOccurred(reason=msg)
-                du_values = stdout.split()
-                total_utilization = int(du_values[0])
-            except Exception as ex:
-                LOG.exception(ex)
+                 total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[4])
+            except:
+                   total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split('Available: ')[1])
+            total_utilization = abs(total_capacity - total_free)
 
         except Exception as ex:
             LOG.exception(ex)
@@ -973,6 +977,7 @@ def get_capacities_utilizations(context):
     def fill_capacity_utilization(context, backup_target, stats):
         nfsshare = backup_target.backup_endpoint
         cap, util = backup_target.get_total_capacity(context)
+           
         stats[nfsshare] = {'total_capacity': cap,
                            'total_utilization': util,
                            'nfsstatus': True }
@@ -1020,7 +1025,6 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     shares = {}
     caps = get_capacities_utilizations(context)
-
     for endpoint, backend in triliovault_backup_targets.iteritems():
         if caps[endpoint]['nfsstatus'] is False:
             continue
@@ -1031,7 +1035,6 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                      'capacity': caps[endpoint]['total_capacity'],
                      'used': caps[endpoint]['total_utilization']
                     }
-
     if len(shares) == 0:
         raise exception.InvalidState(reason="No NFS shares mounted")
 

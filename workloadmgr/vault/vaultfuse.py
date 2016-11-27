@@ -14,6 +14,7 @@ import shutil
 from fuse import FUSE, FuseOSError, Operations
 from pwd import getpwnam
 import functools
+import subprocess
 
 try:
     from oslo_config import cfg
@@ -26,7 +27,7 @@ except ImportError:
     from nova.openstack.common import log as logging
 
 _DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-FUSE_USER = "root"
+FUSE_USER = "nova"
 
 common_cli_opts = [
     cfg.BoolOpt('debug',
@@ -295,6 +296,12 @@ class TrilioVault(Operations):
     def _get_cache(self, partial):
         if partial.startswith("/"):
             partial = partial[1:]
+        if not os.path.isdir(CONF.vault_data_directory_old):
+           try:
+               command = ['sudo', 'mkdir', CONF.vault_data_directory_old]
+               subprocess.call(command, shell=False)
+           except:
+                  pass
         path = os.path.join(CONF.vault_data_directory_old, partial)
         return path
 
@@ -473,8 +480,12 @@ class TrilioVault(Operations):
         _opts = bunchify(_opts)
         args1 = []
         stv = vaultswift.st_stat(args1, _opts)
-        f_blocks = int(stv['headers']['x-account-meta-quota-bytes'])
-        f_bavail = int(stv['headers']['x-account-meta-quota-bytes']) - int(stv['headers']['x-account-bytes-used'])
+        if 'x-account-meta-quota-bytes' in stv['headers']:
+           f_blocks = int(stv['headers']['x-account-meta-quota-bytes'])
+           f_bavail = int(stv['headers']['x-account-meta-quota-bytes']) - int(stv['headers']['x-account-bytes-used'])
+        else:
+             f_blocks = -1
+             f_bavail = int(stv['headers']['x-account-bytes-used'])
         dt = {}
         dt['f_blocks'] = f_blocks
         dt['f_bfree'] = f_bavail
@@ -637,5 +648,6 @@ class TrilioVault(Operations):
 
 def main(mountpoint):
     FUSE(TrilioVault(mountpoint), mountpoint, nothreads=True, foreground=True)
+
 if __name__ == '__main__':
     main(CONF.vault_data_directory)

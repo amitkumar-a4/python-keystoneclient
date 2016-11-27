@@ -59,7 +59,7 @@ if module_dir:
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
 TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
-WLM_USER = 'nova'
+WLM_USER = 'root'
 SSL_INSECURE = True
 SSL_VERIFY = False
 
@@ -2290,6 +2290,7 @@ def start_swift_service():
                pass
         try:
             os.stat(config_data['vault_data_directory_old'])
+            os.mkdir(config_data['vault_data_directory_old'])
         except:
                os.mkdir(config_data['vault_data_directory_old'])   
         try:
