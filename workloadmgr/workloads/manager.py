@@ -368,7 +368,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workload = self.db.workload_get(context, workload_id)
             vms = self.db.workload_vms_get(context, workload_id)
 
-
             compute_service = nova.API(production=True)
             volume_service = cinder.API()
             workload_backup_media_size = 0
