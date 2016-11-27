@@ -59,7 +59,7 @@ if module_dir:
 TVAULT_SERVICE_PASSWORD = '52T8FVYZJse'
 TVAULT_CONFIGURATION_TYPE = 'openstack'
 TVAULT_RABBITMQ_DEB_PATH = '/opt/stack/workloadmgr/workloadmgr/tvault-config/views/debs/amd64/rabbitmq-server_3.2.4-1_all.deb'
-WLM_USER = 'root'
+WLM_USER = 'nova'
 SSL_INSECURE = True
 SSL_VERIFY = False
 
