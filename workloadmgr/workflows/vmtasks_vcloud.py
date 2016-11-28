@@ -194,11 +194,18 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources, restored_sec
                                       instance_options)    
     return None
 
+
 @autolog.log_method(Logger, 'vmtasks_vcloud.poweron_vm')
 def poweron_vm(cntx, instance, restore, restored_instance):
     with vmwaresessionpool.item() as vmsession:
         return vmsession.poweron_vm(cntx, instance, restore, restored_instance)
+
+
+@autolog.log_method(Logger, 'vmtasks_vcloud.set_vm_metadata')
+def set_vm_metadata(cntx, instance, restore, restored_instance):
+    pass
     
+
 @autolog.log_method(Logger, 'vmtasks_vcloud.post_restore_vm')
 def post_restore_vm(cntx, db, instance, restore):
     return None 
