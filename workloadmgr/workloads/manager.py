@@ -397,6 +397,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             if jobschedule['fullbackup_interval'] == '-1':
                 fulls = 1
+            elif jobschedule['fullbackup_interval'] == '0':
+                fulls = incrs
+                incrs = 0
             else:
                 fulls = incrs/int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
@@ -429,7 +432,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             with excutils.save_and_reraise_exception():
                 self.db.workload_update(context, workload_id,
                                       {'status': 'error',
-                                       'fail_reason': unicode(err)})
+                                       'error_msg': str(err)})
 
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
@@ -523,7 +526,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     inst['root_partition_type'] = "Linux"
                 self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
                                            {'metadata':{'root_partition_type': inst['root_partition_type'],
-                                                        'availability_zone': inst['availability_zone']}})
+                                                        'availability_zone': inst['availability_zone'],
+                                                        'vm_metadata': json.dumps(inst['vm_metadata'])}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}

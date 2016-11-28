@@ -655,12 +655,20 @@ def _register_service():
     sess = _get_session()
     keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
  
+    def _get_users_list():
+        users = keystone.users.list()
+        if keystone.version == 'v3':
+            users += keystone.users.list(domain="default")
+        seen = set()
+        users = [x for x in users if x.id not in seen and not seen.add(x.id)]
+        return users
+ 
     if config_data['nodetype'] != 'controller':
         config_data['triliovault_user_domain_id'] = 'default'
         wlm_user = None
-        users = keystone.users.list()
+        users = _get_users_list()
         for user in users:
-            if user.name == 'compute':
+            if user.name in ('compute', 'nova'):
                 if hasattr(user, 'domain_id'):
                     config_data['triliovault_user_domain_id'] = user.domain_id
             if keystone.version == 'v3':
@@ -683,7 +691,7 @@ def _register_service():
         try:
             config_data['triliovault_user_domain_id'] = 'default'
             wlm_user = None
-            users = keystone.users.list()
+            users = _get_users_list()
             for user in users:
                 if user.name in ('compute', 'nova'):
                    if hasattr(user, 'domain_id'):
@@ -2532,7 +2540,7 @@ def configure_vmware():
         
         config_data['workloadmgr_user'] = config_data['vcenter_username']
         config_data['workloadmgr_user_password'] = config_data['vcenter_password']
-        
+
         if 'workloads-import' in config_inputs:
             config_data['workloads_import'] = config_inputs['workloads-import']
         else:
