@@ -1395,6 +1395,27 @@ def poweron_vm(cntx, instance, restore, restored_instance):
     pass
 
 
+@autolog.log_method(Logger, 'vmtasks_openstack.set_vm_metadata')
+def set_vm_metadata(cntx, db, instance, restore, restored_instance):
+    compute_service = nova.API(production=True)
+    for vm in db.snapshot_vms_get(cntx, restore['snapshot_id']):
+        if vm.vm_id != instance['vm_id']:
+            continue
+
+        for meta in vm.metadata:
+            if meta.key != 'vm_metadata':
+                continue
+
+            vm_meta = json.loads(meta.value)
+            for key, value in vm_meta.iteritems():
+                if key in ('workload_id', 'workload_name',
+                           'key_name', 'key_data'):
+                    continue
+   
+                compute_service.set_meta_item(cntx, restored_instance['vm_id'],
+                                              key, value)
+
+
 @autolog.log_method(Logger, 'vmtasks_openstack.post_restore_vm')
 def post_restore_vm(cntx, db, instance, restore):
     # post processing of restore

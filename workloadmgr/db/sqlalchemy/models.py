@@ -26,7 +26,6 @@ BASE = declarative_base()
 
 DB_VERSION = '2.3.1'
 
-
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
     __table_args__ = {'mysql_engine': 'InnoDB'}
@@ -201,6 +200,7 @@ class Workloads(BASE, WorkloadsBase):
     display_description = Column(String(255))
     environment = String(36)
     workload_type_id = Column(String(255), ForeignKey('workload_types.id'))
+    error_msg =  Column(String(4096))
     source_platform = Column(String(255))
     jobschedule = Column(String(4096))
     vault_storage_id = Column(String(255), ForeignKey('vault_storages.id'))

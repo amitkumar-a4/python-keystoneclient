@@ -121,6 +121,7 @@ def _snapshot_create_callback(*args, **kwargs):
                        'fullbackup_interval' in jobscheduler and \
                        jobscheduler['fullbackup_interval'] or "-1"
 
+        snapshot_type = "incremental"
         if int(jobscheduler['fullbackup_interval']) == 0:
             snapshot_type = "full"
         elif int(jobscheduler['fullbackup_interval']) < 0:
@@ -585,6 +586,10 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
+            if workload:
+               self.db.workload_update(context, workload['id'],
+                                      {'status': 'error',
+                                       'error_msg': str(ex.message)})
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
     
     @autolog.log_method(logger=Logger)
