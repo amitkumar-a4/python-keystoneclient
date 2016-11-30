@@ -1057,10 +1057,16 @@ class LibvirtDriver(driver.ComputeDriver):
     def post_restore_vm(self, cntx, db, instance, restore):
         pass
 
-
     @autolog.log_method(Logger, 'libvirt.driver.apply_retention_policy')
-    def apply_retention_policy(self, cntx, db,  instances, snapshot):
-            
+    def apply_retention_policy(self, cntx, db, instances, snapshot):
+
+        def _add_to_commit_list(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing):
+            vault_path = os.path.join(backup_target.mount_path,
+                                      vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
+            backing_vault_path = os.path.join(backup_target.mount_path,
+                                      vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
+            commit_image_list.append((vault_path, backing_vault_path))
+
         try:
             compute_service = nova.API(production=True)
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = \
@@ -1068,14 +1074,13 @@ class LibvirtDriver(driver.ComputeDriver):
 
             if swift == 0:
                 return
-           
-            
+
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,
-                                                'backup_media_target')
+                                                    'backup_media_target')
             backup_target = vault.get_backup_target(backup_endpoint)
-            if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':               
+            if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
                 for snap in snapshots_to_delete:
-                    workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)            
+                    workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
             elif snapshot_to_commit:
                 affected_snapshots.append(snapshot_to_commit.id)
                 for snap in snapshots_to_delete:
@@ -1084,100 +1089,80 @@ class LibvirtDriver(driver.ComputeDriver):
                     if snapshot_to_commit.snapshot_type == 'full':
                         workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
                         continue
-                    
+
                     snapshot_vm_resources = db.snapshot_resources_get(cntx, snapshot_to_commit.id)
                     for snapshot_vm_resource in snapshot_vm_resources:
                         if snapshot_vm_resource.resource_type != 'disk':
                             continue
-                        vm_disk_resource_snap = vm_disk_resource_snap_to_commit = db.vm_disk_resource_snap_get_bottom(cntx, 
-                                                                                                    snapshot_vm_resource.id)
+
+                        snap_to_del = []  #Hold list of snapshot id's to delete
+                        commit_image_list = []  # Hold the list of images need to commit with their backing image
+
+                        vm_disk_resource_snap = vm_disk_resource_snap_to_commit = db.vm_disk_resource_snap_get_bottom(
+                                                                                         cntx, snapshot_vm_resource.id)
                         if vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
-                                                                vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)                        
+                                                       vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
                             if vm_disk_resource_snap_to_commit_backing.snapshot_vm_resource_id != \
-                                                                vm_disk_resource_snap_to_commit.snapshot_vm_resource_id:
-                                vault_path = os.path.join(backup_target.mount_path,
-                                                     vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
-                                backing_vault_path = os.path.join(backup_target.mount_path,
-                                               vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
-                                metadata ={
-                                          'resource_id': vm_disk_resource_snap_to_commit.id,
-                                          'backend_endpoint':backup_endpoint ,
-                                          'snapshot_id': snapshot_to_commit.id
-                                          }
-                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
-                                                             cntx, snapshot_vm_resource['vm_id'],
-                                                             {'vault_path': vault_path,
-                                                              'backing_vault_path': backing_vault_path,
-                                                              'metadata': metadata
-                                                             })
-                                self._wait_for_remote_nova_process(cntx, compute_service,
-                                           metadata,
-                                           snapshot_vm_resource['vm_id'],
-                                           backup_endpoint)
+                                    vm_disk_resource_snap_to_commit.snapshot_vm_resource_id:
 
-                                #Cleaning the content of progress tracker file as same
-                                #file will get used in other calls as well.
-                                backup_target = vault.get_backup_target(backup_endpoint)
-                                progress_tracking_file_path = backup_target.get_progress_tracker_path(metadata)
-                                open(progress_tracking_file_path, 'w').close()
+                                _add_to_commit_list(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing)
+                                snap_to_del.append(vm_disk_resource_snap_to_commit.id)
 
-                                db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
                                 vm_disk_resource_snap_to_commit = vm_disk_resource_snap_to_commit_backing
                                 while vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                                     if vm_disk_resource_snap_to_commit.snapshot_vm_resource_id == \
-                                       db.vm_disk_resource_snap_get_snapshot_vm_resource_id(cntx, 
-                                                                vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id):
-                                            vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
-                                                                vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
-                                            vault_path = os.path.join(backup_target.mount_path,
-                                                     vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
-                                            backing_vault_path = os.path.join(backup_target.mount_path,
-                                                     vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
-                                            metadata ={
-                                                       'resource_id': vm_disk_resource_snap_to_commit.id,
-                                                       'backend_endpoint':backup_endpoint ,
-                                                       'snapshot_id': snapshot_to_commit.id
-                                                      }
-                                            status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
-                                                                          cntx, snapshot_vm_resource['vm_id'],
-                                                                          {'vault_path': vault_path,
-                                                                           'backing_vault_path': backing_vault_path,
-                                                                           'metadata': metadata
-                                                                          })
-                                            self._wait_for_remote_nova_process(cntx, compute_service,
-                                                                               metadata,
-                                                                               snapshot_vm_resource['vm_id'],
-                                                                               backup_endpoint)
+                                            db.vm_disk_resource_snap_get_snapshot_vm_resource_id(cntx,
+                                                                         vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id):
+                                        vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
+                                                                          vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
 
-                                            #Cleaning the content of progress tracker file as same 
-                                            #file will get used in other calls as well.
-                                            backup_target = vault.get_backup_target(backup_endpoint)
-                                            progress_tracking_file_path = backup_target.get_progress_tracker_path(metadata)
-                                            open(progress_tracking_file_path, 'w').close()
+                                        _add_to_commit_list(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing)
+                                        snap_to_del.append(vm_disk_resource_snap_to_commit.id)
 
-                                            db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
-                                            vm_disk_resource_snap_to_commit =  vm_disk_resource_snap_to_commit_backing
+                                        vm_disk_resource_snap_to_commit = vm_disk_resource_snap_to_commit_backing
                                     else:
                                         break
+
+                                metadata = {
+                                    'resource_id': snapshot_vm_resource['vm_id'] + '_' + str(  int(time.time())),
+                                    'backend_endpoint': backup_endpoint,
+                                    'snapshot_id': snapshot_to_commit.id
+                                     }
+
+                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                                                             cntx,
+                                                                             snapshot_vm_resource['vm_id'],
+                                                                             {'commit_image_list': commit_image_list,
+                                                                              'metadata': metadata
+                                                                              })
+                                self._wait_for_remote_nova_process(cntx, compute_service,
+                                                                   metadata,
+                                                                   snapshot_vm_resource['vm_id'],
+                                                                   backup_endpoint)
+                                for snapshot in snap_to_del:
+                                    db.vm_disk_resource_snap_delete(cntx, snapshot)
+
                                 if vm_disk_resource_snap_to_commit_backing:
                                     backing_vault_path = os.path.join(backup_target.mount_path,
-                                                                      vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
+                                                                      vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(
+                                                                          os.sep))
                                     vault_path = os.path.join(backup_target.mount_path,
                                                               vm_disk_resource_snap.vault_url.lstrip(os.sep))
                                     shutil.move(backing_vault_path, vault_path)
-                                    affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx, 
-                                                                                             snapshot_vm_resource, 
-                                                                                             vm_disk_resource_snap, 
-                                                                                             vm_disk_resource_snap_to_commit_backing, 
-                                                                                             affected_snapshots)                                
-                        
+                                    affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx,
+                                                                                                  snapshot_vm_resource,
+                                                                                                  vm_disk_resource_snap,
+                                                                                                  vm_disk_resource_snap_to_commit_backing,
+                                                                                                  affected_snapshots)
+
                     workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
 
             for snapshot_id in affected_snapshots:
-                workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)                       
+                workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)
 
         except Exception as ex:
             LOG.exception(ex)
-            db.snapshot_update( cntx, snapshot['id'], {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
+            db.snapshot_update(cntx, snapshot['id'],
+                               {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
 
