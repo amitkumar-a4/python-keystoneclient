@@ -897,7 +897,8 @@ def _workloads_import():
                                    username=config_data['admin_username'], 
                                    password=config_data['admin_password'], 
                                    tenant_id=config_data['admin_tenant_id'],
-                                   domain_name=config_data['domain_name'])            
+                                   domain_name=config_data['domain_name'],
+                                   insecure=SSL_INSECURE)            
             wlm.workloads.importworkloads()
 
     return {'status':'Success'}
