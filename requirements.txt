@@ -28,4 +28,4 @@ wsgiref>=0.1.2
 pytz
 tzlocal
 fusepy>=2.0.4
-bunch>1.0.1
+bunch>=1.0.1
