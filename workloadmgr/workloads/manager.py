@@ -1160,7 +1160,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             if workload.source_platform == 'openstack': 
                 virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-                fminstance = virtdriver.snapshot_mount(context, snapshot,
+                fminstance = virtdriver.snapshot_mount(context, self.db, snapshot,
                                                        pervmdisks,
                                                        mount_vm_id=mount_vm_id)
                 urls = []

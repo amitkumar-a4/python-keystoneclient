@@ -384,7 +384,7 @@ class LibvirtDriver(driver.ComputeDriver):
                        for target in doc.findall('devices/disk/target')])
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_mount')
-    def snapshot_mount(self, cntx, snapshot, diskfiles, mount_vm_id=None):
+    def snapshot_mount(self, cntx, db, snapshot, diskfiles, mount_vm_id=None):
         
         def _reboot_fminstance():
             # reboot the file manager server 
@@ -413,8 +413,23 @@ class LibvirtDriver(driver.ComputeDriver):
             return fminstance
 
         def _map_snapshot_images(fminstance):
-            compute_service.map_snapshot_files(cntx, fminstance.id, diskfiles)
-            pass
+            workload_obj = db.workload_get(cntx, snapshot.workload_id)
+            backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                    'backup_media_target')
+            metadata = {
+                'resource_id': mount_vm_id + "_" + str( int(time.time()) ),
+                'backend_endpoint': backup_endpoint,
+                'snapshot_id': snapshot.id
+            }
+            status = self._vast_methods_call_by_function(compute_service.map_snapshot_files,
+                                                         cntx, fminstance.id,
+                                                         {'diskfiles': diskfiles,
+                                                          'metadata': metadata
+                                                          })
+            self._wait_for_remote_nova_process(cntx, compute_service,
+                                               metadata,
+                                               fminstance.id,
+                                               backup_endpoint)
 
         compute_service = nova.API(production=True)
         fminstance = _reboot_fminstance()
