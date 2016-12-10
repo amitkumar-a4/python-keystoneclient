@@ -127,6 +127,9 @@ def get_workflow_class(context, workload_type_id, restore=False):
                 workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
             else:
                 workflow_class_name = 'workloadmgr.workflows.compositeworkflow.CompositeWorkflow'             
+        else:
+            kwargs = {'workload_type_id': workload_type_id}
+            raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
                       
     parts = workflow_class_name.split('.')
     module = ".".join(parts[:-1])
@@ -394,9 +397,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 jobsperday = int(jobschedule['interval'].split("hr")[0])
                 incrs = int(jobschedule['retention_policy_value']) * jobsperday
 
-            if jobschedule['fullbackup_interval'] == '-1':
+            if int(jobschedule['fullbackup_interval']) == -1:
                 fulls = 1
-            elif jobschedule['fullbackup_interval'] == '0':
+            elif int(jobschedule['fullbackup_interval']) == 0:
                 fulls = incrs
                 incrs = 0
             else:
@@ -445,7 +448,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 gc.collect()
             except Exception as ex:
                 LOG.exception(ex)  
-                
+
             context = nova._get_tenant_context(context)
             snapshot = self.db.snapshot_update( context, 
                                                 snapshot_id,
@@ -491,12 +494,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     {'progress_percent': 0, 
                                      'progress_msg': 'Initializing Snapshot Workflow',
                                      'status': 'executing'
-                                    })       
+                                    })
             workflow.initflow()
             workflow.execute()
 
             self.db.snapshot_type_time_size_update(context, snapshot_id)               
             # Update vms of the workload
+            hostnames = []
             if  'instances' in workflow._store and workflow._store['instances']:
                 compute_service = nova.API(production=True)                
                 for vm in self.db.workload_vms_get(context, workload.id):
@@ -517,16 +521,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     compute_service.set_meta_item(context, vm.vm_id,
                                                   "workload_name", workload.display_name)
             
-            hostnames = []
-            for inst in workflow._store['instances']:
-                hostnames.append(inst['hostname'])
+                for inst in workflow._store['instances']:
+                    hostnames.append(inst['hostname'])
 
-                if not 'root_partition_type' in inst:
-                    inst['root_partition_type'] = "Linux"
-                self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
-                                           {'metadata':{'root_partition_type': inst['root_partition_type'],
-                                                        'availability_zone': inst['availability_zone'],
-                                                        'vm_metadata': json.dumps(inst['vm_metadata'])}})
+                    if not 'root_partition_type' in inst:
+                        inst['root_partition_type'] = "Linux"
+                    self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
+                                               {'metadata':{'root_partition_type': inst['root_partition_type'],
+                                                            'availability_zone': inst['availability_zone'],
+                                                            'vm_metadata': json.dumps(inst['vm_metadata'])}})
 
             workload_metadata = {'hostnames': json.dumps(hostnames),
                                  'topology': json.dumps(workflow._store['topology'])}
@@ -1085,6 +1088,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot_obj = db.snapshot_get(cntx, snapshot_id)
             workload_obj = self.db.workload_get(context, snapshot_obj.workload_id)
             snapshotvms = self.db.snapshot_vms_get(context, snapshot_id)
+            for vm in snapshotvms:
+                pervmdisks[vm.vm_id] = {'vm_name': vm.vm_name,
+                                        'vault_path': [] }
 
             if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
 
@@ -1134,12 +1140,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshot_vm_resources = self.db.snapshot_resources_get(context, snapshot_id)
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type == 'disk':
-                        if not snapshot_vm_resource.vm_id in pervmdisks:
-                            pervmdisks[snapshot_vm_resource.vm_id] = []
                         vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context,snapshot_vm_resource.id)
                         vault_path = os.path.join(backup_target.mount_path,
                                                   vm_disk_resource_snap.vault_url.lstrip(os.sep))
-                        pervmdisks[snapshot_vm_resource.vm_id].append(vault_path)
+                        pervmdisks[snapshot_vm_resource.vm_id]['vault_path'].append(vault_path)
             return pervmdisks
 
         try:
@@ -1177,6 +1181,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     compute_service = nova.API(production=True)
                     compute_service.set_meta_item(context, mount_vm_id,
                                      "mounted_snapshot_id", snapshot['id'])
+                    compute_service.set_meta_item(context, mount_vm_id,
+                                     "mounted_snapshot__url",
+                                     "/project/workloads/snapshots/%s/detail" % 
+                                     snapshot['id'])
                 except:
                     pass
                 return {"urls": urls}
@@ -1501,6 +1509,3 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             LOG.exception(ex)
             pass
-                
-               
-     

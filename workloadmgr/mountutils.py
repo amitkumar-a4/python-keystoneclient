@@ -599,7 +599,6 @@ try:
         try:
             mount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects)
 
-            import pdb;pdb.set_trace()
             umount_logicalobjects(mountdir, snapshot_id, vmid, logicalobjects)
         finally:
             for vg in logicalobjects['vgs']:

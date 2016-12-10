@@ -939,6 +939,7 @@ triliovault_backup_targets = {}
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
     for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
+        backup_target = backup_target.strip()
         if backup_target == '':
               continue
         if CONF.vault_storage_type == 'nfs': 
@@ -951,6 +952,7 @@ def mount_backup_media():
 
 
 def get_backup_target(backup_endpoint):
+    backup_endpoint = backup_endpoint.strip()
     backup_target = triliovault_backup_targets.get(backup_endpoint, None)
     
     if backup_target is None:
@@ -963,7 +965,7 @@ def get_backup_target(backup_endpoint):
 def get_settings_backup_target():
     settings_path = os.path.join(CONF.cloud_unique_id,"settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
-        get_backup_target(backup_endpoint)
+        get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
         if backup_target.object_exists(settings_path):
             return backup_target
@@ -1093,7 +1095,8 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     def getKey(item):
         item['free'] = item['capacity'] - item['totalcommitted']
-        return item['capacity'] - item['totalcommitted']
+        return min(item['capacity'] - item['totalcommitted'],
+                   item['capacity'] - item['used'])
 
     sortedlist = sorted(shares.values(), reverse=True, key=getKey)
 

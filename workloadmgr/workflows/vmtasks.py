@@ -23,7 +23,6 @@ from taskflow.listeners import printing
 from taskflow.patterns import unordered_flow as uf
 from taskflow.patterns import linear_flow as lf
 from taskflow import task
-from taskflow.utils import reflection
 
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB

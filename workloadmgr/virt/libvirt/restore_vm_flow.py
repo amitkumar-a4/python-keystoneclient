@@ -18,7 +18,6 @@ from taskflow import task
 from taskflow.listeners import printing
 from taskflow.patterns import unordered_flow as uf
 from taskflow.patterns import linear_flow as lf
-from taskflow.utils import reflection
 
 from novaclient.exceptions import Unauthorized as nova_unauthorized
 

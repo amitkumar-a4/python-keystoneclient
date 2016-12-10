@@ -15,6 +15,7 @@ import cPickle as pickle
 
 workloads_manager_opts = [
     cfg.StrOpt('cloud_unique_id',
+               default='test-cloud-id',
                help='cloud unique id.'),
 ]
 

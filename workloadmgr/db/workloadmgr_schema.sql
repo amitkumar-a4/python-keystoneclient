@@ -996,6 +996,7 @@ CREATE TABLE `workloads` (
   `display_description` varchar(255) DEFAULT NULL,
   `source_platform` varchar(255) DEFAULT NULL,
   `workload_type_id` varchar(255) DEFAULT NULL,
+  `error_msg` varchar(4096) DEFAULT NULL,
   `jobschedule` varchar(4096) DEFAULT NULL,
   `vault_storage_id` varchar(255) DEFAULT NULL,
   `status` varchar(255) DEFAULT NULL,
