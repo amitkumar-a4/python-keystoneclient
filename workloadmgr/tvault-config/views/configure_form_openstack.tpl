@@ -27,6 +27,35 @@ function setRequired(val) {
 function findForm() {
   setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
   setRequired($("#configure_openstack input[name='keystone-public-url']").val())
+  obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+  setSwiftRequired(obj.attr('checked'), obj.val())
+}
+function setSwiftRequired(checked, val) {
+     if((checked==true || checked=='checked') && val=='TEMPAUTH') {
+        $('[name="swift-auth-url"]').attr("required", "true");
+        $('[name="swift-username"]').attr("required", "true");
+        $('[name="swift-password"]').attr("required", "true");
+        $('#swift-auth-url-div').toggle(true)
+        $('#swift-username-div').toggle(true)
+        $('#swift-password-div').toggle(true)
+     }
+     if(val != 'TEMPAUTH') {
+        $('#swift-auth-url-div').toggle(false)
+        $('#swift-username-div').toggle(false)
+        $('#swift-password-div').toggle(false)
+        $('[name="swift-auth-url"]').removeAttr('required')
+        $('[name="swift-username"]').removeAttr('required')
+        $('[name="swift-password"]').removeAttr('required')
+     }
+     if(val == 'TEMPAUTH' || val == 'KEYSTONE') {
+       $('[name="storage-nfs-export"]').removeAttr('required')
+       $('[name="storage-nfs-options"]').removeAttr('required')        
+     }
+     else {
+       $('[name="storage-nfs-export"]').attr("required", "true");
+       $('[name="storage-nfs-options"]').attr("required", "true");
+     }
+
 }
 </script>
 </head>
@@ -160,7 +189,7 @@ function findForm() {
 					%else:
 						<option value="{{tz}}">{{tz}}</option>
 					%end
-				%end
+	            %end
 	         </select>
 	        </div>
 	      </div>
@@ -173,7 +202,7 @@ function findForm() {
 		<div class="panel-heading">
 		  <h4 class="panel-title">
 			<a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree">
-			  Storage
+			  NFS Storage
 			</a>
 		  </h4>
 		</div>
@@ -194,30 +223,83 @@ function findForm() {
 	  </div>
 	</div>
 
-	<div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel4">
-		<div class="panel-heading">
-		  <h4 class="panel-title">
-			<a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
-		  </h4>
+        <div class="panel-group" id="accordion">
+		  <div class="panel panel-default" id="panel5">
+		    <div class="panel-heading">
+		      <h4 class="panel-title">
+		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
+		          Swift Object Storage
+		        </a>
+		      </h4>
+		    </div>
+		    <div id="collapseFive" class="panel-collapse collapse in">
+		    <div class="panel-body">
+                    <div class="input-group">
+                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
+                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
+                %else:
+                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="NONE" checked onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
+                %end 
+                     <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
+                </div>
+                <div class="input-group" id="swift-auth-url-div">
+                    <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
+                </div><br>
+                <div class="input-group" id="swift-username-div">
+                    <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                </div><br>
+                <div class="input-group" id="swift-password-div">
+                    <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                    <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
+                    <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                </div><br>
+	 	</div>
 		</div>
-		<div id="collapseFour" class="panel-collapse collapse in">
-		  <div class="panel-body">
-	              <div class="form-group">
-			%if 'workloads_import' in locals() and workloads_import == 'on':
-				<input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
-			%else:
-				<input name="workloads-import" id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
-			%end
-	              </div>
-	              <br />
-		  </div>
-		</div>
-	  </div>
-	</div>
+	      </div>
+        </div>
 
-	<!-- Swift is not yet supported
-	<div class="panel-group" id="accordion">
+        <div class="panel-group" id="accordion">
+          <div class="panel panel-default" id="panel4">
+                <div class="panel-heading">
+                  <h4 class="panel-title">
+                        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
+                  </h4>
+                </div>
+                <div id="collapseFour" class="panel-collapse collapse in">
+                  <div class="panel-body">
+                      <div class="form-group">
+                        %if 'workloads_import' in locals() and workloads_import == 'on':
+                                <input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+                        %else:
+                        <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
+                  </h4>
+                </div>
+                <div id="collapseFour" class="panel-collapse collapse in">
+                  <div class="panel-body">
+                      <div class="form-group">
+                        %if 'workloads_import' in locals() and workloads_import == 'on':
+                                <input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+                        %else:
+                                <input name="workloads-import" id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
+                        %end
+                      </div>
+                      <br />
+                  </div>
+                </div>
+          </div>
+        </div>
+
+	<!--div class="panel-group" id="accordion">
 	  <div class="panel panel-default" id="panel5">
 		<div class="panel-heading">
 		  <h4 class="panel-title">
@@ -239,8 +321,7 @@ function findForm() {
 		  </div>
 		</div>
 	  </div>
-	</div>
-	Swift is not yet supported -->
+	</div-->
     
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
   </form>
@@ -288,15 +369,7 @@ function validate_keystone_url(url, inputelement) {
              spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
              $(spinelement[0]).addClass("hidden")
             },
-            error: function(result) {
-             $($(inputelement).parent()[0]).addClass("has-error")
-             $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
-             $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
-            },
-            success: function(result) {
-             $($(inputelement).parent()[0]).addClass("has-success")
-            }
-    });
+   })
 }
 
 function validate_keystone_credentials(inputelement) {
@@ -338,6 +411,43 @@ function validate_keystone_credentials(inputelement) {
                options += "<option value="+ value +" selected>"+ value + "</option>"
            });
            document.getElementsByName("trustee-role")[0].innerHTML = options
+        }
+    });
+}
+
+function validate_swift_credentials(inputelement) {
+    public_url = $('[name="keystone-public-url"]')[0].value
+    project_name = $('[name="admin-tenant-name"]')[0].value
+    username = $('[name="admin-username"]')[0].value
+    password = $('[name="admin-password"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
+    swift_auth_url = $('[name="swift-auth-url"]')[0].value
+    swift_username = $('[name="swift-username"]')[0].value
+    swift_password = $('[name="swift-password"]')[0].value
+    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+    swift_auth_version = obj.val()
+    $.ajax({
+        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
+              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
         }
     });
 }

@@ -409,16 +409,17 @@ def _authenticate_with_vcenter():
                                 password=config_data['vcenter_password'])
         vim_obj.Logout(vim_obj.get_service_content().sessionManager)
         
-def _authenticate_with_swift():
-    if config_data['configuration_type'] == 'vmware':
+def _authenticate_with_swift(config_data):
+    if config_data['configuration_type'] == 'vmware' or config_data['configuration_type'] == 'openstack':
         if config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
             from swiftclient.service import SwiftService, SwiftError
             from swiftclient.exceptions import ClientException
             
             _opts = {}
-            if config_data['swift_auth_version'] == 'KEYSTONE_V2':
+            if config_data['swift_auth_version'] == 'KEYSTONE_V2' or (config_data['keystone_auth_version'] == 2 and config_data['swift_auth_version'] == 'KEYSTONE'):
                 _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
-                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': None, 'prefix': None, 'auth_version': '2.0', 
+                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'], 
+                         'os_domain_id': config_data['swift_domain_id'], 'prefix': None, 'auth_version': '2.0', 
                          'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
                          'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
                          'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
@@ -427,12 +428,14 @@ def _authenticate_with_swift():
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
                          'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
                                         'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
-                                        'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                        'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],'tenant_id': None,
+                                        'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
                          'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
-            elif config_data['swift_auth_version'] == 'KEYSTONE_V3':
+            elif config_data['swift_auth_version'] == 'KEYSTONE_V3' or (config_data['keystone_auth_version'] == 3 and config_data['swift_auth_version'] == 'KEYSTONE'):
                 _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
-                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': None, 'prefix': None, 'auth_version': '3', 
+                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'], 
+                         'os_domain_id': config_data['swift_domain_id'],'prefix': None, 'auth_version': '3', 
                          'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
                          'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
                          'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
@@ -441,7 +444,8 @@ def _authenticate_with_swift():
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
                          'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
                                         'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
-                                        'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
+                                        'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],
+                                        'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
                          'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
 
@@ -1827,6 +1831,12 @@ def configure_host():
             except Exception as exception:
                 pass                
 
+            try:
+                command = ['sudo', 'service', 'tvault-swift', 'stop'];
+                subprocess.call(command, shell=False)
+            except:
+                   pass
+
         def mount_share(mountpath, nfsshare, nfsoptions):
             with open('/proc/mounts','r') as procfile:
                 mounts = [{line.split()[1]:line.split()[0]}
@@ -1867,6 +1877,7 @@ def configure_host():
             os.path.ismount(config_data['vault_data_directory_old']):
             cleanup_mount(config_data['vault_data_directory_old'])
 
+        cleanup_mount(os.path.join(config_data['vault_data_directory']))
         if os.path.exists(config_data['vault_data_directory']):
             for d in os.listdir(config_data['vault_data_directory']):
                 if os.path.ismount(os.path.join(config_data['vault_data_directory'], d)):
@@ -1874,6 +1885,8 @@ def configure_host():
 
         nfsoptions = config_data['storage_nfs_options']
         for idx, nfsshare in enumerate(str.split(config_data['storage_nfs_export'], ',')):
+            if nfsshare == '' or (config_data['swift_auth_version'] == 'KEYSTONE' or config_data['swift_auth_version'] == 'TEMPAUTH'):
+               continue
             replace_line('/etc/hosts.allow', 'rpcbind : ', 'rpcbind : ' + str.split(nfsshare, ':')[0])
             command = ['sudo', 'service', 'rpcbind', 'restart']
             subprocess.call(command, shell=False)
@@ -1939,13 +1952,13 @@ def authenticate_with_swift():
     # Authenticate with swift
     for i in range(0,1):
         try:
-            _authenticate_with_swift()
+            _authenticate_with_swift(config_data)
             time.sleep(1)
             return {'status':'Success'}            
         except Exception as exception:
             pass    
     try:
-        _authenticate_with_swift()
+        _authenticate_with_swift(config_data)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2134,20 +2147,24 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'cloud_unique_id = ', 'cloud_unique_id = ' + config_data['cloud_unique_id'])
        
         if  config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_nfs_export = ', 'vault_storage_nfs_export = TrilioVault')
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-s')
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url = ', 'vault_swift_url = ' + config_data['swift_auth_url'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_auth_version = ', 'vault_swift_auth_version = ' + config_data['swift_auth_version'])
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_auth_url = ', 'vault_swift_auth_url = ' + config_data['swift_auth_url'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_username = ', 'vault_swift_username = ' + config_data['swift_username'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_password = ', 'vault_swift_password = ' + config_data['swift_password'])            
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['swift_tenantname'])
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_container_prefix = ', 'vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
+            if config_data['swift_auth_version'] == 'TEMPAUTH':
+               replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_username = ', 'vault_swift_username = ' + config_data['swift_username'])
+               replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_password = ', 'vault_swift_password = ' + config_data['swift_password'])            
+               replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['swift_tenantname'])
+               replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_domain_id = ', 'vault_swift_domain_id = ' + config_data['swift_domain_id'])
+            else:
+                 replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_username = ', 'vault_swift_username = ' + config_data['workloadmgr_user'])
+                 replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_password = ', 'vault_swift_password = ' + config_data['workloadmgr_user_password'])
+                 replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['service_tenant_name'])
+                 replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_domain_id = ', 'vault_swift_domain_id = ' + config_data['triliovault_user_domain_id'])
+
+
                         
-        if config_data['swift_url_template'] and len(config_data['swift_url_template']) > 0:
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_storage_type = ', 'vault_storage_type = swift-i')        
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_url_template = ', 'vault_swift_url_template = ' + config_data['swift_url_template'])        
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_container_prefix = ', 'vault_swift_container_prefix = ' + config_data['swift_container_prefix'])
-            
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])
@@ -2261,6 +2278,41 @@ def start_service():
     try:
         command = ['sudo', 'service', 'wlm-workloads', 'restart'];
         #shell=FALSE for sudo to work.
+        subprocess.call(command, shell=False)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        return bottle.HTTPResponse(status=500,body="Error")
+    time.sleep(2)
+    return {'status':'Success'}
+
+@bottle.route('/start_swift_service')
+@authorize()
+def start_swift_service():
+    try:
+        try:
+            shutil.rmtree(config_data['vault_data_directory'])
+        except:
+               pass
+        try:
+            shutil.rmtree(config_data['vault_data_directory_old'])
+        except:
+               pass
+        try:
+            os.stat(config_data['vault_data_directory_old'])
+            os.mkdir(config_data['vault_data_directory_old'])
+        except:
+               os.mkdir(config_data['vault_data_directory_old'])   
+        try:
+            os.stat(config_data['vault_data_directory'])
+        except:
+               os.mkdir(config_data['vault_data_directory'])
+        command = ['sudo', 'chown', WLM_USER+':'+WLM_USER, config_data['vault_data_directory']];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'chown', WLM_USER+':'+WLM_USER, config_data['vault_data_directory_old']];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'chown', WLM_USER+':'+WLM_USER, '/etc/fuse.conf'];
+        subprocess.call(command, shell=False)
+        command = ['sudo', 'service', 'tvault-swift', 'restart'];
         subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
@@ -2621,14 +2673,34 @@ def configure_openstack():
            config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
         else:
              config_data['storage_nfs_options'] = 'nolock'
-        
-        config_data['swift_auth_version'] = ''
-        config_data['swift_auth_url'] = ''
-        config_data['swift_username'] = ''
-        config_data['swift_password'] = ''
-        config_data['swift_tenantname'] = ''
-        config_data['swift_container_prefix'] = '' #config_inputs['swift-container-prefix'].strip()        
-        config_data['swift_url_template'] = '' #config_inputs['swift-url-template'].strip()
+       
+        if 'swift-auth-version' in config_inputs:
+            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
+        else:
+             config_data['swift_auth_version'] = 'NONE'
+
+         
+        if config_data['swift_auth_version'] == 'TEMPAUTH':
+           config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
+           config_data['swift_username'] = config_inputs['swift-username'].strip()
+           config_data['swift_password'] = config_inputs['swift-password'].strip()
+           config_data['swift_tenantname'] = ''
+           config_data['swift_domain_id'] = ''
+        elif config_data['swift_auth_version'] == 'KEYSTONE':
+             config_data['swift_auth_url'] = config_data['keystone_public_url']
+             config_data['swift_username'] = config_data['admin_username']
+             config_data['swift_password'] = config_data['admin_password']
+             config_data['swift_tenantname'] = config_data['admin_tenant_name']
+             config_data['swift_domain_id'] = ''
+             if config_data['keystone_auth_version'] == 3:
+                config_data['swift_domain_id'] = config_data['domain_name']
+        else:
+             config_data['swift_auth_url'] = ''
+             config_data['swift_username'] = ''
+             config_data['swift_password'] = ''
+             config_data['swift_tenantname'] = ''
+             config_data['swift_domain_id'] = ''
+
         config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         
         bottle.redirect("/task_status_openstack")
@@ -2720,6 +2792,40 @@ def validate_keystone_url():
     time.sleep(1)
 
     return {'status':'Success'}        
+
+
+@bottle.route('/validate_swift_credentials')
+@authorize()
+def validate_swift_credentials():
+    data = {}
+    public_url = bottle.request.query['public_url']
+    swift_auth_version = bottle.request.query['swift_auth_version']
+    data['configuration_type'] = 'openstack'
+    data['swift_auth_version'] = swift_auth_version
+    data['keystone_auth_version'] = 2
+    if 'v3' in public_url:
+       data['keystone_auth_version'] = 3
+    if swift_auth_version == 'KEYSTONE':
+       data['swift_auth_url'] = public_url
+       data['swift_username'] =  bottle.request.query['username']
+       data['swift_password'] =  bottle.request.query['password']
+       data['swift_tenantname'] =  bottle.request.query['project_name']
+       data['swift_domain_id'] = bottle.request.query['domain_id']
+    elif swift_auth_version == 'TEMPAUTH':
+         data['swift_auth_url'] = bottle.request.query['swift_auth_url']
+         data['swift_username'] = bottle.request.query['swift_username']
+         data['swift_password'] = bottle.request.query['swift_password']
+
+    try:
+        _authenticate_with_swift(data)
+    except Exception as exception:
+        bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
+        if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise exception
+        else:
+           return bottle.HTTPResponse(status=500, body=str(exception))
+
+    return {'status':'Success'}
 
 
 @bottle.route('/validate_keystone_credentials')

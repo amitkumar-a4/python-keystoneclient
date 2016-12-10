@@ -476,17 +476,23 @@ def to_abs():
 
 class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
-        base64encode = base64.b64encode(backupendpoint)
-        mountpath = os.path.join(CONF.vault_data_directory,
+        if CONF.vault_storage_type == 'nfs':
+           base64encode = base64.b64encode(backupendpoint)
+           mountpath = os.path.join(CONF.vault_data_directory,
                                  base64encode)
-        fileutils.ensure_tree(mountpath)
-        self.__mountpath = mountpath
-        super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
+           fileutils.ensure_tree(mountpath)
+           self.__mountpath = mountpath
+           super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
                                                          mountpath=mountpath)
+           if not self.is_mounted():
+              utils.chmod(mountpath, '0777')
 
-
-        if not self.is_mounted():
-            utils.chmod(mountpath, '0777')
+        elif CONF.vault_storage_type == 'swift-s':
+             mountpath = CONF.vault_data_directory
+             fileutils.ensure_tree(mountpath)
+             self.__mountpath = mountpath
+             super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
+                                                         mountpath=mountpath)  
 
     def get_progress_tracker_directory(self, tracker_metadata):
         """
@@ -684,17 +690,17 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         nfsoptions = CONF.vault_storage_nfs_options
 
         if self.is_online():
-            command = ['timeout', '-sKILL', '30' , 'sudo',
+           command = ['timeout', '-sKILL', '30' , 'sudo',
                        'mount', '-o', nfsoptions, nfsshare,
                        mountpath]
-            subprocess.check_call(command, shell=False) 
-            if old_share is True:
-                command = ['timeout', '-sKILL', '30' , 'sudo',
+           subprocess.check_call(command, shell=False) 
+           if old_share is True:
+              command = ['timeout', '-sKILL', '30' , 'sudo',
                            'mount', '--bind', mountpath,
                            CONF.vault_data_directory_old]
-                subprocess.check_call(command, shell=False) 
+              subprocess.check_call(command, shell=False) 
         else:
-            raise exception.BackupTargetOffline(endpoint=nfsshare)
+             raise exception.BackupTargetOffline(endpoint=nfsshare)
 
     @autolog.log_method(logger=Logger) 
     def get_total_capacity(self, context):
@@ -853,11 +859,93 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             raise
 
 
+class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
+    def __init__(self, backupendpoint):
+        super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
+
+    @autolog.log_method(logger=Logger)
+    def mount_backup_target(self, old_share=False): 
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'start']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+    @autolog.log_method(logger=Logger)
+    def is_online(self):
+        status = False
+        stdout, stderr = utils.execute('sudo', 'service', 'tvault-swift', 'status', run_as_root=False)
+        if 'running' in stdout:
+            stdout, stderr = utils.execute('stat', '-f', self.mount_path)
+            if stderr != '':
+                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                raise exception.ErrorOccurred(reason=msg)
+            file_type = stdout.split('\n')[1].split('Type: ')[1] 
+            if file_type == 'fuseblk':
+               status = True
+        return status
+
+    @autolog.log_method(logger=Logger)
+    def umount_backup_target(self):
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+    @autolog.log_method(logger=Logger)
+    def snapshot_delete(self, context, snapshot_metadata):
+        try:
+            snapshot_path = self.get_snapshot_path(snapshot_metadata)
+            retry = 0
+            while os.path.isdir(snapshot_path):
+               try:
+                   shutil.rmtree(snapshot_path)
+               except:
+                       pass
+               retry += 1
+               if retry >= 5:
+                  break
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
+    def get_total_capacity(self, context):
+        """
+        return total capacity of the backup target and
+        amount of storage that is utilized
+        """
+        total_capacity = 1
+        total_utilization = 1
+        try:
+            mountpath = self.mount_path
+            stdout, stderr = utils.execute('stat', '-f', mountpath)
+            if stderr != '':
+                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                raise exception.ErrorOccurred(reason=msg)
+            total_capacity = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[2])
+            try:
+                 total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[4])
+            except:
+                   total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split('Available: ')[1])
+            total_utilization = abs(total_capacity - total_free)
+
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return total_capacity,total_utilization
+
 triliovault_backup_targets = {}
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
     for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
-        backend = NfsTrilioVaultBackupTarget(backup_target)
+        if backup_target == '':
+              continue
+        if CONF.vault_storage_type == 'nfs': 
+           backend = NfsTrilioVaultBackupTarget(backup_target)
+        elif CONF.vault_storage_type == 'swift-s':
+             backend = SwiftTrilioVaultBackupTarget(backup_target)
+
         triliovault_backup_targets[backup_target] = backend
         backend.mount_backup_target()
 
@@ -889,6 +977,7 @@ def get_capacities_utilizations(context):
     def fill_capacity_utilization(context, backup_target, stats):
         nfsshare = backup_target.backup_endpoint
         cap, util = backup_target.get_total_capacity(context)
+           
         stats[nfsshare] = {'total_capacity': cap,
                            'total_utilization': util,
                            'nfsstatus': True }
@@ -936,7 +1025,6 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     shares = {}
     caps = get_capacities_utilizations(context)
-
     for endpoint, backend in triliovault_backup_targets.iteritems():
         if caps[endpoint]['nfsstatus'] is False:
             continue
@@ -947,7 +1035,6 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                      'capacity': caps[endpoint]['total_capacity'],
                      'used': caps[endpoint]['total_utilization']
                     }
-
     if len(shares) == 0:
         raise exception.InvalidState(reason="No NFS shares mounted")
 
