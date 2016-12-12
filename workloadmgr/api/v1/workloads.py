@@ -178,8 +178,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 name = body['snapshot'].get('name', '')
                 description = body['snapshot'].get('description', '')
                 if not name:
-                    msg = 'Snapshot name is required'
-                    raise exception.InvalidParameterValue(msg)
+                    name = 'Snapshot'
                 if not description:
                     description = ''
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
