@@ -17,3 +17,4 @@ def set_defaults(conf):
     conf.set_default('sqlite_synchronous', False)
     conf.set_default('policy_file', 'workloadmgr/tests/unit/policy.json')
     conf.set_default('vault_storage_type', 'nfs')
+    conf.set_default('vault_data_directory', '/tmp/triliovault-mounts')

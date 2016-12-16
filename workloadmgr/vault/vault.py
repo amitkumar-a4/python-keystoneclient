@@ -944,11 +944,11 @@ def mount_backup_media():
     for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
         backup_target = backup_target.strip()
         if backup_target == '':
-              continue
+            continue
         if CONF.vault_storage_type == 'nfs': 
-           backend = NfsTrilioVaultBackupTarget(backup_target)
+            backend = NfsTrilioVaultBackupTarget(backup_target)
         elif CONF.vault_storage_type == 'swift-s':
-             backend = SwiftTrilioVaultBackupTarget(backup_target)
+            backend = SwiftTrilioVaultBackupTarget(backup_target)
 
         triliovault_backup_targets[backup_target] = backend
         backend.mount_backup_target()
