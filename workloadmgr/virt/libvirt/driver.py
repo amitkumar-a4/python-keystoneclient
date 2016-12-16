@@ -955,6 +955,8 @@ class LibvirtDriver(driver.ComputeDriver):
                         backup_target.mount_path,
                         vm_disk_resource_snap.vault_url.strip(os.sep))
                     try:
+                        os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
+                                   'snapshot_'+snapshot_obj.id))
                         os.listdir(os.path.split(resource_snap_path)[0])
                     except Exception as ex:
                            pass
@@ -1093,8 +1095,8 @@ class LibvirtDriver(driver.ComputeDriver):
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = \
                 workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
 
-            if swift == 0:
-                return
+            #if swift == 0:
+            #    return
            
             
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,

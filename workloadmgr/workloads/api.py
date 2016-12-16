@@ -555,7 +555,6 @@ class API(base.Base):
                           'status': 'available',
                           'metadata': instance.get('metadata', {})}
                 vm = self.db.workload_vms_create(context, values)
-
             self.workloads_rpcapi.workload_create(context,
                                                   workload['host'],
                                                   workload['id'])
