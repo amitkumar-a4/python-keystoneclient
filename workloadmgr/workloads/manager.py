@@ -692,11 +692,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         backup_endpoint = self.db.get_metadata_value(workload.metadata,
                                                      'backup_media_target')
 
-        backup_target = vault.get_backup_target(backup_endpoint)
-        if backup_target is not None:
-            backup_target.workload_delete(context,
-                {'workload_id': workload.id,
-                 'workload_name': workload.display_name,})
+        if backup_endpoint is not None:
+            backup_target = vault.get_backup_target(backup_endpoint)
+            if backup_target is not None:
+                backup_target.workload_delete(context,
+                    {'workload_id': workload.id,
+                     'workload_name': workload.display_name,})
         self.workload_reset(context, workload_id)
 
         compute_service = nova.API(production=True)                
