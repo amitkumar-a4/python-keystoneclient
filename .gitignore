@@ -5,4 +5,5 @@ workloadmgr.egg-info
 tags
 setuptools_git-1.0-py2.7.egg
 .testrepository
+.venv
 workloadmgr.sqlite
