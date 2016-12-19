@@ -179,8 +179,6 @@ class WorkloadMgrsController(wsgi.Controller):
                 description = body['snapshot'].get('description', '')
                 if not name:
                     name = 'Snapshot'
-                if not description:
-                    description = ''
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
             return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
