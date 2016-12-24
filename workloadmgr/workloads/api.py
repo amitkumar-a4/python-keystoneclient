@@ -251,6 +251,8 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
+        if workload_type is None:
+            raise wlm_exceptions.WorkloadTypeNotFound(workload_type_id=workload_type_id)
         workload_type_dict = dict(workload_type.iteritems())
         metadata = {}
         for kvpair in workload_type.metadata:
@@ -261,6 +263,8 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     def workload_type_show(self, context, workload_type_id):
         workload_type = self.db.workload_type_get(context, workload_type_id)
+        if workload_type is None:
+            raise wlm_exceptions.WorkloadTypeNotFound(workload_type_id=workload_type_id)
         workload_type_dict = dict(workload_type.iteritems())
         metadata = {}
         for kvpair in workload_type.metadata:
@@ -298,6 +302,8 @@ class API(base.Base):
         Delete a workload_type. No RPC call is made
         """
         workload_type = self.workload_type_get(context, workload_type_id)
+        if workload_type is None:
+            raise wlm_exceptions.WorkloadTypeNotFound(workload_type_id=workload_type_id)
         AUDITLOG.log(context,'WorkloadType \'' + workload_type['display_name'] + '\' Delete Requested', workload_type)
         if workload_type['status'] not in ['available', 'error']:
             msg = _("WorkloadType status must be 'available' or 'error'")
