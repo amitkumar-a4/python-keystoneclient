@@ -443,6 +443,9 @@ def workload_type_get(context, id):
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadTypeNotFound(workload_type_id = id)
 
+    if workload_types is None:
+        raise exception.WorkloadTypeNotFound(workload_type_id = id)
+
     return workload_types
 
 @require_context
