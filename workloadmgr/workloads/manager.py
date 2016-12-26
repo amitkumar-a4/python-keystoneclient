@@ -1152,9 +1152,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             logicalobjects = {}
             snapshot_metadata = {}
 
-            head, tail = os.path.split(FLAGS.mountdir + '/')
-            fileutils.ensure_tree(head)
-
             snapshot = self.db.snapshot_get(context, snapshot_id)
             workload = self.db.workload_get(context, snapshot.workload_id)
             pervmdisks = _prepare_snapshot_for_mount(context, self.db, snapshot_id)
@@ -1190,6 +1187,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     pass
                 return {"urls": urls}
             elif workload.source_platform == 'vmware': 
+                head, tail = os.path.split(FLAGS.mountdir + '/')
+                fileutils.ensure_tree(head)
                 virtdriver = driver.load_compute_driver(None, 'vmwareapi.VMwareVCDriver')            
 
 
