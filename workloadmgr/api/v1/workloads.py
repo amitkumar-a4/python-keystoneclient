@@ -170,20 +170,14 @@ class WorkloadMgrsController(wsgi.Controller):
                 var = parse_qs(req.environ['QUERY_STRING'])
                 full = var.get('full',[''])[0]
                 full = escape(full)
-                
+
             snapshot_type = 'incremental'
             if (full and full == '1'):
                 snapshot_type = 'full'
-            name = ''
-            description = ''
             if (body and 'snapshot' in body):
-                name = body['snapshot'].get('name', '')
-                if not name:
-                    name = ''
-                if not description:
-                    description = ''                    
+                name = body['snapshot'].get('name', 'Snapshot')
                 description = body['snapshot'].get('description', '')
-                snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)                
+                snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
             return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
         except exception.WorkloadNotFound as error:
@@ -195,7 +189,7 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-                
+
     @wsgi.serializers(xml=WorkloadsTemplate)
     def index(self, req):
         """Returns a summary list of workloads."""
