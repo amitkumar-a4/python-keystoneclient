@@ -1586,8 +1586,8 @@ class API(base.Base):
                         }
                         if self.db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
                             vdisk['image_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
-                            vdisk['image_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,
-                                                                             'image_name')
+                            vdisk['image_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata, 'image_name')
+                            vdisk['hw_qemu_guest_agent'] = self.db.get_metadata_value(snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
                         else:
                             vdisk['volume_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
                             vdisk['volume_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,
