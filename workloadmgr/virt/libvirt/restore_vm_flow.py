@@ -1146,8 +1146,11 @@ class AssignFloatingIP(task.Task):
                     try:
                         floating_ip = json.loads(details.get('floating_ip', None))['addr']
                         fixed_ip = details['fixed_ips'][0]['ip_address']
-                        compute_service.add_floating_ip(self.cntx, restored_instance_id,
-                                                        floating_ip, fixed_ip)
+                        floating_ips_list = compute_service.floating_ip_list(self.cntx)
+                        for fp in floating_ips_list:
+                            if fp.ip == floating_ip and fp.instance_id == '':
+                                compute_service.add_floating_ip(self.cntx, restored_instance_id,
+                                                                floating_ip, fixed_ip)
                     except:
                         # we will ignore any exceptions during assigning floating ip address
                         pass
