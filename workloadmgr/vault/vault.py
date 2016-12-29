@@ -867,6 +867,19 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
 
     @autolog.log_method(logger=Logger)
+    def get_progress_tracker_directory(self, tracker_metadata):
+        """
+        Get the location where all tracking objects are stored. The tracking
+        object is a file on NFS. It can be object in object store
+        """
+        mountpath = self.mount_path
+        progress_tracker_directory = os.path.join(mountpath,
+            "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+
+        fileutils.ensure_tree(progress_tracker_directory)
+        return progress_tracker_directory
+
+    @autolog.log_method(logger=Logger)
     def mount_backup_target(self, old_share=False): 
         try:
             command = ['sudo', 'service', 'tvault-swift', 'start']
