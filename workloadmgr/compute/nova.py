@@ -747,6 +747,22 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
+    def add_floating_ip(self, context, server_id, floating_ip, fixed_ip, **kwargs):
+        """
+        Add floating ip to the server
+        :param server: The :class:`Server` (or its ID) to query.
+        :param floating_ip: Floating IP
+        """
+
+        server = namedtuple('server', 'id')
+        s = server(id=server_id)
+        client = kwargs['client']
+
+        return client.servers.add_floating_ip(server=s, address=floating_ip,
+                                              fixed_address=fixed_ip)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False)
     def attach_volume(self, context, server_id, volume_id, device, **kwargs):
         """
         Attach a volume identified by the volume ID to the given server ID
