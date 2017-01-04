@@ -105,6 +105,9 @@ libvirt_opts = [
                 default=30,
                 help='The amount of time that snapshot mount operation'
                      'should wait for the recovery manager to reboot'),
+    cfg.StrOpt('vault_storage_type',
+               default='none',
+               help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'),
     ]
 
 CONF = cfg.CONF
@@ -1086,8 +1089,13 @@ class LibvirtDriver(driver.ComputeDriver):
             image_backing_info = qemuimages.qemu_img_info(backing_vault_path)
             #increase the size of the base image
             if image_backing_info.virtual_size < image_info.virtual_size :
-                qemuimages.resize_image(backing_vault_path, image_info.virtual_size)  
-            qemuimages.commit_qcow2(vault_path, True)
+                qemuimages.resize_image(backing_vault_path, image_info.virtual_size)
+  
+            if CONF.vault_storage_type == 'swift-s':
+               qemuimages.commit_qcow2(vault_path, False)
+            else:
+                 qemuimages.commit_qcow2(vault_path, True)
+
             os.remove(vault_path)
             db.vm_disk_resource_snap_delete(cntx, vm_disk_resource_snap_to_commit.id)
             

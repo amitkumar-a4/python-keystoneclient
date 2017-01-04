@@ -88,6 +88,8 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
         cntx = nova._get_tenant_context(cntx)
 
         def _snapshot_neutron_networks(instance):
+            server = compute_service.get_server_by_id(cntx,
+                                                      instance['vm_id'])
             interfaces = compute_service.get_interfaces(cntx,
                                                         instance['vm_id'])
             nics = []
@@ -123,6 +125,10 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                     utils.append_unique(networks, network)
                     nic.setdefault('network_id', network['id'])
                     nic.setdefault('network_name', network['name'])
+                    if network['name'] in server.addresses:
+                        for addr in server.addresses[network['name']]:
+                             if addr.get("OS-EXT-IPS:type", "") == 'floating':
+                                 nic.setdefault('floating_ip', json.dumps(addr))
 
                 # Let's find our router
                 routers_data = network_service.get_routers(cntx)
@@ -1148,6 +1154,7 @@ def restore_vm_networks(cntx, db, restore):
                     if restored_net_resources[nic_data['mac_address']]['ip_address'] == \
                        nic_data['ip_address']:
                         restored_net_resources[nic_data['mac_address']]['production'] = True
+
                 else:
                     new_port = _get_nic_port_from_restore_options(
                         restore_options, nic_data,
@@ -1160,6 +1167,10 @@ def restore_vm_networks(cntx, db, restore):
                         if restored_net_resources[nic_data['mac_address']]['fixed_ips'][0]['ip_address'] == \
                            nic_data['ip_address']:
                             restored_net_resources[nic_data['mac_address']]['production'] = True
+
+                        if nic_data.get('floating_ip', None) is not None:
+                            restored_net_resources[nic_data['mac_address']]['floating_ip'] = \
+                                nic_data['floating_ip']
 
                         continue
                     # private network
