@@ -368,16 +368,22 @@ class TrilioVault(Operations):
                d['st_size'] = 4096
                d['st_mode'] = 16893
         except Exception as ex:
-                if prefix is None:
-                   prefix = container
-                full_path = self._get_cache(prefix)
-                mkdirs = get_head(prefix)
-                if prefix == '4913' or prefix[:-1].endswith('~'):
-                   return 
-                st = os.lstat(full_path)
-                d = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-                             'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
-                return d
+            if prefix is None:
+                prefix = container
+            full_path = self._get_cache(prefix)
+            mkdirs = get_head(prefix)
+            if prefix == '4913' or prefix[:-1].endswith('~'):
+                return 
+            st = os.lstat(full_path)
+            d = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
+                     'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid',))
+
+        # st_blksize and st_blocks are import for qemu-img info command to
+        # display disk size attribute correctly. Without this information
+        # it displays disk size 0
+        d['st_blksize'] = 512
+        d['st_blocks'] = d['st_size'] / 512
+        print d
         return d
 
     def readdir(self, path, fh):
@@ -442,15 +448,15 @@ class TrilioVault(Operations):
         try:
             vaultswift.st_delete(args1, _opts)
         except Exception as ex:
-               LOG.exception(ex)
-               pass
+            LOG.exception(ex)
+            pass
 
         try:
             args1[0] = args1[0]+"_segments"
             vaultswift.st_delete(args1, _opts)
         except Exception as ex:
-               LOG.exception(ex)
-               pass
+            LOG.exception(ex)
+            pass
 
         cache_path = self._get_cache(path)
         return os.rmdir(cache_path)
@@ -466,8 +472,8 @@ class TrilioVault(Operations):
                vaultswift.st_post(args1, _opts)
                os.mkdir(container, mode)
            except Exception as ex:
-                  LOG.exception(ex)
-                  return 0
+               LOG.exception(ex)
+               return 0
            return 0
         cache_path = self._get_cache(path)
         if ist is False:
@@ -576,15 +582,15 @@ class TrilioVault(Operations):
                try:
                    os.stat(cache_path)
                except:
-                      _opts['out_file'] = cache_path
-                      _opts = bunchify(_opts)
-                      args1 = [container, obj.strip('/')]
-                      try:
-                          vaultswift.st_download(args1, _opts)
-                      except Exception as ex:
-                             LOG.exception(ex)
-                      self.chmod(full_path, 0751)
-                      fh = os.open(full_path, flags)
+                   _opts['out_file'] = cache_path
+                   _opts = bunchify(_opts)
+                   args1 = [container, obj.strip('/')]
+                   try:
+                       vaultswift.st_download(args1, _opts)
+                   except Exception as ex:
+                       LOG.exception(ex)
+                   self.chmod(full_path, 0751)
+                   fh = os.open(full_path, flags)
         return fh
 
     def read(self, path, length, offset, fh):
@@ -599,15 +605,20 @@ class TrilioVault(Operations):
         try:
             os.stat(cache_path)
         except Exception as ex:
-               _opts['out_file'] = cache_path
-               _opts = bunchify(_opts)
-               args = [container, obj.strip('/')]
-               try:
-                   vaultswift.st_download(args, _opts)
-               except Exception as ex:
-                      LOG.exception(ex)
+            _opts['out_file'] = cache_path
+            _opts = bunchify(_opts)
+            args = [container, obj.strip('/')]
+            try:
+                vaultswift.st_download(args, _opts)
+            except Exception as ex:
+                LOG.exception(ex)
 
         buf = ''
+        # We need to seek to the right offset before read
+        # otherwise random access to file does not work.
+        # very import for qemu-img convert command. otherwise
+        # restores don't work
+        os.lseek(fh, offset, os.SEEK_SET)
         buf = os.read(fh, length)
         return buf
 
@@ -639,8 +650,8 @@ class TrilioVault(Operations):
         try:
             vaultswift.st_upload(args1, _opts)
         except Exception as ex:
-               LOG.exception(ex)
-               return 0
+            LOG.exception(ex)
+            return 0
 
         os.remove(full_path)
 
