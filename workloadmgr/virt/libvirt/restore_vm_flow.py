@@ -1141,9 +1141,9 @@ class AssignFloatingIP(task.Task):
                        nova.API(production = (restore_type == 'restore'))
         for mac, details in restored_net_resources.iteritems():
             for nic in restored_nics:
-                if details['id'] == nic['port-id'] and \
-                    details.get('floating_ip', None) is not None:
-                    try:
+                try:
+                    if details.get('id',None) == nic.get('port-id', None) and \
+                                    details.get('floating_ip', None) is not None:
                         floating_ip = json.loads(details.get('floating_ip', None))['addr']
                         fixed_ip = details['fixed_ips'][0]['ip_address']
                         floating_ips_list = compute_service.floating_ip_list(self.cntx)
@@ -1151,9 +1151,20 @@ class AssignFloatingIP(task.Task):
                             if fp.ip == floating_ip and fp.instance_id == '':
                                 compute_service.add_floating_ip(self.cntx, restored_instance_id,
                                                                 floating_ip, fixed_ip)
-                    except:
-                        # we will ignore any exceptions during assigning floating ip address
-                        pass
+                    else :
+                        if details['ip_address'] == nic['v4-fixed-ip'] and \
+                              details.get('floating_ip_address', None) is not None:
+                            floating_ip = details.get('floating_ip_address', None)
+                            fixed_ip = details.get('floating_ip', None)
+                            floating_ips_list = compute_service.floating_ip_list(self.cntx)
+                            for fp in floating_ips_list:
+                                if fp.ip == floating_ip and fp.instance_id == None:
+                                    compute_service.add_floating_ip(self.cntx, restored_instance_id,
+                                                                floating_ip, fixed_ip)
+
+                except:
+                    # we will ignore any exceptions during assigning floating ip address
+                    pass
         return
 
     @autolog.log_method(Logger, 'AssignFloatingIP.revert')

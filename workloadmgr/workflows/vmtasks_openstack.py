@@ -223,6 +223,11 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                                 break
                         nics.append(nic)
                         uniquemacs.add(interface['OS-EXT-IPS-MAC:mac_addr'])
+                    else:
+                        if interface['OS-EXT-IPS:type'] == 'floating':
+                            for nic in nics:
+                                if nic['mac_address'] == interface['OS-EXT-IPS-MAC:mac_addr']:
+                                    nic['floating_ip_address'] = interface['addr']
             return nics
 
         # Store the nics in the DB
