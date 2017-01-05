@@ -1117,6 +1117,50 @@ class PowerOnInstance(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass
 
+
+class AssignFloatingIP(task.Task):
+    """
+       Assign floating IP address to restored instance.
+       Valid only for one click restore
+    """
+
+    def execute(self, context, restored_instance_id, restored_nics,
+                restored_net_resources, restore_type):
+        return self.execute_with_log(context, restored_instance_id,
+                                     restored_nics, restored_net_resources,
+                                     restore_type)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'AssignFloatingIP.execute')
+    def execute_with_log(self, context, restored_instance_id, restored_nics,
+                         restored_net_resources, restore_type):
+        self.cntx = amqp.RpcContext.from_dict(context)
+        self.compute_service = compute_service = \
+                       nova.API(production = (restore_type == 'restore'))
+        for mac, details in restored_net_resources.iteritems():
+            for nic in restored_nics:
+                if details['id'] == nic['port-id'] and \
+                    details.get('floating_ip', None) is not None:
+                    try:
+                        floating_ip = json.loads(details.get('floating_ip', None))['addr']
+                        fixed_ip = details['fixed_ips'][0]['ip_address']
+                        floating_ips_list = compute_service.floating_ip_list(self.cntx)
+                        for fp in floating_ips_list:
+                            if fp.ip == floating_ip and fp.instance_id == '':
+                                compute_service.add_floating_ip(self.cntx, restored_instance_id,
+                                                                floating_ip, fixed_ip)
+                    except:
+                        # we will ignore any exceptions during assigning floating ip address
+                        pass
+        return
+
+    @autolog.log_method(Logger, 'AssignFloatingIP.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+
 def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restore_id):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
@@ -1294,6 +1338,13 @@ def PowerOnInstanceFlow(context):
 
     return flow
 
+def AssignFloatingIPFlow(context):
+
+    flow = lf.Flow("assignfloatingiplf")
+    flow.add(AssignFloatingIP("AssignFloatingIP"))
+
+    return flow
+
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
                restored_nics, instance_options):
@@ -1419,6 +1470,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # power on the restored instance until all volumes are attached
     childflow = PowerOnInstanceFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    # Assign floating IP address
+    childflow = AssignFloatingIPFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 
