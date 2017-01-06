@@ -1142,24 +1142,22 @@ class AssignFloatingIP(task.Task):
         for mac, details in restored_net_resources.iteritems():
             for nic in restored_nics:
                 try:
-                    if details.get('id',None) == nic.get('port-id', None) and \
-                                    details.get('floating_ip', None) is not None:
-                        floating_ip = json.loads(details.get('floating_ip', None))['addr']
-                        fixed_ip = details['fixed_ips'][0]['ip_address']
+                    if ( (details.get('id',None) and nic.get('port-id', None) ) and
+                             (details.get('id', None) == nic.get('port-id', None)) ) or\
+                         details.get('ip_address',None) == nic.get('v4-fixed-ip') and \
+                                        details.get('floating_ip', None) is not None:
+
+                        if details.get('id',None) and nic.get('port-id', None):
+                            floating_ip = json.loads(details.get('floating_ip', None))['addr']
+                            fixed_ip = details['fixed_ips'][0]['ip_address']
+                        else:
+                            floating_ip = details.get('floating_ip', None)
+                            fixed_ip = details.get('fixed_ip', None)
+
                         floating_ips_list = compute_service.floating_ip_list(self.cntx)
                         for fp in floating_ips_list:
-                            if fp.ip == floating_ip and fp.instance_id == '':
+                            if fp.ip == floating_ip and (fp.instance_id == '' or fp.instance_id == None):
                                 compute_service.add_floating_ip(self.cntx, restored_instance_id,
-                                                                floating_ip, fixed_ip)
-                    else :
-                        if details['ip_address'] == nic['v4-fixed-ip'] and \
-                              details.get('floating_ip_address', None) is not None:
-                            floating_ip = details.get('floating_ip_address', None)
-                            fixed_ip = details.get('floating_ip', None)
-                            floating_ips_list = compute_service.floating_ip_list(self.cntx)
-                            for fp in floating_ips_list:
-                                if fp.ip == floating_ip and fp.instance_id == None:
-                                    compute_service.add_floating_ip(self.cntx, restored_instance_id,
                                                                 floating_ip, fixed_ip)
 
                 except:
