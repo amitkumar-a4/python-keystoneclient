@@ -916,11 +916,12 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
             retry = 0
             while os.path.isdir(snapshot_path):
                try:
-                   shutil.rmtree(snapshot_path)
+                   command = ['rm', '-rf', snapshot_path]
+                   subprocess.check_call(command, shell=False)
                except:
                        pass
                retry += 1
-               if retry >= 5:
+               if retry >= 1:
                   break
         except Exception as ex:
             LOG.exception(ex)

@@ -304,8 +304,16 @@ class TrilioVault(Operations):
            try:
                command = ['sudo', 'mkdir', CONF.vault_data_directory_old]
                subprocess.call(command, shell=False)
+               command = ['sudo', 'chown', str(self.user_id)+':'+str(self.group_id), CONF.vault_data_directory_old]
+               subprocess.call(command, shell=False)
            except:
                   pass
+        else:
+             stat_info = os.stat(CONF.vault_data_directory_old)
+             if stat_info.st_uid != self.user_id or stat_info.st_gid != self.group_id:
+                command = ['sudo', 'chown', str(self.user_id)+':'+str(self.group_id), CONF.vault_data_directory_old]
+                subprocess.call(command, shell=False)
+
         path = os.path.join(CONF.vault_data_directory_old, partial)
         return path
 
@@ -369,9 +377,25 @@ class TrilioVault(Operations):
                d['st_mode'] = 16893
         except Exception as ex:
             if prefix is None:
-                prefix = container
+               prefix = container
+            full_path1 = self._get_cache(os.path.join(container, prefix))
             full_path = self._get_cache(prefix)
             mkdirs = get_head(prefix)
+            try:
+                 st = os.lstat(full_path)
+                 #full_path = full_path1
+            except:
+                   args1 = args
+                   if len(args1) > 1:
+                      args1.pop()
+                   try:
+                       _opts['prefix'] = os.path.join(_opts['prefix'], '')
+                       st = vaultswift.st_list(args1, _opts)
+                       if len(st) > 0:
+                          #full_path = full_path1
+                          self.mkdir(prefix, 0751, True)
+                   except:
+                          pass
             if prefix == '4913' or prefix[:-1].endswith('~'):
                 return 
             st = os.lstat(full_path)
@@ -662,7 +686,23 @@ class TrilioVault(Operations):
         return 0
 
 def main(mountpoint):
-    FUSE(TrilioVault(mountpoint), mountpoint, nothreads=True, foreground=True)
+    try:
+        try:
+            command = ['sudo', 'umount', '-l', mountpoint]
+            subprocess.call(command, shell=False)
+        except:
+               pass
+        if os.path.isdir(mountpoint):
+           command = ['sudo', 'rm', '-rf', os.path.join(mountpoint,'*')]
+           subprocess.call(command, shell=False) 
+        else:
+             command = ['sudo', 'mkdir', mountpoint]
+             subprocess.call(command, shell=False)
+             command = ['sudo', 'chown', FUSE_USER+':'+FUSE_USER, mountpoint]
+             subprocess.call(command, shell=False)
+    except Exception as ex:
+           pass
+    FUSE(TrilioVault(mountpoint), mountpoint, nothreads=True, foreground=True, nonempty=True)
 
 if __name__ == '__main__':
     main(CONF.vault_data_directory)
