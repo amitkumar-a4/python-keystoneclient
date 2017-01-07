@@ -489,7 +489,6 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
         elif CONF.vault_storage_type == 'swift-s':
              mountpath = CONF.vault_data_directory
-             fileutils.ensure_tree(mountpath)
              self.__mountpath = mountpath
              super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
                                                          mountpath=mountpath)  
