@@ -1171,7 +1171,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         {'status': 'mounted',
                                          'metadata': {
                                               'mount_vm_id': mount_vm_id,
-                                              'urls': json.dumps(urls)
+                                              'urls': json.dumps(urls),
+                                              'mount_error': "",
                                            }
                                         })
                 # Add metadata to recovery manager vm
@@ -1236,7 +1237,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         except Exception as ex:
             self.db.snapshot_update(context, snapshot['id'],
-                                    {'status': 'available'})
+                                    {'status': 'available',
+                                     'metadata': {
+                                              'mount_error': ex,
+                                           }})
             try:
                 self.snapshot_dismount(context, snapshot['id'])
             except:
