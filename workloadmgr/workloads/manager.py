@@ -1171,7 +1171,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         {'status': 'mounted',
                                          'metadata': {
                                               'mount_vm_id': mount_vm_id,
-                                              'urls': json.dumps(urls)
+                                              'urls': json.dumps(urls),
+                                              'mount_error': "",
                                            }
                                         })
                 # Add metadata to recovery manager vm
