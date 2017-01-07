@@ -1236,7 +1236,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         except Exception as ex:
             self.db.snapshot_update(context, snapshot['id'],
-                                    {'status': 'available'})
+                                    {'status': 'available',
+                                     'metadata': {
+                                              'mount_error': ex,
+                                           }})
             try:
                 self.snapshot_dismount(context, snapshot['id'])
             except:
