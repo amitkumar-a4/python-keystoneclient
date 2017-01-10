@@ -58,6 +58,7 @@ from workloadmgr import auditlog
 from workloadmgr import autolog
 from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
+from workloadmgr.db.sqlalchemy.session import get_session
 
 workload_lock = threading.Lock()
 
@@ -73,7 +74,7 @@ def _snapshot_create_callback(*args, **kwargs):
     try:
         arg_str = autolog.format_args(args, kwargs)
         LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
-    
+
         from workloadmgr.workloads import API
         workloadmgrapi = API()
  
@@ -2328,3 +2329,141 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+    @autolog.log_method(logger=Logger)
+    def get_orphaned_workloads_list(self, context):
+        AUDITLOG.log(context, 'Get Orphaned Workloads List Requested', None)
+        if context.is_admin == False:
+            raise wlm_exceptions.AdminRequired()
+
+        workloads = []
+        projects = vault.get_project_list_for_import(context)
+        tenant_list = [project.id for project in projects ]
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            vault.get_backup_target(backup_endpoint)
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            backup_target = None
+            try:
+                backup_target = vault.get_backup_target(backup_endpoint)
+                for workload_url in backup_target.get_workloads(context):
+                    try:
+                        workload_values = json.loads(backup_target.get_object(
+                            os.path.join(workload_url, 'workload_db')))
+                        project_id = workload_values.get('project_id')
+                        user_id = workload_values.get('user_id')
+
+                        #Check for valid tenant
+                        if project_id in tenant_list:
+                            #Check for valid workload user
+                            if vault.user_exist_in_tenant(context, project_id, user_id)\
+                                and vault.check_user_role(context, project_id, user_id):
+                                pass
+                            else:
+                                workloads.append(workload_values)
+                        else:
+                            workloads.append(workload_values)
+                    except Exception as ex:
+                        LOG.exception(ex)
+                        continue
+            except Exception as ex:
+                LOG.exception(ex)
+            finally:
+                backup_target.purge_staging_area(context)
+        AUDITLOG.log(context, 'Get Orphaned Workloads List Completed', None)
+        return workloads
+
+    def _update_workloads(self, context, workloads_to_update, new_tenant_id, user_id):
+        '''
+        Update the values for tenant_id and user_id for given list of
+        workloads in database.
+        '''
+        updated_workloads = []
+        workload_update_map =  []
+        snapshot_update_map = []
+
+        try:
+            DBSession = get_session()
+            kwargs = {'session': DBSession}
+            #Create the list for workloads and snapshots to update in 
+            #database with new project_id and user_id
+            for workload_id in workloads_to_update:
+                workload_map = {'id': workload_id, 'project_id':new_tenant_id, 'user_id': user_id }
+                workload_update_map.append(workload_map)
+                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs)
+                for snapshot in snapshots:
+                    snapshot_map = {'id': snapshot.get('id'), 'project_id':new_tenant_id, 'user_id': user_id }
+                    snapshot_update_map.append(snapshot_map)
+
+            #Update all the entries for workloads and snapshots in database
+            DBSession.bulk_update_mappings(eval('models.Workloads'), workload_update_map)
+            DBSession.bulk_update_mappings(eval('models.Snapshots'), snapshot_update_map)
+            for workload_id in workloads_to_update:
+                workload =  self.db.workload_get(context, workload_id)
+                updated_workloads.append(workload)
+
+            return updated_workloads
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
+    def workloads_reassign(self, context, tenant_map):
+        '''
+        Reassign given list of workloads to new tenant_id and user_id.
+        '''
+
+        AUDITLOG.log(context, 'Reassign workloads Requested', None)
+
+        from workloadmgr.workloads import API
+        if context.is_admin == False:
+            raise wlm_exceptions.AdminRequired()
+
+        workloads = []
+        workload_to_update = []
+        workload_to_import = []
+
+        projects = vault.get_project_list_for_import(context)
+        tenant_list = [project.id for project in projects]
+
+        for map in tenant_map:
+            workload_ids = map['workload_ids']
+            old_tenant_ids = map['old_tenant_ids']
+            new_tenant_id = map['new_tenant_id']
+            user_id = map['user_id']
+            if new_tenant_id in tenant_list:
+                # Check for valid workload user
+                if vault.user_exist_in_tenant(context, new_tenant_id, user_id) \
+                        and vault.check_user_role(context, new_tenant_id, user_id):
+
+                    #If old_teanat_id is provided then look for all workloads under that tenant
+                    if old_tenant_ids:
+                        workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
+
+                    workloadmgrapi = API()
+                    for workload_id in workload_ids:
+                        try:
+                            workload = workloadmgrapi.workload_get(context, workload_id)
+                            if workload:
+                                workload_to_update.append(workload_id)
+                            else:
+                                workload_to_import.append(workload_id)
+                        except Exception as ex:
+                            workload_to_import.append(workload_id)
+
+                    if workload_to_import:
+                        vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
+                        imported_workloads = self.import_workloads(context, workload_to_import, True)
+                        workloads.extend(imported_workloads)
+
+                    if workload_to_update:
+                        vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
+                        updated_workloads = self._update_workloads(context, workload_to_update, new_tenant_id, user_id)
+                        workloads.extend(updated_workloads)
+
+                else:
+                    raise Exception("New User ID should have admin/trustee role for new project")
+            else:
+                raise Exception("New Project ID not found in current cloud.")
+
+        AUDITLOG.log(context, 'Workload Reassign Completed', None)
+        return workloads
+

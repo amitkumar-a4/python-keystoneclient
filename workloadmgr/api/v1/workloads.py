@@ -898,6 +898,66 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
 
+    def get_orphaned_workloads_list(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                workloads = self.workload_api.get_orphaned_workloads_list(context)
+                return self._view_builder.detail_list(req, workloads)
+            except exception.WorkloadNotFound as error:
+                LOG.exception(error)
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            except exception.InvalidState as error:
+                LOG.exception(error)
+                raise exc.HTTPBadRequest(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def workloads_reassign(self, req, body=[]):
+        try:
+            context = req.environ['workloadmgr.context']
+            tenant_map = body
+            for map in tenant_map:
+                workload_ids = map['workload_ids']
+                old_tenant_ids = map['old_tenant_ids']
+                new_tenant_id = map['new_tenant_id']
+                user_id = map['user_id']
+                if workload_ids and old_tenant_ids:
+                    raise exc.HTTPBadRequest("Please provide only one parameter among workload_ids and old_tenant_ids")
+                if new_tenant_id == None or user_id == None:
+                    raise exc.HTTPBadRequest("Please provide required parameters: new_tenant_id and user_id.")
+            try:
+                workloads = self.workload_api.workloads_reassign(context, tenant_map)
+                return self._view_builder.detail_list(req, workloads)
+            except exception.WorkloadNotFound as error:
+                LOG.exception(error)
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            except exception.InvalidState as error:
+                LOG.exception(error)
+                raise exc.HTTPBadRequest(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
 

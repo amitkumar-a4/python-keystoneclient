@@ -223,7 +223,21 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='import_workloads',
                        conditions={"method": ['POST']})         
-        
+
+        #reassign workloads
+        mapper.connect("workloads_reassign",
+                       "/{project_id}/workloads/reasign_workloads",
+                       controller=self.resources['workloads'],
+                       action='workloads_reassign',
+                       conditions={"method": ['POST']})
+
+        #list orphaned workloads
+        mapper.connect("orphaned_workload_list",
+                       "/{project_id}/workloads/get_list/orphan_workloads",
+                       controller=self.resources['workloads'],
+                       action='get_orphaned_workloads_list',
+                       conditions={"method": ['GET']})
+
         #take a snapshot of the workload
         mapper.connect("workload_snapshot",
                        "/{project_id}/workloads/{id}",
@@ -284,7 +298,6 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='discover_instances',
                        conditions={"method": ['POST']})
-
         
         ###################################################################################################        
         self.resources['snapshots'] = snapshots.create_resource(ext_mgr)
