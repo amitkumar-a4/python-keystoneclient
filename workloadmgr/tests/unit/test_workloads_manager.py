@@ -99,8 +99,22 @@ class BaseWorkloadTestCase(test.TestCase):
                               {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
                     mock_method2.side_effect = values
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
+
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type.id,
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']
@@ -175,9 +189,23 @@ class BaseWorkloadTestCase(test.TestCase):
 
                     mock_method2.side_effect = values
 
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
+
                     self.workload_params['instances'] = tests_utils.get_instances()
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type['id'],
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']
@@ -249,8 +277,22 @@ class BaseWorkloadTestCase(test.TestCase):
                               {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
                     mock_method2.side_effect = values
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
+
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type['id'],
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']
@@ -311,8 +353,22 @@ class BaseWorkloadTestCase(test.TestCase):
                               {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
                     mock_method2.side_effect = values
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
+
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type['id'],
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']
@@ -380,8 +436,22 @@ class BaseWorkloadTestCase(test.TestCase):
                               {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
                     mock_method2.side_effect = values
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
+
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type['id'],
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']
@@ -448,8 +518,22 @@ class BaseWorkloadTestCase(test.TestCase):
                               {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
 
                     mock_method2.side_effect = values
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
+
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type['id'],
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']
@@ -635,10 +719,6 @@ class BaseWorkloadTestCase(test.TestCase):
                         workload = tests_utils.create_workload(
                             self.context,
                             availability_zone=CONF.storage_availability_zone,
-                            **self.workload_params)
-                        workload = tests_utils.create_workload(
-                            self.context,
-                            availability_zone=CONF.storage_availability_zone,
                             workload_type_id=workload_type.id,
                             **self.workload_params)
                         workload_id = workload['id']
@@ -737,10 +817,6 @@ class BaseWorkloadTestCase(test.TestCase):
                                                          metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances()
-                        workload = tests_utils.create_workload(
-                            self.context,
-                            availability_zone=CONF.storage_availability_zone,
-                            **self.workload_params)
                         workload = tests_utils.create_workload(
                             self.context,
                             availability_zone=CONF.storage_availability_zone,
@@ -859,10 +935,6 @@ class BaseWorkloadTestCase(test.TestCase):
                                                          metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances()
-                        workload = tests_utils.create_workload(
-                            self.context,
-                            availability_zone=CONF.storage_availability_zone,
-                            **self.workload_params)
                         workload = tests_utils.create_workload(
                             self.context,
                             availability_zone=CONF.storage_availability_zone,
@@ -1004,10 +1076,6 @@ class BaseWorkloadTestCase(test.TestCase):
                                                          metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances()
-                        workload = tests_utils.create_workload(
-                            self.context,
-                            availability_zone=CONF.storage_availability_zone,
-                            **self.workload_params)
                         workload = tests_utils.create_workload(
                             self.context,
                             availability_zone=CONF.storage_availability_zone,
@@ -1192,10 +1260,6 @@ class BaseWorkloadTestCase(test.TestCase):
                                                          metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances()
-                        workload = tests_utils.create_workload(
-                            self.context,
-                            availability_zone=CONF.storage_availability_zone,
-                            **self.workload_params)
                         workload = tests_utils.create_workload(
                             self.context,
                             availability_zone=CONF.storage_availability_zone,
