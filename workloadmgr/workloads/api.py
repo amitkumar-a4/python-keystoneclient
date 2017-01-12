@@ -595,21 +595,22 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload, context=context):
-        if jobschedule and len(jobschedule): 
-            if 'enabled' in jobschedule and jobschedule['enabled']:                                       
-                if hasattr(context, 'user_domain_id'):
-                   if context.user_domain_id is None:
+        if self._scheduler.running is True
+           if jobschedule and len(jobschedule): 
+              if 'enabled' in jobschedule and jobschedule['enabled']:                                       
+                 if hasattr(context, 'user_domain_id'):
+                    if context.user_domain_id is None:
+                       user_domain_id = 'default'
+                    else:
+                         user_domain_id = context.user_domain_id
+                 elif hasattr(context, 'user_domain'):
+                      if context.user_domain is None:
+                         user_domain_id = 'default'
+                      else:
+                           user_domain_id = context.user_domain
+                 else:
                       user_domain_id = 'default'
-                   else:
-                        user_domain_id = context.user_domain_id
-                elif hasattr(context, 'user_domain'):
-                     if context.user_domain is None:
-                        user_domain_id = 'default'
-                     else:
-                          user_domain_id = context.user_domain
-                else:
-                     user_domain_id = 'default'
-                self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                 self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
                                                     jobstore='jobscheduler_store', 
                                                     kwargs={'workload_id':workload.id,  
