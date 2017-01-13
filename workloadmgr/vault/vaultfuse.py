@@ -319,6 +319,13 @@ class TrilioVault(Operations):
 
     def destroy(self, path):
         print "destroy, "
+        if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
+        if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
+        if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
+        if vaultswift.swift_download: vaultswift.swift_download.__exit__(None, None, None)
+        if vaultswift.swift_delete: vaultswift.swift_delete.__exit__(None, None, None)
+        if vaultswift.swift_post: vaultswift.swift_post.__exit__(None, None, None)
+        if vaultswift.swift_cap: vaultswift.swift_cap.__exit__(None, None, None)
         shutil.rmtree(CONF.vault_data_directory_old)
         return 0
 
