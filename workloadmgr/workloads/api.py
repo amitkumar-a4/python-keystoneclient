@@ -595,7 +595,7 @@ class API(base.Base):
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload, context=context):
-        if self._scheduler.running is True
+        if self._scheduler.running is True:
            if jobschedule and len(jobschedule): 
               if 'enabled' in jobschedule and jobschedule['enabled']:                                       
                  if hasattr(context, 'user_domain_id'):
