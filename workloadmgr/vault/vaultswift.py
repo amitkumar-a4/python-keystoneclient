@@ -162,6 +162,7 @@ def st_download(args, options):
                        attempts = down['attempts']
                        total_time = finish_time - start_time
                        down_time = total_time - auth_time
+                       _mega = 1000000
                        if down['pseudodir']:
                           time_str = (
                                     'auth %.3fs, headers %.3fs, total %.3fs, '
