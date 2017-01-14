@@ -71,6 +71,9 @@ class Job(object):
         self.max_instances = max_instances
         self.runs = 0
         self.instances = 0
+        self.user_id = kwargs['user_id']
+        self.project_id = kwargs['project_id']
+        self.workload_id = kwargs['workload_id']
 
     def compute_next_run_time(self, now):
         if self.runs == self.max_runs:

@@ -261,9 +261,22 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                         self.stash['import_done'] = True
 
                     import_wl_mock.side_effect = import_wl_mock_se
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                             display_name='Serial',
+                                                             display_description='this is a test workload_type',
+                                                             status='available',
+                                                             is_public=True,
+                                                             metadata=None)
 
                     workload = tests_utils.create_workload(
                         self.context,
+                        workload_type_id=workload_type.id,
                         availability_zone=CONF.storage_availability_zone,
                         **self.workload_params)
                     workload_id = workload['id']

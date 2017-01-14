@@ -495,7 +495,7 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             'start_time': '2:30 PM',
                             'fullbackup_interval': '10',
                             'retention_policy_type': 'Number of Snapshots to Keep',
-                            'retention_policy_value': '2'}),
+                            'retention_policy_value': '30'}),
             'host': CONF.host,}
 
         with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
@@ -562,13 +562,18 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             self.assertEqual(workload.id, wdb['id'])
                             snapshots.append(snapshot)
 
+                        # Call retension policy here
+                        #import pdb;pdb.set_trace()
+
                         for snapshot in snapshots:
+                            snapshot_path = os.path.join(workload_path, "snapshot_" + snapshot.id)
                             workload_utils.snapshot_delete(self.context, snapshot.id)
                             self.assertFalse(os.path.exists(snapshot_path))
 
                             self.db.snapshot_delete(self.context, snapshot.id)
-                            self.workload.workload_delete(self.context, workload_id)
-                            self.assertRaises(exception.NotFound,
-                                              db.workload_get,
-                                              self.context,
-                                              workload_id)
+
+                        self.workload.workload_delete(self.context, workload_id)
+                        self.assertRaises(exception.NotFound,
+                                          db.workload_get,
+                                          self.context,
+                                          workload_id)
