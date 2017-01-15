@@ -332,14 +332,14 @@ class TrilioVault(Operations):
     def chmod(self, path, mode):
         print "chmod, ", path
         container, prefix = split_head_tail(path)
-        cache_path = self._get_cache(prefix)
+        cache_path = self._get_cache(os.path.join(container, prefix))
         return 0
-        return os.chmod(cache_path, mode)
+        return os.chmod(path, mode)
 
     def chown(self, path, uid, gid):
         print "chown, ",path
         container, prefix = split_head_tail(path)
-        cache_path = self._get_cache(prefix)
+        cache_path = self._get_cache(os.path.join(container, prefix))
         return os.chown(cache_path, uid, gid)
 
     @disable_logging
@@ -367,6 +367,21 @@ class TrilioVault(Operations):
            args.append(prefix)
         else:
              prefix = None
+
+        try:
+            prefix1 = prefix
+            if prefix is None:
+               prefix1 = ''
+            full_path = self._get_cache(os.path.join(container, prefix1))
+            st = os.lstat(full_path)
+            d = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
+                       'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid',))
+            d['st_blksize'] = 512
+            d['st_blocks'] = d['st_size'] / 512
+            return d
+        except Exception as ex:
+               pass
+
         try:
             st = vaultswift.st_stat(args, _opts)
             d['st_gid'] = self.group_id
@@ -382,11 +397,13 @@ class TrilioVault(Operations):
                d['st_nlink'] = 3
                d['st_size'] = 4096
                d['st_mode'] = 16893
+               if not os.path.exists(self._get_cache(container)):
+                  self.mkdir(container, 0751, True)
         except Exception as ex:
             if prefix is None:
                prefix = container
             full_path1 = self._get_cache(os.path.join(container, prefix))
-            full_path = self._get_cache(prefix)
+            full_path = self._get_cache(os.path.join(container, prefix))
             mkdirs = get_head(prefix)
             try:
                  st = os.lstat(full_path)
@@ -400,7 +417,9 @@ class TrilioVault(Operations):
                        st = vaultswift.st_list(args1, _opts)
                        if len(st) > 0:
                           #full_path = full_path1
-                          self.mkdir(prefix, 0751, True)
+                          self.mkdir(os.path.join(container, prefix), 0751, True)
+                       else:
+                            self.mkdir(container, 0751, True)
                    except:
                           pass
             if prefix == '4913' or prefix[:-1].endswith('~'):
@@ -446,8 +465,8 @@ class TrilioVault(Operations):
                 component, rest = split_head_tail(lst.split(prefix, 1)[1])
             else:
                 component, rest = split_head_tail(lst)
-            if rest != '' and rest != '':
-               mkdirs = get_head(lst)
+            if rest != '':
+               mkdirs = os.path.join(container, get_head(lst))
                self.mkdir(mkdirs, 0751, True)
             if component is not None and component != '' and \
                 not component.endswith('_segments'):
@@ -463,7 +482,6 @@ class TrilioVault(Operations):
             return os.path.relpath(pathname, self.root)
         else:
             return pathname
-
     def mknod(self, path, mode, dev):
         print "mknod, ", path
         return os.mknod(self._full_path(path), mode, dev)'''
@@ -508,7 +526,7 @@ class TrilioVault(Operations):
            return 0
         cache_path = self._get_cache(path)
         if ist is False:
-           cache_path = self._get_cache(obj)
+           cache_path = self._get_cache(os.path.join(container, obj))
         try:
             os.makedirs(cache_path, mode)
         except Exception as ex:
@@ -538,7 +556,7 @@ class TrilioVault(Operations):
     def unlink(self, path):
         print "unlink, ", path
         container, obj = split_head_tail(path)
-        cache_path = self._get_cache(obj)
+        cache_path = self._get_cache(os.path.join(container, obj))
         _opts = options.copy()
         _opts = bunchify(_opts)
         args1 = [container]
@@ -563,15 +581,15 @@ class TrilioVault(Operations):
     def symlink(self, name, target):
         print "symlink, ", target
         container, prefix = split_head_tail(target)
-        cache_path_target = self._get_cache(prefix)
+        cache_path_target = self._get_cache(os.path.join(container, prefix))
         return os.symlink(name, cache_path_target)
 
     def rename(self, old, new):
         print "rename, %s -> %s" % (old, new)
         container, prefix = split_head_tail(old)
-        cache_path_old = self._get_cache(prefix)
+        cache_path_old = self._get_cache(os.path.join(container, prefix))
         container, prefix = split_head_tail(new)
-        cache_path_new = self._get_cache(prefix)
+        cache_path_new = self._get_cache(os.path.join(container, prefix))
         fh = self.open(old, os.O_RDONLY)
         os.rename(cache_path_old, cache_path_new)
         self.unlink(old)
@@ -581,27 +599,27 @@ class TrilioVault(Operations):
     def link(self, target, name):
         print "link, ", target
         container, prefix = split_head_tail(target)
-        cache_path_target = self._get_cache(prefix)
+        cache_path_target = self._get_cache(os.path.join(container, prefix))
         container, prefix = split_head_tail(name)
-        cache_path_name = self._get_cache(prefix)
+        cache_path_name = self._get_cache(os.path.join(container, prefix))
         return os.link(cache_path_target, cache_path_name)
 
     def utimens(self, path, times=None):
         print "utimens, ", path
         container, prefix = split_head_tail(path)
-        cache_path = self._get_cache(prefix)
+        cache_path = self._get_cache(path)
         return os.utime(cache_path, times)
 
     def create(self, path, mode, fi=None):
         container, prefix = split_head_tail(path)
-        full_path = self._get_cache(prefix)
+        full_path = self._get_cache(os.path.join(container, prefix))
         print "create, ", path
         return os.open(full_path, os.O_WRONLY | os.O_CREAT, mode)
 
     def open(self, path, flags):
         print "open, ", path
         container, prefix = split_head_tail(path)
-        full_path = self._get_cache(prefix)
+        full_path = self._get_cache(os.path.join(container, prefix))
         try:
             fh = os.open(full_path, flags)
         except Exception as ex:
@@ -609,7 +627,7 @@ class TrilioVault(Operations):
                _opts['prefix'] = None
                _opts['out_directory'] = None
                container, obj = split_head_tail(path)
-               cache_path = self._get_cache(prefix)
+               cache_path = self._get_cache(os.path.join(container, prefix))
                try:
                    os.stat(cache_path)
                except:
@@ -620,7 +638,10 @@ class TrilioVault(Operations):
                        vaultswift.st_download(args1, _opts)
                    except Exception as ex:
                        LOG.exception(ex)
-                   self.chmod(full_path, 0751)
+                   """mkdirs = get_head(path)
+                   full_path1 = self._get_cache(mkdirs)
+                   if not os.path.exists(full_path1):
+                      self.mkdir(mkdirs, 0751, True)"""
                    fh = os.open(full_path, flags)
         return fh
 
@@ -632,7 +653,7 @@ class TrilioVault(Operations):
         _opts['out_directory'] = None
 
         container, obj = split_head_tail(path)
-        cache_path = self._get_cache(obj)
+        cache_path = self._get_cache(os.path.join(container, obj))
         try:
             os.stat(cache_path)
         except Exception as ex:
@@ -661,7 +682,7 @@ class TrilioVault(Operations):
     def truncate(self, path, length, fh=None):
         print "truncate, %s, %d" % (path, length)
         container, obj = split_head_tail(path)
-        cache_path = self._get_cache(obj)
+        cache_path = self._get_cache(os.path.join(container, obj))
         with open(cache_path, 'r+') as f:
             f.truncate(length)
 
@@ -672,7 +693,7 @@ class TrilioVault(Operations):
     def release(self, path, fh):
         print "release, %s" % (path)
         container, obj = split_head_tail(path)
-        full_path = self._get_cache(obj)
+        full_path = self._get_cache(os.path.join(container, obj))
         _opts = options.copy()
         _opts['segment_size'] = CONF.vault_swift_segment_size
         _opts['object_name'] = obj.rstrip('/')
@@ -684,6 +705,7 @@ class TrilioVault(Operations):
             LOG.exception(ex)
             return 0
 
+        os.close(fh)
         os.remove(full_path)
 
         return 0
