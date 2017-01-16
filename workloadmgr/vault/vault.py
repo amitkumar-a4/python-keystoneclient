@@ -909,6 +909,19 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
                pass
 
     @autolog.log_method(logger=Logger)
+    @to_abs()
+    def put_object(self, path, json_data):
+        head, tail = os.path.split(path)
+        fileutils.ensure_tree(head)
+        try:
+            with open(path, 'w') as json_file:
+                 json_file.write(json_data)
+        except:
+               with open(path, 'w') as json_file:
+                    json_file.write(json_data)
+        return
+
+    @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
