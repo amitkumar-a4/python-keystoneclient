@@ -471,12 +471,12 @@ class BaseWorkloadUtilTestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.set_meta_item')
     @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def test_common_apply_retention_policy(self, mock_get_servers, m2,
-                                           set_meta_item_mock,
-                                           delete_meta_mock,
-                                           get_server_by_id_mock,
-                                           get_flavor_by_id_mock,
-                                           get_volume_mock):
+    def test_common_apply_retention_policy_all_full(self, mock_get_servers, m2,
+                                                    set_meta_item_mock,
+                                                    delete_meta_mock,
+                                                    get_server_by_id_mock,
+                                                    get_flavor_by_id_mock,
+                                                    get_volume_mock):
         """Test workload can be created and deleted."""
         import workloadmgr.vault.vault
         import workloadmgr.compute.nova
@@ -562,6 +562,7 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             self.assertEqual(workload.id, wdb['id'])
                             snapshots.append(snapshot)
 
+                        snapshots.reverse()
                         # Call retension policy here
                         self.db.workload_update(self.context,
                                                 workload_id,
@@ -580,8 +581,10 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             tests_utils.get_instances(),
                             snapshots[0].__dict__)
                         self.assertEqual(len(snapshots_to_delete), 2)
+                        self.assertEqual(set([s.id for s in snapshots_to_delete]),
+                                         set([s.id for s in snapshots[3:5]]))
                         self.assertEqual(affected_snapshots, [])
-                        self.assertEqual(snapshot_to_commit['id'], snapshots[3]['id'])
+                        self.assertEqual(snapshot_to_commit['id'], snapshots[2]['id'])
 
                         for snapshot in snapshots:
                             snapshot_path = os.path.join(workload_path, "snapshot_" + snapshot.id)
@@ -696,6 +699,7 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             snapshots.append(snapshot)
 
                         # Call retension policy here
+                        snapshots.reverse()
                         self.db.workload_update(self.context,
                                                 workload_id,
                                                 {
@@ -713,8 +717,10 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             tests_utils.get_instances(),
                             snapshots[0].__dict__)
                         self.assertEqual(len(snapshots_to_delete), 2)
+                        self.assertEqual(set([s.id for s in snapshots_to_delete]),
+                                         set([s.id for s in snapshots[3:5]]))
                         self.assertEqual(affected_snapshots, [])
-                        self.assertEqual(snapshot_to_commit['id'], snapshots[3]['id'])
+                        self.assertEqual(snapshot_to_commit['id'], snapshots[2]['id'])
 
                         for snapshot in snapshots:
                             snapshot_path = os.path.join(workload_path, "snapshot_" + snapshot.id)
@@ -840,6 +846,7 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         self.db.snapshot_delete(self.context, snap_to_delete.id)
 
                         # Call retension policy here
+                        snapshots.reverse()
                         self.db.workload_update(self.context,
                                                 workload_id,
                                                 {
@@ -857,8 +864,10 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             tests_utils.get_instances(),
                             snapshots[0].__dict__)
                         self.assertEqual(len(snapshots_to_delete), 7)
+                        self.assertEqual(set([s.id for s in snapshots_to_delete]),
+                                         set([s.id for s in snapshots[7:7+7]]))
                         self.assertEqual(affected_snapshots, [])
-                        self.assertEqual(snapshot_to_commit['id'], snapshots[2]['id'])
+                        self.assertEqual(snapshot_to_commit['id'], snapshots[6]['id'])
 
                         for snapshot in snapshots:
                             snapshot_path = os.path.join(workload_path, "snapshot_" + snapshot.id)
@@ -978,6 +987,7 @@ class BaseWorkloadUtilTestCase(test.TestCase):
 
                         self.db.snapshot_delete(self.context, snap_to_delete.id)
 
+                        snapshots.reverse()
                         # Call retension policy here
                         self.db.workload_update(self.context,
                                                 workload_id,
@@ -1127,3 +1137,155 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                           db.workload_get,
                                           self.context,
                                           workload_id)
+
+    def test_common_apply_retention_disk_check(self):
+        #def test_common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj):
+        pass
+
+
+    @patch('workloadmgr.volume.cinder.API.get')
+    @patch('workloadmgr.compute.nova.API.get_flavor_by_id')
+    @patch('workloadmgr.compute.nova.API.get_server_by_id')
+    @patch('workloadmgr.compute.nova.API.delete_meta')
+    @patch('workloadmgr.compute.nova.API.set_meta_item')
+    @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
+    @patch('workloadmgr.compute.nova.API.get_servers')
+    def test_common_apply_retention_disk_check(self, mock_get_servers, m2,
+                                           set_meta_item_mock,
+                                           delete_meta_mock,
+                                           get_server_by_id_mock,
+                                           get_flavor_by_id_mock,
+                                           get_volume_mock):
+        """Test workload can be created and deleted."""
+        import workloadmgr.vault.vault
+        import workloadmgr.compute.nova
+        import workloadmgr.workloads.manager
+        from workloadmgr.workloads import workload_utils
+
+        mock_get_servers.side_effect = tests_utils.get_vms
+        get_server_by_id_mock.side_effect = tests_utils.get_server_by_id
+        get_flavor_by_id_mock.side_effect = tests_utils.get_flavor_by_id
+        get_volume_mock.side_effect = tests_utils.get_volume_id
+        self.workload_params = {
+            'status': 'creating',
+            'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '10',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}),
+            'host': CONF.host,}
+
+        with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                          'is_mounted', return_value=True) as mock_method1:
+            with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
+                              'get_total_capacity', return_value=None) as mock_method2:
+                with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
+                                  'workload_reset', return_value=None) as mock_method3:
+                    with patch.object(workloadmgr.compute.nova,
+                                      '_get_tenant_context', return_value=None) as mock_method4:
+                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server2:nfsshare2': [1099511627776, 1099511627776],}.values()[0],
+                                  {'server3:nfsshare3': [1099511627776, 7 * 10737418240],}.values()[0],]
+
+                        mock_method2.side_effect = values
+
+                        def _get_tenant_context(context):
+                            return context
+
+                        mock_method4.side_effect = _get_tenant_context
+                        workload_type = tests_utils.create_workload_type(self.context,
+                                                         display_name='Serial',
+                                                         display_description='this is a test workload_type',
+                                                         status='available',
+                                                         is_public=True,
+                                                         metadata=None)
+
+                        self.workload_params['instances'] = tests_utils.get_instances()
+                        workload = tests_utils.create_workload(
+                            self.context,
+                            availability_zone=CONF.storage_availability_zone,
+                            workload_type_id=workload_type.id,
+                            **self.workload_params)
+                        workload_id = workload['id']
+                        self.workload.workload_create(self.context, workload_id)
+
+                        snapshots = []
+                        for i in range(0, 5):
+                            snapshot = tests_utils.create_snapshot(self.context,
+                                                                   workload_id,
+                                                                   display_name='test_snapshot',
+                                                                   display_description='this is a test snapshot',
+                                                                   snapshot_type='full',
+                                                                   status='creating')
+                            self.workload.workload_snapshot(self.context, snapshot['id'])
+                            snapshot = self.db.snapshot_get(self.context, snapshot['id'])
+                            workload = self.db.workload_get(self.context, workload['id'])
+                            self.assertEqual(snapshot.display_name, 'test_snapshot')
+                            self.assertEqual(snapshot.status, 'available')
+
+                            backup_target = None
+                            for meta in workload.metadata:
+                                if meta.key == 'backup_media_target':
+                                    backup_target = workloadmgr.vault.vault.get_backup_target(meta.value)
+                            self.assertNotEqual(backup_target, None)
+
+                            workload_path = os.path.join(backup_target.mount_path,
+                                                         "workload_" + workload_id)
+                            workload_db = backup_target.get_object(os.path.join(workload_path, "workload_db"))
+                            snapshot_path = os.path.join(workload_path, "snapshot_" + snapshot.id)
+                            self.assertTrue(os.path.exists(snapshot_path))
+
+                            wdb = json.loads(workload_db)
+                            self.assertEqual(workload.id, wdb['id'])
+                            snapshots.append(snapshot)
+
+                        snapshots.reverse()
+                        # Call retension policy here
+                        self.db.workload_update(self.context,
+                                                workload_id,
+                                                {
+                                                    'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                                                    'end_date': '07/05/2015',
+                                                                    'interval': '1 hr',
+                                                                    'start_time': '2:30 PM',
+                                                                    'fullbackup_interval': '10',
+                                                                    'retention_policy_type': 'Number of Snapshots to Keep',
+                                                                    'retention_policy_value': '3'}),
+                                                })
+
+                        snapshot_to_commit, snapshots_to_delete, affected_snapshots, \
+                        workload_obj, snapshot_obj, dontcare = workload_utils.common_apply_retention_policy(
+                            self.context,
+                            tests_utils.get_instances(),
+                            snapshots[0].__dict__)
+
+                        self.assertEqual(len(snapshots_to_delete), 2)
+                        self.assertEqual(affected_snapshots, [])
+                        self.assertEqual(snapshot_to_commit['id'], snapshots[2]['id'])
+
+                        workload_utils. common_apply_retention_disk_check(
+                            self.context, snapshot_to_commit, snapshot_obj, workload_obj)
+
+                        for snapshot in snapshots:
+                            snapshot_path = os.path.join(workload_path, "snapshot_" + snapshot.id)
+                            workload_utils.snapshot_delete(self.context, snapshot.id)
+                            self.assertFalse(os.path.exists(snapshot_path))
+
+                            self.db.snapshot_delete(self.context, snapshot.id)
+
+                        self.workload.workload_delete(self.context, workload_id)
+                        self.assertRaises(exception.NotFound,
+                                          db.workload_get,
+                                          self.context,
+                                          workload_id)
+
+
+    def test_common_apply_retention_db_backing_update(self):
+
+        #def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
+        #                                     vm_disk_resource_snap,
+        #                                     vm_disk_resource_snap_backing,
+        #                                     affected_snapshots):
+        pass
