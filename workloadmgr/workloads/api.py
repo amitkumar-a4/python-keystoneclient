@@ -59,7 +59,7 @@ from workloadmgr import autolog
 from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
-
+from workloadmgr.common import workloadmgr_keystoneclient as keystone_utils
 workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
@@ -385,7 +385,7 @@ class API(base.Base):
             metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata        
-        
+
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False
         workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
@@ -2329,46 +2329,52 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
-
+ 
     @autolog.log_method(logger=Logger)
-    def get_orphaned_workloads_list(self, context):
+    def get_orphaned_workloads_list(self, context, migrate_cloud=None):
         AUDITLOG.log(context, 'Get Orphaned Workloads List Requested', None)
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
-
         workloads = []
         projects = vault.get_project_list_for_import(context)
-        tenant_list = [project.id for project in projects ]
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            vault.get_backup_target(backup_endpoint)
-        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-            backup_target = None
-            try:
-                backup_target = vault.get_backup_target(backup_endpoint)
-                for workload_url in backup_target.get_workloads(context):
-                    try:
-                        workload_values = json.loads(backup_target.get_object(
-                            os.path.join(workload_url, 'workload_db')))
-                        project_id = workload_values.get('project_id')
-                        user_id = workload_values.get('user_id')
+        tenant_list = [project.id for project in projects]
+    
+        def _check_workload(context, workload):
+            project_id = workload.get('project_id')
+            user_id = workload.get('user_id')
+            # Check for valid tenant
+            if project_id in tenant_list:
+                # Check for valid workload user
+                if keystone_utils.user_exist_in_tenant(context, project_id, user_id) \
+                        and keystone_utils.check_user_role(context, project_id, user_id):
+                    pass
+                else:
+                    workloads.append(workload)
+            else:
+                workloads.append(workload)
 
-                        #Check for valid tenant
-                        if project_id in tenant_list:
-                            #Check for valid workload user
-                            if vault.user_exist_in_tenant(context, project_id, user_id)\
-                                and vault.check_user_role(context, project_id, user_id):
-                                pass
-                            else:
-                                workloads.append(workload_values)
-                        else:
-                            workloads.append(workload_values)
-                    except Exception as ex:
-                        LOG.exception(ex)
-                        continue
-            except Exception as ex:
-                LOG.exception(ex)
-            finally:
-                backup_target.purge_staging_area(context)
+        if not migrate_cloud:
+            workloads_in_db = self.db.workload_get_all(context)
+            for workload in workloads_in_db:
+                _check_workload(context, workload.__dict__)
+        else:
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                vault.get_backup_target(backup_endpoint)
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                backup_target = None
+                try:
+                    backup_target = vault.get_backup_target(backup_endpoint)
+                    for workload_url in backup_target.get_workloads(context):
+                        try:
+                            workload_values = json.loads(backup_target.get_object(
+                                os.path.join(workload_url, 'workload_db')))
+                            #project_id = workload_values.get('project_id')
+                            #user_id = workload_values.get('user_id')
+                            _check_workload(context, workload_values)
+                        except Exception as ex:
+                            LOG.exception(ex)
+                except Exception as ex:
+                    LOG.exception(ex)
         AUDITLOG.log(context, 'Get Orphaned Workloads List Completed', None)
         return workloads
 
@@ -2406,13 +2412,12 @@ class API(base.Base):
             LOG.exception(ex)
 
     @autolog.log_method(logger=Logger)
-    def workloads_reassign(self, context, tenant_map):
+    def workloads_reassign(self, context, tenant_maps):
         '''
         Reassign given list of workloads to new tenant_id and user_id.
         '''
 
         AUDITLOG.log(context, 'Reassign workloads Requested', None)
-
         from workloadmgr.workloads import API
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
@@ -2420,49 +2425,59 @@ class API(base.Base):
         workloads = []
         workload_to_update = []
         workload_to_import = []
-
         projects = vault.get_project_list_for_import(context)
         tenant_list = [project.id for project in projects]
-
-        for map in tenant_map:
-            workload_ids = map['workload_ids']
-            old_tenant_ids = map['old_tenant_ids']
-            new_tenant_id = map['new_tenant_id']
-            user_id = map['user_id']
+        for tenant_map in tenant_maps:
+            workload_ids = tenant_map['workload_ids']
+            old_tenant_ids = tenant_map['old_tenant_ids']
+            new_tenant_id = tenant_map['new_tenant_id']
+            user_id = tenant_map['user_id']
+            migrate_cloud = tenant_map['migrate_cloud']
             if new_tenant_id in tenant_list:
                 # Check for valid workload user
-                if vault.user_exist_in_tenant(context, new_tenant_id, user_id) \
-                        and vault.check_user_role(context, new_tenant_id, user_id):
+                if keystone_utils.user_exist_in_tenant(context, new_tenant_id, user_id) \
+                        and keystone_utils.check_user_role(context, new_tenant_id, user_id):
 
                     #If old_teanat_id is provided then look for all workloads under that tenant
                     if old_tenant_ids:
-                        workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
+                       if not migrate_cloud:
+                            for old_tenant_id in old_tenant_ids:
+                                if old_tenant_id not in tenant_list:
+                                   raise wlm_exceptions.ProjectNotFound(old_tenant_id)
+                            workload_ids = []
+                            workloads_in_db = self.db.workload_get_all(context)
+                            for workload in workloads_in_db:
+                                if workload.project_id in old_tenant_ids:
+                                    workload_ids.append(workload.id)
+                       else:
+                           workload_ids = keystone_utils.get_workloads_for_tenant(context, old_tenant_ids)
 
                     workloadmgrapi = API()
                     for workload_id in workload_ids:
                         try:
                             workload = workloadmgrapi.workload_get(context, workload_id)
-                            if workload:
-                                workload_to_update.append(workload_id)
-                            else:
-                                workload_to_import.append(workload_id)
+                            workload_to_update.append(workload_id)
                         except Exception as ex:
-                            workload_to_import.append(workload_id)
+                            if migrate_cloud is True:
+                                workload_to_import.append(workload_id)
+                            else:
+                                raise Exception("Workload id doesn't belong to \
+                                current cloud, to reassign them set migrate_cloud option to True")
 
                     if workload_to_import:
-                        vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
+                        keystone_utils.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
                         imported_workloads = self.import_workloads(context, workload_to_import, True)
                         workloads.extend(imported_workloads)
 
                     if workload_to_update:
-                        vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
+                        keystone_utils.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
                         updated_workloads = self._update_workloads(context, workload_to_update, new_tenant_id, user_id)
                         workloads.extend(updated_workloads)
 
                 else:
-                    raise Exception("New User ID should have admin/trustee role for new project")
+                    raise wlm_exceptions.UserNotFound(user_id)
             else:
-                raise Exception("New Project ID not found in current cloud.")
+                raise wlm_exceptions.ProjectNotFound(new_tenant_id)
 
         AUDITLOG.log(context, 'Workload Reassign Completed', None)
         return workloads

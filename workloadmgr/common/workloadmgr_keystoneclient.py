@@ -1,5 +1,4 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
+# vim: tabstop=4 shiftwidth=4 softtabstop=4 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
@@ -8,6 +7,8 @@
 
 import collections
 import uuid
+import json
+import os
 
 from keystoneclient.auth.identity import v3 as kc_auth_v3
 import keystoneclient.exceptions as kc_exception
@@ -23,6 +24,7 @@ from workloadmgr import exception
 from workloadmgr.common.i18n import _
 from workloadmgr.common.i18n import _LE
 from workloadmgr.common.i18n import _LW
+from workloadmgr.vault import vault
 
 LOG = logging.getLogger('workloadmgr.common.keystoneclient')
 
@@ -211,3 +213,96 @@ class KeystoneClient(object):
 
 def list_opts():
     yield None, keystone_opts
+
+def user_exist_in_tenant(context, project_id, user_id):
+    keystone_client = vault.get_client(context)
+    if keystone_client.version == 'v3':
+        try:
+            user = keystone_client.users.get(user_id)
+            projects = keystone_client.projects.list(user=user)
+            project_list = [project.id for project in projects]
+            if project_id in project_list:
+                return True
+            else:
+                return False
+        except Exception :
+            return False
+    else:
+        users = keystone_client.users.list(project_id)
+        user_ids = [user.id for user in users]
+        if user_id in user_ids:
+            return True
+        else:
+            return False
+
+def check_user_role(context, project_id, user_id ):
+    try:
+        keystone_client = vault.get_client(context)
+        if keystone_client.version == 'v3':
+            roles = keystone_client.roles.list(user=user_id, project=project_id)
+        else:
+            roles = keystone_client.tenants.role_manager.roles_for_user(user_id, project_id)
+        trustee_role = vault.CONF.trustee_role
+        for role in roles:
+            if (trustee_role == role.name) or (role.name == 'admin'):
+                return True
+        return False
+    except Exception as ex:
+        LOG.exception(ex)
+
+def get_workloads_for_tenant(context, tenant_ids):
+    workload_ids = []
+    for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+        vault.get_backup_target(backup_endpoint)
+    for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+        backup_target = None
+        try:
+            backup_target = vault.get_backup_target(backup_endpoint)
+            for workload_url in backup_target.get_workloads(context):
+                workload_values = json.loads(backup_target.get_object(\
+                        os.path.join(workload_url, 'workload_db')))
+                project_id = workload_values.get('project_id')
+                workload_id = workload_values.get('id')
+                if project_id in tenant_ids:
+                    workload_ids.append(workload_id)
+        except Exception as ex:
+            LOG.exception(ex)
+    return  workload_ids
+
+def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
+
+    workload_urls = []
+
+    try:
+        #Ensure all mounts
+        for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+            vault.get_backup_target(backup_endpoint)
+
+        #Get list of workload directory path for workloads need to update
+        for workload_id in workloads_to_update:
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                backup_target = None
+                backup_target = vault.get_backup_target(backup_endpoint)
+                workload_url = os.path.join(backup_target.mount_path, "workload_" + workload_id)
+                if os.path.isdir(workload_url):
+                    workload_urls.append(workload_url)
+                    break;
+
+        #Iterate through each workload directory and update workload_db and snapsot_db with new values
+        for workload_path in workload_urls:
+            for path, subdirs, files in os.walk(workload_path):
+                for name in files:
+                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
+                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+
+                        if db_values.get('project_id', None) is not None:
+                            db_values['project_id'] = new_tenant_id
+                        else:
+                            db_values['tenant_id'] = new_tenant_id
+                        db_values['user_id'] = user_id
+
+                        with open(os.path.join(path, name), 'w') as file:
+                            json.dump(db_values, file)
+    except Exception as ex:
+        LOG.exception(ex)
+
