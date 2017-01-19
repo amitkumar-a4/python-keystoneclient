@@ -3,13 +3,15 @@
 #    Copyright 2014 Trilio Data, Inc
 
 
-from bunch import bunchify
+from bunch import bunchify, unbunchify
 import cPickle as pickle
 import os
+import errno    
 import six
 
 from workloadmgr import context
 from workloadmgr import db
+from workloadmgr import utils
 
 
 def get_test_admin_context():
@@ -358,6 +360,55 @@ def get_volume_id(context, id, no_translate=True):
     volumes['92ded426-072c-4645-9f3a-72f9a3ad6899'] = bunchify({'attachments': [{u'server_id': u'92ded426-072c-4645-9f3a-72f9a3ad6899', u'attachment_id': u'ca8ce5ab-4b54-4795-9b89-919aa9271042', u'host_name': None, u'volume_id': u'92ded426-072c-4645-9f3a-72f9a3ad6899', u'device': u'/dev/vdb', u'id': u'92ded426-072c-4645-9f3a-72f9a3ad6899'}], 'availability_zone': u'nova', 'os-vol-host-attr:host': u'kilocontroller@ceph#ceph', 'encrypted': False, 'os-volume-replication:extended_status': None, 'manager': 'VolumeManager', 'os-volume-replication:driver_data': None, 'snapshot_id': None, 'id': u'92ded426-072c-4645-9f3a-72f9a3ad6899', 'size': 80, 'display_name': u'vol2', 'display_description': None, 'os-vol-tenant-attr:tenant_id': u'000d038df75743a88cefaacd9b704b94', 'os-vol-mig-status-attr:migstat': None, 'metadata': {u'readonly': u'False', u'attached_mode': u'rw'}, 'status': u'in-use', 'multiattach': u'false', 'source_volid': None, 'os-vol-mig-status-attr:name_id': None, 'bootable': u'false', 'created_at': u'2016-12-02T15:43:09.000000', 'volume_type': u'ceph', '_info': {u'status': u'in-use', u'display_name': u'vol2', u'attachments': [{u'server_id': u'92ded426-072c-4645-9f3a-72f9a3ad6899', u'attachment_id': u'ca8ce5ab-4b54-4795-9b89-919aa9271042', u'host_name': None, u'volume_id': u'92ded426-072c-4645-9f3a-72f9a3ad6899', u'device': u'/dev/vdb', u'id': u'92ded426-072c-4645-9f3a-72f9a3ad6899'}], u'availability_zone': u'nova', u'bootable': u'false', u'encrypted': False, u'created_at': u'2016-12-02T15:43:09.000000', u'multiattach': u'false', u'os-vol-mig-status-attr:migstat': None, u'os-volume-replication:driver_data': None, u'os-volume-replication:extended_status': None, u'os-vol-host-attr:host': u'kilocontroller@ceph#ceph', u'snapshot_id': None, u'display_description': None, u'os-vol-tenant-attr:tenant_id': u'000d038df75743a88cefaacd9b704b94', u'source_volid': None, u'id': u'92ded426-072c-4645-9f3a-72f9a3ad6899', u'size': 80, u'volume_type': u'ceph', u'os-vol-mig-status-attr:name_id': None, u'metadata': {u'readonly': u'False', u'attached_mode': u'rw'}}, '_loaded': True})
 
     volumes['97aafa48-2d2c-4372-85ca-1d9d32cde50e'] = bunchify({'attachments': [{u'server_id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e', u'attachment_id': u'ca8ce5ab-4b54-4795-9b89-919aa9271042', u'host_name': None, u'volume_id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e', u'device': u'/dev/vdb', u'id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e'}], 'availability_zone': u'nova', 'os-vol-host-attr:host': u'kilocontroller@ceph#ceph', 'encrypted': False, 'os-volume-replication:extended_status': None, 'manager': 'VolumeManager', 'os-volume-replication:driver_data': None, 'snapshot_id': None, 'id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e', 'size': 160, 'display_name': u'vol2', 'display_description': None, 'os-vol-tenant-attr:tenant_id': u'000d038df75743a88cefaacd9b704b94', 'os-vol-mig-status-attr:migstat': None, 'metadata': {u'readonly': u'False', u'attached_mode': u'rw'}, 'status': u'in-use', 'multiattach': u'false', 'source_volid': None, 'os-vol-mig-status-attr:name_id': None, 'bootable': u'false', 'created_at': u'2016-12-02T15:43:09.000000', 'volume_type': u'ceph', '_info': {u'status': u'in-use', u'display_name': u'vol2', u'attachments': [{u'server_id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e', u'attachment_id': u'ca8ce5ab-4b54-4795-9b89-919aa9271042', u'host_name': None, u'volume_id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e', u'device': u'/dev/vdb', u'id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e'}], u'availability_zone': u'nova', u'bootable': u'false', u'encrypted': False, u'created_at': u'2016-12-02T15:43:09.000000', u'multiattach': u'false', u'os-vol-mig-status-attr:migstat': None, u'os-volume-replication:driver_data': None, u'os-volume-replication:extended_status': None, u'os-vol-host-attr:host': u'kilocontroller@ceph#ceph', u'snapshot_id': None, u'display_description': None, u'os-vol-tenant-attr:tenant_id': u'000d038df75743a88cefaacd9b704b94', u'source_volid': None, u'id': u'97aafa48-2d2c-4372-85ca-1d9d32cde50e', u'size': 160, u'volume_type': u'ceph', u'os-vol-mig-status-attr:name_id': None, u'metadata': {u'readonly': u'False', u'attached_mode': u'rw'}}, '_loaded': True})
+
+    volumes[id].__dict__ = unbunchify(volumes[id])
     return volumes[id]
 
+def get_glance_image(*args, **kwargs):
+    return {'status': u'active', 'name': u'cirros-0.3.4-x86_64-uec', 'deleted': False, 'container_format': u'ami', 'created_at': '2017', 'disk_format': u'ami', 'updated_at': '2017', 'id': u'27d059ff-909e-4a84-9901-2ec62bb5407e', 'owner': u'd79496254ddd476891a5fba637ec100e', 'min_ram': 0, 'checksum': u'eb9139e4942121f22bbc2afc0400b2a4', 'min_disk': 0, 'is_public': True, 'deleted_at': None, 'properties': {u'kernel_id': u'a873ad90-20d8-421c-99dc-3dbbd0e7721f', u'ramdisk_id': u'6163a31f-f06d-4b22-b30a-f6a13345014d'}, 'size': 25165824}
 
+def _get_interfaces(*args, **kwargs):
+    interface = bunchify({'fixed_ips': [{u'subnet_id': u'39afe48d-3b15-42f8-bdaf-9bf815e7015c', u'ip_address': u'10.0.0.3'}], 'port_state': u'ACTIVE', 'manager': 'ServerManager', 'mac_addr': u'fa:16:3e:7e:c5:88', '_info': {u'port_state': u'ACTIVE', u'port_id': u'f5f1b34e-40de-49a6-a2c4-6d2283630502', u'fixed_ips': [{u'subnet_id': u'39afe48d-3b15-42f8-bdaf-9bf815e7015c', u'ip_address': u'10.0.0.3'}], u'net_id': u'7e5e75f5-872d-43e9-a00e-b791862d3378', u'mac_addr': u'fa:16:3e:7e:c5:88'}, 'port_id': u'f5f1b34e-40de-49a6-a2c4-6d2283630502', 'net_id': u'7e5e75f5-872d-43e9-a00e-b791862d3378', '_loaded': True})
+    interfaces = []
+    interfaces.append(interface)
+    return interfaces
+
+def _port_data(*args, **kwargs):
+    return {u'port': {u'status': u'ACTIVE', u'binding:host_id': u'kilocontroller', u'name': u'', u'allowed_address_pairs': [], u'admin_state_up': True, u'network_id': u'7e5e75f5-872d-43e9-a00e-b791862d3378', u'tenant_id': u'4cdf6b19c2644369a5e64277810d8016', u'extra_dhcp_opts': [], u'binding:vif_details': {u'port_filter': True, u'ovs_hybrid_plug': True}, u'binding:vif_type': u'ovs', u'device_owner': u'compute:nova', u'mac_address': u'fa:16:3e:7e:c5:88', u'binding:profile': {}, u'binding:vnic_type': u'normal', u'fixed_ips': [{u'subnet_id': u'39afe48d-3b15-42f8-bdaf-9bf815e7015c', u'ip_address': u'10.0.0.3'}], u'id': u'f5f1b34e-40de-49a6-a2c4-6d2283630502', u'security_groups': [u'2aa7b3e8-ed27-48b8-8fb7-5ba29efe1e6d'], u'device_id': u'18ee5bb3-385d-4e1b-a87b-b60cd626c4f7'}}
+
+def _subnets_data(*args, **kwargs):
+    return {'subnets': [{u'name': u'private-subnet', u'enable_dhcp': True, u'network_id': u'7e5e75f5-872d-43e9-a00e-b791862d3378', u'tenant_id': u'4cdf6b19c2644369a5e64277810d8016', u'dns_nameservers': [], u'ipv6_ra_mode': None, u'allocation_pools': [{u'start': u'10.0.0.2', u'end': u'10.0.0.254'}], u'gateway_ip': u'10.0.0.1', u'ipv6_address_mode': None, u'ip_version': 4, u'host_routes': [], u'cidr': u'10.0.0.0/24', u'id': u'39afe48d-3b15-42f8-bdaf-9bf815e7015c', u'subnetpool_id': None}]}
+
+def _network(*args, **kwargs):
+    return {u'status': u'ACTIVE', u'subnets': [u'39afe48d-3b15-42f8-bdaf-9bf815e7015c'], u'name': u'private', u'provider:physical_network': None, u'router:external': False, u'tenant_id': u'4cdf6b19c2644369a5e64277810d8016', u'admin_state_up': True, 'label': u'private', u'mtu': 0, u'shared': False, u'provider:network_type': u'vxlan', u'id': u'7e5e75f5-872d-43e9-a00e-b791862d3378', u'provider:segmentation_id': 1099}
+
+def _routers_data(*args, **kwargs):
+    return [{u'status': u'ACTIVE', u'external_gateway_info': {u'network_id': u'4477fb7e-78e7-45fb-9ba0-14ee79f2d97a', u'enable_snat': True, u'external_fixed_ips': [{u'subnet_id': u'2be808b5-2fd6-4883-a611-df527355ba80', u'ip_address': u'172.24.4.2'}]}, u'name': u'router1', u'admin_state_up': True, u'tenant_id': u'4cdf6b19c2644369a5e64277810d8016', u'distributed': False, u'routes': [], u'ha': False, u'id': u'495d3f5e-eb3c-475a-9e96-f6fa16044a1f'}]
+
+def _router_ports(*args, **kwargs):
+    return [{u'status': u'ACTIVE', u'binding:host_id': u'kilocontroller', u'name': u'', u'allowed_address_pairs': [], u'admin_state_up': True, u'network_id': u'7e5e75f5-872d-43e9-a00e-b791862d3378', u'tenant_id': u'4cdf6b19c2644369a5e64277810d8016', u'extra_dhcp_opts': [], u'binding:vif_details': {u'port_filter': True, u'ovs_hybrid_plug': True}, u'binding:vif_type': u'ovs', u'device_owner': u'network:router_interface', u'mac_address': u'fa:16:3e:d9:55:c3', u'binding:profile': {}, u'binding:vnic_type': u'normal', u'fixed_ips': [{u'subnet_id': u'39afe48d-3b15-42f8-bdaf-9bf815e7015c', u'ip_address': u'10.0.0.1'}], u'id': u'e91aae8b-3259-45d9-b52d-af3a2a2072a2', u'security_groups': [], u'device_id': u'495d3f5e-eb3c-475a-9e96-f6fa16044a1f'}]
+
+def _router_ext_ports(*args, **kwargs):
+    return  [{u'status': u'ACTIVE', u'binding:host_id': u'kilocontroller', u'name': u'', u'allowed_address_pairs': [], u'admin_state_up': True, u'network_id': u'4477fb7e-78e7-45fb-9ba0-14ee79f2d97a', u'tenant_id': u'', u'extra_dhcp_opts': [], u'binding:vif_details': {u'port_filter': True, u'ovs_hybrid_plug': True}, u'binding:vif_type': u'ovs', u'device_owner': u'network:router_gateway', u'mac_address': u'fa:16:3e:7f:2e:ae', u'binding:profile': {}, u'binding:vnic_type': u'normal', u'fixed_ips': [{u'subnet_id': u'2be808b5-2fd6-4883-a611-df527355ba80', u'ip_address': u'172.24.4.2'}], u'id': u'26168992-778b-416b-8253-458c4ff38b1f', u'security_groups': [], u'device_id': u'495d3f5e-eb3c-475a-9e96-f6fa16044a1f'}]
+
+def _ext_subnets_data(*args, **kwargs):
+    return {'subnets': [{u'name': u'public-subnet', u'enable_dhcp': False, u'network_id': u'4477fb7e-78e7-45fb-9ba0-14ee79f2d97a', u'tenant_id': u'd79496254ddd476891a5fba637ec100e', u'dns_nameservers': [], u'ipv6_ra_mode': None, u'allocation_pools': [{u'start': u'172.24.4.2', u'end': u'172.24.4.254'}], u'gateway_ip': u'172.24.4.1', u'ipv6_address_mode': None, u'ip_version': 4, u'host_routes': [], u'cidr': u'172.24.4.0/24', u'id': u'2be808b5-2fd6-4883-a611-df527355ba80', u'subnetpool_id': None}]}
+
+def _snapshot_data_ex(*args, **kwargs):
+    return {u'disks_info': [{u'dev': u'vda', u'snapshot_name': u'triliovault:416620e5-e5f6-40a7-a8ca-f422b9be381b', u'backings': [{u'path': u'rbd:vms/18ee5bb3-385d-4e1b-a87b-b60cd626c4f7_disk', u'size': 1073741824}], u'volume_id': None, u'path': u'rbd:vms/18ee5bb3-385d-4e1b-a87b-b60cd626c4f7_disk', u'size': 1073741824, u'type': u'network', u'backend': u'rbdboot'}, {u'status': u'creating', u'display_name': u'TrilioVaultSnapshot', u'created_at': u'2017-01-20T01:35:50.315882', u'size': 1073741824, u'display_description': u'TrilioVault initiated snapshot', u'volume_size': 1, u'dev': u'vdb', u'backings': [{u'path': u'6847f146-bf45-46f7-9860-0f35734b2f30', u'size': 1073741824}], u'volume_id': u'e24b486e-189d-48a6-aacb-4329e43ce9a1', u'progress': None, u'path': u'volumes/volume-e24b486e-189d-48a6-aacb-4329e43ce9a1', u'project_id': u'4cdf6b19c2644369a5e64277810d8016', u'id': u'6847f146-bf45-46f7-9860-0f35734b2f30', u'backend': u'rbd'}]}
+
+
+def create_qcow2_image(source, out_format="qcow2", size="1G", run_as_root=False):
+
+    def _mkdir_p(path):
+        try:
+            os.makedirs(path)
+        except OSError as exc:  # Python >2.5
+            if exc.errno == errno.EEXIST and os.path.isdir(path):
+                pass
+            else:
+                raise
+
+    _mkdir_p(os.path.dirname(source))
+    cmd = ('qemu-img', 'create', '-f', out_format, source, "1G")
+    utils.execute(*cmd, run_as_root=run_as_root)
