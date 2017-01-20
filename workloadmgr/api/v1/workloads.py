@@ -898,10 +898,11 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
 
-    def get_orphaned_workloads_list(self, req, body):
+    def get_orphaned_workloads_list(self, req ):
         try:
             context = req.environ['workloadmgr.context']
-            migrate_cloud = body['migrate_cloud']
+            qs = parse_qs(req.environ['QUERY_STRING'])
+            migrate_cloud = bool(qs.get('migrate_cloud')[0])
             try:
                 workloads = self.workload_api.get_orphaned_workloads_list(context, migrate_cloud)
                 return self._view_builder.detail_list(req, workloads)

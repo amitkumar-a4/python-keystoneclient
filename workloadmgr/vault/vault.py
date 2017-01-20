@@ -1128,6 +1128,56 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     return sortedlist[0]['endpoint']
 
+def get_workloads_for_tenant(context, tenant_ids):
+    workload_ids = []
+    for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+        backup_target = None
+        try:
+            backup_target = vault.get_backup_target(backup_endpoint)
+            for workload_url in backup_target.get_workloads(context):
+                workload_values = json.loads(backup_target.get_object(\
+                        os.path.join(workload_url, 'workload_db')))
+                project_id = workload_values.get('project_id')
+                workload_id = workload_values.get('id')
+                if project_id in tenant_ids:
+                    workload_ids.append(workload_id)
+        except Exception as ex:
+            LOG.exception(ex)
+    return  workload_ids
+
+def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
+
+    workload_urls = []
+
+    try:
+        #Get list of workload directory path for workloads need to update
+        for workload_id in workloads_to_update:
+            for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+                backup_target = None
+                backup_target = get_backup_target(backup_endpoint)
+                workload_url = os.path.join(backup_target.mount_path, "workload_" + workload_id)
+                if os.path.isdir(workload_url):
+                    workload_urls.append(workload_url)
+                    break;
+
+        #Iterate through each workload directory and update workload_db and snapsot_db with new values
+        for workload_path in workload_urls:
+            for path, subdirs, files in os.walk(workload_path):
+                for name in files:
+                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
+                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+
+                        if db_values.get('project_id', None) is not None:
+                            db_values['project_id'] = new_tenant_id
+                        else:
+                            db_values['tenant_id'] = new_tenant_id
+                        db_values['user_id'] = user_id
+
+                        with open(os.path.join(path, name), 'w') as file:
+                            json.dump(db_values, file)
+    except Exception as ex:
+        LOG.exception(ex)
+
 """
 if __name__ == '__main__':
     nfsbackend = 
