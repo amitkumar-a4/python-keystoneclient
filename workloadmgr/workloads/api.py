@@ -2345,8 +2345,7 @@ class API(base.Base):
             # Check for valid tenant
             if project_id in tenant_list:
                 # Check for valid workload user
-                if keystone_utils.user_exist_in_tenant(context, project_id, user_id) \
-                        and keystone_utils.check_user_role(context, project_id, user_id):
+                if keystone_utils.user_exist_in_tenant(context, project_id, user_id):
                     pass
                 else:
                     workloads.append(workload)
@@ -2359,8 +2358,6 @@ class API(base.Base):
                 _check_workload(context, workload.__dict__)
         else:
             for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
-                vault.get_backup_target(backup_endpoint)
-            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
                 backup_target = None
                 try:
                     backup_target = vault.get_backup_target(backup_endpoint)
@@ -2368,8 +2365,6 @@ class API(base.Base):
                         try:
                             workload_values = json.loads(backup_target.get_object(
                                 os.path.join(workload_url, 'workload_db')))
-                            #project_id = workload_values.get('project_id')
-                            #user_id = workload_values.get('user_id')
                             _check_workload(context, workload_values)
                         except Exception as ex:
                             LOG.exception(ex)
@@ -2418,7 +2413,6 @@ class API(base.Base):
         '''
 
         AUDITLOG.log(context, 'Reassign workloads Requested', None)
-        from workloadmgr.workloads import API
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
 
@@ -2450,12 +2444,11 @@ class API(base.Base):
                                 if workload.project_id in old_tenant_ids:
                                     workload_ids.append(workload.id)
                        else:
-                           workload_ids = keystone_utils.get_workloads_for_tenant(context, old_tenant_ids)
+                           workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
 
-                    workloadmgrapi = API()
                     for workload_id in workload_ids:
                         try:
-                            workload = workloadmgrapi.workload_get(context, workload_id)
+                            workload = self.workload_get(context, workload_id)
                             workload_to_update.append(workload_id)
                         except Exception as ex:
                             if migrate_cloud is True:
@@ -2465,12 +2458,12 @@ class API(base.Base):
                                 current cloud, to reassign them set migrate_cloud option to True")
 
                     if workload_to_import:
-                        keystone_utils.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
+                        vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
                         imported_workloads = self.import_workloads(context, workload_to_import, True)
                         workloads.extend(imported_workloads)
 
                     if workload_to_update:
-                        keystone_utils.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
+                        vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
                         updated_workloads = self._update_workloads(context, workload_to_update, new_tenant_id, user_id)
                         workloads.extend(updated_workloads)
 
