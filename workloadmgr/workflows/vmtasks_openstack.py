@@ -228,14 +228,9 @@ def snapshot_vm_networks(cntx, db, instances, snapshot):
                 nics = _snapshot_neutron_networks(instance)
                 network_type = "neutron"
             except Exception as ex:
-                 LOG.exception(ex)
-
-            if network_type == "":    
-                try:
-                    nics = _snapshot_nova_networks(instance)
-                    network_type = "nova"
-                except Exception as ex:
-                    LOG.exception(ex)
+                # This is configured to use nova network
+                nics = _snapshot_nova_networks(instance)
+                network_type = "nova"
 
             for nic in nics:
                 snapshot_vm_resource_values = {
