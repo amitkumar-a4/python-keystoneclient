@@ -898,7 +898,7 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
 
-    def get_orphaned_workloads_list(self, req ):
+    def get_orphaned_workloads_list(self, req, path_info=None ):
         try:
             context = req.environ['workloadmgr.context']
             qs = parse_qs(req.environ['QUERY_STRING'])

@@ -128,6 +128,10 @@ def workload_get_all(context, **kwargs):
     """Get all workloads."""
     return IMPL.workload_get_all(context, **kwargs)
 
+def workload_get_by_projects(context, project_list, exclude=False):
+    """Get workloads for given project id's"""
+    return IMPL.workload_get_by_projects(context, project_list, exclude)
+
 def workload_create(context, values):
     """Create a workload from the values dictionary."""
     return IMPL.workload_create(context, values)

@@ -2336,7 +2336,7 @@ class API(base.Base):
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
         workloads = []
-        projects = vault.get_project_list_for_import(context)
+        projects = keystone_utils.get_project_list_for_import(context)
         tenant_list = [project.id for project in projects]
     
         def _check_workload(context, workload):
@@ -2419,7 +2419,7 @@ class API(base.Base):
         workloads = []
         workload_to_update = []
         workload_to_import = []
-        projects = vault.get_project_list_for_import(context)
+        projects = keystone_utils.get_project_list_for_import(context)
         tenant_list = [project.id for project in projects]
         for tenant_map in tenant_maps:
             workload_ids = tenant_map['workload_ids']
@@ -2439,10 +2439,9 @@ class API(base.Base):
                                 if old_tenant_id not in tenant_list:
                                    raise wlm_exceptions.ProjectNotFound(old_tenant_id)
                             workload_ids = []
-                            workloads_in_db = self.db.workload_get_all(context)
+                            workloads_in_db = self.db.workload_get_by_projects(context, old_tenant_ids)
                             for workload in workloads_in_db:
-                                if workload.project_id in old_tenant_ids:
-                                    workload_ids.append(workload.id)
+                                workload_ids.append(workload.id)
                        else:
                            workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
 

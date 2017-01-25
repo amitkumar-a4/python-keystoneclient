@@ -210,7 +210,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='get_auditlog',
                        conditions={"method": ['GET']})                    
-        
+
         #get the specified workload
         mapper.connect("workloads_4",
                        "/{project_id}/workloads/{id}",
@@ -233,7 +233,7 @@ class APIRouter(workloadmgr.api.APIRouter):
 
         #list orphaned workloads
         mapper.connect("orphaned_workload_list",
-                       "/{project_id}/workloads/get_list/orphan_workloads",
+                       "/{project_id}/workloads/{path_info:orphan_workloads}/",
                        controller=self.resources['workloads'],
                        action='get_orphaned_workloads_list',
                        conditions={"method": ['GET']})

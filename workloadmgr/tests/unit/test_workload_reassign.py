@@ -124,7 +124,7 @@ class BaseReassignAPITestCase(test.TestCase):
             f.write(json.dumps(snapshot))
         return snapshot
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_single_old_tenant(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -176,7 +176,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual( db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual( db_values.get('user_id', None), user_id)
     
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_multiple_old_tenant(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -233,7 +233,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual( db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual( db_values.get('user_id', None), user_id)
      
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_non_existing_old_tenant(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -267,7 +267,7 @@ class BaseReassignAPITestCase(test.TestCase):
         ]
         self.assertRaises(wlm_exceptions.ProjectNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
    
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_existing_new_tenant_and_user_id(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -318,7 +318,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual(db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual(db_values.get('user_id', None), user_id)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_non_existing_new_tenant(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -353,7 +353,7 @@ class BaseReassignAPITestCase(test.TestCase):
         ]
         self.assertRaises(wlm_exceptions.ProjectNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_non_existing_user_id(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -388,7 +388,7 @@ class BaseReassignAPITestCase(test.TestCase):
         ]
         self.assertRaises(wlm_exceptions.UserNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
         
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_single_workload(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -436,7 +436,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual(db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual(db_values.get('user_id', None), user_id)
     
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_multiple_workload(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -487,7 +487,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual(db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual(db_values.get('user_id', None), user_id)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_existing_project_id_and_migrate_cloud(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -540,7 +540,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual(db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual(db_values.get('user_id', None), user_id)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_non_existing_project_id_and_migrate_cloud(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -577,7 +577,7 @@ class BaseReassignAPITestCase(test.TestCase):
         ]
         self.assertRaises(wlm_exceptions.ProjectNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map) 
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_existing_user_id_and_migrate_cloud(self, check_user_mock, user_exist_mock, get_project_mock):
@@ -630,7 +630,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         self.assertEqual(db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual(db_values.get('user_id', None), user_id)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
     def test_reassign_with_non_existing_user_id_and_migrate_cloud(self, check_user_mock, user_exist_mock, get_project_mock):

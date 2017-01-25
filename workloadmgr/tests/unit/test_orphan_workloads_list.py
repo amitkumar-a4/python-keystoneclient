@@ -126,7 +126,7 @@ class BaseReassignAPITestCase(test.TestCase):
             f.write(json.dumps(snapshot))
         return snapshot
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     def test_orphan_workload_list_with_existing_tenant_and_user(self, user_exist_mock, get_project_mock):
 
@@ -149,7 +149,7 @@ class BaseReassignAPITestCase(test.TestCase):
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context)
         self.assertEqual(workloads, [])
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     def test_orphan_workload_list_with_non_existing_tenant(self, user_exist_mock, get_project_mock):
 
@@ -172,7 +172,7 @@ class BaseReassignAPITestCase(test.TestCase):
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context)
         self.assertEqual(len(workloads), 5)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     def test_orphan_workload_list_with_non_existing_user(self, user_exist_mock, get_project_mock):
 
@@ -191,11 +191,10 @@ class BaseReassignAPITestCase(test.TestCase):
         for w in workloads:
             for i in range(5):
                 self.create_snapshot(workload)
-
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context)
         self.assertEqual(len(workloads), 5)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     def test_orphan_workload_list_with_existing_tenant_and_user_with_migrate_cloud(self, user_exist_mock,
                                                                  get_project_mock):
@@ -223,7 +222,7 @@ class BaseReassignAPITestCase(test.TestCase):
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context, migrate_cloud=True)
         self.assertEqual(workloads, [])
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     def test_orphan_workload_list_with_non_exist_tenant_with_migrate_cloud(self, user_exist_mock,
                                                                  get_project_mock):
@@ -251,7 +250,7 @@ class BaseReassignAPITestCase(test.TestCase):
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context, migrate_cloud=True)
         self.assertEqual(len(workloads), 5)
 
-    @patch('workloadmgr.vault.vault.get_project_list_for_import')
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
     @patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
     def test_orphan_workload_list_with_non_exist_user_with_migrate_cloud(self, user_exist_mock,
                                                                  get_project_mock):
