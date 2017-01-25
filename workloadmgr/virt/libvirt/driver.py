@@ -958,8 +958,8 @@ class LibvirtDriver(driver.ComputeDriver):
                         backup_target.mount_path,
                         vm_disk_resource_snap.vault_url.strip(os.sep))
                     try:
-                        os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
-                                   'snapshot_'+snapshot_obj.id))
+                        """os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
+                                   'snapshot_'+snapshot_obj.id))"""
                         os.listdir(os.path.split(resource_snap_path)[0])
                     except Exception as ex:
                            pass
