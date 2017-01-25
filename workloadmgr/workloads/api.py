@@ -827,6 +827,8 @@ class API(base.Base):
                                              'import_settings')
             import_settings_method(context, models.DB_VERSION)
 
+            self.workload_ensure_global_job_scheduler(context)
+
             #TODO:Need to make this call to a single import module instead of 
             #looking for new import module for each new build.
             import_workload_module = importlib.import_module(
