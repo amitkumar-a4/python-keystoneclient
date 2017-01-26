@@ -76,6 +76,15 @@ class BaseWorkloadTestCase(test.TestCase):
                           self.context)
 
     def test_get_storage_usage(self):
-        import pdb;pdb.set_trace()
         self.context.is_admin = True
-        self.workloadAPI.get_storage_usage(self.context)
+        storage_usage = self.workloadAPI.get_storage_usage(self.context)
+
+        self.assertEqual(len(storage_usage['storage_usage']), 3)
+        self.assertTrue('count_dict' in storage_usage)
+        shares = set(['server1:nfsshare1', 'server2:nfsshare2', 'server3:nfsshare3'])
+        sharesinusage = []
+        storage_usage['storage_usage'][0]['nfs_share(s)'][0]['nfsshare']
+        for details in storage_usage['storage_usage']:
+            sharesinusage.append(details['nfs_share(s)'][0]['nfsshare'])
+
+        self.assertEqual(set(sharesinusage), shares)
