@@ -966,7 +966,7 @@ class API(base.Base):
         total_usage = 0
         nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
-            nfsshare - nfsshare.strip()
+            nfsshare = nfsshare.strip()
             stat = nfsstats[nfsshare]
 
             total_capacity = stat['total_capacity']
