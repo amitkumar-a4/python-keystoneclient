@@ -586,6 +586,17 @@ def workload_get_all(context, **kwargs):
         else:
              qs = qs.filter_by(project_id=context.project_id)
 
+        if 'project_list' in kwargs:
+           project_list = kwargs['project_list']
+           if isinstance(project_list, list):
+              if 'exclude' in kwargs and kwargs['exclude'] is True:
+                 qs = qs.filter(and_(models.Workloads.project_id.notin_(project_list)) )
+              else:
+                 qs = qs.filter(and_(models.Workloads.project_id.in_(project_list)) )
+           else:
+               error = _('project list should be list')
+               raise exception.ErrorOccurred(reason=error)
+
         qs = qs.order_by(models.Workloads.created_at.desc())
 
         if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
@@ -617,22 +628,6 @@ def workload_get(context, id, **kwargs):
     session = get_session() 
     return _workload_get(context, id, session, **kwargs)   
 
-@require_context
-def workload_get_by_projects(context, project_list, exclude):
-    qs = model_query(context, models.Workloads). \
-        options(sa_orm.joinedload(models.Workloads.metadata))
-
-    if isinstance(project_list, list):
-        if exclude:
-            qs = qs.filter(and_(models.Workloads.project_id.notin_(project_list)) )
-        else:
-            qs = qs.filter(and_(models.Workloads.project_id.in_(project_list)) )
-    else:
-        error = _('project list should be list')
-        raise exception.ErrorOccurred(reason=error)
-
-    return qs.all()
-    
 @require_context
 def workload_delete(context, id):
     session = get_session()

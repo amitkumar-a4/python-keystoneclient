@@ -2439,7 +2439,8 @@ class API(base.Base):
                                 if old_tenant_id not in tenant_list:
                                    raise wlm_exceptions.ProjectNotFound(old_tenant_id)
                             workload_ids = []
-                            workloads_in_db = self.db.workload_get_by_projects(context, old_tenant_ids)
+                            kwargs = {'project_list': old_tenant_ids}
+                            workloads_in_db = self.db.workload_get_all(context, **kwargs)
                             for workload in workloads_in_db:
                                 workload_ids.append(workload.id)
                        else:
