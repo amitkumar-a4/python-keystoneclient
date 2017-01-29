@@ -91,6 +91,7 @@ class BaseVaultTestCase(test.TestCase):
 
         import workloadmgr.vault.vault
         from workloadmgr.db.imports.import_workload_1_0_177 import import_workload
+        from workloadmgr.db.imports.import_workload_1_0_177 import import_settings
 
         values = [{'server1:nfsshare1': [1099511627776, 0],}.values()[0],
                    {'server2:nfsshare2': [1099511627776, 0],}.values()[0],
@@ -170,6 +171,11 @@ class BaseVaultTestCase(test.TestCase):
                  f.write(json.dumps(workload))
 
             return workload
+ 
+        def create_setting(cntx):
+            backup_target = vault.get_settings_backup_target() 
+            settings_db = [{"status": "available", "category": "job_scheduler", "user_id": cntx.user_id, "description": "Controls job scheduler status", "deleted": False, "value": "1", "name": "global-job-scheduler", "version": "2.3.1", "hidden": False, "project_id": cntx.project_id, "type": "job-scheduler-setting", "public": False, "metadata": []}]
+            backup_target.put_object('settings_db', json.dumps(settings_db))
 
         def delete_workload(workload):
             for meta in workload['metadata']:
@@ -255,9 +261,15 @@ class BaseVaultTestCase(test.TestCase):
             for s in range(5):
                 create_snapshot(w)
 
+        create_setting(self.context)
+
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
 
+        import_settings(self.context, '2.3.1')
+        setting = self.db.setting_get(self.context, 'global-job-scheduler')
+        self.assertEqual(setting.name, 'global-job-scheduler')
+        self.assertEqual(setting.value, '1')
         import_workload(self.context, [], '2.3.1')
         workloads_in_db = self.db.workload_get_all(self.context)
         self.assertEqual(len(workloads_in_db), 20)
