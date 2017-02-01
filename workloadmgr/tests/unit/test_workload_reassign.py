@@ -37,20 +37,29 @@ class BaseReassignAPITestCase(test.TestCase):
 
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
-        self.project_list_for_import = patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
-        self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
-        self.user_role = patch('workloadmgr.common.workloadmgr_keystoneclient.check_user_role')
+        self.project_list_for_import = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.get_project_list_for_import')
+        self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.user_exist_in_tenant')
+        self.user_role = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.check_user_role')
+        self.project_list_for_importV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.get_project_list_for_import')
+        self.user_exist_in_tenantV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.user_exist_in_tenant')
+        self.user_roleV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.check_user_role')
 
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.ProjectListMockMethod = self.project_list_for_import.start()
         self.UserExistMockMethod = self.user_exist_in_tenant.start()
         self.UserRoleMockMethod = self.user_role.start()
+        self.ProjectListMockMethodV3 = self.project_list_for_importV3.start()
+        self.UserExistMockMethodV3 = self.user_exist_in_tenantV3.start()
+        self.UserRoleMockMethodV3 = self.user_roleV3.start()
 
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
         self.UserExistMockMethod.return_value = True
         self.UserRoleMockMethod.return_value = True
+        self.ProjectListMockMethodV3.return_value = True
+        self.UserExistMockMethodV3.return_value = True
+        self.UserRoleMockMethodV3.return_value = True
 
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import API
@@ -79,6 +88,9 @@ class BaseReassignAPITestCase(test.TestCase):
         self.project_list_for_import.stop()
         self.user_exist_in_tenant.stop()
         self.user_role.stop()
+        self.project_list_for_importV3.stop()
+        self.user_exist_in_tenantV3.stop()
+        self.user_roleV3.stop()
         self.stderr_patch.stop()
 
         super(BaseReassignAPITestCase, self).tearDown()
@@ -126,6 +138,113 @@ class BaseReassignAPITestCase(test.TestCase):
             f.write(json.dumps(snapshot))
         return snapshot
 
+    def test_reassign_for_idempotent(self):
+        update_workload = patch('workloadmgr.workloads.api.API._update_workloads')
+        UpdateWorkloadMockMethod = update_workload.start()
+        UpdateWorkloadMockMethod.side_effect = wlm_exceptions.DBError('DB crashed.')
+        new_tenant_id = str(uuid.uuid4())
+        old_tenant_id = self.context.project_id
+        tenant_list = [bunchify({'id': new_tenant_id}), bunchify({'id': old_tenant_id})]
+        self.ProjectListMockMethod.return_value = tenant_list
+
+        for wdb in self.db.workload_get_all(self.context):
+            self.db.workload_delete(self.context, wdb.id)
+
+        workloads = []
+        for i in range(5):
+            workload = self.create_workload()
+            workloads.append(workload)
+
+        for w in workloads:
+            for i in range(5):
+                self.create_snapshot(workload)
+
+        user_id = self.context.user_id
+        tenant_map = [
+            {'old_tenant_ids': [],
+             'new_tenant_id': new_tenant_id,
+             'user_id': user_id,
+             'workload_ids': [workload['id'] for workload in workloads],
+             'migrate_cloud': False
+             }
+        ]
+
+        self.assertRaises(wlm_exceptions.DBError, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+        update_workload.stop()
+
+        self.workloadAPI.workloads_reassign(self.context, tenant_map)
+        workloads_in_db = self.db.workload_get_all(self.context)
+        for w in workloads_in_db:
+            self.assertEqual(w.project_id, new_tenant_id)
+            self.assertEqual(w.user_id, user_id)
+        for workload in workloads:
+            for meta in workload['metadata']:
+                if meta['key'] == 'backup_media_target':
+                    backup_target = meta['value']
+            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+
+            for path, subdirs, files in os.walk(workload_path):
+                for name in files:
+                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
+                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
+                        self.assertEqual(db_values.get('user_id', None), user_id)
+
+    def test_reassign_for_idempotent_with_migrate(self):
+        import_workload = patch('workloadmgr.workloads.api.API.import_workloads')
+        ImportWorkloadMockMethod = import_workload.start()
+        ImportWorkloadMockMethod.side_effect = wlm_exceptions.DBError('DB crashed.')
+        new_tenant_id = str(uuid.uuid4())
+        old_tenant_id = self.context.project_id
+        tenant_list = [bunchify({'id': new_tenant_id}), bunchify({'id': old_tenant_id})]
+        self.ProjectListMockMethod.return_value = tenant_list
+
+        for wdb in self.db.workload_get_all(self.context):
+            self.db.workload_delete(self.context, wdb.id)
+
+        workloads = []
+        for i in range(5):
+            workload = self.create_workload()
+            workloads.append(workload)
+
+        for workload in workloads:
+            for i in range(5):
+                snapshot = self.create_snapshot(workload)
+                self.db.snapshot_delete(self.context, snapshot['id'])
+            self.db.workload_delete(self.context, workload['id'])
+
+        user_id = self.context.user_id
+        tenant_map = [
+            {'old_tenant_ids': [old_tenant_id],
+             'new_tenant_id': new_tenant_id,
+             'user_id': user_id,
+             'workload_ids': None,
+             'migrate_cloud': True
+             }
+
+        ]
+
+        self.assertRaises(wlm_exceptions.DBError, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+        import_workload.stop()
+
+        self.workloadAPI.workloads_reassign(self.context, tenant_map)
+        workloads_in_db = self.db.workload_get_all(self.context)
+        for w in workloads_in_db:
+            self.assertEqual(w.project_id, new_tenant_id)
+            self.assertEqual(w.user_id, user_id)
+        for workload in workloads:
+            for meta in workload['metadata']:
+                if meta['key'] == 'backup_media_target':
+                    backup_target = meta['value']
+            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+
+            for path, subdirs, files in os.walk(workload_path):
+                for name in files:
+                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
+                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
+                        self.assertEqual(db_values.get('user_id', None), user_id)
+ 
     def test_reassign_with_single_old_tenant(self):
 
         new_tenant_id = str(uuid.uuid4())
@@ -358,7 +477,7 @@ class BaseReassignAPITestCase(test.TestCase):
              }
         ]
         self.assertRaises(wlm_exceptions.UserNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
-
+ 
     def test_reassign_with_single_workload(self):
 
         new_tenant_id = str(uuid.uuid4())
@@ -374,7 +493,6 @@ class BaseReassignAPITestCase(test.TestCase):
 
         for i in range(5):
             self.create_snapshot(workload)
-
         user_id = self.context.user_id
         tenant_map = [
             {'old_tenant_ids': [],
@@ -608,4 +726,4 @@ class BaseReassignAPITestCase(test.TestCase):
              }
         ]
         self.assertRaises(wlm_exceptions.UserNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
-
+    

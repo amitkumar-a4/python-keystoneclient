@@ -36,15 +36,23 @@ class BaseReassignAPITestCase(test.TestCase):
 
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
-        self.project_list_for_import =  patch('workloadmgr.common.workloadmgr_keystoneclient.get_project_list_for_import')
-        self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.user_exist_in_tenant')
+        self.project_list_for_import =  patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.get_project_list_for_import')
+        self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.user_exist_in_tenant')
+        self.project_list_for_importV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.get_project_list_for_import')
+        self.user_exist_in_tenantV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.user_exist_in_tenant')
+        self.user_list_patach = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient.get_user_list')
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.ProjectListMockMethod = self.project_list_for_import.start()
         self.UserExistMockMethod = self.user_exist_in_tenant.start()
+        self.ProjectListMockMethodV3 = self.project_list_for_importV3.start()
+        self.UserExistMockMethodV3 = self.user_exist_in_tenantV3.start()
+        self.UserListMockMethod = self.user_list_patach.start()
+
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
         self.UserExistMockMethod.return_value = True
+        self.UserExistMockMethodV3.return_value = True
 
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import API
@@ -53,6 +61,7 @@ class BaseReassignAPITestCase(test.TestCase):
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = str(uuid.uuid4())
         self.context.tenant_id = self.context.project_id
+        self.UserListMockMethod.return_value = [bunchify({'id': str(self.context.user_id)})]
 
     def tearDown(self):
         #Delete all workloads and snapshots from database
@@ -70,6 +79,8 @@ class BaseReassignAPITestCase(test.TestCase):
         self.is_online_patch.stop()
         self.subprocess_patch.stop()
         self.stderr_patch.stop()
+        self.project_list_for_importV3.stop()
+        self.user_exist_in_tenantV3.stop()
 
         super(BaseReassignAPITestCase, self).tearDown()
 
@@ -120,6 +131,7 @@ class BaseReassignAPITestCase(test.TestCase):
 
         tenant_list = [bunchify({'id': self.context.project_id })]
         self.ProjectListMockMethod.return_value = tenant_list
+        self.ProjectListMockMethodV3.return_value = tenant_list
 
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
@@ -138,7 +150,8 @@ class BaseReassignAPITestCase(test.TestCase):
     def test_orphan_workload_list_with_non_existing_tenant(self):
 
         tenant_list = [bunchify({'id': str(uuid.uuid4()) })]
-        self.ProjectListMockMethod.return_value = tenant_list
+        self.ProjectListMockMethod.return_value = [bunchify({'id': str(uuid.uuid4()) })]
+        self.ProjectListMockMethodV3.return_value = [bunchify({'id': str(uuid.uuid4()) })]
 
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
@@ -157,8 +170,11 @@ class BaseReassignAPITestCase(test.TestCase):
     def test_orphan_workload_list_with_non_existing_user(self):
 
         self.UserExistMockMethod.return_value = False
+        self.UserExistMockMethodV3.return_value = False
+        self.UserListMockMethod.return_value = [bunchify({'id':  str(uuid.uuid4()) })]
         tenant_list = [bunchify({'id': self.context.project_id })]
         self.ProjectListMockMethod.return_value = tenant_list
+        self.ProjectListMockMethodV3.return_value = tenant_list
 
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
@@ -177,6 +193,7 @@ class BaseReassignAPITestCase(test.TestCase):
 
         tenant_list = [bunchify({'id': self.context.project_id})]
         self.ProjectListMockMethod.return_value = tenant_list
+        self.ProjectListMockMethodV3.return_value = tenant_list
 
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
@@ -198,6 +215,7 @@ class BaseReassignAPITestCase(test.TestCase):
 
         tenant_list = [bunchify({'id': str(uuid.uuid4())})]
         self.ProjectListMockMethod.return_value = tenant_list
+        self.ProjectListMockMethodV3.return_value = tenant_list
 
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
@@ -219,8 +237,10 @@ class BaseReassignAPITestCase(test.TestCase):
     def test_orphan_workload_list_with_non_exist_user_with_migrate_cloud(self):
 
         self.UserExistMockMethod.return_value = False
+        self.UserExistMockMethodV3.return_value = False
         tenant_list = [bunchify({'id': str(uuid.uuid4())})]
         self.ProjectListMockMethod .return_value = tenant_list
+        self.ProjectListMockMethodV3.return_value = tenant_list
 
         for wdb in self.db.workload_get_all(self.context):
             self.db.workload_delete(self.context, wdb.id)
@@ -238,3 +258,4 @@ class BaseReassignAPITestCase(test.TestCase):
 
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context, migrate_cloud=True)
         self.assertEqual(len(workloads), 5)
+    

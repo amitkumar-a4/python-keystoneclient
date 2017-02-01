@@ -802,7 +802,6 @@ class WorkloadMgrsController(wsgi.Controller):
     def test_email(self, req):
         """Test email configuration"""
         try:
-
             context = req.environ['workloadmgr.context']        
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'

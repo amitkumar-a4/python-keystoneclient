@@ -59,7 +59,7 @@ from workloadmgr import autolog
 from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
-from workloadmgr.common import workloadmgr_keystoneclient as keystone_utils
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
@@ -2336,8 +2336,11 @@ class API(base.Base):
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
         workloads = []
-        projects = keystone_utils.get_project_list_for_import(context)
+        keystone_client = KeystoneClient()
+        projects = keystone_client.client.get_project_list_for_import(context)
         tenant_list = [project.id for project in projects]
+        users = keystone_client.get_user_list()
+        user_list = [user.id for user in users]
     
         def _check_workload(context, workload):
             project_id = workload.get('project_id')
@@ -2345,7 +2348,7 @@ class API(base.Base):
             # Check for valid tenant
             if project_id in tenant_list:
                 # Check for valid workload user
-                if keystone_utils.user_exist_in_tenant(context, project_id, user_id):
+                if keystone_client.client.user_exist_in_tenant(project_id, user_id):
                     pass
                 else:
                     workloads.append(workload)
@@ -2353,9 +2356,10 @@ class API(base.Base):
                 workloads.append(workload)
 
         if not migrate_cloud:
-            workloads_in_db = self.db.workload_get_all(context)
+            kwargs = {'project_list':tenant_list, 'exclude': True, 'user_list': user_list }
+            workloads_in_db = self.db.workload_get_all(context, **kwargs )
             for workload in workloads_in_db:
-                _check_workload(context, workload.__dict__)
+                 workloads.append(workload)
         else:
             for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
                 backup_target = None
@@ -2416,10 +2420,12 @@ class API(base.Base):
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
 
+        keystone_client = KeystoneClient()
+
         workloads = []
         workload_to_update = []
         workload_to_import = []
-        projects = keystone_utils.get_project_list_for_import(context)
+        projects = keystone_client.client.get_project_list_for_import(context)
         tenant_list = [project.id for project in projects]
         for tenant_map in tenant_maps:
             workload_ids = tenant_map['workload_ids']
@@ -2429,9 +2435,18 @@ class API(base.Base):
             migrate_cloud = tenant_map['migrate_cloud']
             if new_tenant_id in tenant_list:
                 # Check for valid workload user
-                if keystone_utils.user_exist_in_tenant(context, new_tenant_id, user_id) \
-                        and keystone_utils.check_user_role(context, new_tenant_id, user_id):
+                if keystone_client.client.user_exist_in_tenant(new_tenant_id, user_id) \
+                        and keystone_client.client.check_user_role(new_tenant_id, user_id):
 
+                    #If workload id's are provided then check whether they 
+                    #exist in current cloud or not.
+                    if workload_ids:
+                         kwargs = {'workload_list' : workload_ids}
+                         workloads = self.db.workload_get_all(context, **kwargs)
+                         if len(workloads) != len(workload_ids) and migrate_cloud is not True:
+                            raise Exception("Workload id's doesn't belong to \
+                                current cloud, to reassign them set migrate_cloud option to True")
+     
                     #If old_teanat_id is provided then look for all workloads under that tenant
                     if old_tenant_ids:
                        if not migrate_cloud:
@@ -2446,16 +2461,10 @@ class API(base.Base):
                        else:
                            workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
 
-                    for workload_id in workload_ids:
-                        try:
-                            workload = self.workload_get(context, workload_id)
-                            workload_to_update.append(workload_id)
-                        except Exception as ex:
-                            if migrate_cloud is True:
-                                workload_to_import.append(workload_id)
-                            else:
-                                raise Exception("Workload id doesn't belong to \
-                                current cloud, to reassign them set migrate_cloud option to True")
+                    if migrate_cloud:
+                       workload_to_import.extend(workload_ids)
+                    else:
+                       workload_to_update.extend(workload_ids)
 
                     if workload_to_import:
                         vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
