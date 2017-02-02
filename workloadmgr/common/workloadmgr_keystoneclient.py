@@ -238,7 +238,7 @@ class KeystoneClientV2(object):
     @property
     def client(self):
         if not self._client:
-            # Create connection to v3 API
+            # Create connection to v2 API
             self._client = self._v2_client_init()
         return self._client
 
@@ -310,6 +310,13 @@ class KeystoneClientV2(object):
 class KeystoneClient(object):
     """Keystone Auth Client.
     """
+
+    _instance = None
+
+    def __new__(class_, *args, **kwargs):
+        if not isinstance(class_._instance, class_):
+            class_._instance = object.__new__(class_, *args, **kwargs)
+        return class_._instance
 
     def __init__(self):
         auth_url = CONF.keystone_endpoint_url
