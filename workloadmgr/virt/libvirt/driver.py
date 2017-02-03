@@ -1092,12 +1092,7 @@ class LibvirtDriver(driver.ComputeDriver):
         try:
             compute_service = nova.API(production=True)
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = \
-                workload_utils.common_apply_retention_policy(cntx, instances, 
-            if swift == 0:
-                return
-
-            #if swift == 0:
-            #    return
+                workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
             
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                                     'backup_media_target')
