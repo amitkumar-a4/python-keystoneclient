@@ -417,7 +417,8 @@ def workload_type_update(context, id, values, purge_metadata=False):
 def workload_types_get(context):
     session = get_session()
     try:
-        query = session.query(models.WorkloadTypes)\
+        query = model_query(context, models.WorkloadTypes, session=session,
+                            read_deleted="no")\
                        .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
                        .filter((models.WorkloadTypes.project_id == context.project_id) | (models.WorkloadTypes.is_public == True))
 
@@ -441,6 +442,9 @@ def workload_type_get(context, id):
         workload_types = query.first()
 
     except sa_orm.exc.NoResultFound:
+        raise exception.WorkloadTypeNotFound(workload_type_id = id)
+
+    if workload_types is None:
         raise exception.WorkloadTypeNotFound(workload_type_id = id)
 
     return workload_types

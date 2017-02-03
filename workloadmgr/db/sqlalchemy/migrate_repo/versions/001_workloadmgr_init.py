@@ -123,6 +123,7 @@ def upgrade(migrate_engine):
         Column('display_description', String(length=255)),
         Column('source_platform', String(length=255)),
         Column('workload_type_id', String(length=255), ForeignKey('workload_types.id')),
+        Column('error_msg', String(length=4096)),
         Column('jobschedule', String(length=4096)),
         Column('vault_storage_id', String(length=255), ForeignKey('vault_storages.id')),
         Column('status', String(length=255)),

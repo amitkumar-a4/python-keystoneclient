@@ -22,7 +22,6 @@ from taskflow.patterns import linear_flow as lf
 from taskflow.patterns import graph_flow as gf
 from taskflow import task
 from taskflow import flow
-from taskflow.utils import reflection
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import log as logging
@@ -135,6 +134,9 @@ class RestoreWorkflow(object):
         
         if pre_poweron:
             self._flow.add(pre_poweron)
+
+        #linear poweron VMs
+        self._flow.add(vmtasks.LinearSetVMsMetadata(self._store['instances']))
 
         #linear poweron VMs
         self._flow.add(vmtasks.LinearPowerOnVMs(self._store['instances']))

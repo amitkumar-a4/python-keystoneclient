@@ -121,6 +121,7 @@ def _snapshot_create_callback(*args, **kwargs):
                        'fullbackup_interval' in jobscheduler and \
                        jobscheduler['fullbackup_interval'] or "-1"
 
+        snapshot_type = "incremental"
         if int(jobscheduler['fullbackup_interval']) == 0:
             snapshot_type = "full"
         elif int(jobscheduler['fullbackup_interval']) < 0:
@@ -490,6 +491,7 @@ class API(base.Base):
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
+            workload = None
             #TODO(giri): optimize this lookup
 
             if len(instances) == 0:
@@ -554,7 +556,6 @@ class API(base.Base):
                           'status': 'available',
                           'metadata': instance.get('metadata', {})}
                 vm = self.db.workload_vms_create(context, values)
-
             self.workloads_rpcapi.workload_create(context,
                                                   workload['host'],
                                                   workload['id'])
@@ -586,25 +587,30 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+            if workload:
+               self.db.workload_update(context, workload['id'],
+                                      {'status': 'error',
+                                       'error_msg': str(ex.message)})
+            raise
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload, context=context):
-        if jobschedule and len(jobschedule): 
-            if 'enabled' in jobschedule and jobschedule['enabled']:                                       
-                if hasattr(context, 'user_domain_id'):
-                   if context.user_domain_id is None:
+        if self._scheduler.running is True:
+           if jobschedule and len(jobschedule): 
+              if 'enabled' in jobschedule and jobschedule['enabled']:                                       
+                 if hasattr(context, 'user_domain_id'):
+                    if context.user_domain_id is None:
+                       user_domain_id = 'default'
+                    else:
+                         user_domain_id = context.user_domain_id
+                 elif hasattr(context, 'user_domain'):
+                      if context.user_domain is None:
+                         user_domain_id = 'default'
+                      else:
+                           user_domain_id = context.user_domain
+                 else:
                       user_domain_id = 'default'
-                   else:
-                        user_domain_id = context.user_domain_id
-                elif hasattr(context, 'user_domain'):
-                     if context.user_domain is None:
-                        user_domain_id = 'default'
-                     else:
-                          user_domain_id = context.user_domain
-                else:
-                     user_domain_id = 'default'
-                self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                 self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
                                                     jobstore='jobscheduler_store', 
                                                     kwargs={'workload_id':workload.id,  
@@ -820,6 +826,8 @@ class API(base.Base):
             import_settings_method = getattr(import_workload_module,
                                              'import_settings')
             import_settings_method(context, models.DB_VERSION)
+
+            self.workload_ensure_global_job_scheduler(context)
 
             #TODO:Need to make this call to a single import module instead of 
             #looking for new import module for each new build.
@@ -1537,6 +1545,7 @@ class API(base.Base):
                         if self.db.get_metadata_value(snapshot_vm_resource.metadata,'image_id'):
                            vdisk['image_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'image_id')
                            vdisk['image_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'image_name')
+                           vdisk['hw_qemu_guest_agent'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'hw_qemu_guest_agent')
                         else:
                            vdisk['volume_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_id')
                            vdisk['volume_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_name')
@@ -2322,5 +2331,3 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
-
-

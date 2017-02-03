@@ -105,6 +105,9 @@ libvirt_opts = [
                 default=30,
                 help='The amount of time that snapshot mount operation'
                      'should wait for the recovery manager to reboot'),
+    cfg.StrOpt('vault_storage_type',
+               default='none',
+               help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'),
     ]
 
 CONF = cfg.CONF
@@ -384,7 +387,7 @@ class LibvirtDriver(driver.ComputeDriver):
                        for target in doc.findall('devices/disk/target')])
 
     @autolog.log_method(Logger, 'libvirt.driver.snapshot_mount')
-    def snapshot_mount(self, cntx, snapshot, diskfiles, mount_vm_id=None):
+    def snapshot_mount(self, cntx, db, snapshot, diskfiles, mount_vm_id=None):
         
         def _reboot_fminstance():
             # reboot the file manager server 
@@ -413,8 +416,23 @@ class LibvirtDriver(driver.ComputeDriver):
             return fminstance
 
         def _map_snapshot_images(fminstance):
-            compute_service.map_snapshot_files(cntx, fminstance.id, diskfiles)
-            pass
+            workload_obj = db.workload_get(cntx, snapshot.workload_id)
+            backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                    'backup_media_target')
+            metadata = {
+                'resource_id': mount_vm_id + "_" + str( int(time.time()) ),
+                'backend_endpoint': backup_endpoint,
+                'snapshot_id': snapshot.id
+            }
+            status = self._vast_methods_call_by_function(compute_service.map_snapshot_files,
+                                                         cntx, fminstance.id,
+                                                         {'diskfiles': diskfiles,
+                                                          'metadata': metadata
+                                                          })
+            self._wait_for_remote_nova_process(cntx, compute_service,
+                                               metadata,
+                                               fminstance.id,
+                                               backup_endpoint)
 
         compute_service = nova.API(production=True)
         fminstance = _reboot_fminstance()
@@ -940,6 +958,8 @@ class LibvirtDriver(driver.ComputeDriver):
                         backup_target.mount_path,
                         vm_disk_resource_snap.vault_url.strip(os.sep))
                     try:
+                        """os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
+                                   'snapshot_'+snapshot_obj.id))"""
                         os.listdir(os.path.split(resource_snap_path)[0])
                     except Exception as ex:
                            pass
@@ -1064,17 +1084,21 @@ class LibvirtDriver(driver.ComputeDriver):
             vault_path = os.path.join(backup_target.mount_path,
                                       vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
             backing_vault_path = os.path.join(backup_target.mount_path,
+
                                       vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
             commit_image_list.append((vault_path, backing_vault_path))
+
 
         try:
             compute_service = nova.API(production=True)
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = \
-                workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
-
+                workload_utils.common_apply_retention_policy(cntx, instances, 
             if swift == 0:
                 return
 
+            #if swift == 0:
+            #    return
+            
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                                     'backup_media_target')
             backup_target = vault.get_backup_target(backup_endpoint)
