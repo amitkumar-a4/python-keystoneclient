@@ -1084,10 +1084,8 @@ class LibvirtDriver(driver.ComputeDriver):
             vault_path = os.path.join(backup_target.mount_path,
                                       vm_disk_resource_snap_to_commit.vault_url.lstrip(os.sep))
             backing_vault_path = os.path.join(backup_target.mount_path,
-
                                       vm_disk_resource_snap_to_commit_backing.vault_url.lstrip(os.sep))
             commit_image_list.append((vault_path, backing_vault_path))
-
 
         try:
             compute_service = nova.API(production=True)
