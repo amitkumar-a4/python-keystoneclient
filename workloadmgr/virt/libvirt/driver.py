@@ -635,7 +635,7 @@ class LibvirtDriver(driver.ComputeDriver):
                           if async_task_status_swift and 'disks_info' in async_task_status_swift and len(async_task_status_swift['disks_info']):
                              if len(async_task_status_swift['disks_info'][0]) > 2:
                                 operation_completed = True
-                                return True
+                                return async_task_status_swift
               except nova_unauthorized as ex:
                      LOG.exception(ex)
                      cntx = nova._get_tenant_context(cntx)
@@ -667,21 +667,24 @@ class LibvirtDriver(driver.ComputeDriver):
         progress_tracker_metadata = {'snapshot_id': snapshot['id'],
                                      'resource_id' : instance['vm_id'],
                                      'backend_endpoint': backup_endpoint}
-        self._wait_for_remote_nova_process(cntx, compute_service,
+        ret = self._wait_for_remote_nova_process(cntx, compute_service,
                                            progress_tracker_metadata,
                                            instance['vm_id'],
                                            backup_endpoint)
 
-        try:
-            snapshot_data = compute_service.vast_async_task_status(cntx,
+        if ret is not True and ret is not False:
+           snapshot_data = ret
+        else:
+             try:
+                 snapshot_data = compute_service.vast_async_task_status(cntx,
                                                                  instance['vm_id'],
                                                                  {'metadata': progress_tracker_metadata})
-        except nova_unauthorized as ex:
-               LOG.exception(ex)
-               cntx = nova._get_tenant_context(cntx)
-        except Exception as ex:
-               LOG.exception(ex)
-               raise ex
+             except nova_unauthorized as ex:
+                    LOG.exception(ex)
+                    cntx = nova._get_tenant_context(cntx)
+             except Exception as ex:
+                    LOG.exception(ex)
+                    raise ex
 
         return snapshot_data
 
