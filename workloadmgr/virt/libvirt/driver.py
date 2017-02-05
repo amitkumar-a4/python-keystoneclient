@@ -579,6 +579,7 @@ class LibvirtDriver(driver.ComputeDriver):
            uploaded_size = 0
            uploaded_size_incremental = 0
            previous_uploaded_size = 0
+
         while True:
               try:
                   time.sleep(10)
@@ -617,6 +618,24 @@ class LibvirtDriver(driver.ComputeDriver):
                          if 'Completed' in line:
                             operation_completed = True
                             return True
+
+                  now = timeutils.utcnow()
+                  if (now - start_time) > datetime.timedelta(minutes=5) and CONF.vault_storage_type == 'swift-s':
+                     async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata})
+                     start_time = timeutils.utcnow()
+                     if async_task_status_swift and 'status' in async_task_status_swift and len(async_task_status_swift['status']):
+                        for line in async_task_status['status']:
+                            if 'Completed' in line:
+                               operation_completed = True
+                               return True
+                            if '100.0 %' in line:
+                               operation_completed = True
+                               return True
+                     elif calc_size is False:
+                          if async_task_status_swift and 'disks_info' in async_task_status_swift and len(async_task_status_swift['disks_info']):
+                             if len(async_task_status_swift['disks_info'][0]) > 2:
+                                operation_completed = True
+                                return True
               except nova_unauthorized as ex:
                      LOG.exception(ex)
                      cntx = nova._get_tenant_context(cntx)
