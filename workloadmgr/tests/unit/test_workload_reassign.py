@@ -19,6 +19,7 @@ from workloadmgr.openstack.common import importutils
 from workloadmgr.tests.unit import utils as tests_utils
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr.vault import vault
+from workloadmgr.db.sqlalchemy.session import get_session
 
 CONF = cfg.CONF
 
@@ -139,9 +140,19 @@ class BaseReassignAPITestCase(test.TestCase):
         return snapshot
 
     def test_reassign_for_idempotent(self):
-        update_workload = patch('workloadmgr.workloads.api.API._update_workloads')
-        UpdateWorkloadMockMethod = update_workload.start()
-        UpdateWorkloadMockMethod.side_effect = wlm_exceptions.DBError('DB crashed.')
+        bulk_update = patch('sqlalchemy.orm.session.Session.bulk_update_mappings')
+        def side_effect(*args, **kwargs):
+            DBSession = get_session()
+            if args[0].__tablename__ == 'workloads':
+               bulk_update.stop()
+               DBSession.bulk_update_mappings(args[0], args[1])
+               BulkUpdateMock = bulk_update.start()
+               BulkUpdateMock.side_effect = side_effect
+            else:
+               raise wlm_exceptions.DBError('DB crashed.')
+
+        BulkUpdateMock = bulk_update.start()
+        BulkUpdateMock.side_effect = side_effect
         new_tenant_id = str(uuid.uuid4())
         old_tenant_id = self.context.project_id
         tenant_list = [bunchify({'id': new_tenant_id}), bunchify({'id': old_tenant_id})]
@@ -170,7 +181,7 @@ class BaseReassignAPITestCase(test.TestCase):
         ]
 
         self.assertRaises(wlm_exceptions.DBError, self.workloadAPI.workloads_reassign, self.context, tenant_map)
-        update_workload.stop()
+        bulk_update.stop()
 
         self.workloadAPI.workloads_reassign(self.context, tenant_map)
         workloads_in_db = self.db.workload_get_all(self.context)
@@ -223,7 +234,6 @@ class BaseReassignAPITestCase(test.TestCase):
              }
 
         ]
-
         self.assertRaises(wlm_exceptions.DBError, self.workloadAPI.workloads_reassign, self.context, tenant_map)
         import_workload.stop()
 
@@ -244,7 +254,7 @@ class BaseReassignAPITestCase(test.TestCase):
                         db_values = json.loads(open(os.path.join(path, name), 'r').read())
                         self.assertEqual(db_values.get('project_id', None), new_tenant_id)
                         self.assertEqual(db_values.get('user_id', None), user_id)
- 
+
     def test_reassign_with_single_old_tenant(self):
 
         new_tenant_id = str(uuid.uuid4())
@@ -477,7 +487,7 @@ class BaseReassignAPITestCase(test.TestCase):
              }
         ]
         self.assertRaises(wlm_exceptions.UserNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
- 
+
     def test_reassign_with_single_workload(self):
 
         new_tenant_id = str(uuid.uuid4())
