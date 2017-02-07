@@ -731,7 +731,7 @@ def main(mountpoint):
              subprocess.call(command, shell=False)
     except Exception as ex:
            pass
-    FUSE(TrilioVault(mountpoint), mountpoint, nothreads=True, foreground=True, nonempty=True)
+    FUSE(TrilioVault(mountpoint), mountpoint, nothreads=False, foreground=True, nonempty=True, big_writes=True, direct_io=True)
 
 if __name__ == '__main__':
     main(CONF.vault_data_directory)
