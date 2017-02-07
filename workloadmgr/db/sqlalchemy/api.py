@@ -586,6 +586,42 @@ def workload_get_all(context, **kwargs):
                qs = qs.filter_by(project_id=context.project_id)
         else:
              qs = qs.filter_by(project_id=context.project_id)
+        if 'project_list' and 'user_list' in kwargs:
+           project_list = kwargs['project_list']
+           user_list = kwargs['user_list']
+           if isinstance(project_list, list) and isinstance(user_list, list):
+              if 'exclude' in kwargs and kwargs['exclude'] is True:
+                 qs = qs.filter( models.Workloads.project_id.notin_(project_list) | models.Workloads.user_id.notin_(user_list)  )
+              else:
+                 qs = qs.filter(models.Workloads.project_id.in_(project_list), models.Workloads.user_id.in_(user_list))
+           else:
+               error = _('Project list and user list should be list')
+               raise exception.ErrorOccurred(reason=error)
+
+        if 'project_list' in kwargs and 'user_list' not in kwargs:
+            project_list = kwargs['project_list']
+            qs = model_query( context, models.Workloads.id, **kwargs)
+            if isinstance(project_list, list):
+                if 'exclude_project' in kwargs and kwargs['exclude_project'] is True:
+                    qs = qs.filter((models.Workloads.project_id.notin_(project_list)) )
+                else:
+                    qs = qs.filter((models.Workloads.project_id.in_(project_list)) )
+            else:
+                error = _('Project list should be list')
+                raise exception.ErrorOccurred(reason=error)
+
+        if 'workload_list' in kwargs:
+           workload_list = kwargs['workload_list']
+           if isinstance(workload_list, list):
+              qs = model_query( context, models.Workloads.id, **kwargs)
+              if 'exclude_workload' in kwargs and kwargs['exclude_workload'] is True:
+                 qs = qs.filter(and_(models.Workloads.id.notin_(workload_list)) )
+              else:
+                 qs = qs.filter(and_(models.Workloads.id.in_(workload_list)) )
+           else:
+               error = _('Workload list should be list')
+               raise exception.ErrorOccurred(reason=error)
+
 
         qs = qs.order_by(models.Workloads.created_at.desc())
 
@@ -617,7 +653,7 @@ def _workload_get(context, id, session, **kwargs):
 def workload_get(context, id, **kwargs):
     session = get_session() 
     return _workload_get(context, id, session, **kwargs)   
-    
+
 @require_context
 def workload_delete(context, id):
     session = get_session()

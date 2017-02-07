@@ -19,8 +19,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
-from workloadmgr.vault import vault
-
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 LOG = logging.getLogger(__name__)
 
 
@@ -81,6 +80,7 @@ class SettingsController(wsgi.Controller):
 
     def show(self, req, name):
         """Return data about the given setting."""
+        keystone_client = KeystoneClient()
         try:
             context = req.environ['workloadmgr.context']
             get_hidden = False
@@ -93,7 +93,7 @@ class SettingsController(wsgi.Controller):
                     get_hidden = True              
 
             if name == 'user_email_address_'+context.user_id:
-               user = vault.get_user_to_get_email_address(context)
+               user = keystone_client.get_user_to_get_email_address(context)
                user_obj = {}
                user_obj['email'] = user.email
                return {'setting' : user_obj}
