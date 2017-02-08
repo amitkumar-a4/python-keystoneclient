@@ -22,6 +22,7 @@ from workloadmgr.common import context as wlm_context
 from workloadmgr.common import clients
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 
 LOG = logging.getLogger(__name__)
 DBSession = get_session()
@@ -89,7 +90,8 @@ def project_id_exists(cntx, project_id):
 
     # TODO: Optimize it without reading project list os many times
     kclient.client_plugin = kclient"""
-    projects = vault.get_project_list_for_import(cntx)
+    keystone_client = KeystoneClient()
+    projects = keystone_client.client.get_project_list_for_import(cntx)
     for prj in projects:
         if uuid.UUID(prj.id) == uuid.UUID(project_id):
             return True

@@ -520,7 +520,9 @@ def _authenticate_with_keystone():
                config_data['service_tenant_domain_id'] = tenant.domain_id
         if tenant.name == config_data['admin_tenant_name']:
             config_data['admin_tenant_id'] = tenant.id            
-            
+    
+    if 'admin_tenant_id' not in config_data:
+       raise Exception('Entered invalid admin tenant name')       
     if 'service_tenant_id' not in config_data:
         if config_data['configuration_type'] == 'vmware':
             config_data['service_tenant_id'] = config_data['admin_tenant_id']

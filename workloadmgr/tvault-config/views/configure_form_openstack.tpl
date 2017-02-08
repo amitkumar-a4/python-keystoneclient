@@ -298,35 +298,12 @@ function setSwiftRequired(checked, val) {
                 </div>
           </div>
         </div>
-
-	<!--div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel5">
-		<div class="panel-heading">
-		  <h4 class="panel-title">
-			<a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
-			  Swift Object Storage (Optional)
-			</a>
-		  </h4>
-		</div>
-		<div id="collapseFive" class="panel-collapse">
-		  <div class="panel-body">
-			<div class="form-group">
-				<label class="control-label">URL Template</label>
-				<input name="swift-url-template" {{'value=' + swift_url_template if (defined('swift_url_template') and len(swift_url_template)) else ''}} type="text" placeholder="http://swifthost:8080/v1/AUTH_%(project_id)s" class="form-control"><br>
-			</div><br>
-			<div class="form-group">
-				<label class="control-label">Container Prefix</label>
-				<input name="swift-container-prefix" type="text" {{'value=' + swift_container_prefix if (defined('swift_container_prefix') and len(swift_container_prefix)) else ''}} placeholder="TrilioVault" class="form-control"> <br>
-			</div><br>  			
-		  </div>
-		</div>
-	  </div>
-	</div-->
-    
+    </div>
+    </div>
+    <div>
     <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
+    </div>
   </form>
-  </div>
-</div>
 
 <script>
 $(document).ready(function(){

@@ -159,66 +159,6 @@ def run_async(func):
 
     return async_func
 
-
-def get_client(context):
-    try:
-        username=CONF.get('keystone_authtoken').username 
-    except:
-           username=CONF.get('keystone_authtoken').admin_user
-    try:
-        password=CONF.get('keystone_authtoken').password 
-    except:
-           password=CONF.get('keystone_authtoken').admin_password
-    try:
-        tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
-    except:
-           project_id = context.project_id
-           context.project_id = 'Configurator'
-           tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
-           context.project_id = project_id
-    auth_url=CONF.keystone_endpoint_url
-    if auth_url.find('v3') != -1:
-       username=CONF.get('nova_admin_username')
-       password=CONF.get('nova_admin_password')
-       if username == 'triliovault':
-          domain_id=CONF.get('triliovault_user_domain_id')
-       else:
-            domain_id=CONF.get('domain_name')
-       auth = passMod.Password(auth_url=auth_url,
-                                    username=username,
-                                    password=password,
-                                    user_domain_id=domain_id,
-                                    domain_id=domain_id,
-                                    )
-    else:
-         auth = passMod.Password(auth_url=auth_url,
-                                    username=username,
-                                    password=password,
-                                    project_name=tenant_name,
-                                    )
-    sess = session.Session(auth=auth, verify=False)
-    return client.Client(session=sess, auth_url=auth_url, insecure=True)
-
-def get_project_list_for_import(context):
-    keystone_client = get_client(context)
-    if keystone_client.version == 'v3':
-       if(context.user == CONF.get('nova_admin_username')):
-           projects = keystone_client.projects.list()
-       else:
-            user = keystone_client.users.get(context.user_id)
-            projects = keystone_client.projects.list(user=user)
-    else:
-         projects = keystone_client.tenants.list()
-    return projects
-
-def get_user_to_get_email_address(context):
-    keystone_client = get_client(context)
-    user = keystone_client.users.get(context.user_id)
-    if not hasattr(user, 'email'):
-       user.email = None
-    return user
-
-
 class TrilioVaultBackupTarget(object):
 
     __metaclass__ = abc.ABCMeta
@@ -489,7 +429,6 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
         elif CONF.vault_storage_type == 'swift-s':
              mountpath = CONF.vault_data_directory
-             fileutils.ensure_tree(mountpath)
              self.__mountpath = mountpath
              super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
                                                          mountpath=mountpath)  
@@ -867,6 +806,19 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
 
     @autolog.log_method(logger=Logger)
+    def get_progress_tracker_directory(self, tracker_metadata):
+        """
+        Get the location where all tracking objects are stored. The tracking
+        object is a file on NFS. It can be object in object store
+        """
+        mountpath = self.mount_path
+        progress_tracker_directory = os.path.join(mountpath,
+            "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+
+        fileutils.ensure_tree(progress_tracker_directory)
+        return progress_tracker_directory
+
+    @autolog.log_method(logger=Logger)
     def mount_backup_target(self, old_share=False): 
         try:
             command = ['sudo', 'service', 'tvault-swift', 'start']
@@ -897,17 +849,31 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
                pass
 
     @autolog.log_method(logger=Logger)
+    @to_abs()
+    def put_object(self, path, json_data):
+        head, tail = os.path.split(path)
+        fileutils.ensure_tree(head)
+        try:
+            with open(path, 'w') as json_file:
+                 json_file.write(json_data)
+        except:
+               with open(path, 'w') as json_file:
+                    json_file.write(json_data)
+        return
+
+    @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
             retry = 0
             while os.path.isdir(snapshot_path):
                try:
-                   shutil.rmtree(snapshot_path)
+                   command = ['rm', '-rf', snapshot_path]
+                   subprocess.check_call(command, shell=False)
                except:
                        pass
                retry += 1
-               if retry >= 5:
+               if retry >= 1:
                   break
         except Exception as ex:
             LOG.exception(ex)
@@ -1114,6 +1080,56 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     sortedlist = sorted(shares.values(), reverse=True, key=getKey)
 
     return sortedlist[0]['endpoint']
+
+def get_workloads_for_tenant(context, tenant_ids):
+    workload_ids = []
+    for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+        backup_target = None
+        try:
+            backup_target = get_backup_target(backup_endpoint)
+            for workload_url in backup_target.get_workloads(context):
+                workload_values = json.loads(backup_target.get_object(\
+                        os.path.join(workload_url, 'workload_db')))
+                project_id = workload_values.get('project_id')
+                workload_id = workload_values.get('id')
+                if project_id in tenant_ids:
+                    workload_ids.append(workload_id)
+        except Exception as ex:
+            LOG.exception(ex)
+    return  workload_ids
+
+def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
+
+    workload_urls = []
+
+    try:
+        #Get list of workload directory path for workloads need to update
+        for workload_id in workloads_to_update:
+            for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+                backup_target = None
+                backup_target = get_backup_target(backup_endpoint)
+                workload_url = os.path.join(backup_target.mount_path, "workload_" + workload_id)
+                if os.path.isdir(workload_url):
+                    workload_urls.append(workload_url)
+                    break;
+
+        #Iterate through each workload directory and update workload_db and snapsot_db with new values
+        for workload_path in workload_urls:
+            for path, subdirs, files in os.walk(workload_path):
+                for name in files:
+                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
+                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+
+                        if db_values.get('project_id', None) is not None:
+                            db_values['project_id'] = new_tenant_id
+                        else:
+                            db_values['tenant_id'] = new_tenant_id
+                        db_values['user_id'] = user_id
+
+                        with open(os.path.join(path, name), 'w') as file:
+                            json.dump(db_values, file)
+    except Exception as ex:
+        LOG.exception(ex)
 
 """
 if __name__ == '__main__':
