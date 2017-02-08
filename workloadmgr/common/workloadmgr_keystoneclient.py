@@ -1,5 +1,4 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
-
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
@@ -7,7 +6,6 @@
 """Keystone Client functionality for use by resources."""
 
 import collections
-import uuid
 
 from keystoneclient.auth.identity import v3 as kc_auth_v3
 import keystoneclient.exceptions as kc_exception
@@ -15,18 +13,19 @@ from keystoneclient import session
 from keystoneclient.v3 import client as kc_v3
 from oslo_config import cfg
 from oslo_log import log as logging
-from oslo_serialization import jsonutils
-from oslo_utils import importutils
+from keystoneauth1.identity.generic import password as passMod
+from keystoneclient import client
 
 from workloadmgr.common import context
 from workloadmgr import exception
-from workloadmgr.common.i18n import _
 from workloadmgr.common.i18n import _LE
 from workloadmgr.common.i18n import _LW
+#from workloadmgr.vault import vault
+from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 LOG = logging.getLogger('workloadmgr.common.keystoneclient')
 
-AccessKey = collections.namedtuple('AccessKey', ['id', 'access', 'secret'])
+#AccessKey = collections.namedtuple('AccessKey', ['id', 'access', 'secret'])
 
 _default_keystone_backend = "workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3"
 
@@ -35,8 +34,11 @@ keystone_opts = [
                default=_default_keystone_backend,
                help="Fully qualified class name to use as a keystone backend.")
 ]
-cfg.CONF.register_opts(keystone_opts)
 
+#TODO(Jignasha) : Do we need this
+cfg.CONF.register_opts(keystone_opts)
+CONF = cfg.CONF
+#CONF.register_opts(keystone_opts)
 
 class KeystoneClientV3(object):
     """Wrap keystone client so we can encapsulate logic used in resources.
@@ -69,7 +71,6 @@ class KeystoneClientV3(object):
 
         self.session = session.Session.construct(self._ssl_options())
         self.v3_endpoint = self.context.keystone_v3_endpoint
-
         if self.context.trust_id:
             # Create a client with the specified trust_id, this
             # populates self.context.auth_token with a trust-scoped token
@@ -191,23 +192,149 @@ class KeystoneClientV3(object):
     def auth_ref(self):
         return self.context.auth_plugin.get_access(self.session)
 
+    def user_exist_in_tenant(self, project_id, user_id):
+        try:
+            user = self.client.users.get(user_id)
+            projects = self.client.projects.list(user=user)
+            project_list = [project.id for project in projects]
+            if project_id in project_list:
+                return True
+            else:
+                return False
+        except Exception:
+            return False
+
+    def check_user_role(self, project_id, user_id):
+        try:
+            roles = self.client.roles.list(user=user_id, project=project_id)
+            trustee_role = CONF.trustee_role
+            for role in roles:
+                if (trustee_role == role.name) or (role.name == 'admin'):
+                    return True
+            return False
+        except Exception as ex:
+            LOG.exception(ex)
+
+    def get_project_list_for_import(self, context):
+        try:
+            if (context.user == CONF.get('nova_admin_username')):
+                projects = self.client.projects.list()
+            else:
+                user = self.client.users.get(context.user_id)
+                projects = self.client.projects.list(user=user)
+
+            return projects
+        except Exception as ex:
+            LOG.exception(ex)
+
+
+class KeystoneClientV2(object):
+
+    def __init__(self, context):
+        self.context = context
+        self._client = None
+        self.session = None
+
+    @property
+    def client(self):
+        if not self._client:
+            # Create connection to v2 API
+            self._client = self._v2_client_init()
+        return self._client
+
+    def _v2_client_init(self):
+        try:
+            username = CONF.get('keystone_authtoken').username
+        except:
+            username = CONF.get('keystone_authtoken').admin_user
+        try:
+            password = CONF.get('keystone_authtoken').password
+        except:
+            password = CONF.get('keystone_authtoken').admin_password
+        try:
+            tenant_name = CONF.get('keystone_authtoken').admin_tenant_name
+        except:
+            project_id = context.project_id
+            context.project_id = 'Configurator'
+            tenant_name = WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
+            context.project_id = project_id
+        auth_url = CONF.keystone_endpoint_url
+        auth = passMod.Password(auth_url=auth_url,
+                                username=username,
+                                password=password,
+                                project_name=tenant_name,
+                                )
+        self.session = session.Session(auth=auth, verify=False)
+        return client.Client(session=self.session, auth_url=auth_url, insecure=True)
+
+    def _get_username(self, username):
+        if(len(username) > 64):
+            LOG.warning(_LW("Truncating the username %s to the last 64 "
+                            "characters."), username)
+        # get the last 64 characters of the username
+        return username[-64:]
+
+    @property
+    def auth_token(self):
+        return self.context.auth_plugin.get_token(self.session)
+
+    def user_exist_in_tenant(self, project_id, user_id):
+        try:
+            users = self.client.users.list(project_id)
+            user_ids = [user.id for user in users]
+            if user_id in user_ids:
+                return True
+            else:
+                return False
+        except Exception as ex:
+            LOG.exception(ex)
+
+    def check_user_role(self, project_id, user_id):
+        try:
+            roles = self.client.tenants.role_manager.roles_for_user(user_id, project_id)
+            trustee_role = CONF.trustee_role
+            for role in roles:
+                if (trustee_role == role.name) or (role.name == 'admin'):
+                    return True
+            return False
+        except Exception as ex:
+            LOG.exception(ex)
+
+    def get_project_list_for_import(self, context):
+        try:
+            projects = self.client.tenants.list()
+            return projects
+        except Exception as ex:
+            LOG.exception(ex)
 
 class KeystoneClient(object):
     """Keystone Auth Client.
-
-    Delay choosing the backend client module until the client's class
-    needs to be initialized.
     """
 
-    def __new__(cls, context):
-        if cfg.CONF.keystone_backend == _default_keystone_backend:
-            return KeystoneClientV3(context)
-        else:
-            return importutils.import_object(
-                cfg.CONF.keystone_backend,
-                context
-            )
+    _instance = None
 
+    def __new__(class_, *args, **kwargs):
+        if not isinstance(class_._instance, class_):
+            class_._instance = object.__new__(class_, *args, **kwargs)
+        return class_._instance
+
+    def __init__(self):
+        auth_url = CONF.keystone_endpoint_url
+        if auth_url.find('v3') != -1:
+            self.client = KeystoneClientV3(context)
+        else:
+            self.client = KeystoneClientV2(context)
+
+    def get_user_to_get_email_address(self, context):
+        user = self.client.users.get(context.user_id)
+        if not hasattr(user, 'email'):
+            user.email = None
+        return user
+
+    def get_user_list(self):
+        users = self.client.users.list()
+        return users
 
 def list_opts():
     yield None, keystone_opts
+

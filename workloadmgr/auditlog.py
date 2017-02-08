@@ -104,9 +104,7 @@ class AuditLog(object):
                     for line in auditlogfile:
                         values = line.split(",") 
                         record_time = datetime.strptime(values[0], "%d-%m-%Y %H:%M:%S.%f") 
-                        epoch = time.mktime(record_time.timetuple())
-                        offset = datetime.fromtimestamp (epoch) - datetime.utcfromtimestamp (epoch)
-                        local_time = datetime.strftime((record_time + offset), "%I:%M:%S.%f %p - %m/%d/%Y")
+                        local_time = datetime.strftime(record_time , "%I:%M:%S.%f %p - %m/%d/%Y")
                         fetch = False
                         if time_in_minutes:
                             if (now - record_time) < timedelta(minutes=time_in_minutes):

@@ -57,6 +57,7 @@ from workloadmgr.network import neutron
 from workloadmgr.volume import cinder
 from workloadmgr.vault import vault
 from workloadmgr import utils
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 
 import  workloadmgr.workflows
 from workloadmgr.workflows import vmtasks_openstack
@@ -1171,7 +1172,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         {'status': 'mounted',
                                          'metadata': {
                                               'mount_vm_id': mount_vm_id,
-                                              'urls': json.dumps(urls)
+                                              'urls': json.dumps(urls),
+                                              'mount_error': "",
                                            }
                                         })
                 # Add metadata to recovery manager vm
@@ -1236,7 +1238,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         except Exception as ex:
             self.db.snapshot_update(context, snapshot['id'],
-                                    {'status': 'available'})
+                                    {'status': 'available',
+                                     'metadata': {
+                                              'mount_error': ex,
+                                           }})
             try:
                 self.snapshot_dismount(context, snapshot['id'])
             except:
@@ -1378,6 +1383,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         else error email
         """  
         try:
+            keystone_client = KeystoneClient()
             if type == 'snapshot':
                 workload = self.db.workload_get(context, object.workload_id)
                 workload_type = self.db.workload_type_get(context, workload.workload_type_id)
@@ -1389,7 +1395,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshotvms = self.db.snapshot_vms_get(context, object.snapshot_id)             
 
             try:
-                user = vault.get_user_to_get_email_address(context)
+                user = keystone_client.get_user_to_get_email_address(context)
                 if user.email is None or user.email == '':
                     user.email = settings.get_settings(context).get('smtp_default_recipient')
             except:
