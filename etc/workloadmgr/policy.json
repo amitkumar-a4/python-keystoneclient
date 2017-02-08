@@ -1,89 +1,24 @@
 {
-	"context_is_admin": [["role:admin"]],
-	"admin_or_owner":  [["is_admin:True"], ["project_id:%(project_id)s"]],
-	"default": [["rule:admin_or_owner"]],
-	"admin_api": [["is_admin:True"]],
+        "context_is_admin": [["role:admin"]],
+        "admin_or_owner":  [["is_admin:True"], ["project_id:%(project_id)s"]],
+        "default": [["rule:admin_or_owner"]],
+        "admin_api": [["is_admin:True"]],
 
-	"workload:workload_type_get": "rule:admin_or_owner",
-	"workload:workload_type_show": "rule:admin_or_owner",
-	"workload:workload_type_get_all": "rule:admin_or_owner",
-	"workload:workload_type_create": "rule:admin_or_owner",
-	"workload:workload_type_delete": "rule:admin_or_owner",
-	"workload:workload_type_discover_instances": "rule:admin_or_owner",
-	"workload:workload_type_topology": "rule:admin_or_owner",
-	
-	
-	"workload:workload_get": "rule:admin_or_owner",
-	"workload:workload_show": "rule:admin_or_owner",
-	"workload:workload_get_all": "rule:admin_api_or_owner",
-	"workload:workload_get_all_by_admin": "rule:admin_api",
-	"workload:workload_create": "rule:admin_or_owner",
-	"workload:workload_add_scheduler_job": "rule:admin_or_owner",
-	"workload:workload_modify": "rule:admin_or_owner",
-	"workload:workload_delete": "rule:admin_or_owner",
-	"workload:workload_reset": "rule:admin_or_owner",
-	"workload:workload_get_workflow": "rule:admin_or_owner",
-	"workload:workload_get_topology": "rule:admin_or_owner",
-	"workload:workload_discover_instances": "rule:admin_or_owner",
-	"workload:workload_pause": "rule:admin_or_owner",
-	"workload:workload_resume": "rule:admin_or_owner",
-	"workload:workload_unlock": "rule:admin_or_owner",
-	"workload:workload_snapshot": "rule:admin_or_owner",
-	"workload:get_import_workloads_list": "rule:admin_api",
-	"workload:import_workloads": "rule:admin_api",
-	"workload:get_nodes": "rule:admin_or_owner",
-	"workload:remove_node": "rule:admin_or_owner",
-	"workload:get_contego_status": "rule:admin_or_owner",
-	"workload:add_node": "rule:admin_or_owner",
-	"workload:get_storage_usage": "rule:admin_or_owner",
-	"workload:get_recentactivities": "rule:admin_or_owner",
-	"workload:get_auditlog": "rule:admin_or_owner",
-	
-	"workload:snapshot_show": "rule:admin_or_owner",
-	"workload:snapshot_get_all": "rule:admin_or_owner",
-	"workload:snapshot_get_all_by_host": "rule:admin_or_owner",
-	"workload:snapshot_delete": "rule:admin_or_owner",
-	"workload:snapshot_restore": "rule:admin_or_owner",
-	"workload:snapshot_cancel": "rule:admin_or_owner",
-	"workload:snapshot_mount": "rule:admin_or_owner",
-	"workload:snapshot_dismount": "rule:admin_or_owner",
-	"workload:mounted_list": "rule:admin_or_owner",
-	
-	
-	"workload:restore_get": "rule:admin_or_owner",
-	"workload:restore_show": "rule:admin_or_owner",
-	"workload:restore_get_all": "rule:admin_or_owner",
-	"workload:restore_delete": "rule:admin_or_owner",
-	"workload:restore_cancel": "rule:admin_or_owner",
-	
-	"workload:settings_create": "rule:admin_or_owner",
-	"workload:settings_update": "rule:admin_or_owner",
-	"workload:setting_delete": "rule:admin_or_owner",
-	"workload:setting_get": "rule:admin_or_owner",
-	"workload:settings_get": "rule:admin_or_owner",
-	
-	"workload:task_show": "rule:admin_or_owner",
-	"workload:tasks_get": "rule:admin_or_owner",
-	
-	"workload:trust_create": "rule:admin_or_owner",
-	"workload:trust_delete": "rule:admin_or_owner",
-	"workload:trust_list": "rule:admin_or_owner",
-	"workload:trust_get": "rule:admin_or_owner",
-	
-	"workload:workload_disable_global_job_scheduler": "rule:admin_api",
-	"workload:workload_enable_global_job_scheduler": "rule:admin_api",
-	"workload:workload_get_global_job_scheduler": "rule:admin_or_owner",
-	"workload:workload_ensure_global_job_scheduler": "rule:admin_api",
-	
-	"workload:license_create": "rule:admin_api",
-	"workload:license_list": "rule:admin_api",
-	
-	"transfer:get": "rule:admin_or_owner",
-	"transfer:delete": "rule:admin_or_owner",
-	"transfer:get_all": "rule:admin_or_owner",
-	"transfer:create": "rule:admin_or_owner",
-	"transfer:accept": "rule:admin_or_owner",
-	"transfer:complete": "rule:admin_or_owner"
-		
+        "workload:get_contego_status": "rule:admin_api",
+        "workload:workload_get_all_by_admin": "rule:admin_api",
+        "workload:get_storage_usage": "rule:admin_api",
+
+        "workload:get_import_workloads_list": "rule:admin_api",
+        "workload:import_workloads": "rule:admin_api",
+
+        "workload:get_orphaned_workloads_list": "rule:admin_api",
+        "workload:workloads_reassign": "rule:admin_api",
+
+        "workload:workload_disable_global_job_scheduler": "rule:admin_api",
+        "workload:workload_enable_global_job_scheduler": "rule:admin_api",
+        "workload:workload_ensure_global_job_scheduler": "rule:admin_api",
+
+        "workload:license_create": "rule:admin_api",
+        "workload:license_list": "rule:admin_api"
 }
 
