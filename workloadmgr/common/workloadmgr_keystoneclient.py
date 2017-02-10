@@ -326,13 +326,13 @@ class KeystoneClient(object):
             self.client = KeystoneClientV2(context)
 
     def get_user_to_get_email_address(self, context):
-        user = self.client.users.get(context.user_id)
+        user = self.client.client.users.get(context.user_id)
         if not hasattr(user, 'email'):
             user.email = None
         return user
 
     def get_user_list(self):
-        users = self.client.users.list()
+        users = self.client.client.users.list()
         return users
 
 def list_opts():
