@@ -802,7 +802,6 @@ class WorkloadMgrsController(wsgi.Controller):
     def test_email(self, req):
         """Test email configuration"""
         try:
-
             context = req.environ['workloadmgr.context']        
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'
@@ -897,6 +896,68 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
+
+    def get_orphaned_workloads_list(self, req, path_info=None ):
+        try:
+            context = req.environ['workloadmgr.context']
+            qs = parse_qs(req.environ['QUERY_STRING'])
+            migrate_cloud = bool(qs.get('migrate_cloud')[0])
+            try:
+                workloads = self.workload_api.get_orphaned_workloads_list(context, migrate_cloud)
+                return self._view_builder.detail_list(req, workloads)
+            except exception.WorkloadNotFound as error:
+                LOG.exception(error)
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            except exception.InvalidState as error:
+                LOG.exception(error)
+                raise exc.HTTPBadRequest(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def workloads_reassign(self, req, body=[]):
+        try:
+            context = req.environ['workloadmgr.context']
+            tenant_maps = body
+            for tenant_map in tenant_maps:
+                workload_ids = tenant_map['workload_ids']
+                old_tenant_ids = tenant_map['old_tenant_ids']
+                new_tenant_id = tenant_map['new_tenant_id']
+                user_id = tenant_map['user_id']
+                if workload_ids and old_tenant_ids:
+                    raise exc.HTTPBadRequest("Please provide only one parameter among workload_ids and old_tenant_ids")
+                if new_tenant_id == None or user_id == None:
+                    raise exc.HTTPBadRequest("Please provide required parameters: new_tenant_id and user_id.")
+            try:
+                workloads = self.workload_api.workloads_reassign(context, tenant_maps)
+                return self._view_builder.detail_list(req, workloads)
+            except exception.WorkloadNotFound as error:
+                LOG.exception(error)
+                raise exc.HTTPNotFound(explanation=unicode(error))
+            except exception.InvalidState as error:
+                LOG.exception(error)
+                raise exc.HTTPBadRequest(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

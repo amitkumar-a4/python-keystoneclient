@@ -518,3 +518,10 @@ class BackupTargetOffline(Invalid):
 
 class InvalidNFSMountPoint(Invalid):
     pass
+
+class ProjectNotFound(NotFound):
+    message = _("Project %(project_id)s could not be found.")
+
+class UserNotFound(NotFound):
+    message = _("User %(user_id)s could not be found.")
+
