@@ -913,9 +913,12 @@ class SwiftRepository(ObjectRepository):
 
     def chown(self, path, uid, gid):
         print "chown, ",path
-        container, prefix = self.split_head_tail(path)
-        cache_path = self._get_cache(os.path.join(container, prefix))
-        return os.chown(cache_path, uid, gid)
+        try:
+            container, prefix = self.split_head_tail(path)
+            cache_path = self._get_cache(os.path.join(container, prefix))
+            return os.chown(cache_path, uid, gid)
+        except:
+            pass
 
     def symlink(self, name, target):
         raise Exception("Not Applicable")
@@ -961,6 +964,7 @@ class SwiftRepository(ObjectRepository):
         except:
             return 0
 
+        return 0
 
 class FileRepository(ObjectRepository):
     def __init__(self, root, **kwargs):
@@ -1381,7 +1385,7 @@ def main(mountpoint, cacheroot):
                       repository=SwiftRepository(cacheroot))
     FUSE(tvaultplugin, mountpoint,
          nothreads=True, foreground=True, nonempty=True,
-         big_writes=True, direct_io=True)
+         big_writes=True, direct_io=True, allow_other=True)
 
 if __name__ == '__main__':
     main(CONF.vault_data_directory, CONF.vault_data_directory_old )
