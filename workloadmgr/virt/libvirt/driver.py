@@ -1168,7 +1168,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'backend_endpoint': backup_endpoint,
                                     'snapshot_id': snapshot_to_commit.id
                                      }
-
                                 status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
                                                                              cntx,
                                                                              snapshot_vm_resource['vm_id'],
@@ -1202,6 +1201,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
         except Exception as ex:
             LOG.exception(ex)
+            if 'reason' in ex.kwargs:
+               msg = ex.kwargs['reason']
+            else:
+               msg = ex.message
+
             db.snapshot_update(cntx, snapshot['id'],
-                               {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
+                               {'warning_msg': 'Failed to apply retention policy - ' + msg})
 
