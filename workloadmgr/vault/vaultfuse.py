@@ -1196,6 +1196,7 @@ class FuseCache(object):
             except:
                 try:
                     # cache miss. free up a cache slot 
+                    cache = self.lrucache[fh]['lrucache']
                     if len(cache) == CONF.vault_cache_size:
                         # cache overflow
                         # kick an item so we can accomodate new one
