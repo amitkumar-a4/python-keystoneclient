@@ -198,6 +198,12 @@ contego_vault_opts = [
     cfg.StrOpt('vault_swift_url_template',
                default='http://localhost:8080/v1/AUTH_%(project_id)s',
                help='The URL of the Swift endpoint'),
+    cfg.IntOpt('vault_segment_size',
+               default=32 * 1024 * 1024,
+               help='vault swift object segmentation size'),
+    cfg.IntOpt('vault_cache_size',
+               default=5,
+               help='Number of segments of an object that need to be cached'),
 ]
 
 CONF = cfg.CONF
@@ -281,8 +287,6 @@ else:
     options['key'] = CONF.vault_swift_password
 
 
-SEGMENT_SIZE = 32 * 1024 * 1024
-CACHE_SIZE = 5
 CACHE_LOW_WATERMARK = 10
 CACHE_HIGH_WATERMARK = 20
 
@@ -550,8 +554,8 @@ class SwiftRepository(ObjectRepository):
                 stat = bunchify(st)
                 object_manifest.append({"path": os.path.join(container, objects[-1]),
                                         "etag": stat.etag,
-                                        "size_bytes": min(stat.st_size, SEGMENT_SIZE)})
-                offset += SEGMENT_SIZE 
+                                        "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
+                offset += CONF.vault_segment_size 
 
             object_manifest = json.dumps(object_manifest)
             self._write_object_manifest(object_name, object_manifest,
@@ -567,7 +571,7 @@ class SwiftRepository(ObjectRepository):
                 for obj in list(set(objects) - set([objects[-1]])):
                     self.object_delete(os.path.join(container, obj))
 
-                offset += SEGMENT_SIZE 
+                offset += CONF.vault_segment_size 
 
             try:
                 os.close(fh)
@@ -1020,8 +1024,8 @@ class FileRepository(ObjectRepository):
             stat = os.stat(objects[-1])
             object_manifest.append({"path": objects[-1],
                                     "etag": "etagoftheobjectsegment1",
-                                    "size_bytes": min(stat.st_size, SEGMENT_SIZE)})
-            offset += SEGMENT_SIZE 
+                                    "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
+            offset += CONF.vault_segment_size 
 
         with open(manifest, "w") as manf:
             manf.write(json.dumps(object_manifest))
@@ -1036,7 +1040,7 @@ class FileRepository(ObjectRepository):
             for obj in list(set(objects) - set([objects[-1]])):
                 os.remove(obj) 
 
-            offset += SEGMENT_SIZE 
+            offset += CONF.vault_segment_size 
 
         os.close(fh)
         return
@@ -1142,7 +1146,7 @@ class FuseCache(object):
         if self.lrucache.get(fh, None):
             self.lrucache.pop(fh)
 
-        self.lrucache[fh] = {'lrucache': LRUCache(maxsize=CACHE_SIZE),
+        self.lrucache[fh] = {'lrucache': LRUCache(maxsize=CONF.vault_cache_size),
                              'object_name': object_name}
         return fh
      
@@ -1169,15 +1173,15 @@ class FuseCache(object):
 
     def _walk_segments(self, offset, length):
         while length != 0:
-            seg_offset = offset/SEGMENT_SIZE * SEGMENT_SIZE
+            seg_offset = offset/CONF.vault_segment_size * CONF.vault_segment_size
             base = offset - seg_offset
-            seg_len = min(length, SEGMENT_SIZE - base)
+            seg_len = min(length, CONF.vault_segment_size - base)
             yield seg_offset, base, seg_len
             offset += seg_len
             length -= seg_len
 
     def object_read(self, object_name, length, offset, fh):
-        #if len(cache) == CACHE_SIZE:
+        #if len(cache) == CONF.vault_cache_size:
             #off, item = cache.popitem()
             #segname = next_segname_from_offset(off)
             #object_name = os.path.join(SEGMENT_DIR, segname)
@@ -1191,7 +1195,14 @@ class FuseCache(object):
                 segdata = self.lrucache[fh]['lrucache'][segoffset]['data']
             except:
                 try:
-                    # cache miss. load the data from the segment
+                    # cache miss. free up a cache slot 
+                    if len(cache) == CONF.vault_cache_size:
+                        # cache overflow
+                        # kick an item so we can accomodate new one
+                        off, item = cache.popitem()
+                        if item['modified'] == True:
+                            self.repository.object_upload(object_name, off, item['data'])
+  
                     segdata = self.repository.object_download(object_name, segoffset)
                 except:
                     # end of file
@@ -1209,10 +1220,9 @@ class FuseCache(object):
         bufptr = 0
         for segoffset, base, seg_len in self._walk_segments(offset, length):
 
-            #TODO: Handle the case where the writes may span multiple segments
             cache = self.lrucache[fh]['lrucache']
             if segoffset not in cache:
-                if len(cache) == CACHE_SIZE:
+                if len(cache) == CONF.vault_cache_size:
                     # cache overflow
                     # kick an item so we can accomodate new one
                     off, item = cache.popitem()
