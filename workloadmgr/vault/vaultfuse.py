@@ -590,7 +590,7 @@ class SwiftRepository(ObjectRepository):
 
             return
         except Exception as ex:
-            print ex
+            LOG.exception(ex)
             pass
 
     def object_upload(self, object_name, off, buf):
@@ -615,7 +615,7 @@ class SwiftRepository(ObjectRepository):
             vaultswift.st_upload(args1, _opts)
             os.remove(cache_path.rstrip('/'))
         except Exception as ex:
-            print ex
+            LOG.exception(ex)
             raise
 
     def object_download(self, object_name, offset):
@@ -646,7 +646,7 @@ class SwiftRepository(ObjectRepository):
             os.remove(cache_path.rstrip('/'))
             return bytearray(buf)
         except Exception as ex:
-            print ex
+            LOG.exception(ex)
             raise
 
     def object_delete(self, object_name):
@@ -662,7 +662,7 @@ class SwiftRepository(ObjectRepository):
         try:
             vaultswift.st_delete(args1, _opts)
         except Exception as ex:
-            print ex
+            LOG.exception(ex)
             pass
 
     def object_truncate(self, object_name, length, fh=None):
@@ -842,7 +842,7 @@ class SwiftRepository(ObjectRepository):
         try:
             vaultswift.st_delete(args1, _opts)
         except Exception as ex:
-            print ex
+            LOG.exception(ex)
             pass
 
     def object_statfs(self, object_name):
@@ -866,7 +866,7 @@ class SwiftRepository(ObjectRepository):
         return dt
 
     def mkdir(self, path, mode, ist=False):
-        print "mkdir, ", path
+        LOG.debug(("mkdir, %s" % path))
         container, obj = self.split_head_tail(path)
         if (obj == '' or obj == '/') and ist is False:
            _opts = options.copy()
@@ -890,7 +890,7 @@ class SwiftRepository(ObjectRepository):
         return 0
 
     def rmdir(self, path):
-        print "rmdir, ", path
+        LOG.debug(("rmdir, %s" % path))
         container, obj = self.split_head_tail(path)
         _opts = options.copy()
         _opts = bunchify(_opts)
@@ -907,7 +907,7 @@ class SwiftRepository(ObjectRepository):
         return os.rmdir(cache_path)
 
     def chmod(self, path, mode):
-        print "chmod, ", path
+        LOG.debug(("chmod, %s" % path))
         try:
             container, prefix = self.split_head_tail(path)
             cache_path = self._get_cache(os.path.join(container, prefix))
@@ -916,7 +916,7 @@ class SwiftRepository(ObjectRepository):
             pass
 
     def chown(self, path, uid, gid):
-        print "chown, ",path
+        LOG.debug(("chown, %s" % path))
         try:
             container, prefix = self.split_head_tail(path)
             cache_path = self._get_cache(os.path.join(container, prefix))
@@ -928,7 +928,7 @@ class SwiftRepository(ObjectRepository):
         raise Exception("Not Applicable")
 
     def rename(self, old, new):
-        print "rename, %s -> %s" % (old, new)
+        LOG.debug(( "rename, %s -> %s" % (old, new)))
         #make a copy of the manifest
         try:
             manifest = self._read_object_manifest(old)
@@ -951,7 +951,7 @@ class SwiftRepository(ObjectRepository):
         return 0
 
     def link(self, target, name):
-        print "link, ", target
+        LOG.debug(( "link, %s" % target))
         container, prefix = split_head_tail(target)
         cache_path_target = self._get_cache(os.path.join(container, prefix))
         container, prefix = split_head_tail(name)
@@ -959,7 +959,7 @@ class SwiftRepository(ObjectRepository):
         return os.link(cache_path_target, cache_path_name)
 
     def utimens(self, path, times=None):
-        print "utimens, ", path
+        LOG.debug(( "utimens, %s" % path))
         container, prefix = split_head_tail(path)
         cache_path = self._get_cache(path)
         """ This file won't be existing until not downloaded for writing/reading"""
@@ -1341,11 +1341,9 @@ class TrilioVault(Operations):
         return self.open(path, os.O_CREAT)
 
     def read(self, path, length, offset, fh):
-        #print "read", path, offset, length
         return self.cache.object_read(path, length, offset, fh)
 
     def write(self, path, buf, offset, fh):
-        #print "write", path, offset, len(buf)
         return self.cache.object_write(path, buf, offset, fh)
 
     def truncate(self, path, length, fh=None):
@@ -1362,7 +1360,7 @@ class TrilioVault(Operations):
         return self.cache.object_flush(path, fh)
 
     def destroy(self, path):
-        print "destroy, "
+        LOG.debug( "destroy, %s" % path)
         if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
         if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
         if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
