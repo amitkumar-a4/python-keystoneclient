@@ -2476,7 +2476,7 @@ class API(base.Base):
                             if not migrate_cloud:
                                 for old_tenant_id in old_tenant_ids:
                                     if old_tenant_id not in tenant_list:
-                                        raise wlm_exceptions.ProjectNotFound(old_tenant_id)
+                                        raise wlm_exceptions.ProjectNotFound(project_id=old_tenant_id)
                                 kwargs = {'project_list': old_tenant_ids}
                                 workloads_in_db = self.db.workload_get_all(context, **kwargs)
                                 for workload in workloads_in_db:
@@ -2510,9 +2510,9 @@ class API(base.Base):
                             workloads.extend(updated_workloads)
 
                     else:
-                        raise wlm_exceptions.UserNotFound(user_id)
+                        raise wlm_exceptions.UserNotFound(user_id=user_id)
                 else:
-                    raise wlm_exceptions.ProjectNotFound(new_tenant_id)
+                    raise wlm_exceptions.ProjectNotFound(project_id=new_tenant_id)
         except Exception as ex:
             LOG.exception(ex)
             raise ex
