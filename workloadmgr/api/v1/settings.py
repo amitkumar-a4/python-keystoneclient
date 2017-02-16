@@ -80,9 +80,9 @@ class SettingsController(wsgi.Controller):
 
     def show(self, req, name):
         """Return data about the given setting."""
-        keystone_client = KeystoneClient()
         try:
             context = req.environ['workloadmgr.context']
+            keystone_client = KeystoneClient(context)
             get_hidden = False
             if ('QUERY_STRING' in req.environ) :
                 qs=parse_qs(req.environ['QUERY_STRING'])

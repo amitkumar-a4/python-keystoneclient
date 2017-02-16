@@ -1383,7 +1383,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         else error email
         """  
         try:
-            keystone_client = KeystoneClient()
+            keystone_client = KeystoneClient(context)
             if type == 'snapshot':
                 workload = self.db.workload_get(context, object.workload_id)
                 workload_type = self.db.workload_type_get(context, workload.workload_type_id)
