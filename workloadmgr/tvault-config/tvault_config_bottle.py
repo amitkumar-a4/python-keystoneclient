@@ -554,10 +554,10 @@ def _authenticate_with_keystone():
     #image
     if keystone.version == 'v3':
         image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                   region=config_data['region_name'], interface='public').url
+                                                   region=config_data['region_name'], interface='internal').url
     else:
         image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                   region=config_data['region_name']).publicurl
+                                                   region=config_data['region_name']).internalurl
 
     parse_result = urlparse(image_public_url)
     config_data['glance_production_api_servers'] = image_public_url
@@ -569,10 +569,10 @@ def _authenticate_with_keystone():
     try:
         if keystone.version == 'v3':
            network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
-                                                        region=config_data['region_name'], interface='public').url
+                                                        region=config_data['region_name'], interface='internal').url
         else:
              network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
-                                                          region=config_data['region_name']).publicurl
+                                                          region=config_data['region_name']).internalurl
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
         config_data['neutron_production_url'] = "unavailable"
@@ -585,10 +585,10 @@ def _authenticate_with_keystone():
     #compute
     if keystone.version == 'v3':
         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
-                                                     region=config_data['region_name'], interface='public').url
+                                                     region=config_data['region_name'], interface='internal').url
     else:
         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
-                                                     region=config_data['region_name']).publicurl
+                                                     region=config_data['region_name']).internalurl
 
   
     def _get_service_endpoint(public_url):
@@ -607,10 +607,10 @@ def _authenticate_with_keystone():
         #volume
         if keystone.version == 'v3':
             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                       region=config_data['region_name'], interface='public').url
+                                                       region=config_data['region_name'], interface='internal').url
         else:
             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                        region=config_data['region_name']).publicurl
+                                                        region=config_data['region_name']).internalurl
 
         config_data['cinder_production_endpoint_template'] = \
             _get_service_endpoint(volume_public_url)
@@ -623,10 +623,10 @@ def _authenticate_with_keystone():
         #object
         if keystone.version == 'v3':
             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                       region=config_data['region_name'], interface='public').url
+                                                       region=config_data['region_name'], interface='internal').url
         else:
             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                        region=config_data['region_name']).publicurl
+                                                        region=config_data['region_name']).internalurl
 
         config_data['vault_swift_url'] = object_public_url.replace(
                                              object_public_url.split("/")[-1], 'AUTH_') 

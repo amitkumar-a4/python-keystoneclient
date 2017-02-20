@@ -22,7 +22,7 @@ from workloadmgr.common.i18n import _
 
 default_clients_opts = [
     cfg.StrOpt('endpoint_type',
-               default='publicURL',
+               default='internalURL',
                help=_(
                    'Type of endpoint in Identity service catalog to use '
                    'for communication with the OpenStack service.')),
