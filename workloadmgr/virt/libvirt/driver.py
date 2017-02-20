@@ -1178,8 +1178,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                               'metadata': metadata
                                                                               })
                                       if status['result'] == 'retry':
-                                         LOG.debug(_('tvault-contego returned "retry". Waiting for 15 seconds before retry.'))
-                                         time.sleep(15)
+                                         LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
+                                         time.sleep(60)
 
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
