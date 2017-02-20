@@ -1169,12 +1169,18 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'snapshot_id': snapshot_to_commit.id
                                      }
 
-                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                status = {'result': 'retry'}
+                                while status['result'] == 'retry':
+                                      status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
                                                                              cntx,
                                                                              snapshot_vm_resource['vm_id'],
                                                                              {'commit_image_list': commit_image_list,
                                                                               'metadata': metadata
                                                                               })
+                                      if status['result'] == 'retry':
+                                         LOG.debug(_('tvault-contego returned "retry". Waiting for 15 seconds before retry.'))
+                                         time.sleep(15)
+
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
