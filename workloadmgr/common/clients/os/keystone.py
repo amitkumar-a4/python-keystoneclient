@@ -20,7 +20,9 @@ class KeystoneClientPlugin(client_plugin.ClientPlugin):
     service_types = [IDENTITY] = ['identity']
 
     def _create(self):
-        return wkc.KeystoneClient(self.context)
+        client = wkc.KeystoneClient(self.context)
+        keystone_client = client.client
+        return keystone_client
 
     def is_not_found(self, ex):
         return isinstance(ex, exceptions.NotFound)

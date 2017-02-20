@@ -2424,7 +2424,7 @@ class API(base.Base):
             if context.is_admin == False:
                 raise wlm_exceptions.AdminRequired()
 
-            keystone_client = KeystoneClient()
+            keystone_client = KeystoneClient(context)
 
             workloads = []
             workload_to_update = []
