@@ -506,9 +506,17 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 compute_service = nova.API(production=True)                
                 for vm in self.db.workload_vms_get(context, workload.id):
                     self.db.workload_vms_delete(context, vm.vm_id, workload.id) 
-                    compute_service.delete_meta(context, vm.vm_id,
+                    try:
+                         compute_service.delete_meta(context, vm.vm_id,
                                             ["workload_id", 'workload_name'])
-
+                    except Exception as ex:
+                           LOG.exception(ex)
+                           try:
+                               context = nova._get_tenant_context(context)
+                               compute_service.delete_meta(context, vm.vm_id,
+                                            ["workload_id", 'workload_name'])
+                           except Exception as ex:
+                                  LOG.exception(ex)
 
                 for instance in workflow._store['instances']:
                     values = {'workload_id': workload.id,
