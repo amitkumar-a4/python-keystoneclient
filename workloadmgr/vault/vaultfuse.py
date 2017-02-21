@@ -18,10 +18,11 @@ import vaultswift
 import shutil
 import functools
 import subprocess
+from tempfile import mkstemp
 
+from contego import utils
 from swiftclient.service import (
-   SwiftService, SwiftError,
-   SwiftUploadObject, get_conn
+   get_conn
 )
 
 from swiftclient.utils import (
@@ -159,6 +160,10 @@ contego_vault_opts = [
     cfg.StrOpt('vault_data_directory_old',
                default='/var/triliovault',
                help='Location where snapshots will be stored'),
+    cfg.StrOpt('tmpfs_mount_path',
+               default='tmpfs',
+               help='Location with respect to CONF.vault_data_directory_old'
+                    'where tmpfs is mounted'),
     cfg.StrOpt('vault_storage_nfs_export',
                default='local',
                help='NFS Export'),
@@ -327,6 +332,24 @@ def get_head(path):
     return head
 
 
+class tmpfsfile():
+    def __init__(self, remove=False):
+        self.remove = remove
+        pass
+
+    def __enter__(self):
+        tmpfs_mountpath = os.path.join(CONF.vault_data_directory_old,
+                                       CONF.tmpfs_mount_path)
+        fh, self.open_file = mkstemp(dir=tmpfs_mountpath)
+        os.close(fh)
+        if self.remove:
+            os.remove(self.open_file)
+        return self.open_file
+
+    def __exit__(self, *args):
+        os.remove(self.open_file)
+
+
 class ObjectRepository(object):
     def __init__(self, root, **kwargs):
         self.root = root
@@ -416,6 +439,21 @@ class SwiftRepository(ObjectRepository):
                            str(self.user_id)+':'+str(self.group_id),
                            CONF.vault_data_directory_old]
                 subprocess.call(command, shell=False)
+
+        #mount /var/triliovault/tmpfs
+        try:
+            tmpfs_mountpath = os.path.join(CONF.vault_data_directory_old,
+                                           CONF.tmpfs_mount_path)
+            if not os.path.isdir(tmpfs_mountpath):
+                utils.ensure_tree(tmpfs_mountpath)
+
+            if not os.path.ismount(tmpfs_mountpath):
+                command = ['timeout', '-sKILL', '30', 'sudo', 'mount',
+                           '-t', 'tmpfs', '-o', 'size=200M,mode=0777',
+                           "tmpfs", tmpfs_mountpath]
+                subprocess.check_call(command, shell=False)
+        except:
+            pass
 
         path = os.path.join(self.root, partial)
         return path
@@ -601,22 +639,22 @@ class SwiftRepository(ObjectRepository):
         seg_fullname = os.path.join(segments_dir, segname)
         container, obj = self.split_head_tail(seg_fullname)
 
-        cache_path = self._full_path(seg_fullname)
+        cache_path = self._get_cache(seg_fullname)
 
-        with open(cache_path, "w") as f:
-             f.write(buf)
+        with tmpfsfile() as tempfs:
+            with open(tempfs, "w") as f:
+                f.write(buf)
 
-        _opts = options.copy()
-        _opts['segment_size'] = len(buf)
-        _opts['object_name'] = obj.rstrip('/')
-        _opts = bunchify(_opts)
-        args1 = [container, cache_path]
-        try:
-            vaultswift.st_upload(args1, _opts)
-            os.remove(cache_path.rstrip('/'))
-        except Exception as ex:
-            LOG.exception(ex)
-            raise
+            _opts = options.copy()
+            _opts['segment_size'] = len(buf)
+            _opts['object_name'] = obj.rstrip('/')
+            _opts = bunchify(_opts)
+            args1 = [container, tempfs]
+            try:
+                vaultswift.st_upload(args1, _opts)
+            except Exception as ex:
+                LOG.exception(ex)
+                raise
 
     def object_download(self, object_name, offset):
         container, obj = self.split_head_tail(object_name)
@@ -626,28 +664,29 @@ class SwiftRepository(ObjectRepository):
         seg_fullname = os.path.join(segments_dir, segname)
 
         container, obj = self.split_head_tail(seg_fullname.rstrip('/'))
-        cache_path = self._full_path(seg_fullname)
+        # make sure that tmpfs is mounted
+        cache_path = self._get_cache(seg_fullname)
 
         try:
             os.makedirs(self._full_path(segments_dir),  mode=0751)
         except:
             pass
 
-        _opts = options.copy()
-        _opts['prefix'] = None
-        _opts['out_directory'] = None
-        _opts['out_file'] = cache_path.rstrip('/')
-        _opts = bunchify(_opts)
-        args1 = [container, obj]
-        try:
-            vaultswift.st_download(args1, _opts)
-            with open(cache_path.rstrip('/'), "rb") as f:
-                buf = f.read()
-            os.remove(cache_path.rstrip('/'))
-            return bytearray(buf)
-        except Exception as ex:
-            LOG.exception(ex)
-            raise
+        with tmpfsfile(remove=True) as tempfs:
+            _opts = options.copy()
+            _opts['prefix'] = None
+            _opts['out_directory'] = None
+            _opts['out_file'] = tempfs.rstrip('/')
+            _opts = bunchify(_opts)
+            args1 = [container, obj]
+            try:
+                vaultswift.st_download(args1, _opts)
+                with open(tempfs.rstrip('/'), "rb") as f:
+                    buf = f.read()
+                return bytearray(buf)
+            except Exception as ex:
+                LOG.exception(ex)
+                raise
 
     def object_delete(self, object_name):
 
@@ -1372,6 +1411,21 @@ class TrilioVault(Operations):
         return 0
 
 
+def fuse_conf():
+    with open('/etc/fuse.conf', 'r') as f:
+         found = 0
+         for line in f:
+             if 'user_allow_other' in line and '#user_allow_other' not in line:
+                found = 1
+                break
+    if found == 0:
+       with open('/etc/fuse.conf', 'rt') as f:
+            s = f.read() + '\n' + 'user_allow_other \n'
+       with open('/tmp/fuse.conf.tmp', 'wt') as outf:
+            outf.write(s)
+       os.system('sudo mv /tmp/fuse.conf.tmp /etc/fuse.conf')
+       os.system('sudo chown root:root /etc/fuse.conf')
+      
 def main(mountpoint, cacheroot):
     try:
         try:
@@ -1394,7 +1448,7 @@ def main(mountpoint, cacheroot):
                       repository=SwiftRepository(cacheroot))
     FUSE(tvaultplugin, mountpoint,
          nothreads=True, foreground=True, nonempty=True,
-         big_writes=True, direct_io=True, allow_other=True)
+         big_writes=True, direct_io=True)
 
 if __name__ == '__main__':
     main(CONF.vault_data_directory, CONF.vault_data_directory_old )
