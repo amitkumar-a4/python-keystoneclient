@@ -133,7 +133,7 @@ class PrepareBackupImage(task.Task):
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
-            restore_file_path = image_info.image
+            restore_file_path = image_info.backing_file
             image_overlay_file_path = resource_snap_path
             image_virtual_size = image_info.virtual_size
         else:
@@ -244,7 +244,7 @@ class UploadImageToGlance(task.Task):
         try:
             org_image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
             org_glance_image = self.image_service.show(self.cntx, org_image_id)
-            if org_glance_image:
+            if org_glance_image and org_glance_image['deleted'] is False:
                 return org_glance_image['id'], org_glance_image['disk_format']
         except:
             pass

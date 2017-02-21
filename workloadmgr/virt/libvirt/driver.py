@@ -610,7 +610,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                        instance_id,
                                                                                        {'metadata': progress_tracker_metadata})
                   if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
-                     for line in async_task_status['status']:
+                     for line in async_task_status['status'].split('\n'):
                          if 'Down' in line:
                             raise Exception("Contego service Unreachable - " + line)
                          if 'Error' in line:
@@ -790,7 +790,6 @@ class LibvirtDriver(driver.ComputeDriver):
         cinder_volumes = []
         for volume in getattr(nova_instance, 'os-extended-volumes:volumes_attached'):
             cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
-        
         
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
