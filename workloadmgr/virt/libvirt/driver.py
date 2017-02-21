@@ -610,7 +610,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                        instance_id,
                                                                                        {'metadata': progress_tracker_metadata})
                   if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
-                     for line in async_task_status['status'].split('\n'):
+                     for line in async_task_status['status']:
                          if 'Down' in line:
                             raise Exception("Contego service Unreachable - " + line)
                          if 'Error' in line:
