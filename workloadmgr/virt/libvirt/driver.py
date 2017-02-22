@@ -1201,8 +1201,9 @@ class LibvirtDriver(driver.ComputeDriver):
 
         except Exception as ex:
             LOG.exception(ex)
-            if 'reason' in ex.kwargs:
-               msg = ex.kwargs['reason']
+            if hasattr(ex, 'kwargs'):
+               if 'reason' in ex.kwargs:
+                   msg = ex.kwargs['reason']
             else:
                msg = ex.message
 
