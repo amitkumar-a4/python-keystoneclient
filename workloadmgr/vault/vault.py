@@ -1101,6 +1101,7 @@ def get_workloads_for_tenant(context, tenant_ids):
 def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
 
     workload_urls = []
+    jobscheduler_map = {}
 
     try:
         #Get list of workload directory path for workloads need to update
@@ -1126,8 +1127,18 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
                             db_values['tenant_id'] = new_tenant_id
                         db_values['user_id'] = user_id
 
+                        if db_values.get('jobschedule', None) is not None:
+                            jobschedule = pickle.loads(db_values['jobschedule'])
+                            if jobschedule['enabled'] is True:
+                               jobschedule['enabled'] = False
+                               db_values['jobschedule'] = pickle.dumps(jobschedule)
+                            jobscheduler_map[db_values['id']] = db_values['jobschedule']
+
                         with open(os.path.join(path, name), 'w') as file:
                             json.dump(db_values, file)
+
+        return jobscheduler_map
+
     except Exception as ex:
         LOG.exception(ex)
 

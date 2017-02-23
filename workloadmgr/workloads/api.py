@@ -2380,7 +2380,7 @@ class API(base.Base):
         AUDITLOG.log(context, 'Get Orphaned Workloads List Completed', None)
         return workloads
 
-    def _update_workloads(self, context, workloads_to_update, new_tenant_id, user_id):
+    def _update_workloads(self, context, workloads_to_update, jobscheduler_map, new_tenant_id, user_id):
         '''
         Update the values for tenant_id and user_id for given list of
         workloads in database.
@@ -2395,12 +2395,20 @@ class API(base.Base):
             #Create the list for workloads and snapshots to update in 
             #database with new project_id and user_id
             for workload_id in workloads_to_update:
-                workload_map = {'id': workload_id, 'project_id':new_tenant_id, 'user_id': user_id }
+                workload_map = {'id': workload_id, 'jobschedule':jobscheduler_map[workload_id],\
+                                 'project_id':new_tenant_id, 'user_id': user_id }
                 workload_update_map.append(workload_map)
                 snapshots = self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs)
                 for snapshot in snapshots:
                     snapshot_map = {'id': snapshot.get('id'), 'project_id':new_tenant_id, 'user_id': user_id }
                     snapshot_update_map.append(snapshot_map)
+
+                #Removing workloads from job scheduler
+                jobs = self._scheduler.get_jobs()
+                for job in jobs:
+                    if job.kwargs['workload_id'] == workload_id:
+                       self._scheduler.unschedule_job(job)
+                       break;
 
             #Update all the entries for workloads and snapshots in database
             DBSession.bulk_update_mappings(eval('models.Workloads'), workload_update_map)
@@ -2505,8 +2513,9 @@ class API(base.Base):
                             reassigned_workloads.extend(imported_workloads)
 
                         if workload_to_update:
-                            vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
-                            updated_workloads = self._update_workloads(context, workload_to_update, new_tenant_id, user_id)
+                            jobscheduler_map = vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
+                            updated_workloads = self._update_workloads(context, workload_to_update,\
+                                                      jobscheduler_map, new_tenant_id, user_id)
                             reassigned_workloads.extend(updated_workloads)
 
                         return reassigned_workloads
