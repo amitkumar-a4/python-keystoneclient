@@ -1750,6 +1750,12 @@ class API(base.Base):
                 error_msg = "Recovery manager instance cannot have ephemeral disk"
                 raise Exception(error_msg)
 
+            try:
+                server_id = server.image['id']
+            except Exception as ex:
+                   error_msg = "Not able to acces VM image, Recovery manager should be booted from Image"
+                   raise Exception(error_msg)
+
             (image_service, image_id) = glance.get_remote_image_service(context, server.image['id'])
             metadata = image_service.show(context, server.image['id'])
             error_msg = "Recovery manager instance needs to be created with glance image property 'hw_qemu_guest_agent=yes'"
