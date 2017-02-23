@@ -318,7 +318,7 @@ class KeystoneClient(object):
             class_._instance = object.__new__(class_, *args, **kwargs)
         return class_._instance
 
-    def __init__(self):
+    def __init__(self, context):
         auth_url = CONF.keystone_endpoint_url
         if auth_url.find('v3') != -1:
             self.client = KeystoneClientV3(context)

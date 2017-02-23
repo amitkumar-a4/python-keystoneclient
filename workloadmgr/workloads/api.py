@@ -969,6 +969,7 @@ class API(base.Base):
         total_usage = 0
         nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
+            nfsshare = nfsshare.strip()
             stat = nfsstats[nfsshare]
 
             total_capacity = stat['total_capacity']
@@ -2424,9 +2425,9 @@ class API(base.Base):
             if context.is_admin == False:
                 raise wlm_exceptions.AdminRequired()
 
-            keystone_client = KeystoneClient()
+            keystone_client = KeystoneClient(context)
 
-            workloads = []
+            reassigned_workloads = []
             workload_to_update = []
             workload_to_import = []
             projects = keystone_client.client.get_project_list_for_import(context)
@@ -2476,7 +2477,7 @@ class API(base.Base):
                             if not migrate_cloud:
                                 for old_tenant_id in old_tenant_ids:
                                     if old_tenant_id not in tenant_list:
-                                        raise wlm_exceptions.ProjectNotFound(old_tenant_id)
+                                        raise wlm_exceptions.ProjectNotFound(project_id=old_tenant_id)
                                 kwargs = {'project_list': old_tenant_ids}
                                 workloads_in_db = self.db.workload_get_all(context, **kwargs)
                                 for workload in workloads_in_db:
@@ -2502,17 +2503,19 @@ class API(base.Base):
                         if workload_to_import:
                             vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
                             imported_workloads = self.import_workloads(context, workload_to_import, True)
-                            workloads.extend(imported_workloads)
+                            reassigned_workloads.extend(imported_workloads)
 
                         if workload_to_update:
                             vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
                             updated_workloads = self._update_workloads(context, workload_to_update, new_tenant_id, user_id)
-                            workloads.extend(updated_workloads)
+                            reassigned_workloads.extend(updated_workloads)
+
+                        return reassigned_workloads
 
                     else:
-                        raise wlm_exceptions.UserNotFound(user_id)
+                        raise wlm_exceptions.UserNotFound(user_id=user_id)
                 else:
-                    raise wlm_exceptions.ProjectNotFound(new_tenant_id)
+                    raise wlm_exceptions.ProjectNotFound(project_id=new_tenant_id)
         except Exception as ex:
             LOG.exception(ex)
             raise ex

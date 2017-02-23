@@ -621,7 +621,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
                   now = timeutils.utcnow()
                   if (now - start_time) > datetime.timedelta(minutes=5) and CONF.vault_storage_type == 'swift-s':
-                     async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata})
+                     try:
+                         async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata})
+                     except:
+                            async_task_status_swift = None
                      start_time = timeutils.utcnow()
                      if async_task_status_swift and 'status' in async_task_status_swift and len(async_task_status_swift['status']):
                         for line in async_task_status['status']:
@@ -787,7 +790,6 @@ class LibvirtDriver(driver.ComputeDriver):
         cinder_volumes = []
         for volume in getattr(nova_instance, 'os-extended-volumes:volumes_attached'):
             cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
-        
         
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
@@ -1168,13 +1170,19 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'backend_endpoint': backup_endpoint,
                                     'snapshot_id': snapshot_to_commit.id
                                      }
-
-                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                
+                                status = {'result': 'retry'}
+                                while status['result'] == 'retry':
+                                      status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
                                                                              cntx,
                                                                              snapshot_vm_resource['vm_id'],
                                                                              {'commit_image_list': commit_image_list,
                                                                               'metadata': metadata
                                                                               })
+                                      if status['result'] == 'retry':
+                                         LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
+                                         time.sleep(60)
+
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
@@ -1202,6 +1210,12 @@ class LibvirtDriver(driver.ComputeDriver):
 
         except Exception as ex:
             LOG.exception(ex)
+            if hasattr(ex, 'kwargs'):
+               if 'reason' in ex.kwargs:
+                   msg = ex.kwargs['reason']
+            else:
+               msg = ex.message
+
             db.snapshot_update(cntx, snapshot['id'],
-                               {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
+                               {'warning_msg': 'Failed to apply retention policy - ' + msg})
 

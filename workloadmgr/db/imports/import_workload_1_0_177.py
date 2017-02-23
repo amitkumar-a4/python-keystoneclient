@@ -90,7 +90,7 @@ def project_id_exists(cntx, project_id):
 
     # TODO: Optimize it without reading project list os many times
     kclient.client_plugin = kclient"""
-    keystone_client = KeystoneClient()
+    keystone_client = KeystoneClient(cntx)
     projects = keystone_client.client.get_project_list_for_import(cntx)
     for prj in projects:
         if uuid.UUID(prj.id) == uuid.UUID(project_id):
