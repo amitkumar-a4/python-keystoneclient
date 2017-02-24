@@ -437,13 +437,14 @@ def _authenticate_with_swift(config_data):
                          'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'], 
                          'os_domain_id': config_data['swift_domain_id'],'prefix': None, 'auth_version': '3', 
                          'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
-                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
-                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': config_data['swift_tenantname'], 
+                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': config_data['swift_domain_id'], 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
-                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
-                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                         'os_options': {'project_name': config_data['swift_tenantname'], 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 
+                                        'user_domain_name': None, 
+                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': config_data['swift_domain_id'], 'user_id': None, 
                                         'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],
                                         'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
@@ -463,7 +464,8 @@ def _authenticate_with_swift(config_data):
                                         'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
                          'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
-                
+               
+            import pdb;pdb.set_trace() 
             with SwiftService(options=_opts) as swift:
                 try:
                     stats_parts_gen = swift.list()
