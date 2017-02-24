@@ -105,10 +105,7 @@ logging_cli_opts = [
 generic_log_opts = [
     cfg.BoolOpt('use_stderr',
                 default=True,
-                help='Log output to standard error'),
-    cfg.IntOpt('rate_limit_burst',
-                default=1,
-                help='Burst limit')
+                help='Log output to standard error')
 ]
 
 log_opts = [
@@ -1022,6 +1019,28 @@ class SwiftRepository(ObjectRepository):
 
         return 0
 
+    def destroy(self, path):
+        try:
+            tmpfs_mountpath = os.path.join(CONF.vault_data_directory_old,
+                                           CONF.tmpfs_mount_path)
+            if os.path.isdir(tmpfs_mountpath) and \
+               os.path.ismount(tmpfs_mountpath):
+                command = ['timeout', '-sKILL', '30', 'sudo', 'umount',
+                           tmpfs_mountpath]
+                subprocess.check_call(command, shell=False)
+        except:
+            pass
+
+        if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
+        if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
+        if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
+        if vaultswift.swift_download: vaultswift.swift_download.__exit__(None, None, None)
+        if vaultswift.swift_delete: vaultswift.swift_delete.__exit__(None, None, None)
+        if vaultswift.swift_post: vaultswift.swift_post.__exit__(None, None, None)
+        if vaultswift.swift_cap: vaultswift.swift_cap.__exit__(None, None, None) 
+        shutil.rmtree(self.root)
+        return 0
+
 class FileRepository(ObjectRepository):
     def __init__(self, root, **kwargs):
         super(FileRepository, self).__init__(root, **kwargs)
@@ -1185,6 +1204,10 @@ class FileRepository(ObjectRepository):
         return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
             'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
             'f_frsize', 'f_namemax'))
+
+    def destroy(self, path):
+        shutil.rmtree(self.root)
+        return 0
 
 
 class FuseCache(object):
@@ -1413,16 +1436,8 @@ class TrilioVault(Operations):
         return self.cache.object_flush(path, fh)
 
     def destroy(self, path):
-        LOG.debug( "destroy, %s" % path)
-        if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
-        if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
-        if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
-        if vaultswift.swift_download: vaultswift.swift_download.__exit__(None, None, None)
-        if vaultswift.swift_delete: vaultswift.swift_delete.__exit__(None, None, None)
-        if vaultswift.swift_post: vaultswift.swift_post.__exit__(None, None, None)
-        if vaultswift.swift_cap: vaultswift.swift_cap.__exit__(None, None, None) 
-        shutil.rmtree(self.root)
-        return 0
+          LOG.debug( "destroy, %s" % path)
+          return self.repository.destroy(path)
 
 
 def fuse_conf():
