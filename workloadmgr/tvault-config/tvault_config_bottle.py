@@ -465,7 +465,6 @@ def _authenticate_with_swift(config_data):
                                         'auth_token': None, 'project_domain_name': None}, 
                          'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
                
-            import pdb;pdb.set_trace() 
             with SwiftService(options=_opts) as swift:
                 try:
                     stats_parts_gen = swift.list()
