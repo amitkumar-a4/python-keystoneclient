@@ -105,7 +105,10 @@ logging_cli_opts = [
 generic_log_opts = [
     cfg.BoolOpt('use_stderr',
                 default=True,
-                help='Log output to standard error')
+                help='Log output to standard error'),
+    cfg.IntOpt('rate_limit_burst',
+                default=1,
+                help='Burst limit')
 ]
 
 log_opts = [
@@ -540,8 +543,7 @@ class SwiftRepository(ObjectRepository):
         self.manifest[object_name]['mode'] = flags
 
         if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
-           flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)) or \
-           flags == int('8401', 16) or flags in (int('8001', 16), int('8801', 16)):
+           flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
             # load manifst
 
             manifest = self._read_object_manifest(object_name)
@@ -565,6 +567,16 @@ class SwiftRepository(ObjectRepository):
                 f.write(json.dumps(manifest))
 
         else:
+            # this is either write or create request
+            #flags == int('8401', 16) or flags in (int('8001', 16), int('8801', 16)):
+            try:
+                self.object_unlink(object_name)
+            except:
+                pass
+
+            if flags & os.O_WRONLY:
+                with open(full_path, "w") as f:
+                    pass
             try:
                 segment_dir = self._full_path(object_name + "-segments")
                 os.makedirs(segment_dir)
@@ -580,10 +592,11 @@ class SwiftRepository(ObjectRepository):
                                             object_name + "-segments")
             container, prefix = self.split_head_tail(segments_dir)
             object_manifest = []
+            segments_list = {}
 
             offset = 0
             while True:
-                objects = self.segment_list(container, prefix, offset)
+                segments_list[offset] = objects = self.segment_list(container, prefix, offset)
                 if len(objects) == 0:
                     break
 
@@ -601,7 +614,7 @@ class SwiftRepository(ObjectRepository):
 
             offset = 0
             while True:
-                objects = self.segment_list(container, prefix, offset)
+                objects = segments_list[offset]
                 if len(objects) == 0:
                     break
 
@@ -1053,9 +1066,10 @@ class FileRepository(ObjectRepository):
         manifest = full_path + ".manifest"
         segment_dir = self._full_path(object_name + "-segments")
         object_manifest = []
+        segments_list = {}
         offset = 0
         while True:
-            objects = self.segment_list(segment_dir, offset)
+            segments_list[offset] = objects = self.segment_list(segment_dir, offset)
             if len(objects) == 0:
                 break
 
@@ -1071,7 +1085,7 @@ class FileRepository(ObjectRepository):
 
         offset = 0
         while True:
-            objects = self.segment_list(segment_dir, offset)
+            objects = segments_list[offset]
             if len(objects) == 0:
                 break
 
