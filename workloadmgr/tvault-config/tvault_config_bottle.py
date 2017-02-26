@@ -2619,7 +2619,7 @@ def configure_openstack():
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
     
-    try:    
+    try:
         config_inputs = bottle.request.POST
 
         config_data['configuration_type'] = 'openstack'
@@ -2674,38 +2674,40 @@ def configure_openstack():
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
-        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
-        if 'storage-nfs-options' in config_inputs:
-           config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
-        else:
-             config_data['storage_nfs_options'] = 'nolock'
-       
-        if 'swift-auth-version' in config_inputs:
-            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
-        else:
-             config_data['swift_auth_version'] = 'NONE'
 
-         
-        if config_data['swift_auth_version'] == 'TEMPAUTH':
-           config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
-           config_data['swift_username'] = config_inputs['swift-username'].strip()
-           config_data['swift_password'] = config_inputs['swift-password'].strip()
-           config_data['swift_tenantname'] = ''
-           config_data['swift_domain_id'] = ''
-        elif config_data['swift_auth_version'] == 'KEYSTONE':
-             config_data['swift_auth_url'] = config_data['keystone_public_url']
-             config_data['swift_username'] = config_data['admin_username']
-             config_data['swift_password'] = config_data['admin_password']
-             config_data['swift_tenantname'] = config_data['admin_tenant_name']
-             config_data['swift_domain_id'] = ''
-             if config_data['keystone_auth_version'] == 3:
-                config_data['swift_domain_id'] = config_data['domain_name']
+        config_data['storage_nfs_options'] = 'nolock'
+        config_data['storage_nfs_export'] = ''
+        config_data['swift_auth_url'] = ''
+        config_data['swift_username'] = ''
+        config_data['swift_password'] = ''
+        config_data['swift_tenantname'] = ''
+        config_data['swift_domain_id'] = ''
+        config_data['swift_auth_version'] = 'NONE'
+
+        config_data['backup_target_type'] = config_inputs['backup_target_type']
+        if config_data['backup_target_type'] == 'NFS':
+            config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
+
+            if 'storage-nfs-options' in config_inputs:
+                config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
+
         else:
-             config_data['swift_auth_url'] = ''
-             config_data['swift_username'] = ''
-             config_data['swift_password'] = ''
-             config_data['swift_tenantname'] = ''
-             config_data['swift_domain_id'] = ''
+            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
+
+            if config_data['swift_auth_version'] == 'TEMPAUTH':
+                config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
+                config_data['swift_username'] = config_inputs['swift-username'].strip()
+                config_data['swift_password'] = config_inputs['swift-password'].strip()
+                config_data['swift_tenantname'] = ''
+                config_data['swift_domain_id'] = ''
+            elif config_data['swift_auth_version'] == 'KEYSTONE':
+                config_data['swift_auth_url'] = config_data['keystone_public_url']
+                config_data['swift_username'] = config_data['admin_username']
+                config_data['swift_password'] = config_data['admin_password']
+                config_data['swift_tenantname'] = config_data['admin_tenant_name']
+                config_data['swift_domain_id'] = ''
+                if config_data['keystone_auth_version'] == 3:
+                    config_data['swift_domain_id'] = config_data['domain_name']
 
         config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         

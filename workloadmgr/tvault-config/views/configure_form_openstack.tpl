@@ -30,6 +30,7 @@ function findForm() {
   obj = $("#configure_openstack input[name='swift-auth-version']:checked")
   setSwiftRequired(obj.attr('checked'), obj.val())
 }
+
 function setSwiftRequired(checked, val) {
      if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
@@ -208,14 +209,26 @@ function setSwiftRequired(checked, val) {
           <div id="collapsebackendtype" class="panel-collapse collapse in">
             <div class="panel-body">
              <label class="radio-inline">
+             %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
                 <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden')">NFS
+             %else:
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden')">NFS
+             %end 
              </label>
              <label class="radio-inline">
+             %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden')">SWIFT
+             %else:
                 <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden')">SWIFT
+             %end 
              </label>
              <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span> 
 
+            %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
 	    <div class="panel-group" id="nfsstorage-panel">
+             %else:
+	    <div class="panel-group hidden" id="nfsstorage-panel">
+             %end 
 	       <div class="panel panel-default" id="panel3">
 		<div class="panel-heading">
 		  <h4 class="panel-title">
@@ -239,7 +252,11 @@ function setSwiftRequired(checked, val) {
 	      </div>
 	    </div>
 
+            %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
+            <div class="panel-group" id="swiftstorage-panel">
+            %else:
             <div class="panel-group hidden" id="swiftstorage-panel">
+            %end 
                <div class="panel panel-default" id="panel5">
                   <div class="panel-heading">
                      <h4 class="panel-title">
@@ -256,7 +273,7 @@ function setSwiftRequired(checked, val) {
                          <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
                          <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
                 %else:
-                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
                          <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
                 %end 
                          <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
