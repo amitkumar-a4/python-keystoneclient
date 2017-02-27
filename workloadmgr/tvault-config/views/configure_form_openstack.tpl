@@ -101,7 +101,7 @@ function setSwiftRequired(checked, val) {
 	%end  
 		   
     <div class="form-group">
-    	<label class="control-label">Floating IP Address	<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
+    	<label class="control-label">TrilioVault Controller IP Address<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
     	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control">
     </div>
     <div class="form-group">
