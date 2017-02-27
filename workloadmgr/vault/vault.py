@@ -159,66 +159,6 @@ def run_async(func):
 
     return async_func
 
-
-def get_client(context):
-    try:
-        username=CONF.get('keystone_authtoken').username 
-    except:
-           username=CONF.get('keystone_authtoken').admin_user
-    try:
-        password=CONF.get('keystone_authtoken').password 
-    except:
-           password=CONF.get('keystone_authtoken').admin_password
-    try:
-        tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
-    except:
-           project_id = context.project_id
-           context.project_id = 'Configurator'
-           tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
-           context.project_id = project_id
-    auth_url=CONF.keystone_endpoint_url
-    if auth_url.find('v3') != -1:
-       username=CONF.get('nova_admin_username')
-       password=CONF.get('nova_admin_password')
-       if username == 'triliovault':
-          domain_id=CONF.get('triliovault_user_domain_id')
-       else:
-            domain_id=CONF.get('domain_name')
-       auth = passMod.Password(auth_url=auth_url,
-                                    username=username,
-                                    password=password,
-                                    user_domain_id=domain_id,
-                                    domain_id=domain_id,
-                                    )
-    else:
-         auth = passMod.Password(auth_url=auth_url,
-                                    username=username,
-                                    password=password,
-                                    project_name=tenant_name,
-                                    )
-    sess = session.Session(auth=auth, verify=False)
-    return client.Client(session=sess, auth_url=auth_url, insecure=True)
-
-def get_project_list_for_import(context):
-    keystone_client = get_client(context)
-    if keystone_client.version == 'v3':
-       if(context.user == CONF.get('nova_admin_username')):
-           projects = keystone_client.projects.list()
-       else:
-            user = keystone_client.users.get(context.user_id)
-            projects = keystone_client.projects.list(user=user)
-    else:
-         projects = keystone_client.tenants.list()
-    return projects
-
-def get_user_to_get_email_address(context):
-    keystone_client = get_client(context)
-    user = keystone_client.users.get(context.user_id)
-    if not hasattr(user, 'email'):
-       user.email = None
-    return user
-
-
 class TrilioVaultBackupTarget(object):
 
     __metaclass__ = abc.ABCMeta
@@ -476,17 +416,22 @@ def to_abs():
 
 class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
-        base64encode = base64.b64encode(backupendpoint)
-        mountpath = os.path.join(CONF.vault_data_directory,
+        if CONF.vault_storage_type == 'nfs':
+           base64encode = base64.b64encode(backupendpoint)
+           mountpath = os.path.join(CONF.vault_data_directory,
                                  base64encode)
-        fileutils.ensure_tree(mountpath)
-        self.__mountpath = mountpath
-        super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
+           fileutils.ensure_tree(mountpath)
+           self.__mountpath = mountpath
+           super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
                                                          mountpath=mountpath)
+           if not self.is_mounted():
+              utils.chmod(mountpath, '0777')
 
-
-        if not self.is_mounted():
-            utils.chmod(mountpath, '0777')
+        elif CONF.vault_storage_type == 'swift-s':
+             mountpath = CONF.vault_data_directory
+             self.__mountpath = mountpath
+             super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
+                                                         mountpath=mountpath)  
 
     def get_progress_tracker_directory(self, tracker_metadata):
         """
@@ -684,17 +629,17 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         nfsoptions = CONF.vault_storage_nfs_options
 
         if self.is_online():
-            command = ['timeout', '-sKILL', '30' , 'sudo',
+           command = ['timeout', '-sKILL', '30' , 'sudo',
                        'mount', '-o', nfsoptions, nfsshare,
                        mountpath]
-            subprocess.check_call(command, shell=False) 
-            if old_share is True:
-                command = ['timeout', '-sKILL', '30' , 'sudo',
+           subprocess.check_call(command, shell=False) 
+           if old_share is True:
+              command = ['timeout', '-sKILL', '30' , 'sudo',
                            'mount', '--bind', mountpath,
                            CONF.vault_data_directory_old]
-                subprocess.check_call(command, shell=False) 
+              subprocess.check_call(command, shell=False) 
         else:
-            raise exception.BackupTargetOffline(endpoint=nfsshare)
+             raise exception.BackupTargetOffline(endpoint=nfsshare)
 
     @autolog.log_method(logger=Logger) 
     def get_total_capacity(self, context):
@@ -748,12 +693,15 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         """
         List of workload transfers on this particular backup media
         """
-        workload_transfers_directory = get_workload_transfers_directory()
+        workload_transfers_directory = self.get_workload_transfers_directory()
+        transfers = []
         if workload_transfers_directory:
             pattern = os.path.join(workload_transfers_directory, "*")
-            return glob.glob(pattern)
-        else:
-            return None
+            for transfer_file in glob.glob(pattern):
+                tran = json.loads(self.get_object(transfer_file))
+                transfers.append(tran)
+
+        return transfers
 
     @autolog.log_method(logger=Logger) 
     def transfers_delete(self, context, transfers_metadata):
@@ -761,7 +709,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         List of workload transfers on this particular backup media
         """
         try:
-            transfer_path  = get_workload_transfers_path(transfers_metadata)
+            transfer_path  = self.get_workload_transfers_path(transfers_metadata)
             if isfile(transfer_path):
                 os.remove(transfer_path)
         except Exception as ex:
@@ -841,7 +789,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                 metadata['user_id'] = context.user_id
                 metadata['project_id'] = context.project_id
 
-                self.put_object(pathname, metadata)
+                self.put_object(pathname, json.dumps(metadata))
 
             for snap in glob.glob(os.path.join(workload_path, "snapshot_*")):
                 _update_metadata_file(os.path.join(snap, "snapshot_db"))
@@ -853,16 +801,127 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             raise
 
 
+class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
+    def __init__(self, backupendpoint):
+        super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
+
+    @autolog.log_method(logger=Logger)
+    def get_progress_tracker_directory(self, tracker_metadata):
+        """
+        Get the location where all tracking objects are stored. The tracking
+        object is a file on NFS. It can be object in object store
+        """
+        mountpath = self.mount_path
+        progress_tracker_directory = os.path.join(mountpath,
+            "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+
+        fileutils.ensure_tree(progress_tracker_directory)
+        return progress_tracker_directory
+
+    @autolog.log_method(logger=Logger)
+    def mount_backup_target(self, old_share=False): 
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'start']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+    @autolog.log_method(logger=Logger)
+    def is_online(self):
+        status = False
+        stdout, stderr = utils.execute('sudo', 'service', 'tvault-swift', 'status', run_as_root=False)
+        if 'running' in stdout:
+            stdout, stderr = utils.execute('stat', '-f', self.mount_path)
+            if stderr != '':
+                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                raise exception.ErrorOccurred(reason=msg)
+            file_type = stdout.split('\n')[1].split('Type: ')[1] 
+            if file_type == 'fuseblk':
+               status = True
+        return status
+
+    @autolog.log_method(logger=Logger)
+    def umount_backup_target(self):
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+    @autolog.log_method(logger=Logger)
+    @to_abs()
+    def put_object(self, path, json_data):
+        head, tail = os.path.split(path)
+        fileutils.ensure_tree(head)
+        try:
+            with open(path, 'w') as json_file:
+                 json_file.write(json_data)
+        except:
+               with open(path, 'w') as json_file:
+                    json_file.write(json_data)
+        return
+
+    @autolog.log_method(logger=Logger)
+    def snapshot_delete(self, context, snapshot_metadata):
+        try:
+            snapshot_path = self.get_snapshot_path(snapshot_metadata)
+            retry = 0
+            while os.path.isdir(snapshot_path):
+               try:
+                   command = ['rm', '-rf', snapshot_path]
+                   subprocess.check_call(command, shell=False)
+               except:
+                       pass
+               retry += 1
+               if retry >= 1:
+                  break
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
+    def get_total_capacity(self, context):
+        """
+        return total capacity of the backup target and
+        amount of storage that is utilized
+        """
+        total_capacity = 1
+        total_utilization = 1
+        try:
+            mountpath = self.mount_path
+            stdout, stderr = utils.execute('stat', '-f', mountpath)
+            if stderr != '':
+                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                raise exception.ErrorOccurred(reason=msg)
+            total_capacity = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[2])
+            try:
+                 total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[4])
+            except:
+                   total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split('Available: ')[1])
+            total_utilization = abs(total_capacity - total_free)
+
+        except Exception as ex:
+            LOG.exception(ex)
+
+        return total_capacity,total_utilization
+
 triliovault_backup_targets = {}
 @autolog.log_method(logger=Logger) 
 def mount_backup_media():
     for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
-        backend = NfsTrilioVaultBackupTarget(backup_target)
+        backup_target = backup_target.strip()
+        if backup_target == '':
+            continue
+        if CONF.vault_storage_type == 'nfs': 
+            backend = NfsTrilioVaultBackupTarget(backup_target)
+        elif CONF.vault_storage_type == 'swift-s':
+            backend = SwiftTrilioVaultBackupTarget(backup_target)
+
         triliovault_backup_targets[backup_target] = backend
         backend.mount_backup_target()
 
 
 def get_backup_target(backup_endpoint):
+    backup_endpoint = backup_endpoint.strip()
     backup_target = triliovault_backup_targets.get(backup_endpoint, None)
     
     if backup_target is None:
@@ -875,7 +934,7 @@ def get_backup_target(backup_endpoint):
 def get_settings_backup_target():
     settings_path = os.path.join(CONF.cloud_unique_id,"settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
-        get_backup_target(backup_endpoint)
+        get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
         if backup_target.object_exists(settings_path):
             return backup_target
@@ -889,6 +948,7 @@ def get_capacities_utilizations(context):
     def fill_capacity_utilization(context, backup_target, stats):
         nfsshare = backup_target.backup_endpoint
         cap, util = backup_target.get_total_capacity(context)
+           
         stats[nfsshare] = {'total_capacity': cap,
                            'total_utilization': util,
                            'nfsstatus': True }
@@ -925,7 +985,17 @@ def get_workloads(context):
         workloads += backup_target.get_workloads(context)
 
     return workloads
-        
+
+def get_all_workload_transfers(context):
+    transfers = []
+
+    for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+        get_backup_target(backup_endpoint)
+
+    for endpoint, backup_target in triliovault_backup_targets.iteritems():
+        transfers += backup_target.get_all_workload_transfers()
+
+    return transfers
 
 def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     """
@@ -936,7 +1006,6 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     shares = {}
     caps = get_capacities_utilizations(context)
-
     for endpoint, backend in triliovault_backup_targets.iteritems():
         if caps[endpoint]['nfsstatus'] is False:
             continue
@@ -947,7 +1016,6 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
                      'capacity': caps[endpoint]['total_capacity'],
                      'used': caps[endpoint]['total_utilization']
                     }
-
     if len(shares) == 0:
         raise exception.InvalidState(reason="No NFS shares mounted")
 
@@ -1006,11 +1074,62 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     def getKey(item):
         item['free'] = item['capacity'] - item['totalcommitted']
-        return item['capacity'] - item['totalcommitted']
+        return min(item['capacity'] - item['totalcommitted'],
+                   item['capacity'] - item['used'])
 
     sortedlist = sorted(shares.values(), reverse=True, key=getKey)
 
     return sortedlist[0]['endpoint']
+
+def get_workloads_for_tenant(context, tenant_ids):
+    workload_ids = []
+    for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+        backup_target = None
+        try:
+            backup_target = get_backup_target(backup_endpoint)
+            for workload_url in backup_target.get_workloads(context):
+                workload_values = json.loads(backup_target.get_object(\
+                        os.path.join(workload_url, 'workload_db')))
+                project_id = workload_values.get('project_id')
+                workload_id = workload_values.get('id')
+                if project_id in tenant_ids:
+                    workload_ids.append(workload_id)
+        except Exception as ex:
+            LOG.exception(ex)
+    return  workload_ids
+
+def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
+
+    workload_urls = []
+
+    try:
+        #Get list of workload directory path for workloads need to update
+        for workload_id in workloads_to_update:
+            for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+                backup_target = None
+                backup_target = get_backup_target(backup_endpoint)
+                workload_url = os.path.join(backup_target.mount_path, "workload_" + workload_id)
+                if os.path.isdir(workload_url):
+                    workload_urls.append(workload_url)
+                    break;
+
+        #Iterate through each workload directory and update workload_db and snapsot_db with new values
+        for workload_path in workload_urls:
+            for path, subdirs, files in os.walk(workload_path):
+                for name in files:
+                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
+                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+
+                        if db_values.get('project_id', None) is not None:
+                            db_values['project_id'] = new_tenant_id
+                        else:
+                            db_values['tenant_id'] = new_tenant_id
+                        db_values['user_id'] = user_id
+
+                        with open(os.path.join(path, name), 'w') as file:
+                            json.dump(db_values, file)
+    except Exception as ex:
+        LOG.exception(ex)
 
 """
 if __name__ == '__main__':

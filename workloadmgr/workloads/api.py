@@ -58,7 +58,8 @@ from workloadmgr import auditlog
 from workloadmgr import autolog
 from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
-
+from workloadmgr.db.sqlalchemy.session import get_session
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
@@ -73,7 +74,7 @@ def _snapshot_create_callback(*args, **kwargs):
     try:
         arg_str = autolog.format_args(args, kwargs)
         LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
-    
+
         from workloadmgr.workloads import API
         workloadmgrapi = API()
  
@@ -121,6 +122,7 @@ def _snapshot_create_callback(*args, **kwargs):
                        'fullbackup_interval' in jobscheduler and \
                        jobscheduler['fullbackup_interval'] or "-1"
 
+        snapshot_type = "incremental"
         if int(jobscheduler['fullbackup_interval']) == 0:
             snapshot_type = "full"
         elif int(jobscheduler['fullbackup_interval']) < 0:
@@ -383,7 +385,7 @@ class API(base.Base):
             metadata.get("backup_media_target", None) and \
             metadata.pop("backup_media_target")
         workload_dict['metadata'] = metadata        
-        
+
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False
         workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
@@ -490,6 +492,7 @@ class API(base.Base):
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
+            workload = None
             #TODO(giri): optimize this lookup
 
             if len(instances) == 0:
@@ -554,7 +557,6 @@ class API(base.Base):
                           'status': 'available',
                           'metadata': instance.get('metadata', {})}
                 vm = self.db.workload_vms_create(context, values)
-
             self.workloads_rpcapi.workload_create(context,
                                                   workload['host'],
                                                   workload['id'])
@@ -586,25 +588,30 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+            if workload:
+               self.db.workload_update(context, workload['id'],
+                                      {'status': 'error',
+                                       'error_msg': str(ex.message)})
+            raise
     
     @autolog.log_method(logger=Logger)
     def workload_add_scheduler_job(self, jobschedule, workload, context=context):
-        if jobschedule and len(jobschedule): 
-            if 'enabled' in jobschedule and jobschedule['enabled']:                                       
-                if hasattr(context, 'user_domain_id'):
-                   if context.user_domain_id is None:
+        if self._scheduler.running is True:
+           if jobschedule and len(jobschedule): 
+              if 'enabled' in jobschedule and jobschedule['enabled']:                                       
+                 if hasattr(context, 'user_domain_id'):
+                    if context.user_domain_id is None:
+                       user_domain_id = 'default'
+                    else:
+                         user_domain_id = context.user_domain_id
+                 elif hasattr(context, 'user_domain'):
+                      if context.user_domain is None:
+                         user_domain_id = 'default'
+                      else:
+                           user_domain_id = context.user_domain
+                 else:
                       user_domain_id = 'default'
-                   else:
-                        user_domain_id = context.user_domain_id
-                elif hasattr(context, 'user_domain'):
-                     if context.user_domain is None:
-                        user_domain_id = 'default'
-                     else:
-                          user_domain_id = context.user_domain
-                else:
-                     user_domain_id = 'default'
-                self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                 self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
                                                     jobstore='jobscheduler_store', 
                                                     kwargs={'workload_id':workload.id,  
@@ -821,6 +828,8 @@ class API(base.Base):
                                              'import_settings')
             import_settings_method(context, models.DB_VERSION)
 
+            self.workload_ensure_global_job_scheduler(context)
+
             #TODO:Need to make this call to a single import module instead of 
             #looking for new import module for each new build.
             import_workload_module = importlib.import_module(
@@ -960,6 +969,7 @@ class API(base.Base):
         total_usage = 0
         nfsstats = vault.get_capacities_utilizations(context)
         for nfsshare in vault.CONF.vault_storage_nfs_export.split(','):
+            nfsshare = nfsshare.strip()
             stat = nfsstats[nfsshare]
 
             total_capacity = stat['total_capacity']
@@ -1537,6 +1547,7 @@ class API(base.Base):
                         if self.db.get_metadata_value(snapshot_vm_resource.metadata,'image_id'):
                            vdisk['image_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'image_id')
                            vdisk['image_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'image_name')
+                           vdisk['hw_qemu_guest_agent'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'hw_qemu_guest_agent')
                         else:
                            vdisk['volume_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_id')
                            vdisk['volume_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_name')
@@ -2322,5 +2333,189 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+ 
+    @autolog.log_method(logger=Logger)
+    def get_orphaned_workloads_list(self, context, migrate_cloud=None):
+        AUDITLOG.log(context, 'Get Orphaned Workloads List Requested', None)
+        if context.is_admin == False:
+            raise wlm_exceptions.AdminRequired()
+        workloads = []
+        keystone_client = KeystoneClient()
+        projects = keystone_client.client.get_project_list_for_import(context)
+        tenant_list = [project.id for project in projects]
+        users = keystone_client.get_user_list()
+        user_list = [user.id for user in users]
+    
+        def _check_workload(context, workload):
+            project_id = workload.get('project_id')
+            user_id = workload.get('user_id')
+            # Check for valid tenant
+            if project_id in tenant_list:
+                # Check for valid workload user
+                if keystone_client.client.user_exist_in_tenant(project_id, user_id):
+                    pass
+                else:
+                    workloads.append(workload)
+            else:
+                workloads.append(workload)
 
+        if not migrate_cloud:
+            kwargs = {'project_list':tenant_list, 'exclude': True, 'user_list': user_list }
+            workloads_in_db = self.db.workload_get_all(context, **kwargs )
+            for workload in workloads_in_db:
+                 workloads.append(workload)
+        else:
+            for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
+                backup_target = None
+                try:
+                    backup_target = vault.get_backup_target(backup_endpoint)
+                    for workload_url in backup_target.get_workloads(context):
+                        try:
+                            workload_values = json.loads(backup_target.get_object(
+                                os.path.join(workload_url, 'workload_db')))
+                            _check_workload(context, workload_values)
+                        except Exception as ex:
+                            LOG.exception(ex)
+                except Exception as ex:
+                    LOG.exception(ex)
+        AUDITLOG.log(context, 'Get Orphaned Workloads List Completed', None)
+        return workloads
 
+    def _update_workloads(self, context, workloads_to_update, new_tenant_id, user_id):
+        '''
+        Update the values for tenant_id and user_id for given list of
+        workloads in database.
+        '''
+        updated_workloads = []
+        workload_update_map =  []
+        snapshot_update_map = []
+
+        try:
+            DBSession = get_session()
+            kwargs = {'session': DBSession}
+            #Create the list for workloads and snapshots to update in 
+            #database with new project_id and user_id
+            for workload_id in workloads_to_update:
+                workload_map = {'id': workload_id, 'project_id':new_tenant_id, 'user_id': user_id }
+                workload_update_map.append(workload_map)
+                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs)
+                for snapshot in snapshots:
+                    snapshot_map = {'id': snapshot.get('id'), 'project_id':new_tenant_id, 'user_id': user_id }
+                    snapshot_update_map.append(snapshot_map)
+
+            #Update all the entries for workloads and snapshots in database
+            DBSession.bulk_update_mappings(eval('models.Workloads'), workload_update_map)
+            DBSession.bulk_update_mappings(eval('models.Snapshots'), snapshot_update_map)
+            for workload_id in workloads_to_update:
+                workload =  self.db.workload_get(context, workload_id)
+                updated_workloads.append(workload)
+
+            return updated_workloads
+        except Exception as ex:
+            LOG.exception(ex)
+            raise ex
+
+    @autolog.log_method(logger=Logger)
+    def workloads_reassign(self, context, tenant_maps):
+        '''
+        Reassign given list of workloads to new tenant_id and user_id.
+        '''
+        try:
+            AUDITLOG.log(context, 'Reassign workloads Requested', None)
+            if context.is_admin == False:
+                raise wlm_exceptions.AdminRequired()
+
+            keystone_client = KeystoneClient(context)
+
+            reassigned_workloads = []
+            workload_to_update = []
+            workload_to_import = []
+            projects = keystone_client.client.get_project_list_for_import(context)
+            tenant_list = [project.id for project in projects]
+            for tenant_map in tenant_maps:
+                workload_ids = tenant_map['workload_ids']
+                old_tenant_ids = tenant_map['old_tenant_ids']
+                new_tenant_id = tenant_map['new_tenant_id']
+                user_id = tenant_map['user_id']
+                migrate_cloud = tenant_map['migrate_cloud']
+
+                # If workload id's are provided then check whether they
+                # exist in current cloud or not.
+                if workload_ids:
+                    kwargs = {'workload_list': workload_ids}
+                    workloads = self.db.workload_get_all(context, **kwargs)
+
+                    if len(workloads) == len(workload_ids):
+                        workload_to_update.extend(workload_ids)
+
+                    if len(workloads) != len(workload_ids) and migrate_cloud is not True:
+                        raise Exception("Workload id's doesn't belong to \
+                               current cloud, to reassign them set migrate_cloud option to True")
+
+                    # In case workload id's are provided and some are in DB and
+                    # some need to import then filter those workloads here.
+                    if len(workloads) != len(workload_ids) and migrate_cloud is True:
+
+                        if len(workloads) == 0:
+                            workload_to_import.extend(workload_ids)
+                        else:
+                            workloads = self.db.workload_get_all(context)
+                            workload_ids_in_db = [workload.id for workload in workloads]
+                            for workload_id in workload_ids:
+                                if workload_id in workload_ids_in_db:
+                                    workload_to_update.append(workload_id)
+                                else:
+                                    workload_to_import.append(workload_id)
+
+                if new_tenant_id in tenant_list:
+                    # Check for valid workload user
+                    if keystone_client.client.user_exist_in_tenant(new_tenant_id, user_id) \
+                            and keystone_client.client.check_user_role(new_tenant_id, user_id):
+
+                        # If old_teanat_id is provided then look for all workloads under that tenant
+                        if old_tenant_ids:
+                            if not migrate_cloud:
+                                for old_tenant_id in old_tenant_ids:
+                                    if old_tenant_id not in tenant_list:
+                                        raise wlm_exceptions.ProjectNotFound(project_id=old_tenant_id)
+                                kwargs = {'project_list': old_tenant_ids}
+                                workloads_in_db = self.db.workload_get_all(context, **kwargs)
+                                for workload in workloads_in_db:
+                                    workload_to_update.append(workload.id)
+                            else:
+                                # When migrate is True then there could be the scenerio where some
+                                # of the workloads exist in DB, in that case directly importing
+                                # them will result in error, so filtering those workloads here
+                                workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
+                                kwargs = {'workload_list': workload_ids}
+                                workloads = self.db.workload_get_all(context, **kwargs)
+                                if len(workloads) == 0:
+                                    workload_to_import.extend(workload_ids)
+                                else:
+                                    workloads_in_db = self.db.workload_get_all(context)
+                                    workload_ids_in_db = [workload.id for workload in workloads_in_db]
+                                    for workload_id in workload_ids:
+                                        if workload_id in workload_ids_in_db:
+                                            workload_to_update.append(workload_id)
+                                        else:
+                                            workload_to_import.append(workload_id)
+
+                        if workload_to_import:
+                            vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
+                            imported_workloads = self.import_workloads(context, workload_to_import, True)
+                            reassigned_workloads.extend(imported_workloads)
+
+                        if workload_to_update:
+                            vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
+                            updated_workloads = self._update_workloads(context, workload_to_update, new_tenant_id, user_id)
+                            reassigned_workloads.extend(updated_workloads)
+
+                        return reassigned_workloads
+
+                    else:
+                        raise wlm_exceptions.UserNotFound(user_id=user_id)
+                else:
+                    raise wlm_exceptions.ProjectNotFound(project_id=new_tenant_id)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise ex

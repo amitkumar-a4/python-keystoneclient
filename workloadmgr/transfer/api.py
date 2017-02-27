@@ -66,8 +66,25 @@ class API(base.Base):
         super(API, self).__init__(db_driver)
 
 
-    def _update_workload_ownership_on_media(context, workload_id):
+    def _update_workload_ownership_on_media(self, context, workload_id):
         pass
+
+    def _backup_target_for_workload(self, context, workload_id):
+
+        workload_ref = self.db.workload_get(context, workload_id)
+        backup_endpoint = None
+
+        for meta in workload_ref['metadata']:
+            if meta['key'] == 'backup_media_target':
+                backup_endpoint = meta['value']
+                break
+
+        if backup_endpoint is None:
+            raise exception.InvalidWorkload(reason=_("workload record does not contain backup_media_target metadata field"))
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+
+        return backup_target
 
     def get(self, context, transfer_id):
         try:
@@ -82,8 +99,9 @@ class API(base.Base):
         workload_api.check_policy(context, 'delete_transfer')
         transfer_rec = self.get(context, transfer_id)
 
+        workload_id = transfer_rec['workload_id']
         AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Delete  Requested')
-        workload_ref = self.db.workload_get(context, transfer_rec['workload_id'])
+        workload_ref = self.db.workload_get(context, workload_id)
         if workload_ref['status'] != 'transfer-in-progress':
             LOG.error(_LE("Workload in unexpected state"))
 
@@ -92,8 +110,10 @@ class API(base.Base):
             # and change user ids and tenant id.
             # This might as well be no nop, but want to make sure transfer is
             # not aborted in the middle leaving user.id and project.id messup
-            vault._update_workload_ownership_on_media(context,
-                                                      workload_id)
+            backup_target = self._backup_target_for_workload(context,
+                                                             workload_id)
+            backup_target._update_workload_ownership_on_media(context,
+                                                              workload_id)
 
         except Exception as ex:
             LOG.exception(ex)
@@ -101,18 +121,13 @@ class API(base.Base):
         self.db.workload_update(context, workload_ref.id,
                                 {'status': 'available',
                                  'metadata': {'transfer_id': ""}})
-        vault.transfers_delete(context, transfer_rec)
+        backup_target.transfers_delete(context, transfer_rec)
         self.workload_api.workload_resume(context, workload_ref.id)
 
     def get_all(self, context, filters=None):
         filters = filters or {}
         workload_api.check_policy(context, 'get_all_transfers')
-        all_transfers = vault.get_all_workload_transfers()
-        transfers = []
-        for transfer_file in all_transfers:
-            tran = json.loads(vault.get_object(transfer_file))
-       
-            transfers.append(tran)
+        transfers = vault.get_all_workload_transfers(context)
 
         return transfers
 
@@ -171,8 +186,10 @@ class API(base.Base):
         # 1. Mark workload as transfer-in-progress
         #
         try:
-            transfer_rec_path = vault.get_workload_transfers_path(transfer_rec)
-            vault.put_object(transfer_rec_path, json.dumps(transfer_rec))
+
+            backup_target = self._backup_target_for_workload(context, workload_id)
+            transfer_rec_path = backup_target.get_workload_transfers_path(transfer_rec)
+            backup_target.put_object(transfer_rec_path, json.dumps(transfer_rec))
         except Exception:
             LOG.error(_LE("Failed to create transfer record "
                           "for %s"), workload_id)
@@ -219,6 +236,8 @@ class API(base.Base):
         try:
             workload_ref = self.db.workload_get(context, workload_id)
             raise exception.TransferNotAllowed(workload_id=workload_id)
+        except exception.TransferNotAllowed:
+            raise
         except:
             pass
 
@@ -227,8 +246,22 @@ class API(base.Base):
             # and change user ids and tenant id
             # Transfer ownership of the workload now, must use an elevated
             # context.
-            vault._update_workload_ownership_on_media(context,
-                                                      workload_id)
+            backup_target = None
+            for w in vault.get_workloads(context):
+                if workload_id in w:
+                    db_path = os.path.join(w, "workload_db")
+                    with open(db_path, "r") as f:
+                         wdb = json.load(f)
+                    for m in wdb['metadata']:
+                        if m['key'] == 'backup_media_target':
+                            backup_target = vault.get_backup_target(m['value'])
+                            break
+
+            if backup_target is None:
+                raise exception.WorkloadNotFound(workload_id=workload_id)
+
+            backup_target._update_workload_ownership_on_media(context,
+                                                              workload_id)
 
             # import workload now
             # this is point of no return. How do we make sure we either
@@ -241,15 +274,17 @@ class API(base.Base):
 
         try:
             workload_ref = self.db.workload_get(context, workload_id)
-            transfer_rec_path = vault.get_workload_transfers_path(transfer)
+            transfer_rec_path = backup_target.get_workload_transfers_path(transfer)
             transfer['status'] = "transfer-completed"
-            vault.put_object(transfer_rec_path, json.dumps(transfer))
+            backup_target.put_object(transfer_rec_path, json.dumps(transfer))
+
+            return {'id': transfer_id,
+                    'display_name': transfer['display_name'],
+                    'workload_id': workload_ref['id']}
         except Exception:
             LOG.error(_LE("Failed to create transfer record "
                           "for %s"), workload_id)
-        return {'id': transfer_id,
-                'display_name': transfer['display_name'],
-                'workload_id': workload_ref['id']}
+            raise
 
     # complete is executed on the cloud that transfer is initiated
     def complete(self, context, transfer_id):
@@ -270,8 +305,10 @@ class API(base.Base):
 
         # If the workload tenant id is not changed, we will not complete 
         # the transfer
-        wl_path = vault.get_workload_path({'workload_id': workload_ref.id})
-        wl_json = vault.get_object(os.path.join(wl_path, "workload_db"))
+        backup_target = self._backup_target_for_workload(context, workload_id)
+
+        wl_path = os.path.join(backup_target.mount_path, "workload_" + workload_id)
+        wl_json = backup_target.get_object(os.path.join(wl_path, "workload_db"))
         wl_rec = json.loads(wl_json) 
         wl_tenant_id = uuid.UUID(wl_rec.get('project_id', wl_rec.get('tenant_id', None)))
         if wl_tenant_id == uuid.UUID(context.project_id):
@@ -300,11 +337,11 @@ class API(base.Base):
             workload_ref = self.db.workload_get(context, workload_id)
 
         # make sure we do some additional checks
-        snapshots = self.db.snapshot_get_all(context, workload_id)
+        snapshots = self.db.snapshot_get_all(context, workload_id=workload_id)
         for snap in snapshots:
             self.db.snapshot_delete(context, snap.id)
 
         for vm in self.db.workload_vms_get(context, workload_id):
             self.db.workload_vms_delete(context, vm.vm_id, workload_id) 
         self.db.workload_delete(context, workload_id)
-        vault.transfers_delete(context, transfer)
+        backup_target.transfers_delete(context, transfer)

@@ -22,6 +22,7 @@ from workloadmgr.common import context as wlm_context
 from workloadmgr.common import clients
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 
 LOG = logging.getLogger(__name__)
 DBSession = get_session()
@@ -89,7 +90,8 @@ def project_id_exists(cntx, project_id):
 
     # TODO: Optimize it without reading project list os many times
     kclient.client_plugin = kclient"""
-    projects = vault.get_project_list_for_import(cntx)
+    keystone_client = KeystoneClient(cntx)
+    projects = keystone_client.client.get_project_list_for_import(cntx)
     for prj in projects:
         if uuid.UUID(prj.id) == uuid.UUID(project_id):
             return True
@@ -204,10 +206,13 @@ def update_workload_metadata(workload_values):
                 jobsperday = int(jobschedule['interval'].split("hr")[0])
                 incrs = int(jobschedule['retention_policy_value']) * jobsperday
 
-            if jobschedule['fullbackup_interval'] == '-1':
+            if int(jobschedule['fullbackup_interval']) == -1:
                 fulls = 1
+            elif int(jobschedule['fullbackup_interval']) == 0:
+                fulls = incrs
+                incrs = 0
             else:
-                fulls = incrs / jobschedule['fullbackup_interval']
+                fulls = incrs / int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
 
             if workload_backup_media_size.get(workload_values['id'], None) is None:

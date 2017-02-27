@@ -23,7 +23,6 @@ from taskflow.listeners import printing
 from taskflow.patterns import unordered_flow as uf
 from taskflow.patterns import linear_flow as lf
 from taskflow import task
-from taskflow.utils import reflection
 
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -158,9 +157,9 @@ class RestoreKeypairs(task.Task):
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
-    @autolog.log_method(Logger, 'RestoreSecurityGroups.execute')
+    @autolog.log_method(Logger, 'RestoreKeypairs.execute')
     def execute_with_log(self, context, target_platform, instances, restore):
-        # Restore the security groups
+        # Restore keypairs
         self.db = db = WorkloadMgrDB().db
         self.cntx = cntx = amqp.RpcContext.from_dict(context)
         self.target_platform = target_platform
@@ -175,6 +174,7 @@ class RestoreKeypairs(task.Task):
     @autolog.log_method(Logger, 'RestoreKeypairs.revert') 
     def revert_with_log(self, *args, **kwargs):
         pass
+
 
 class PreRestore(task.Task):
 
@@ -280,9 +280,42 @@ class PowerOnVM(task.Task):
         except Exception as ex:
             LOG.exception(ex)
         finally:
-            pass            
+            pass
                
              
+class SetVMMetadata(task.Task):
+
+    def execute(self, context, target_platform, instance, restore, restored_instance):
+        return self.execute_with_log(context, target_platform, instance, restore, restored_instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'SetVMMetadata.execute')
+    def execute_with_log(self, context, target_platform, instance, restore, restored_instance):
+        # Resume the VM
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
+        if target_platform == 'openstack':
+            return vmtasks_openstack.set_vm_metadata(cntx, db, instance, restore, restored_instance)
+        else:
+            return vmtasks_vcloud.set_vm_metadata(cntx, db, instance, restore, restored_instance)
+
+    @autolog.log_method(Logger, 'SetVMMetadata.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
+
+
 class PostRestore(task.Task):
 
     def execute(self, context, target_platform, instance, restore):
@@ -1156,6 +1189,13 @@ def LinearPowerOnVMs(instances):
     for index,item in enumerate(instances):
         rebind_dict = dict(restored_instance = "restored_instance_" + str(index), instance = "instance_" + str(index))
         flow.add(PowerOnVM("PowerOnVM_" + item['vm_id'], rebind=rebind_dict))
+    return flow
+
+def LinearSetVMsMetadata(instances):
+    flow = lf.Flow("setvmsmetadata")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(restored_instance = "restored_instance_" + str(index), instance = "instance_" + str(index))
+        flow.add(SetVMMetadata("SetVMMetadata_" + item['vm_id'], rebind=rebind_dict))
     return flow
 
 def UnorderedPostRestore(instances):

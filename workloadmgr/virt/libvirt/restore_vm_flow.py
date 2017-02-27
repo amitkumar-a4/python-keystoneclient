@@ -18,7 +18,6 @@ from taskflow import task
 from taskflow.listeners import printing
 from taskflow.patterns import unordered_flow as uf
 from taskflow.patterns import linear_flow as lf
-from taskflow.utils import reflection
 
 from novaclient.exceptions import Unauthorized as nova_unauthorized
 
@@ -123,12 +122,18 @@ class PrepareBackupImage(task.Task):
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
         resource_snap_path = os.path.join(backup_target.mount_path,
                                           vm_disk_resource_snap.vault_url.strip(os.sep))
+        """try:
+            os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
+                                   'snapshot_'+snapshot_obj.id))
+            os.listdir(os.path.split(resource_snap_path)[0])
+        except:
+               pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
         
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             #upload the bottom of the chain to glance
-            restore_file_path = image_info.image
+            restore_file_path = image_info.backing_file
             image_overlay_file_path = resource_snap_path
             image_virtual_size = image_info.virtual_size
         else:
@@ -239,7 +244,7 @@ class UploadImageToGlance(task.Task):
         try:
             org_image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
             org_glance_image = self.image_service.show(self.cntx, org_image_id)
-            if org_glance_image:
+            if org_glance_image and org_glance_image['deleted'] is False:
                 return org_glance_image['id'], org_glance_image['disk_format']
         except:
             pass
@@ -1112,6 +1117,59 @@ class PowerOnInstance(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass
 
+
+class AssignFloatingIP(task.Task):
+    """
+       Assign floating IP address to restored instance.
+       Valid only for one click restore
+    """
+
+    def execute(self, context, restored_instance_id, restored_nics,
+                restored_net_resources, restore_type):
+        return self.execute_with_log(context, restored_instance_id,
+                                     restored_nics, restored_net_resources,
+                                     restore_type)
+
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'AssignFloatingIP.execute')
+    def execute_with_log(self, context, restored_instance_id, restored_nics,
+                         restored_net_resources, restore_type):
+        self.cntx = amqp.RpcContext.from_dict(context)
+        self.compute_service = compute_service = \
+                       nova.API(production = (restore_type == 'restore'))
+        for mac, details in restored_net_resources.iteritems():
+            for nic in restored_nics:
+                try:
+                    if ( (details.get('id',None) and nic.get('port-id', None) ) and
+                             (details.get('id', None) == nic.get('port-id', None)) ) or\
+                         details.get('ip_address',None) == nic.get('v4-fixed-ip') and \
+                                        details.get('floating_ip', None) is not None:
+
+                        if details.get('id',None) and nic.get('port-id', None):
+                            floating_ip = json.loads(details.get('floating_ip', None))['addr']
+                            fixed_ip = details['fixed_ips'][0]['ip_address']
+                        else:
+                            floating_ip = details.get('floating_ip', None)
+                            fixed_ip = details.get('fixed_ip', None)
+
+                        floating_ips_list = compute_service.floating_ip_list(self.cntx)
+                        for fp in floating_ips_list:
+                            if fp.ip == floating_ip and (fp.instance_id == '' or fp.instance_id == None):
+                                compute_service.add_floating_ip(self.cntx, restored_instance_id,
+                                                                floating_ip, fixed_ip)
+
+                except:
+                    # we will ignore any exceptions during assigning floating ip address
+                    pass
+        return
+
+    @autolog.log_method(Logger, 'AssignFloatingIP.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+
 def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restore_id):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
@@ -1289,6 +1347,13 @@ def PowerOnInstanceFlow(context):
 
     return flow
 
+def AssignFloatingIPFlow(context):
+
+    flow = lf.Flow("assignfloatingiplf")
+    flow.add(AssignFloatingIP("AssignFloatingIP"))
+
+    return flow
+
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
                restored_nics, instance_options):
@@ -1414,6 +1479,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # power on the restored instance until all volumes are attached
     childflow = PowerOnInstanceFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    # Assign floating IP address
+    childflow = AssignFloatingIPFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 

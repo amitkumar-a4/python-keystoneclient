@@ -20,4 +20,17 @@ tox>=2.3.1
 alembic>=0.7.2
 sqlalchemy_utils>=0.32.9
 sqlalchemy-migrate>=0.9.6 # Apache-2.0
-taskflow>0.1.3,<=1.17.0
+M2Crypto==0.22.3
+oslo.policy==0.11.0
+oslo.log==3.5.0
+oslo.messaging==1.8.3
+python-neutronclient==3.1.1
+python-cinderclient==1.5.0
+IPy
+pymongo
+oslo_cache
+oslo.utils==1.4.2
+oslo.serialization==1.4.0
+taskflow==0.1.3
+oslo.i18n==1.5.0
+libvirt-python==1.3.0

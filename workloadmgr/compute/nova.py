@@ -408,11 +408,11 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                         return
 
                 if contego is True:
-                    msg = 'Unable to call %s; Please check contego \
-                           logs for more details' % func.func_name
+                    msg = "Unable to call %s; Please check contego " \
+                          "logs for more details" % func.func_name
                     if ex.code == 413:
                        msg = ex.message
-                    raise exception.ErrorOccurred(msg)
+                    raise exception.ErrorOccurred(reason=msg)
                 else:
                     raise
 
@@ -744,6 +744,35 @@ class API(base.Base):
         client = kwargs['client']
 
         return client.servers.remove_security_group(server=s, security_group=security_group_id)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False)
+    def add_floating_ip(self, context, server_id, floating_ip, fixed_ip, **kwargs):
+        """
+        Add floating ip to the server
+        :param server: The :class:`Server` (or its ID) to query.
+        :param floating_ip: Floating IP
+        """
+
+        server = namedtuple('server', 'id')
+        s = server(id=server_id)
+        client = kwargs['client']
+
+        return client.servers.add_floating_ip(server=s, address=floating_ip,
+                                              fixed_address=fixed_ip)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False)
+    def floating_ip_list(self, context, **kwargs):
+        """
+        Add floating ip to the server
+        :param server: The :class:`Server` (or its ID) to query.
+        :param floating_ip: Floating IP
+        """
+
+        client = kwargs['client']
+
+        return client.floating_ips.list()
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
@@ -1098,3 +1127,13 @@ class API(base.Base):
         """
         client = kwargs['client']
         return client.contego.testbubble_reboot_instance(server=server, params=params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def vast_commit_image(self, context, server, params, **kwargs):
+        """
+        Commit snapshot image for instance.
+        :param server: The :class:`Server` (or its ID) to query.
+        """
+        client = kwargs['client']
+        return client.contego.vast_commit_image(server=server, params=params)
