@@ -35,14 +35,11 @@ keystone_opts = [
                help="Fully qualified class name to use as a keystone backend.")
 ]
 
-#TODO(Jignasha) : Do we need this
 cfg.CONF.register_opts(keystone_opts)
 CONF = cfg.CONF
-#CONF.register_opts(keystone_opts)
 
-class KeystoneClientV3(object):
+class KeystoneClientBase(object):
     """Wrap keystone client so we can encapsulate logic used in resources.
-
     Note this is intended to be initialized from a resource on a per-session
     basis, so the session context is passed in on initialization
     Also note that an instance of this is created in each request context as
@@ -65,16 +62,24 @@ class KeystoneClientV3(object):
         #   path, we will work with either a v2.0 or v3 path
         self.context = context
         self._client = None
+        self._client_instance = None
         self._admin_auth = None
         self._domain_admin_auth = None
         self._domain_admin_client = None
 
         self.session = session.Session.construct(self._ssl_options())
-        self.v3_endpoint = self.context.keystone_v3_endpoint
-        if self.context.trust_id:
-            # Create a client with the specified trust_id, this
-            # populates self.context.auth_token with a trust-scoped token
-            self._client = self._v3_client_init()
+        try:
+            self.v3_endpoint = self.context.keystone_v3_endpoint
+        except:
+                self.v3_endpoint = None
+
+        try:
+            if self.context.trust_id:
+               # Create a client with the specified trust_id, this
+               # populates self.context.auth_token with a trust-scoped token
+               self._client = self._v3_client_init()
+        except:
+               self._client = self._v3_client_init()
 
     @property
     def client(self):
@@ -82,6 +87,38 @@ class KeystoneClientV3(object):
             # Create connection to v3 API
             self._client = self._v3_client_init()
         return self._client
+
+    @property
+    def client_instance(self):
+        if not self._client_instance:
+            # Create connection to v3 API
+            self._client_instance = self._v2_client_init()
+        return self._client_instance
+
+    def _v2_client_init(self):
+        try:
+            username = CONF.get('keystone_authtoken').username
+        except:
+            username = CONF.get('keystone_authtoken').admin_user
+        try:
+            password = CONF.get('keystone_authtoken').password
+        except:
+            password = CONF.get('keystone_authtoken').admin_password
+        try:
+            tenant_name = CONF.get('keystone_authtoken').admin_tenant_name
+        except:
+            project_id = context.project_id
+            context.project_id = 'Configurator'
+            tenant_name = WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
+            context.project_id = project_id
+        auth_url = CONF.keystone_endpoint_url
+        auth = passMod.Password(auth_url=auth_url,
+                                username=username,
+                                password=password,
+                                project_name=tenant_name,
+                                )
+        self.session = session.Session(auth=auth, verify=False)
+        return client.Client(session=self.session, auth_url=auth_url, insecure=True)
 
     def _v3_client_init(self):
         client = kc_v3.Client(session=self.session,
@@ -117,12 +154,9 @@ class KeystoneClientV3(object):
 
     def create_trust_context(self):
         """Create a trust using the trustor identity in the current context.
-
         The trust is created with the trustee as the heat service user.
-
         If the current context already contains a trust_id, we do nothing
         and return the current context.
-
         Returns a context containing the new trust_id.
         """
         if self.context.trust_id:
@@ -192,10 +226,26 @@ class KeystoneClientV3(object):
     def auth_ref(self):
         return self.context.auth_plugin.get_access(self.session)
 
+    def get_user_to_get_email_address(self, context):
+        user = self.client_instance.users.get(context.user_id)
+        if not hasattr(user, 'email'):
+            user.email = None
+        return user
+
+    def get_user_list(self):
+        users = self.client_instance.users.list()
+        return users
+
+
+class KeystoneClientV3(KeystoneClientBase):
+
+    def __init__(self, context):
+       super(KeystoneClientV3, self).__init__(context)
+
     def user_exist_in_tenant(self, project_id, user_id):
         try:
-            user = self.client.users.get(user_id)
-            projects = self.client.projects.list(user=user)
+            user = self.client_instance.users.get(user_id)
+            projects = self.client_instance.projects.list(user=user)
             project_list = [project.id for project in projects]
             if project_id in project_list:
                 return True
@@ -206,7 +256,7 @@ class KeystoneClientV3(object):
 
     def check_user_role(self, project_id, user_id):
         try:
-            roles = self.client.roles.list(user=user_id, project=project_id)
+            roles = self.client_instance.roles.list(user=user_id, project=project_id)
             trustee_role = CONF.trustee_role
             for role in roles:
                 if (trustee_role == role.name) or (role.name == 'admin'):
@@ -218,69 +268,24 @@ class KeystoneClientV3(object):
     def get_project_list_for_import(self, context):
         try:
             if (context.user == CONF.get('nova_admin_username')):
-                projects = self.client.projects.list()
+                projects = self.client_instance.projects.list()
             else:
-                user = self.client.users.get(context.user_id)
-                projects = self.client.projects.list(user=user)
+                user = self.client_instance.users.get(context.user_id)
+                projects = self.client_instance.projects.list(user=user)
 
             return projects
         except Exception as ex:
             LOG.exception(ex)
 
 
-class KeystoneClientV2(object):
+class KeystoneClientV2(KeystoneClientBase):
 
     def __init__(self, context):
-        self.context = context
-        self._client = None
-        self.session = None
-
-    @property
-    def client(self):
-        if not self._client:
-            # Create connection to v2 API
-            self._client = self._v2_client_init()
-        return self._client
-
-    def _v2_client_init(self):
-        try:
-            username = CONF.get('keystone_authtoken').username
-        except:
-            username = CONF.get('keystone_authtoken').admin_user
-        try:
-            password = CONF.get('keystone_authtoken').password
-        except:
-            password = CONF.get('keystone_authtoken').admin_password
-        try:
-            tenant_name = CONF.get('keystone_authtoken').admin_tenant_name
-        except:
-            project_id = context.project_id
-            context.project_id = 'Configurator'
-            tenant_name = WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
-            context.project_id = project_id
-        auth_url = CONF.keystone_endpoint_url
-        auth = passMod.Password(auth_url=auth_url,
-                                username=username,
-                                password=password,
-                                project_name=tenant_name,
-                                )
-        self.session = session.Session(auth=auth, verify=False)
-        return client.Client(session=self.session, auth_url=auth_url, insecure=True)
-
-    def _get_username(self, username):
-        if(len(username) > 64):
-            LOG.warning(_LW("Truncating the username %s to the last 64 "
-                            "characters."), username)
-        # get the last 64 characters of the username
-        return username[-64:]
-
-    @property
-    def auth_token(self):
-        return self.context.auth_plugin.get_token(self.session)
+       super(KeystoneClientV2, self).__init__(context)
 
     def user_exist_in_tenant(self, project_id, user_id):
         try:
-            users = self.client.users.list(project_id)
+            users = self.client_instance.users.list(project_id)
             user_ids = [user.id for user in users]
             if user_id in user_ids:
                 return True
@@ -291,7 +296,7 @@ class KeystoneClientV2(object):
 
     def check_user_role(self, project_id, user_id):
         try:
-            roles = self.client.tenants.role_manager.roles_for_user(user_id, project_id)
+            roles = self.client_instance.tenants.role_manager.roles_for_user(user_id, project_id)
             trustee_role = CONF.trustee_role
             for role in roles:
                 if (trustee_role == role.name) or (role.name == 'admin'):
@@ -302,7 +307,7 @@ class KeystoneClientV2(object):
 
     def get_project_list_for_import(self, context):
         try:
-            projects = self.client.tenants.list()
+            projects = self.client_instance.tenants.list()
             return projects
         except Exception as ex:
             LOG.exception(ex)
@@ -325,15 +330,6 @@ class KeystoneClient(object):
         else:
             self.client = KeystoneClientV2(context)
 
-    def get_user_to_get_email_address(self, context):
-        user = self.client.client.users.get(context.user_id)
-        if not hasattr(user, 'email'):
-            user.email = None
-        return user
-
-    def get_user_list(self):
-        users = self.client.client.users.list()
-        return users
 
 def list_opts():
     yield None, keystone_opts
