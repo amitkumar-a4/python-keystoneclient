@@ -31,6 +31,16 @@ function findForm() {
   setSwiftRequired(obj.attr('checked'), obj.val())
 }
 
+function setNFSRequired(checked, val) {
+    if((val=='NFS')) {
+       $($('.bootstrap-tagsinput > input')[0]).attr("required", true)
+       $($('.bootstrap-tagsinput > input')[1]).attr("required", true)
+    } else {
+       $($('.bootstrap-tagsinput > input')[0]).removeAttr("required")
+       $($('.bootstrap-tagsinput > input')[1]).removeAttr("required")
+    }
+}
+
 function setSwiftRequired(checked, val) {
      if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
@@ -52,11 +62,6 @@ function setSwiftRequired(checked, val) {
        $('[name="storage-nfs-export"]').removeAttr('required')
        $('[name="storage-nfs-options"]').removeAttr('required')        
      }
-     else {
-       $('[name="storage-nfs-export"]').attr("required", "true");
-       $('[name="storage-nfs-options"]').attr("required", "true");
-     }
-
 }
 </script>
 </head>
@@ -210,19 +215,19 @@ function setSwiftRequired(checked, val) {
             <div class="panel-body">
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden')">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">NFS
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden')">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">NFS
              %end 
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden')">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">SWIFT
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden')">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">SWIFT
              %end 
              </label>
-             <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span> 
+             <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
 
             %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
 	    <div class="panel-group" id="nfsstorage-panel">
@@ -239,7 +244,7 @@ function setSwiftRequired(checked, val) {
 		  <div class="panel-body">
 			<div class="form-group" >
 		        <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
-			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
+			<input name="storage-nfs-export" {{'value='+storage_nfs_export if (defined('storage_nfs_export') and len(storage_nfs_export)) else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                         <span id="nfs_helpblock" class="help-block">Please enter list of NFS shares separated by commas</span>
 			</div>
                         <div class="form-group">
