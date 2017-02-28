@@ -30,6 +30,17 @@ function findForm() {
   obj = $("#configure_openstack input[name='swift-auth-version']:checked")
   setSwiftRequired(obj.attr('checked'), obj.val())
 }
+
+function setNFSRequired(checked, val) {
+    if((val=='NFS')) {
+       $($('.bootstrap-tagsinput > input')[0]).attr("required", true)
+       $($('.bootstrap-tagsinput > input')[1]).attr("required", true)
+    } else {
+       $($('.bootstrap-tagsinput > input')[0]).removeAttr("required")
+       $($('.bootstrap-tagsinput > input')[1]).removeAttr("required")
+    }
+}
+
 function setSwiftRequired(checked, val) {
      if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
@@ -51,11 +62,6 @@ function setSwiftRequired(checked, val) {
        $('[name="storage-nfs-export"]').removeAttr('required')
        $('[name="storage-nfs-options"]').removeAttr('required')        
      }
-     else {
-       $('[name="storage-nfs-export"]').attr("required", "true");
-       $('[name="storage-nfs-options"]').attr("required", "true");
-     }
-
 }
 </script>
 </head>
@@ -196,21 +202,49 @@ function setSwiftRequired(checked, val) {
 	    </div>
 	  </div>
 	</div> 
-	
-	<div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel3">
+
+	<div class="panel-group" id="backend-choice">
+	  <div class="panel panel-default" id="panel9">
+             <div class="panel-heading">
+                <h4 class="panel-title">
+                  <a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree"> Choose Backup Target </a>
+                </h4>
+             </div>
+          </div>
+          <div id="collapsebackendtype" class="panel-collapse collapse in">
+            <div class="panel-body">
+             <label class="radio-inline">
+             %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">NFS
+             %else:
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">NFS
+             %end 
+             </label>
+             <label class="radio-inline">
+             %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">SWIFT
+             %else:
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">SWIFT
+             %end 
+             </label>
+             <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
+
+            %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
+	    <div class="panel-group" id="nfsstorage-panel">
+             %else:
+	    <div class="panel-group hidden" id="nfsstorage-panel">
+             %end 
+	       <div class="panel panel-default" id="panel3">
 		<div class="panel-heading">
 		  <h4 class="panel-title">
-			<a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree">
-			  NFS Storage
-			</a>
+                     <a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree"> NFS Storage </a>
 		  </h4>
 		</div>
 		<div id="collapseThree" class="panel-collapse collapse in">
 		  <div class="panel-body">
 			<div class="form-group" >
 		        <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
-			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
+			<input name="storage-nfs-export" {{'value='+storage_nfs_export if (defined('storage_nfs_export') and len(storage_nfs_export)) else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                         <span id="nfs_helpblock" class="help-block">Please enter list of NFS shares separated by commas</span>
 			</div>
                         <div class="form-group">
@@ -220,52 +254,54 @@ function setSwiftRequired(checked, val) {
                         </div>
 		  </div>
 		</div>
-	  </div>
-	</div>
-
-        <div class="panel-group" id="accordion">
-		  <div class="panel panel-default" id="panel5">
-		    <div class="panel-heading">
-		      <h4 class="panel-title">
-		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
-		          Swift Object Storage
-		        </a>
-		      </h4>
-		    </div>
-		    <div id="collapseFive" class="panel-collapse collapse in">
-		    <div class="panel-body">
-                    <div class="input-group">
-                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
-                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
-                %else:
-                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="NONE" checked onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
-                %end 
-                     <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
-                </div>
-                <div class="input-group" id="swift-auth-url-div">
-                    <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                    <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
-                </div><br>
-                <div class="input-group" id="swift-username-div">
-                    <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                    <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
-                </div><br>
-                <div class="input-group" id="swift-password-div">
-                    <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-                    <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
-                    <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                </div><br>
-	 	</div>
-		</div>
 	      </div>
+	    </div>
+
+            %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
+            <div class="panel-group" id="swiftstorage-panel">
+            %else:
+            <div class="panel-group hidden" id="swiftstorage-panel">
+            %end 
+               <div class="panel panel-default" id="panel5">
+                  <div class="panel-heading">
+                     <h4 class="panel-title">
+		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive"> Swift Object Storage </a>
+		     </h4>
+		  </div>
+		  <div id="collapseFive" class="panel-collapse collapse in">
+		     <div class="panel-body">
+                       <div class="input-group">
+                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
+                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
+                %else:
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
+                %end 
+                         <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
+                       </div>
+                       <div class="input-group" id="swift-auth-url-div">
+                         <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                         <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
+                       </div><br>
+                       <div class="input-group" id="swift-username-div">
+                          <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                          <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                       </div><br>
+                       <div class="input-group" id="swift-password-div">
+                         <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                         <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
+                         <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                       </div><br>
+	 	     </div>
+		  </div>
+	        </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="panel-group" id="accordion">

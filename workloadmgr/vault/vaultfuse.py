@@ -540,8 +540,7 @@ class SwiftRepository(ObjectRepository):
         self.manifest[object_name]['mode'] = flags
 
         if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
-           flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)) or \
-           flags == int('8401', 16) or flags in (int('8001', 16), int('8801', 16)):
+           flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
             # load manifst
 
             manifest = self._read_object_manifest(object_name)
@@ -565,6 +564,16 @@ class SwiftRepository(ObjectRepository):
                 f.write(json.dumps(manifest))
 
         else:
+            # this is either write or create request
+            #flags == int('8401', 16) or flags in (int('8001', 16), int('8801', 16)):
+            try:
+                self.object_unlink(object_name)
+            except:
+                pass
+
+            if flags & os.O_WRONLY:
+                with open(full_path, "w") as f:
+                    pass
             try:
                 segment_dir = self._full_path(object_name + "-segments")
                 os.makedirs(segment_dir)
@@ -580,10 +589,11 @@ class SwiftRepository(ObjectRepository):
                                             object_name + "-segments")
             container, prefix = self.split_head_tail(segments_dir)
             object_manifest = []
+            segments_list = {}
 
             offset = 0
             while True:
-                objects = self.segment_list(container, prefix, offset)
+                segments_list[offset] = objects = self.segment_list(container, prefix, offset)
                 if len(objects) == 0:
                     break
 
@@ -601,7 +611,7 @@ class SwiftRepository(ObjectRepository):
 
             offset = 0
             while True:
-                objects = self.segment_list(container, prefix, offset)
+                objects = segments_list[offset]
                 if len(objects) == 0:
                     break
 
@@ -1009,6 +1019,28 @@ class SwiftRepository(ObjectRepository):
 
         return 0
 
+    def destroy(self, path):
+        try:
+            tmpfs_mountpath = os.path.join(CONF.vault_data_directory_old,
+                                           CONF.tmpfs_mount_path)
+            if os.path.isdir(tmpfs_mountpath) and \
+               os.path.ismount(tmpfs_mountpath):
+                command = ['timeout', '-sKILL', '30', 'sudo', 'umount',
+                           tmpfs_mountpath]
+                subprocess.check_call(command, shell=False)
+        except:
+            pass
+
+        if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
+        if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
+        if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
+        if vaultswift.swift_download: vaultswift.swift_download.__exit__(None, None, None)
+        if vaultswift.swift_delete: vaultswift.swift_delete.__exit__(None, None, None)
+        if vaultswift.swift_post: vaultswift.swift_post.__exit__(None, None, None)
+        if vaultswift.swift_cap: vaultswift.swift_cap.__exit__(None, None, None) 
+        shutil.rmtree(self.root)
+        return 0
+
 class FileRepository(ObjectRepository):
     def __init__(self, root, **kwargs):
         super(FileRepository, self).__init__(root, **kwargs)
@@ -1053,9 +1085,10 @@ class FileRepository(ObjectRepository):
         manifest = full_path + ".manifest"
         segment_dir = self._full_path(object_name + "-segments")
         object_manifest = []
+        segments_list = {}
         offset = 0
         while True:
-            objects = self.segment_list(segment_dir, offset)
+            segments_list[offset] = objects = self.segment_list(segment_dir, offset)
             if len(objects) == 0:
                 break
 
@@ -1071,7 +1104,7 @@ class FileRepository(ObjectRepository):
 
         offset = 0
         while True:
-            objects = self.segment_list(segment_dir, offset)
+            objects = segments_list[offset]
             if len(objects) == 0:
                 break
 
@@ -1171,6 +1204,10 @@ class FileRepository(ObjectRepository):
         return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
             'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
             'f_frsize', 'f_namemax'))
+
+    def destroy(self, path):
+        shutil.rmtree(self.root)
+        return 0
 
 
 class FuseCache(object):
@@ -1399,16 +1436,8 @@ class TrilioVault(Operations):
         return self.cache.object_flush(path, fh)
 
     def destroy(self, path):
-        LOG.debug( "destroy, %s" % path)
-        if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
-        if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
-        if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
-        if vaultswift.swift_download: vaultswift.swift_download.__exit__(None, None, None)
-        if vaultswift.swift_delete: vaultswift.swift_delete.__exit__(None, None, None)
-        if vaultswift.swift_post: vaultswift.swift_post.__exit__(None, None, None)
-        if vaultswift.swift_cap: vaultswift.swift_cap.__exit__(None, None, None) 
-        shutil.rmtree(self.root)
-        return 0
+          LOG.debug( "destroy, %s" % path)
+          return self.repository.destroy(path)
 
 
 def fuse_conf():
