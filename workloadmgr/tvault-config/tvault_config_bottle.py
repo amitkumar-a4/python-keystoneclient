@@ -437,13 +437,14 @@ def _authenticate_with_swift(config_data):
                          'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'], 
                          'os_domain_id': config_data['swift_domain_id'],'prefix': None, 'auth_version': '3', 
                          'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
-                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
-                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': config_data['swift_tenantname'], 
+                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': config_data['swift_domain_id'], 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
-                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
-                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                         'os_options': {'project_name': config_data['swift_tenantname'], 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 
+                                        'user_domain_name': None, 
+                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': config_data['swift_domain_id'], 'user_id': None, 
                                         'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],
                                         'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
@@ -463,7 +464,7 @@ def _authenticate_with_swift(config_data):
                                         'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
                          'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
-                
+               
             with SwiftService(options=_opts) as swift:
                 try:
                     stats_parts_gen = swift.list()
@@ -1875,6 +1876,10 @@ def configure_host():
                     subprocess.check_call(command, shell=False)
                     raise Exception("Failed to verify R/W permissions of the NFS export: " + nfsshare)
 
+        tmpfs_path = os.path.join(config_data['vault_data_directory_old'], "tmpfs")
+        if os.path.exists(tmpfs_path) and os.path.ismount(tmpfs_path):
+            cleanup_mount(tmpfs_path)
+
         if os.path.exists(config_data['vault_data_directory_old']) and \
             os.path.ismount(config_data['vault_data_directory_old']):
             cleanup_mount(config_data['vault_data_directory_old'])
@@ -2615,7 +2620,7 @@ def configure_openstack():
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
     
-    try:    
+    try:
         config_inputs = bottle.request.POST
 
         config_data['configuration_type'] = 'openstack'
@@ -2670,38 +2675,40 @@ def configure_openstack():
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
-        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
-        if 'storage-nfs-options' in config_inputs:
-           config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
-        else:
-             config_data['storage_nfs_options'] = 'nolock'
-       
-        if 'swift-auth-version' in config_inputs:
-            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
-        else:
-             config_data['swift_auth_version'] = 'NONE'
 
-         
-        if config_data['swift_auth_version'] == 'TEMPAUTH':
-           config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
-           config_data['swift_username'] = config_inputs['swift-username'].strip()
-           config_data['swift_password'] = config_inputs['swift-password'].strip()
-           config_data['swift_tenantname'] = ''
-           config_data['swift_domain_id'] = ''
-        elif config_data['swift_auth_version'] == 'KEYSTONE':
-             config_data['swift_auth_url'] = config_data['keystone_public_url']
-             config_data['swift_username'] = config_data['admin_username']
-             config_data['swift_password'] = config_data['admin_password']
-             config_data['swift_tenantname'] = config_data['admin_tenant_name']
-             config_data['swift_domain_id'] = ''
-             if config_data['keystone_auth_version'] == 3:
-                config_data['swift_domain_id'] = config_data['domain_name']
+        config_data['storage_nfs_options'] = 'nolock'
+        config_data['storage_nfs_export'] = ''
+        config_data['swift_auth_url'] = ''
+        config_data['swift_username'] = ''
+        config_data['swift_password'] = ''
+        config_data['swift_tenantname'] = ''
+        config_data['swift_domain_id'] = ''
+        config_data['swift_auth_version'] = 'NONE'
+
+        config_data['backup_target_type'] = config_inputs['backup_target_type']
+        if config_data['backup_target_type'] == 'NFS':
+            config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
+
+            if 'storage-nfs-options' in config_inputs:
+                config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
+
         else:
-             config_data['swift_auth_url'] = ''
-             config_data['swift_username'] = ''
-             config_data['swift_password'] = ''
-             config_data['swift_tenantname'] = ''
-             config_data['swift_domain_id'] = ''
+            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
+
+            if config_data['swift_auth_version'] == 'TEMPAUTH':
+                config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
+                config_data['swift_username'] = config_inputs['swift-username'].strip()
+                config_data['swift_password'] = config_inputs['swift-password'].strip()
+                config_data['swift_tenantname'] = ''
+                config_data['swift_domain_id'] = ''
+            elif config_data['swift_auth_version'] == 'KEYSTONE':
+                config_data['swift_auth_url'] = config_data['keystone_public_url']
+                config_data['swift_username'] = config_data['admin_username']
+                config_data['swift_password'] = config_data['admin_password']
+                config_data['swift_tenantname'] = config_data['admin_tenant_name']
+                config_data['swift_domain_id'] = ''
+                if config_data['keystone_auth_version'] == 3:
+                    config_data['swift_domain_id'] = config_data['domain_name']
 
         config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         
