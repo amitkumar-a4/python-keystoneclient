@@ -175,8 +175,8 @@ class WorkloadMgrsController(wsgi.Controller):
             if (full and full == '1'):
                 snapshot_type = 'full'
             if (body and 'snapshot' in body):
-                name = body['snapshot'].get('name', 'Snapshot')
-                description = body['snapshot'].get('description', '')
+                name = body['snapshot'].get('name', 'Snapshot') or 'Snapshot'
+                description = body['snapshot'].get('description', '') or 'NA'
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
             return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
