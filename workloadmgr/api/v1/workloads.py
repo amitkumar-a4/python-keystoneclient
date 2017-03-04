@@ -175,8 +175,12 @@ class WorkloadMgrsController(wsgi.Controller):
             if (full and full == '1'):
                 snapshot_type = 'full'
             if (body and 'snapshot' in body):
-                name = body['snapshot'].get('name', 'Snapshot') or 'Snapshot'
-                description = body['snapshot'].get('description', '') or 'NA'
+
+                name = body['snapshot'].get('name', "") or 'Snapshot'
+                name = name.strip() or 'Snapshot'
+                description = body['snapshot'].get('description', "") or 'no-description'
+                description = description.strip() or 'no-description'
+
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
             return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
@@ -268,8 +272,12 @@ class WorkloadMgrsController(wsgi.Controller):
             except KeyError:
                 msg = _("Incorrect request body format")
                 raise exc.HTTPBadRequest(explanation=msg)
-            name = workload.get('name', None)
-            description = workload.get('description', None)
+
+            name = workload.get('name', "") or 'workload-noname'
+            name = name.strip() or "workload-noname"
+            description = workload.get('description', "") or 'no-description'
+            description = description.strip() or "no-description"
+
             workload_type_id = workload.get('workload_type_id', None)
             source_platform = workload.get('source_platform', "openstack")
             jobdefaults = {'fullbackup_interval': '-1',

@@ -210,8 +210,11 @@ class SnapshotsController(wsgi.Controller):
                 description = body['testbubble'].get('description', None)
                 options = body['testbubble'].get('options', {})
             elif (body and 'restore' in body):
-                name = body['restore'].get('name', None)
-                description = body['restore'].get('description', None)
+                name = body['restore'].get('name', "") or 'restore'
+                name = name.strip() or "restore"
+                description = body['restore'].get('description', "") or 'no-description'
+                description = description.strip() or "no-description"
+
                 options = body['restore'].get('options', {})
             if not options:
                 options = {'type' : 'openstack'}                
