@@ -273,8 +273,8 @@ class WorkloadMgrsController(wsgi.Controller):
                 msg = _("Incorrect request body format")
                 raise exc.HTTPBadRequest(explanation=msg)
 
-            name = workload.get('name', "") or 'workload-noname'
-            name = name.strip() or "workload-noname"
+            name = workload.get('name', "") or 'workload'
+            name = name.strip() or "workload"
             description = workload.get('description', "") or 'no-description'
             description = description.strip() or "no-description"
 
