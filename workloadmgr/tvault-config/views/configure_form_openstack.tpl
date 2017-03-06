@@ -31,16 +31,6 @@ function findForm() {
   setSwiftRequired(obj.attr('checked'), obj.val())
 }
 
-function setNFSRequired(checked, val) {
-    if((val=='NFS')) {
-       $($('.bootstrap-tagsinput > input')[0]).attr("required", true)
-       $($('.bootstrap-tagsinput > input')[1]).attr("required", true)
-    } else {
-       $($('.bootstrap-tagsinput > input')[0]).removeAttr("required")
-       $($('.bootstrap-tagsinput > input')[1]).removeAttr("required")
-    }
-}
-
 function setSwiftRequired(checked, val) {
      if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
@@ -215,16 +205,16 @@ function setSwiftRequired(checked, val) {
             <div class="panel-body">
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');">NFS
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');">NFS
              %end 
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');setNFSRequired(this.checked, this.value)">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
              %end 
              </label>
              <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
@@ -352,6 +342,16 @@ else
 {
 $('#ntp-servers').removeAttr('required');
 }
+});
+
+$('form').submit(function () {
+    if ($('[name="backup_target_type"]')[0].checked && $('[name="storage-nfs-export"]')[0].value == "") {
+        inputelement = $('[name="storage-nfs-export"]')[0]
+        $($(inputelement).parent()[0]).addClass("has-error")
+        $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+        $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = "Please enter one or more valid NFS Shares"
+        return false
+    }
 });
 });
 
