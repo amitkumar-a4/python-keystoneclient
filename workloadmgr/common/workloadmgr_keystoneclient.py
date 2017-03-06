@@ -226,16 +226,6 @@ class KeystoneClientBase(object):
     def auth_ref(self):
         return self.context.auth_plugin.get_access(self.session)
 
-    def get_user_to_get_email_address(self, context):
-        user = self.client_instance.users.get(context.user_id)
-        if not hasattr(user, 'email'):
-            user.email = None
-        return user
-
-    def get_user_list(self):
-        users = self.client_instance.users.list()
-        return users
-
 
 class KeystoneClientV3(KeystoneClientBase):
 
@@ -329,6 +319,16 @@ class KeystoneClient(object):
             self.client = KeystoneClientV3(context)
         else:
             self.client = KeystoneClientV2(context)
+
+    def get_user_to_get_email_address(self, context):
+        user = self.client.client_instance.users.get(context.user_id)
+        if not hasattr(user, 'email'):
+            user.email = None
+        return user
+
+    def get_user_list(self):
+        users = self.client.client_instance.users.list()
+        return users
 
 
 def list_opts():
