@@ -538,8 +538,9 @@ class SwiftRepository(ObjectRepository):
 
         self.manifest[object_name] = {}
         self.manifest[object_name]['mode'] = flags
-
+ 
         if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
+           flags == int('8401', 16) or \
            flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
             # load manifst
 
@@ -565,11 +566,11 @@ class SwiftRepository(ObjectRepository):
 
         else:
             # this is either write or create request
-            #flags == int('8401', 16) or flags in (int('8001', 16), int('8801', 16)):
-            try:
-                self.object_unlink(object_name)
-            except:
-                pass
+            if flags in (int('8001', 16), int('8801', 16), int('0001', 16)):
+                try:
+                    self.object_unlink(object_name)
+                except:
+                    pass
 
             if flags & os.O_WRONLY:
                 with open(full_path, "w") as f:
