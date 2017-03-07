@@ -91,8 +91,12 @@ class KeystoneClientBase(object):
     @property
     def client_instance(self):
         if not self._client_instance:
-            # Create connection to v3 API
-            self._client_instance = self._v2_client_init()
+            # Create connection to API
+            if self.__class__.__name__ == 'KeystoneClientV3':
+               self._client_instance = self._v3_client_init()
+            else:
+               self._client_instance = self._v2_client_init()
+
         return self._client_instance
 
     def _v2_client_init(self):
