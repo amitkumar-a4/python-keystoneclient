@@ -93,7 +93,7 @@ class KeystoneClientBase(object):
         if not self._client_instance:
             # Create connection to API
             if self.__class__.__name__ == 'KeystoneClientV3':
-               self._client_instance = self._v3_client_init()
+               self._client_instance = self._v2_client_init()
             else:
                self._client_instance = self._v2_client_init()
 
@@ -101,28 +101,42 @@ class KeystoneClientBase(object):
 
     def _v2_client_init(self):
         try:
-            username = CONF.get('keystone_authtoken').username
+            username=CONF.get('keystone_authtoken').username 
         except:
-            username = CONF.get('keystone_authtoken').admin_user
+               username=CONF.get('keystone_authtoken').admin_user
         try:
-            password = CONF.get('keystone_authtoken').password
+            password=CONF.get('keystone_authtoken').password 
         except:
-            password = CONF.get('keystone_authtoken').admin_password
+               password=CONF.get('keystone_authtoken').admin_password
         try:
-            tenant_name = CONF.get('keystone_authtoken').admin_tenant_name
+            tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
         except:
-            project_id = context.project_id
-            context.project_id = 'Configurator'
-            tenant_name = WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
-            context.project_id = project_id
-        auth_url = CONF.keystone_endpoint_url
-        auth = passMod.Password(auth_url=auth_url,
-                                username=username,
-                                password=password,
-                                project_name=tenant_name,
-                                )
-        self.session = session.Session(auth=auth, verify=False)
-        return client.Client(session=self.session, auth_url=auth_url, insecure=True)
+               project_id = context.project_id
+               context.project_id = 'Configurator'
+               tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
+               context.project_id = project_id
+        auth_url=CONF.keystone_endpoint_url
+        if auth_url.find('v3') != -1:
+           username=CONF.get('nova_admin_username')
+           password=CONF.get('nova_admin_password')
+           if username == 'triliovault':
+              domain_id=CONF.get('triliovault_user_domain_id')
+           else:
+                domain_id=CONF.get('domain_name')
+           auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    user_domain_id=domain_id,
+                                    domain_id=domain_id,
+                                    )
+        else:
+             auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    project_name=tenant_name,
+                                    )
+        sess = session.Session(auth=auth, verify=False)
+        return client.Client(session=sess, auth_url=auth_url, insecure=True)
 
     def _v3_client_init(self):
         client = kc_v3.Client(session=self.session,
@@ -230,17 +244,6 @@ class KeystoneClientBase(object):
     def auth_ref(self):
         return self.context.auth_plugin.get_access(self.session)
 
-    def get_user_to_get_email_address(self, context):
-        user = self.client_instance.users.get(context.user_id)
-        if not hasattr(user, 'email'):
-            user.email = None
-        return user
-
-    def get_user_list(self):
-        users = self.client_instance.users.list()
-        return users
-
-
 class KeystoneClientV3(KeystoneClientBase):
 
     def __init__(self, context):
@@ -334,6 +337,15 @@ class KeystoneClient(object):
         else:
             self.client = KeystoneClientV2(context)
 
+    def get_user_to_get_email_address(self, context):
+        user = self.client.client_instance.users.get(context.user_id)
+        if not hasattr(user, 'email'):
+            user.email = None
+        return user
+
+    def get_user_list(self):
+        users = self.client.client_instance.users.list()
+        return users
 
 def list_opts():
     yield None, keystone_opts
