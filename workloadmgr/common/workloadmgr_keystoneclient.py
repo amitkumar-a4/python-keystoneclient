@@ -92,14 +92,11 @@ class KeystoneClientBase(object):
     def client_instance(self):
         if not self._client_instance:
             # Create connection to API
-            if self.__class__.__name__ == 'KeystoneClientV3':
-               self._client_instance = self._v2_client_init()
-            else:
-               self._client_instance = self._v2_client_init()
+            self._client_instance = self._common_client_init()
 
         return self._client_instance
 
-    def _v2_client_init(self):
+    def _common_client_init(self):
         try:
             username=CONF.get('keystone_authtoken').username 
         except:
