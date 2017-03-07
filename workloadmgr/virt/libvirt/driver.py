@@ -1119,6 +1119,8 @@ class LibvirtDriver(driver.ComputeDriver):
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                                     'backup_media_target')
             backup_target = vault.get_backup_target(backup_endpoint)
+
+            instance_ids = [instance['vm_id'] for instance in instances]
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
                 for snap in snapshots_to_delete:
                     workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
@@ -1141,6 +1143,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
                         vm_disk_resource_snap = vm_disk_resource_snap_to_commit = db.vm_disk_resource_snap_get_bottom(
                                                                                          cntx, snapshot_vm_resource.id)
+
                         if vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
                                                        vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
@@ -1170,12 +1173,21 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'backend_endpoint': backup_endpoint,
                                     'snapshot_id': snapshot_to_commit.id
                                      }
-                                
+
                                 status = {'result': 'retry'}
+
+                                #After one click restore snapshot_vm_resource['vm_id'] would be addressing to
+                                #old vm_id which doesn't exist in Nova DB. So it will give ServerNotFound error
+                                #To overcome this issue creating a check for vm_id. if it's not existing then
+                                #passing a existing vm_id.
+                                server_id = snapshot_vm_resource['vm_id']
+                                if server_id not in instance_ids:
+                                    server_id = instance_ids[0]
+
                                 while status['result'] == 'retry':
                                       status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
                                                                              cntx,
-                                                                             snapshot_vm_resource['vm_id'],
+                                                                             server_id,
                                                                              {'commit_image_list': commit_image_list,
                                                                               'metadata': metadata
                                                                               })
@@ -1187,8 +1199,8 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
                                                                    backup_endpoint)
-                                for snapshot in snap_to_del:
-                                    db.vm_disk_resource_snap_delete(cntx, snapshot)
+                                for snapshot_del in snap_to_del:
+                                    db.vm_disk_resource_snap_delete(cntx, snapshot_del)
 
                                 if vm_disk_resource_snap_to_commit_backing:
                                     backing_vault_path = os.path.join(backup_target.mount_path,
@@ -1209,12 +1221,15 @@ class LibvirtDriver(driver.ComputeDriver):
                 workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)
 
         except Exception as ex:
+            msg = ''
             LOG.exception(ex)
             if hasattr(ex, 'kwargs'):
                if 'reason' in ex.kwargs:
                    msg = ex.kwargs['reason']
-            else:
+            elif hasattr(ex,'message') and ex.message != '':
                msg = ex.message
+            elif hasattr(ex,'strerror') and ex.strerror != '':
+               msg = ex.strerror
 
             db.snapshot_update(cntx, snapshot['id'],
                                {'warning_msg': 'Failed to apply retention policy - ' + msg})
