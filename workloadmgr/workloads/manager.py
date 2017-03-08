@@ -1052,7 +1052,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 backup_target.purge_restore_from_staging_area(context, {'restore_id': restore_id})
             except Exception as ex:
                 LOG.exception(ex)             
-            
+
+            try:
+                backup_target.purge_snapshot_from_staging_area(context,
+                    {'workload_id' : workload.id,
+                     'snapshot_id' : snapshot.id})
+            except Exception as ex:
+                LOG.exception(ex) 
+
             try:
                 import gc
                 gc.collect() 

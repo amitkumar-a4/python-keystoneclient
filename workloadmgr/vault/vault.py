@@ -264,6 +264,8 @@ class TrilioVaultBackupTarget(object):
         pass
 
     def purge_snapshot_from_staging_area(self, context, snapshot_metadata):
+        directory = self.get_progress_tracker_directory(snapshot_metadata)
+        shutil.rmtree(directory)
         pass
 
     def purge_snapshot_vm_from_staging_area(self, context, snapshot_vm_metadata):
