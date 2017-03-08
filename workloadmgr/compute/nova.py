@@ -410,7 +410,7 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                 if contego is True:
                     msg = "Unable to call %s; Please check contego " \
                           "logs for more details" % func.func_name
-                    if ex.code == 413:
+                    if hasattr(ex, 'code') and ex.code == 413:
                        msg = ex.message
                     raise exception.ErrorOccurred(reason=msg)
                 else:
