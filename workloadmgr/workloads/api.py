@@ -2344,7 +2344,7 @@ class API(base.Base):
         if context.is_admin == False:
             raise wlm_exceptions.AdminRequired()
         workloads = []
-        keystone_client = KeystoneClient()
+        keystone_client = KeystoneClient(context)
         projects = keystone_client.client.get_project_list_for_import(context)
         tenant_list = [project.id for project in projects]
         users = keystone_client.get_user_list()
