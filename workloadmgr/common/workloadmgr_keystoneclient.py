@@ -91,34 +91,49 @@ class KeystoneClientBase(object):
     @property
     def client_instance(self):
         if not self._client_instance:
-            # Create connection to v3 API
-            self._client_instance = self._v2_client_init()
+            # Create connection to API
+            self._client_instance = self._common_client_init()
+
         return self._client_instance
 
-    def _v2_client_init(self):
+    def _common_client_init(self):
         try:
-            username = CONF.get('keystone_authtoken').username
+            username=CONF.get('keystone_authtoken').username 
         except:
-            username = CONF.get('keystone_authtoken').admin_user
+               username=CONF.get('keystone_authtoken').admin_user
         try:
-            password = CONF.get('keystone_authtoken').password
+            password=CONF.get('keystone_authtoken').password 
         except:
-            password = CONF.get('keystone_authtoken').admin_password
+               password=CONF.get('keystone_authtoken').admin_password
         try:
-            tenant_name = CONF.get('keystone_authtoken').admin_tenant_name
+            tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
         except:
-            project_id = context.project_id
-            context.project_id = 'Configurator'
-            tenant_name = WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
-            context.project_id = project_id
-        auth_url = CONF.keystone_endpoint_url
-        auth = passMod.Password(auth_url=auth_url,
-                                username=username,
-                                password=password,
-                                project_name=tenant_name,
-                                )
-        self.session = session.Session(auth=auth, verify=False)
-        return client.Client(session=self.session, auth_url=auth_url, insecure=True)
+               project_id = context.project_id
+               context.project_id = 'Configurator'
+               tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
+               context.project_id = project_id
+        auth_url=CONF.keystone_endpoint_url
+        if auth_url.find('v3') != -1:
+           username=CONF.get('nova_admin_username')
+           password=CONF.get('nova_admin_password')
+           if username == 'triliovault':
+              domain_id=CONF.get('triliovault_user_domain_id')
+           else:
+                domain_id=CONF.get('domain_name')
+           auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    user_domain_id=domain_id,
+                                    domain_id=domain_id,
+                                    )
+        else:
+             auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    project_name=tenant_name,
+                                    )
+        sess = session.Session(auth=auth, verify=False)
+        return client.Client(session=sess, auth_url=auth_url, insecure=True)
 
     def _v3_client_init(self):
         client = kc_v3.Client(session=self.session,
@@ -226,7 +241,6 @@ class KeystoneClientBase(object):
     def auth_ref(self):
         return self.context.auth_plugin.get_access(self.session)
 
-
 class KeystoneClientV3(KeystoneClientBase):
 
     def __init__(self, context):
@@ -329,7 +343,6 @@ class KeystoneClient(object):
     def get_user_list(self):
         users = self.client.client_instance.users.list()
         return users
-
 
 def list_opts():
     yield None, keystone_opts
