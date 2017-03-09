@@ -91,6 +91,7 @@ function hideshowstorages() {
 
 function setSwiftRequired(checked, val) {
      storage_nfs_export  = $('#storage-nfs-export').val()
+     val_length = storage_nfs_export.split(",").length
      if (val == "decide") {
          obj = $("#configure_openstack input[name='swift-auth-version']:checked")
          if (typeof obj == "undefined") {
@@ -119,7 +120,6 @@ function setSwiftRequired(checked, val) {
        $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
      }
      else {
-       val_length = storage_nfs_export.split(",").length
        if(storage_nfs_export == "")
          $('[placeholder="server:/var/nfs"]').first().attr("required", "true");
      }
