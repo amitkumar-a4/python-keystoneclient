@@ -212,9 +212,9 @@ function setSwiftRequired(checked, val) {
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
+                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
+                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
              %end 
              </label>
              <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
@@ -438,6 +438,9 @@ function validate_swift_credentials(inputelement) {
     swift_username = $('[name="swift-username"]')[0].value
     swift_password = $('[name="swift-password"]')[0].value
     obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+    if (inputelement.name != 'swift-auth-version') {
+        inputelement = obj
+    }
     swift_auth_version = obj.val()
     $.ajax({
         url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
