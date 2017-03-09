@@ -15,6 +15,46 @@
 <script src="js/bootstrap-tagsinput.min.js"></script>
 <script type="text/javascript">
 IsV3 = false
+function validate_swift_credentials(inputelement) {
+    public_url = $('[name="keystone-public-url"]')[0].value
+    project_name = $('[name="admin-tenant-name"]')[0].value
+    username = $('[name="admin-username"]')[0].value
+    password = $('[name="admin-password"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
+    swift_auth_url = $('[name="swift-auth-url"]')[0].value
+    swift_username = $('[name="swift-username"]')[0].value
+    swift_password = $('[name="swift-password"]')[0].value
+    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+    if (inputelement.name != 'swift-auth-version' || inputelement == 'custom') {
+       inputelement = obj
+    }
+    swift_auth_version = obj.val()
+    $.ajax({
+        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
+              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
+        }
+    });
+}
+
 function setRequired(val) {
     if(val.includes('v3')) {
        IsV3 = true
@@ -27,8 +67,24 @@ function setRequired(val) {
 function findForm() {
   setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
   setRequired($("#configure_openstack input[name='keystone-public-url']").val())
-  obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-  setSwiftRequired(obj.attr('checked'), obj.val())
+  hideshowstorages()
+}
+
+function hideshowstorages() {
+  backup_target_type = $('[name="backup_target_type"]:checked').val()
+  if (typeof backup_target_type == "undefined") {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');
+     $($('#nfsstorage-panel')[0]).addClass('hidden');
+  }
+  if (backup_target_type == 'NFS') {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');
+  }
+  if (backup_target_type == 'SWIFT') {
+     $($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');
+     obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+     setSwiftRequired(obj.attr('checked'), obj.val())
+     validate_swift_credentials('custom')
+  }
 }
 
 function setSwiftRequired(checked, val) {
@@ -212,7 +268,7 @@ function setSwiftRequired(checked, val) {
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
+                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
              %else:
                 <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
              %end 
@@ -424,46 +480,6 @@ function validate_keystone_credentials(inputelement) {
                options += "<option value="+ value +" selected>"+ value + "</option>"
            });
            document.getElementsByName("trustee-role")[0].innerHTML = options
-        }
-    });
-}
-
-function validate_swift_credentials(inputelement) {
-    public_url = $('[name="keystone-public-url"]')[0].value
-    project_name = $('[name="admin-tenant-name"]')[0].value
-    username = $('[name="admin-username"]')[0].value
-    password = $('[name="admin-password"]')[0].value
-    domain_id = $('[name="domain-name"]')[0].value
-    swift_auth_url = $('[name="swift-auth-url"]')[0].value
-    swift_username = $('[name="swift-username"]')[0].value
-    swift_password = $('[name="swift-password"]')[0].value
-    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-    if (inputelement.name != 'swift-auth-version') {
-        inputelement = obj
-    }
-    swift_auth_version = obj.val()
-    $.ajax({
-        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
-              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
-        beforeSend: function() {
-           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-           $(spinelement[0]).removeClass("hidden")
-           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
-           $($(inputelement).parent()[0]).removeClass("has-error")
-           $($(inputelement).parent()[0]).removeClass("has-success")
-        },
-        complete: function(result) {
-           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-           $(spinelement[0]).addClass("hidden")
-        },
-        error: function(result) {
-           $($(inputelement).parent()[0]).addClass("has-error")
-           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
-           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
-        },
-        success: function(result) {
-           $($(inputelement).parent()[0]).addClass("has-success")
-           options = ""
         }
     });
 }
