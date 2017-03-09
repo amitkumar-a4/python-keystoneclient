@@ -188,7 +188,7 @@ def get_workload_url(context, workload_ids, upgrade):
             LOG.exception(ex)
 
         finally:
-            backup_target and backup_target.purge_staging_area(context)
+            pass
     return workload_url_iterate
 
 def update_workload_metadata(workload_values):

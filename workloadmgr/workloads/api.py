@@ -803,7 +803,7 @@ class API(base.Base):
             except Exception as ex:
                 LOG.exception(ex)
             finally:
-                backup_target.purge_staging_area(context)
+                pass
 
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
