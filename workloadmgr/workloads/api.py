@@ -1851,7 +1851,7 @@ class API(base.Base):
             for snapshot in snapshots:
                 if snapshot.status == 'mounted':
                    fspid = self.db.get_metadata_value(snapshot.metadata, 'fsmanagerpid')
-                   mounturl = fspid = self.db.get_metadata_value(snapshot.metadata, 'urls')
+                   mounturl = fspid = self.db.get_metadata_value(snapshot.metadata, 'mounturl')
                    #if (fspid and int(fspid) != -1) and (mounturl and len(mounturl) > 1):
                    mounted = {'snapshot_id': snapshot.id,
                               'snapshot_name': snapshot.display_name,
