@@ -1464,8 +1464,8 @@ def main(mountpoint, cacheroot):
         except:
                pass
         if os.path.isdir(mountpoint):
-           command = ['sudo', 'rm', '-rf', os.path.join(mountpoint,'*')]
-           subprocess.call(command, shell=False) 
+           os.system('sudo chown -R '+ FUSE_USER+':'+FUSE_USER+' '+ mountpoint)
+           os.system('sudo rm -rf '+os.path.join(mountpoint,'*'))
         else:
              command = ['sudo', 'mkdir', mountpoint]
              subprocess.call(command, shell=False)
