@@ -279,7 +279,8 @@ class WorkloadMgrsController(wsgi.Controller):
             description = description.strip() or "no-description"
 
             workload_type_id = workload.get('workload_type_id', None)
-            source_platform = workload.get('source_platform', "openstack")
+            source_platform = workload.get('source_platform', "") or 'openstack'
+            source_platform = source_platform.strip() or "openstack"
             jobdefaults = {'fullbackup_interval': '-1',
                            'start_time': '09:00 PM',
                            'interval': u'24hr',
