@@ -2484,7 +2484,9 @@ class API(base.Base):
                     if keystone_client.client.user_exist_in_tenant(new_tenant_id, user_id) is False:
                         raise wlm_exceptions.UserNotFound(user_id=user_id)
                     if keystone_client.client.check_user_role(new_tenant_id, user_id) is False:
-                        raise wlm_exceptions.ProjectNotFound(project_id=new_tenant_id)
+                        raise wlm_exceptions.RoleNotFound(user_id=user_id,
+                                                          role_name = vault.CONF.trustee_role,
+                                                          project_id=new_tenant_id)
 
                     # If old_teanat_id is provided then look for all workloads under that tenant
                     if old_tenant_ids:

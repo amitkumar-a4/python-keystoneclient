@@ -525,3 +525,6 @@ class ProjectNotFound(NotFound):
 class UserNotFound(NotFound):
     message = _("User %(user_id)s could not be found.")
 
+class RoleNotFound(NotFound):
+    message = _("User %(user_id)s does not have role '%(role_name)s' on "
+                "project %(project_id)s")
