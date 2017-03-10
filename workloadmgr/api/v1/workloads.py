@@ -369,30 +369,6 @@ class WorkloadMgrsController(wsgi.Controller):
                                'retention_policy_value': '30'}
 
                 jobschedule = workload.get('jobschedule', jobdefaults)
-                # IF user is intended to modify the job schedule
-                # then fill in the default values if user did not specify 
-                # any of them
-                """if jobschedule:
-                    if not 'fullbackup_interval' in jobschedule:
-                        jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
-
-                    if not 'start_time' in jobschedule:
-                        jobschedule['start_time'] = jobdefaults['start_time']
-
-                    if not 'interval' in jobschedule:
-                        jobschedule['interval'] = jobdefaults['interval']
-
-                    if not 'enabled' in jobschedule:
-                        jobschedule['enabled'] = jobdefaults['enabled']
-
-                    if not 'start_date' in jobschedule:
-                        jobschedule['start_date'] = jobdefaults['start_date']
-                
-                    if not 'retention_policy_type' in jobschedule:
-                        jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']                  
-                
-                    if not 'retention_policy_value' in jobschedule:
-                        jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']"""
                 self.workload_api.workload_modify(context, id, body['workload'])
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
