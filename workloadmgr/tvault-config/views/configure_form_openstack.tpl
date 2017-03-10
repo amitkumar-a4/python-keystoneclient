@@ -15,6 +15,47 @@
 <script src="js/bootstrap-tagsinput.min.js"></script>
 <script type="text/javascript">
 IsV3 = false
+function validate_swift_credentials(inputelement) {
+    public_url = $('[name="keystone-public-url"]')[0].value
+    project_name = $('[name="admin-tenant-name"]')[0].value
+    username = $('[name="admin-username"]')[0].value
+    password = $('[name="admin-password"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
+    swift_auth_url = $('[name="swift-auth-url"]')[0].value
+    swift_username = $('[name="swift-username"]')[0].value
+    swift_password = $('[name="swift-password"]')[0].value
+    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+    if (inputelement.name != 'swift-auth-version' || inputelement == 'custom') {
+       inputelement = obj
+    }
+    swift_auth_version = obj.val()
+    $.ajax({
+        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
+              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
+        }
+    });
+}
+
+
 function setRequired(val) {
     if(val.includes('v3')) {
        IsV3 = true
@@ -27,11 +68,38 @@ function setRequired(val) {
 function findForm() {
   setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
   setRequired($("#configure_openstack input[name='keystone-public-url']").val())
-  obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-  setSwiftRequired(obj.attr('checked'), obj.val())
+  hideshowstorages()
+}
+
+function hideshowstorages() {
+  backup_target_type = $('[name="backup_target_type"]:checked').val()
+  if (typeof backup_target_type == "undefined") {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');
+     $($('#nfsstorage-panel')[0]).addClass('hidden');
+  }
+  if (backup_target_type == 'NFS') {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');
+     setSwiftRequired(true, 'NFS')
+  }
+  if (backup_target_type == 'SWIFT') {
+     $($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');
+     obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+     setSwiftRequired(obj.attr('checked'), obj.val())
+     validate_swift_credentials('custom')
+  }
 }
 
 function setSwiftRequired(checked, val) {
+     storage_nfs_export  = $('#storage-nfs-export').val()
+     val_length = storage_nfs_export.split(",").length
+     if (val == "decide") {
+         obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+         if (typeof obj == "undefined") {
+             $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+             return
+         }
+         val = obj.val()
+     }
      if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
         $('[name="swift-username"]').attr("required", "true");
@@ -49,8 +117,11 @@ function setSwiftRequired(checked, val) {
         $('[name="swift-password"]').removeAttr('required')
      }
      if(val == 'TEMPAUTH' || val == 'KEYSTONE') {
-       $('[name="storage-nfs-export"]').removeAttr('required')
-       $('[name="storage-nfs-options"]').removeAttr('required')        
+       $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+     }
+     else {
+       if(storage_nfs_export == "")
+         $('[placeholder="server:/var/nfs"]').first().attr("required", "true");
      }
 }
 </script>
@@ -87,7 +158,7 @@ function setSwiftRequired(checked, val) {
  		</div>
   % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
-  <form role="form" id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
+  <form role="form"  id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
 	%if 'nodetype' in locals() and nodetype == 'additional':
 		<input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node
 		<input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
@@ -205,16 +276,16 @@ function setSwiftRequired(checked, val) {
             <div class="panel-body">
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
              %end 
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
+                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide')">SWIFT
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');">SWIFT
+                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onchange="setSwiftRequired(true, 'decide')">SWIFT
              %end 
              </label>
              <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
@@ -234,7 +305,7 @@ function setSwiftRequired(checked, val) {
 		  <div class="panel-body">
 			<div class="form-group" >
 		        <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
-			<input name="storage-nfs-export" {{'value='+storage_nfs_export if (defined('storage_nfs_export') and len(storage_nfs_export)) else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
+			<input name="storage-nfs-export" {{'value='+storage_nfs_export if (defined('storage_nfs_export') and len(storage_nfs_export)) else ''}} id="storage-nfs-export" type="text" placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                         <span id="nfs_helpblock" class="help-block">Please enter list of NFS shares separated by commas</span>
 			</div>
                         <div class="form-group">
@@ -344,17 +415,6 @@ $('#ntp-servers').removeAttr('required');
 }
 });
 
-$('form').submit(function () {
-    if ($('[name="backup_target_type"]')[0].checked && $('[name="storage-nfs-export"]')[0].value == "") {
-        inputelement = $('[name="storage-nfs-export"]')[0]
-        $($(inputelement).parent()[0]).addClass("has-error")
-        $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
-        $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = "Please enter one or more valid NFS Shares"
-        return false
-    }
-});
-});
-
 function validate_url_versions() {
    if ($( "input[name='keystone-admin-url']" )[0].value.split('v')[1] !=
        $( "input[name='keystone-public-url']" )[0].value.split('v')[1]) {
@@ -428,51 +488,30 @@ function validate_keystone_credentials(inputelement) {
     });
 }
 
-function validate_swift_credentials(inputelement) {
-    public_url = $('[name="keystone-public-url"]')[0].value
-    project_name = $('[name="admin-tenant-name"]')[0].value
-    username = $('[name="admin-username"]')[0].value
-    password = $('[name="admin-password"]')[0].value
-    domain_id = $('[name="domain-name"]')[0].value
-    swift_auth_url = $('[name="swift-auth-url"]')[0].value
-    swift_username = $('[name="swift-username"]')[0].value
-    swift_password = $('[name="swift-password"]')[0].value
-    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-    swift_auth_version = obj.val()
-    $.ajax({
-        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
-              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
-        beforeSend: function() {
-           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-           $(spinelement[0]).removeClass("hidden")
-           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
-           $($(inputelement).parent()[0]).removeClass("has-error")
-           $($(inputelement).parent()[0]).removeClass("has-success")
-        },
-        complete: function(result) {
-           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-           $(spinelement[0]).addClass("hidden")
-        },
-        error: function(result) {
-           $($(inputelement).parent()[0]).addClass("has-error")
-           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
-           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
-        },
-        success: function(result) {
-           $($(inputelement).parent()[0]).addClass("has-success")
-           options = ""
-        }
-    });
-}
-
 /*$('[name="storage-nfs-options"]').tagsinput({
   allowDuplicates: true
 });*/
+
+$('[name="storage-nfs-export"]').on('itemRemoved', function(event) {
+  storage_nfs_export = $('#storage-nfs-export').val()
+  val_length = storage_nfs_export.split(",").length
+  if(val_length >= 1 && storage_nfs_export != "") {
+      $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+  }
+  if(storage_nfs_export == "") {
+    $('[placeholder="server:/var/nfs"]').first().attr("required", "true");
+  }
+});
 
 $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 //function validate_nfsshare(inputelement) {
 //}
     //nfsshare = $('[name="storage-nfs-export"]')[0].value
+    storage_nfs_export = $('#storage-nfs-export').val()
+    val_length = storage_nfs_export.split(",").length
+    if(val_length >= 1 && storage_nfs_export != "") {
+      $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+    }
     nfsshare = event.item
     inputelement = this
     $.ajax({
@@ -502,7 +541,7 @@ $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 if ($('input:radio[name=nodetype]:checked').val() == "additional") {
     $("#panel4")[0].hidden=true
 }
-
+});
 </script>
 </body>
 </html>
