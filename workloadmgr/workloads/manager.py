@@ -1180,7 +1180,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         {'status': 'mounted',
                                          'metadata': {
                                               'mount_vm_id': mount_vm_id,
-                                              'urls': json.dumps(urls),
+                                              'mounturl': json.dumps(urls),
                                               'mount_error': "",
                                            }
                                         })
