@@ -372,7 +372,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 # IF user is intended to modify the job schedule
                 # then fill in the default values if user did not specify 
                 # any of them
-                if jobschedule:
+                """if jobschedule:
                     if not 'fullbackup_interval' in jobschedule:
                         jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
 
@@ -392,8 +392,7 @@ class WorkloadMgrsController(wsgi.Controller):
                         jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']                  
                 
                     if not 'retention_policy_value' in jobschedule:
-                        jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
-
+                        jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']"""
                 self.workload_api.workload_modify(context, id, body['workload'])
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))

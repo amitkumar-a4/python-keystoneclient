@@ -643,7 +643,28 @@ class API(base.Base):
             options['metadata'] = workload['metadata']     
 
         if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
-            options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
+           if not 'fullbackup_interval' in workload['jobschedule']:
+              workload['jobschedule']['fullbackup_interval'] = workloadobj['jobschedule']['fullbackup_interval']
+
+           if not 'start_time' in workload['jobschedule']:
+              workload['jobschedule']['start_time'] = workloadobj['jobschedule']['start_time']
+
+           if not 'interval' in workload['jobschedule']:
+              workload['jobschedule']['interval'] = workloadobj['jobschedule']['interval']
+
+           if not 'enabled' in workload['jobschedule']:
+              workload['jobschedule']['enabled'] = workloadobj['jobschedule']['enabled']
+
+           if not 'start_date' in workload['jobschedule']:
+              workload['jobschedule']['start_date'] = workloadobj['jobschedule']['start_date']
+
+           if not 'retention_policy_type' in workload['jobschedule']:
+              workload['jobschedule']['retention_policy_type'] = workloadobj['jobschedule']['retention_policy_type']
+
+           if not 'retention_policy_value' in workload['jobschedule']:
+              workload['jobschedule']['retention_policy_value'] = workloadobj['jobschedule']['retention_policy_value']
+
+           options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
 
         if  'instances' in workload and workload['instances']:
 
