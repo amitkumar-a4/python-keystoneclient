@@ -807,9 +807,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             context = nova._get_tenant_context(context)
 
-            backup_target.purge_workload_from_staging_area(context,
-                {'workload_id': workload.id})            
-
             target_platform = 'vmware'
             if hasattr(restore, 'pickle'):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
