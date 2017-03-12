@@ -595,8 +595,7 @@ class SettingMetadata(BASE, WorkloadsBase):
     id = Column(Integer, primary_key=True)
     settings_name = Column(String(255), ForeignKey('settings.name'), nullable=False)
     settings_project_id = Column(String(255), nullable=False)
-    
-    settings = relationship(Settings, backref=backref('metadata'))
+    settings = relationship(Settings, backref=backref('metadata', cascade="all, delete-orphan"))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
     
