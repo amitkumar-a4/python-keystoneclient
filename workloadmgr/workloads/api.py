@@ -526,9 +526,14 @@ class API(base.Base):
             workload_type_id_valid = False
             workload_types = self.workload_type_get_all(context)            
             for workload_type in workload_types:
+                if workload_type_id is None and workload_type.display_name == 'Serial':
+                   workload_type_id = workload_type.id
+                   workload_type_id_valid = True
+                   break
                 if workload_type_id == workload_type.id:
                     workload_type_id_valid = True
                     break 
+
             if workload_type_id_valid == False:
                 msg = _('Invalid workload type')
                 raise wlm_exceptions.Invalid(reason=msg)                
