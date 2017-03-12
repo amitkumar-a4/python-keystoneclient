@@ -2619,7 +2619,6 @@ def configure_openstack():
     global config_data
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
-    
     try:
         config_inputs = bottle.request.POST
 
@@ -2629,6 +2628,17 @@ def configure_openstack():
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress'].strip()
         if config_data['nodetype'] == 'controller':
             config_data['tvault_primary_node'] = config_data['floating_ipaddress'].strip()
+        elif config_data['nodetype'] == 'additional':
+             sql_connection = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+             engine = create_engine(sql_connection)
+             rows = engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator'))
+             if not int(rows.rowcount) >= 0:
+                raise Exception("Invalid controller node")
+             for row in rows:
+                 items = dict(row.items())
+                 if items['name'] == 'tvault_ipaddress':
+                    if items['value'] == config_data['tvault_ipaddress']:
+                       raise Exception("Additional node IP address cannot be Controller node, Enter Controller node Ip address")
         config_data['name_server'] = config_inputs['name-server'].strip()
         config_data['domain_search_order'] = config_inputs['domain-search-order'].strip()        
         
