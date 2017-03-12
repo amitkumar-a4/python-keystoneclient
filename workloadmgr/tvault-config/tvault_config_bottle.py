@@ -2628,7 +2628,7 @@ def configure_openstack():
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress'].strip()
         if config_data['nodetype'] == 'controller':
             config_data['tvault_primary_node'] = config_data['floating_ipaddress'].strip()
-        else:
+        elif config_data['nodetype'] == 'additional':
              sql_connection = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
              engine = create_engine(sql_connection)
              rows = engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator'))
