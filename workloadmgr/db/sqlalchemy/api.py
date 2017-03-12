@@ -2942,7 +2942,8 @@ def _setting_update(context, values, setting_name, purge_metadata, session):
                 values['status'] = 'available'
             if not values.get('project_id'):
                 values['project_id'] = context.project_id                
-                
+        if 'is_hidden' in values:
+           values['hidden'] = int(values['is_hidden'])
         setting_ref.update(values)
         setting_ref.save(session)
         
