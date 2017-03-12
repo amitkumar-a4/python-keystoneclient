@@ -21,6 +21,7 @@ from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 from workloadmgr import settings as settings_module
+LOG = logging.getLogger(__name__)
 
 FLAGS = flags.FLAGS
 
