@@ -762,16 +762,23 @@ class WorkloadMgrsController(wsgi.Controller):
         """settings"""
         try:
             context = req.environ['workloadmgr.context']
+            get_hidden = False
+            if ('QUERY_STRING' in req.environ) :
+               qs=parse_qs(req.environ['QUERY_STRING'])
+               var = parse_qs(req.environ['QUERY_STRING'])
+               get_hidden = var.get('get_hidden',[''])[0]
+               get_hidden = escape(get_hidden)                
+               if get_hidden.lower() == 'true':
+                  get_hidden = True
             Config = ConfigParser.RawConfigParser()
             Config.read('/var/triliovault/settings/workloadmgr-settings.conf')
-            
             settings = None            
             if (body and 'settings' in body):
                 settings = settings_module.set_settings(context, body['settings'])
             if (body and 'page_size' in body['settings']):
                 settings = self.workload_api.setting_get(context,'page_size')                
             if not settings:
-                settings = settings_module.get_settings(context)
+                settings = settings_module.get_settings(context, get_hidden)
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)

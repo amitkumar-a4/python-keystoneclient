@@ -31,11 +31,11 @@ default_settings = {
 'smtp_timeout' : '10',
 }
 
-def get_settings(context=None):                           
+def get_settings(context=None, get_hidden=False):                           
     """get settings"""
     try:
         persisted_settings = {}
-        persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no',get_hidden = False)
+        persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no',get_hidden = get_hidden)
         for persisted_setting in persisted_setting_objs:
             persisted_settings[persisted_setting.name] = persisted_setting.value
         for setting, value in default_settings.iteritems():
