@@ -633,12 +633,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                      'snapshot_id' : snapshot.id})
             except Exception as ex:
                 LOG.exception(ex) 
-                                           
-            try:
-                backup_target.purge_staging_area(context)
-            except Exception as ex:
-                LOG.exception(ex) 
-                
+
             try:
                 import gc
                 gc.collect() 
@@ -811,9 +806,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             backup_target = vault.get_backup_target(backup_endpoint)
 
             context = nova._get_tenant_context(context)
-
-            backup_target.purge_workload_from_staging_area(context,
-                {'workload_id': workload.id})            
 
             target_platform = 'vmware'
             if hasattr(restore, 'pickle'):
@@ -1044,15 +1036,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     })
         finally:
             try:
-                backup_target.purge_staging_area(context)
+                backup_target.purge_snapshot_from_staging_area(context,
+                    {'workload_id' : workload.id,
+                     'snapshot_id' : snapshot.id})
             except Exception as ex:
-                LOG.exception(ex)  
-            
-            try:
-                backup_target.purge_restore_from_staging_area(context, {'restore_id': restore_id})
-            except Exception as ex:
-                LOG.exception(ex)             
-            
+                LOG.exception(ex) 
+
             try:
                 import gc
                 gc.collect() 

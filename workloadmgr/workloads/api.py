@@ -829,7 +829,7 @@ class API(base.Base):
             except Exception as ex:
                 LOG.exception(ex)
             finally:
-                backup_target.purge_staging_area(context)
+                pass
 
         AUDITLOG.log(context,'Get Import Workloads List Completed', None)
         return workloads
@@ -2507,54 +2507,54 @@ class API(base.Base):
 
                 if new_tenant_id in tenant_list:
                     # Check for valid workload user
-                    if keystone_client.client.user_exist_in_tenant(new_tenant_id, user_id) \
-                            and keystone_client.client.check_user_role(new_tenant_id, user_id):
-
-                        # If old_teanat_id is provided then look for all workloads under that tenant
-                        if old_tenant_ids:
-                            if not migrate_cloud:
-                                for old_tenant_id in old_tenant_ids:
-                                    if old_tenant_id not in tenant_list:
-                                        raise wlm_exceptions.ProjectNotFound(project_id=old_tenant_id)
-                                kwargs = {'project_list': old_tenant_ids}
-                                workloads_in_db = self.db.workload_get_all(context, **kwargs)
-                                for workload in workloads_in_db:
-                                    workload_to_update.append(workload.id)
-                            else:
-                                # When migrate is True then there could be the scenerio where some
-                                # of the workloads exist in DB, in that case directly importing
-                                # them will result in error, so filtering those workloads here
-                                workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
-                                kwargs = {'workload_list': workload_ids}
-                                workloads = self.db.workload_get_all(context, **kwargs)
-                                if len(workloads) == 0:
-                                    workload_to_import.extend(workload_ids)
-                                else:
-                                    workloads_in_db = self.db.workload_get_all(context)
-                                    workload_ids_in_db = [workload.id for workload in workloads_in_db]
-                                    for workload_id in workload_ids:
-                                        if workload_id in workload_ids_in_db:
-                                            workload_to_update.append(workload_id)
-                                        else:
-                                            workload_to_import.append(workload_id)
-
-                        if workload_to_import:
-                            vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
-                            imported_workloads = self.import_workloads(context, workload_to_import, True)
-                            reassigned_workloads.extend(imported_workloads)
-
-                        if workload_to_update:
-                            jobscheduler_map = vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
-                            updated_workloads = self._update_workloads(context, workload_to_update,\
-                                                      jobscheduler_map, new_tenant_id, user_id)
-                            reassigned_workloads.extend(updated_workloads)
-
-                        return reassigned_workloads
-
-                    else:
+                    if keystone_client.client.user_exist_in_tenant(new_tenant_id, user_id) is False:
                         raise wlm_exceptions.UserNotFound(user_id=user_id)
-                else:
-                    raise wlm_exceptions.ProjectNotFound(project_id=new_tenant_id)
+                    if keystone_client.client.check_user_role(new_tenant_id, user_id) is False:
+                        raise wlm_exceptions.RoleNotFound(user_id=user_id,
+                                                          role_name = vault.CONF.trustee_role,
+                                                          project_id=new_tenant_id)
+
+                    # If old_teanat_id is provided then look for all workloads under that tenant
+                    if old_tenant_ids:
+                        if not migrate_cloud:
+                            for old_tenant_id in old_tenant_ids:
+                                if old_tenant_id not in tenant_list:
+                                    raise wlm_exceptions.ProjectNotFound(project_id=old_tenant_id)
+                            kwargs = {'project_list': old_tenant_ids}
+                            workloads_in_db = self.db.workload_get_all(context, **kwargs)
+                            for workload in workloads_in_db:
+                                workload_to_update.append(workload.id)
+                        else:
+                            # When migrate is True then there could be the scenerio where some
+                            # of the workloads exist in DB, in that case directly importing
+                            # them will result in error, so filtering those workloads here
+                            workload_ids = vault.get_workloads_for_tenant(context, old_tenant_ids)
+                            kwargs = {'workload_list': workload_ids}
+                            workloads = self.db.workload_get_all(context, **kwargs)
+                            if len(workloads) == 0:
+                                workload_to_import.extend(workload_ids)
+                            else:
+                                workloads_in_db = self.db.workload_get_all(context)
+                                workload_ids_in_db = [workload.id for workload in workloads_in_db]
+                                for workload_id in workload_ids:
+                                    if workload_id in workload_ids_in_db:
+                                        workload_to_update.append(workload_id)
+                                    else:
+                                        workload_to_import.append(workload_id)
+
+                    if workload_to_import:
+                        vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
+                        imported_workloads = self.import_workloads(context, workload_to_import, True)
+                        reassigned_workloads.extend(imported_workloads)
+
+                    if workload_to_update:
+                        jobscheduler_map = vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
+                        updated_workloads = self._update_workloads(context, workload_to_update,\
+                                                  jobscheduler_map, new_tenant_id, user_id)
+                        reassigned_workloads.extend(updated_workloads)
+
+                    return reassigned_workloads
+
         except Exception as ex:
             LOG.exception(ex)
             raise ex
