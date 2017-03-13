@@ -1817,13 +1817,13 @@ def configure_host():
 
         def cleanup_mount(path):
             try:
-                command = ['sudo', 'umount', path]
+                command = ['sudo', 'umount', '-f', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass
         
             try:
-                command = ['sudo', 'umount', path]
+                command = ['sudo', 'umount', '-f', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass           
@@ -2296,6 +2296,11 @@ def start_service():
 @authorize()
 def start_swift_service():
     try:
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop'];
+            subprocess.call(command, shell=False)
+        except:
+               pass
         try:
             shutil.rmtree(config_data['vault_data_directory'])
         except:
