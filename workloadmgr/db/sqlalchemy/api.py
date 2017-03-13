@@ -783,9 +783,11 @@ def workload_vm_get_by_id(context, vm_id, **kwargs):
     try:
         query = model_query(context, models.WorkloadVMs,
                             session=session, read_deleted="no")\
-                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter(models.WorkloadVMs.status != None)\
+                     .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                     .join(models.Workloads)\
+                     .filter(models.WorkloadVMs.status != None)\
+                     .filter(models.WorkloadVMs.vm_id==vm_id)\
+                     .filter(models.Workloads.project_id == context.project_id)\
 
         vm_found = query.all()
 
