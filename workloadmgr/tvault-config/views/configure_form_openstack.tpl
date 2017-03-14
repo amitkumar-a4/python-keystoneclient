@@ -283,9 +283,9 @@ function setSwiftRequired(checked, val) {
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide')">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
              %else:
-                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onchange="setSwiftRequired(true, 'decide')">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
              %end 
              </label>
              <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
@@ -403,7 +403,7 @@ function setSwiftRequired(checked, val) {
   </form>
 
 <script>
-//$(document).ready(function(){
+$(document).ready(function(){
 $('#ntp-enabled').click(function(){
 if($(this).is(':checked'))
 {
@@ -541,7 +541,7 @@ $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 if ($('input:radio[name=nodetype]:checked').val() == "additional") {
     $("#panel4")[0].hidden=true
 }
-//});
+});
 </script>
 </body>
 </html>
