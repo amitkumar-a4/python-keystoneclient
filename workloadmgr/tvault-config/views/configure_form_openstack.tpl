@@ -403,7 +403,7 @@ function setSwiftRequired(checked, val) {
   </form>
 
 <script>
-$(document).ready(function(){
+//$(document).ready(function(){
 $('#ntp-enabled').click(function(){
 if($(this).is(':checked'))
 {
@@ -541,7 +541,7 @@ $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 if ($('input:radio[name=nodetype]:checked').val() == "additional") {
     $("#panel4")[0].hidden=true
 }
-});
+//});
 </script>
 </body>
 </html>
