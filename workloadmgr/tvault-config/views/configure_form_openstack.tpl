@@ -278,14 +278,14 @@ function setSwiftRequired(checked, val) {
              %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
                 <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
              %else:
-                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')" required>NFS
              %end 
              </label>
              <label class="radio-inline">
              %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide')">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
              %else:
-                <input type="radio" name="backup_target_type" onclick="validate_swift_credentials(this)" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onchange="setSwiftRequired(true, 'decide')">SWIFT
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
              %end 
              </label>
              <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
