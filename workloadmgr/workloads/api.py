@@ -633,8 +633,10 @@ class API(base.Base):
         """
         workloadobj = self.workload_get(context, workload_id)
         AUDITLOG.log(context,'Workload \'' + workloadobj['display_name'] + '\' Modify Requested', None)
-   
+           
         purge_metadata = False
+        pause_workload = False
+        unpause_workload = False
         options = {}
 
         if 'name' in workload and workload['name']:
@@ -669,6 +671,16 @@ class API(base.Base):
            if not 'retention_policy_value' in workload['jobschedule']:
               workload['jobschedule']['retention_policy_value'] = workloadobj['jobschedule']['retention_policy_value']
 
+           if workload['jobschedule']['enabled'] == 'True' or workload['jobschedule']['enabled'] == '1':
+              workload['jobschedule']['enabled'] = True
+           elif workload['jobschedule']['enabled'] == 'False' or workload['jobschedule']['enabled'] == '0':
+                workload['jobschedule']['enabled'] = False
+
+           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
+              pause_workload = True
+           if workload['jobschedule']['enabled'] == True and \
+              workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
+              unpause_workload = True
            options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
 
         if  'instances' in workload and workload['instances']:
@@ -729,7 +741,15 @@ class API(base.Base):
                 compute_service.set_meta_item(context, vm.vm_id,
                                         'workload_name', workloadobj['display_name'] )
 
-        workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
+        try:
+            if pause_workload is True:
+               self.workload_pause(context, workload_id)
+            workload_obj = self.db.workload_update(context, workload_id, options, purge_metadata)
+            if unpause_workload is True:
+               self.workload_resume(context, workload_id)
+        except Exception as ex:
+               LOG.exception(ex)
+               raise wlm_exceptions.ErrorOccurred(reason = _("Error Modifying workload"))
 
         workload_utils.upload_workload_db_entry(context, workload_id)
             
