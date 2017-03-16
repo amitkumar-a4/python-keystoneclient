@@ -174,6 +174,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         self._wrapped_conn = None
         self.read_only = read_only
+        self.snaps_data = {}
 
 
     def has_min_version(self, lv_ver=None, hv_ver=None, hv_type=None):
@@ -622,7 +623,7 @@ class LibvirtDriver(driver.ComputeDriver):
                   now = timeutils.utcnow()
                   if (now - start_time) > datetime.timedelta(minutes=5) and CONF.vault_storage_type == 'swift-s':
                      try:
-                         async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata})
+                         async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata, 'fetched': True})
                      except:
                             async_task_status_swift = None
                      start_time = timeutils.utcnow()
@@ -638,6 +639,7 @@ class LibvirtDriver(driver.ComputeDriver):
                           if async_task_status_swift and 'disks_info' in async_task_status_swift and len(async_task_status_swift['disks_info']):
                              if len(async_task_status_swift['disks_info'][0]) > 2:
                                 operation_completed = True
+                                self.snaps_data[instance_id] = {'fetched': True, 'snaps': async_task_status_swift}
                                 return async_task_status_swift
               except nova_unauthorized as ex:
                      LOG.exception(ex)
@@ -674,20 +676,25 @@ class LibvirtDriver(driver.ComputeDriver):
                                            progress_tracker_metadata,
                                            instance['vm_id'],
                                            backup_endpoint)
-
-        if ret is not True and ret is not False:
-           snapshot_data = ret
-        else:
-             try:
-                 snapshot_data = compute_service.vast_async_task_status(cntx,
+        #if ret is not True and ret is not False:
+        #   snapshot_data = ret
+        if instance['vm_id'] in self.snaps_data and \
+           self.snaps_data[instance['vm_id']]['fetched'] is True:
+               
+           snapshot_data = self.snaps_data[instance['vm_id']]['snaps']
+           self.snaps_data.pop(instance['vm_id'])
+           return snapshot_data
+       
+        try:
+             snapshot_data = compute_service.vast_async_task_status(cntx,
                                                                  instance['vm_id'],
-                                                                 {'metadata': progress_tracker_metadata})
-             except nova_unauthorized as ex:
-                    LOG.exception(ex)
-                    cntx = nova._get_tenant_context(cntx)
-             except Exception as ex:
-                    LOG.exception(ex)
-                    raise ex
+                                                                 {'metadata': progress_tracker_metadata, 'fetched': True})
+        except nova_unauthorized as ex:
+                LOG.exception(ex)
+                cntx = nova._get_tenant_context(cntx)
+        except Exception as ex:
+                LOG.exception(ex)
+                raise ex
 
         return snapshot_data
 
