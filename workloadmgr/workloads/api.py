@@ -1331,7 +1331,7 @@ class API(base.Base):
 
         try:
             try:
-                self.db.setting_get(context, setting['name'])
+                self.db.setting_get(context, setting['name'], get_hidden=True)
                 self.db.setting_update(context, setting['name'], setting)
             except wlm_exceptions.SettingNotFound:
                 self.db.setting_create(context, setting)
@@ -1365,7 +1365,7 @@ class API(base.Base):
                    u'type': "job-scheduler-setting",}
         try:
             try:
-                self.db.setting_get(context, setting['name'])
+                self.db.setting_get(context, setting['name'], get_hidden=True)
                 self.db.setting_update(context, setting['name'], setting)
             except wlm_exceptions.SettingNotFound:
                 self.db.setting_create(context, setting)
