@@ -1776,7 +1776,7 @@ class API(base.Base):
                 error_msg = "Recovery manager instance cannot have ephemeral disk"
                 raise Exception(error_msg)
 
-            if not hasattr(server, 'image'):
+            if not hasattr(server, 'image') or server.image == '':
                error_msg = "Not able to acces VM image, Recovery manager should be booted from Image"
                raise Exception(error_msg) 
 
