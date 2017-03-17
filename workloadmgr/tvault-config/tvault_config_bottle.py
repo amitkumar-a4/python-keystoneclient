@@ -1717,7 +1717,7 @@ def configure_form_openstack():
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
     if 'storage_nfs_options' not in config_data:
-       config_data['storage_nfs_options'] = 'nolock'
+       config_data['storage_nfs_options'] = 'nolock,soft,timeo=180,intr'
     roles = ['_member_','Member','member']
     config_data['roles'] = roles
     if 'trustee_role' not in config_data:
@@ -2676,7 +2676,7 @@ def configure_openstack():
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
 
-        config_data['storage_nfs_options'] = 'nolock'
+        config_data['storage_nfs_options'] = 'nolock,soft,timeo=180,intr'
         config_data['storage_nfs_export'] = ''
         config_data['swift_auth_url'] = ''
         config_data['swift_username'] = ''
