@@ -1074,6 +1074,7 @@ class API(base.Base):
         storage_usage['count_dict']['full'] = full_size
         storage_usage['count_dict']['incremental'] = incr_size
         storage_usage['count_dict']['total'] = full_size + incr_size
+        total_usage = storage_usage['count_dict']['total']
         if float(total_usage) > 0:
            storage_usage['count_dict']['full_snaps_utilization'] = \
                round(((float(full_size) / float(total_usage)) * 100), 2)
