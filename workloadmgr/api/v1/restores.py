@@ -181,26 +181,34 @@ class RestoresController(wsgi.Controller):
     def _get_restores(self, req, snapshot_id, is_detail):
         """Returns a list of restores, transformed through view builder."""
         context = req.environ['workloadmgr.context']
-        if not snapshot_id:
-            snapshot_id = req.GET.get('snapshot_id', None)
-        if snapshot_id:
-            restores_all = self.workload_api.restore_get_all(context, snapshot_id)
-        else:
-            restores_all = self.workload_api.restore_get_all(context)
-   
-        limited_list = common.limited(restores_all, req)
-        
-        #TODO(giri): implement the search_opts to specify the filters
-        restores = []
-        for restore in limited_list:
-            if (restore['deleted'] == False) and (restore['restore_type'] != 'test'):
-                restores.append(restore)        
+        try:
+             if not snapshot_id:
+                 snapshot_id = req.GET.get('snapshot_id', None)
+             if snapshot_id:
 
-        if is_detail:
-            restores = self._view_builder.detail_list(req, restores)
-        else:
-            restores = self._view_builder.summary_list(req, restores)
-        return restores
-    
+                 #verify snapshot exists
+                 self.workload_api.snapshot_get(context, snapshot_id)
+
+                 restores_all = self.workload_api.restore_get_all(context, snapshot_id)
+             else:
+                 restores_all = self.workload_api.restore_get_all(context)
+
+             limited_list = common.limited(restores_all, req)
+
+             #TODO(giri): implement the search_opts to specify the filters
+             restores = []
+             for restore in limited_list:
+                 if (restore['deleted'] == False) and (restore['restore_type'] != 'test'):
+                     restores.append(restore)
+
+             if is_detail:
+                 restores = self._view_builder.detail_list(req, restores)
+             else:
+                 restores = self._view_builder.summary_list(req, restores)
+             return restores
+        except Exception as ex:
+             LOG.exception(ex)
+             raise ex
+
 def create_resource(ext_mgr):
     return wsgi.Resource(RestoresController(ext_mgr))
