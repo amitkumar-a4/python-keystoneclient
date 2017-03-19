@@ -911,10 +911,13 @@ class API(base.Base):
                     if len(node_record.ip_addresses) > 0 and len(node_record.ip_addresses[0]) > 0:
                         ipaddress = ip_addresses[0]
                     if any([ipaddress == ip , node_record.host == ip]) and socket.gethostname() != node_record.host:
+                       if utils.service_is_up(node_record):
+                          msg = _("Node is up, Please shutdown/delete node then only this can be removed with this command")
+                          raise wlm_exceptions.ErrorOccurred(reason=msg)              
                        self.db.service_delete(context, int(node_record.id))
-
                 except Exception as ex:
                     LOG.exception(ex)
+                    raise ex
         except Exception as ex:
             LOG.exception(ex)
             raise ex
