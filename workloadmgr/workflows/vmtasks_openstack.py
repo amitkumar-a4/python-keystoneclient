@@ -773,7 +773,6 @@ def restore_vm_flavor(cntx, db, instance, restore):
         name = str(uuid.uuid4())
         keystone_client = KeystoneClient(cntx)
         restored_compute_flavor = keystone_client.create_flavor(name, ram, vcpus, disk, ephemeral)
-        import pdb;pdb.set_trace()
         #restored_compute_flavor = compute_service.create_flavor(
         #    cntx, name, ram, vcpus, disk, ephemeral)
         restored_vm_resource_values = {'id': restored_compute_flavor.id,
