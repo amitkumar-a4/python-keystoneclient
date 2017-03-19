@@ -29,6 +29,8 @@ from workloadmgr.virt import driver
 from workloadmgr import utils
 from workloadmgr import exception
 
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
+
 
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
@@ -769,8 +771,11 @@ def restore_vm_flavor(cntx, db, instance, restore):
     if not restored_compute_flavor:
         # TODO(giri):create a new flavor
         name = str(uuid.uuid4())
-        restored_compute_flavor = compute_service.create_flavor(
-            cntx, name, ram, vcpus, disk, ephemeral)
+        keystone_client = KeystoneClient(cntx)
+        restored_compute_flavor = keystone_client.create_flavor(name, ram, vcpus, disk, ephemeral)
+        import pdb;pdb.set_trace()
+        #restored_compute_flavor = compute_service.create_flavor(
+        #    cntx, name, ram, vcpus, disk, ephemeral)
         restored_vm_resource_values = {'id': restored_compute_flavor.id,
                                        'vm_id': restore['id'],
                                        'restore_id': restore['id'],

@@ -15,6 +15,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from keystoneauth1.identity.generic import password as passMod
 from keystoneclient import client
+from novaclient import client as novaclient
 
 from workloadmgr.common import context
 from workloadmgr import exception
@@ -63,6 +64,7 @@ class KeystoneClientBase(object):
         self.context = context
         self._client = None
         self._client_instance = None
+        self._nova_client = None
         self._admin_auth = None
         self._domain_admin_auth = None
         self._domain_admin_client = None
@@ -93,10 +95,15 @@ class KeystoneClientBase(object):
         if not self._client_instance:
             # Create connection to API
             self._client_instance = self._common_client_init()
-
         return self._client_instance
 
-    def _common_client_init(self):
+    @property
+    def nova_client(self):
+        if not self._nova_client:
+           self._nova_client = self._common_client_init(nova_client=True)
+        return self._nova_client
+
+    def _common_client_init(self, nova_client=False):
         try:
             username=CONF.get('keystone_authtoken').username 
         except:
@@ -120,6 +127,7 @@ class KeystoneClientBase(object):
               domain_id=CONF.get('triliovault_user_domain_id')
            else:
                 domain_id=CONF.get('domain_name')
+
            auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
@@ -133,6 +141,8 @@ class KeystoneClientBase(object):
                                     project_name=tenant_name,
                                     )
         sess = session.Session(auth=auth, verify=False)
+        if nova_client is True:
+           return novaclient.Client("2", session=sess)
         return client.Client(session=sess, auth_url=auth_url, insecure=True)
 
     def _v3_client_init(self):
@@ -344,6 +354,9 @@ class KeystoneClient(object):
         users = self.client.client_instance.users.list()
         return users
 
+    def create_flavor(self, name, ram, vcpus, disk, ephemeral=0, swap=0):
+        nova = self.client.nova_client
+        return nova.flavors.create(name, ram, vcpus, disk, ephemeral=ephemeral, swap=swap)
+
 def list_opts():
     yield None, keystone_opts
-
