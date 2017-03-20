@@ -943,8 +943,10 @@ class WorkloadMgrsController(wsgi.Controller):
                 user_id = tenant_map['user_id']
                 if workload_ids and old_tenant_ids:
                     raise exc.HTTPBadRequest("Please provide only one parameter among workload_ids and old_tenant_ids")
-                if new_tenant_id == None or user_id == None:
-                    raise exc.HTTPBadRequest("Please provide required parameters: new_tenant_id and user_id.")
+                if new_tenant_id == None:
+                    raise exc.HTTPBadRequest("Please provide required parameters: new_tenant_id.")
+                if user_id == None:
+                    raise exc.HTTPBadRequest("Please provide required parameters: user_id.")
             try:
                 workloads = self.workload_api.workloads_reassign(context, tenant_maps)
                 return self._view_builder.detail_list(req, workloads)
