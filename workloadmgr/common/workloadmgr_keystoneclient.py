@@ -249,12 +249,14 @@ class KeystoneClientV3(KeystoneClientBase):
     def user_exist_in_tenant(self, project_id, user_id):
         try:
             user = self.client_instance.users.get(user_id)
-            projects = self.client_instance.projects.list(user=user)
-            project_list = [project.id for project in projects]
-            if project_id in project_list:
-                return True
+            project = self.client_instance.users.get(project_id)
+            output = self.client_instance.role_assignments(user=user, project=project)
+            if len(output) > 0:
+               return True
             else:
-                return False
+                 return False
+            #projects = self.client_instance.projects.list(user=user)
+            #project_list = [project.id for project in projects]
         except Exception:
             return False
 
