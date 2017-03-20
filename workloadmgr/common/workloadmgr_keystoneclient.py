@@ -249,7 +249,7 @@ class KeystoneClientV3(KeystoneClientBase):
     def user_exist_in_tenant(self, project_id, user_id):
         try:
             user = self.client_instance.users.get(user_id)
-            project = self.client_instance.users.get(project_id)
+            project = self.client_instance.projects.get(project_id)
             output = self.client_instance.role_assignments(user=user, project=project)
             if len(output) > 0:
                return True
