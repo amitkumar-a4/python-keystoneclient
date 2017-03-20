@@ -512,6 +512,36 @@ def _authenticate_with_keystone():
     except Exception as e:
            raise Exception( "KeystoneError:Unable to connect to keystone Admin URL "+e.message  )
 
+    if keystone.version == 'v3':
+       keystone_endpoints = keystone.endpoints.list(service=keystone.services.find(type='identity').id, region=config_data['region_name'])
+       for endpoint in keystone_endpoints:
+           if endpoint.interface == 'public':
+              keystone_public_url = endpoint.url
+           elif endpoint.interface == 'internal':
+                keystone_internal_url = endpoint.url
+           elif endpoint.interface == 'admin':
+                keystone_admin_url = endpoint.url
+    else:
+         endpoint = keystone.endpoints.find(service_id=keystone.services.find(type='identity').id,
+                                                   region=config_data['region_name'])
+         keystone_public_url = endpoint.publicurl
+         keystone_internal_url = endpoint.publicurl
+         keystone_admin_url = endpoint.adminurl
+
+    if keystone_admin_url != config_data['keystone_admin_url']:
+       raise Exception( "KeystoneError:Please enter correct keystone admin url ")
+
+    
+    if keystone_public_url == config_data['keystone_public_url']:
+       config_data['endpoint_type'] = 'publicURL'
+       v3_str = 'public'
+    elif keystone_internal_url == config_data['keystone_public_url']:
+         config_data['endpoint_type'] = 'internalURL'
+         v3_str = 'internal'
+
+    if 'endpoint_type' not in config_data:
+       raise Exception( "KeystoneError:Please enter correct keystone public/internal url ")
+  
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
@@ -555,10 +585,10 @@ def _authenticate_with_keystone():
     #image
     if keystone.version == 'v3':
         image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                   region=config_data['region_name'], interface='internal').url
+                                                   region=config_data['region_name'], interface=v3_str).url
     else:
-        image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                   region=config_data['region_name']).internalurl
+        image_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
+                                                   region=config_data['region_name']), v3_str+"url")
 
     parse_result = urlparse(image_public_url)
     config_data['glance_production_api_servers'] = image_public_url
@@ -570,10 +600,10 @@ def _authenticate_with_keystone():
     try:
         if keystone.version == 'v3':
            network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
-                                                        region=config_data['region_name'], interface='internal').url
+                                                        region=config_data['region_name'], interface=v3_str).url
         else:
-             network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
-                                                          region=config_data['region_name']).internalurl
+             network_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
+                                                          region=config_data['region_name']), v3_str+"url")
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
         config_data['neutron_production_url'] = "unavailable"
@@ -586,10 +616,10 @@ def _authenticate_with_keystone():
     #compute
     if keystone.version == 'v3':
         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
-                                                     region=config_data['region_name'], interface='internal').url
+                                                     region=config_data['region_name'], interface=v3_str).url
     else:
-        compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
-                                                     region=config_data['region_name']).internalurl
+        compute_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
+                                                     region=config_data['region_name']), v3_str+"url")
 
   
     def _get_service_endpoint(public_url):
@@ -608,10 +638,10 @@ def _authenticate_with_keystone():
         #volume
         if keystone.version == 'v3':
             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                       region=config_data['region_name'], interface='internal').url
+                                                       region=config_data['region_name'], interface=v3_str).url
         else:
-            volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                        region=config_data['region_name']).internalurl
+            volume_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
+                                                        region=config_data['region_name']), v3_str+"url")
 
         config_data['cinder_production_endpoint_template'] = \
             _get_service_endpoint(volume_public_url)
@@ -624,10 +654,10 @@ def _authenticate_with_keystone():
         #object
         if keystone.version == 'v3':
             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                       region=config_data['region_name'], interface='internal').url
+                                                       region=config_data['region_name'], interface=v3_str).url
         else:
-            object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                        region=config_data['region_name']).internalurl
+            object_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
+                                                        region=config_data['region_name']), v3_str+"url")
 
         config_data['vault_swift_url'] = object_public_url.replace(
                                              object_public_url.split("/")[-1], 'AUTH_') 
@@ -2218,6 +2248,10 @@ def configure_service():
                      starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_domain_id = ',
                      'project_domain_id = ' + config_data['service_tenant_domain_id'],
+                     starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'endpoint_type = ',
+                     'endpoint_type = ' + config_data['endpoint_type'],
                      starts_with=True)
 
         #configure api-paste
