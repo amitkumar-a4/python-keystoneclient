@@ -671,9 +671,11 @@ class API(base.Base):
            if not 'retention_policy_value' in workload['jobschedule']:
               workload['jobschedule']['retention_policy_value'] = workloadobj['jobschedule']['retention_policy_value']
 
-           if workload['jobschedule']['enabled'] == 'True' or workload['jobschedule']['enabled'] == '1':
+           if workload['jobschedule']['enabled'] == 'True' or workload['jobschedule']['enabled'] == '1'\
+                                                           or workload['jobschedule']['enabled'] == 'true':
               workload['jobschedule']['enabled'] = True
-           elif workload['jobschedule']['enabled'] == 'False' or workload['jobschedule']['enabled'] == '0':
+           elif workload['jobschedule']['enabled'] == 'False' or workload['jobschedule']['enabled'] == '0'\
+                                                              or workload['jobschedule']['enabled'] == 'false':
                 workload['jobschedule']['enabled'] = False
 
            if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
