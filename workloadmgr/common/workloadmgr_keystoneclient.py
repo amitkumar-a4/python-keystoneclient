@@ -250,7 +250,7 @@ class KeystoneClientV3(KeystoneClientBase):
         try:
             user = self.client_instance.users.get(user_id)
             project = self.client_instance.projects.get(project_id)
-            output = self.client_instance.role_assignments(user=user, project=project)
+            output = self.client_instance.role_assignments.list(user=user, project=project)
             if len(output) > 0:
                return True
             else:
