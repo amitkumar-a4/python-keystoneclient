@@ -930,10 +930,16 @@ def get_settings_backup_target():
         get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
         if backup_target.object_exists(settings_path):
-            return backup_target
+            return (backup_target, settings_path)
 
+    
     triliovault_backup_targets.values()[0].put_object(settings_path,
                                                       json.dumps([]))
+    settings_path = "settings_db"
+    for endpoint, backup_target in triliovault_backup_targets.iteritems():
+        if backup_target.object_exists(settings_path):
+            return (backup_target, settings_path)
+
     return triliovault_backup_targets.values()[0]
 
 

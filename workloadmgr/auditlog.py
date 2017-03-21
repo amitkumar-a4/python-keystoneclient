@@ -38,7 +38,7 @@ lock = threading.Lock()
 def getAuditLogger(name='auditlog', version='unknown', filepath=None):
  
     if filepath is None:
-        backup_target = vault.get_settings_backup_target()
+        (backup_target, path) = vault.get_settings_backup_target()
         filepath = os.path.join(backup_target.mount_path, CONF.cloud_unique_id)
         filepath = os.path.join(filepath, CONF.audit_log_file)
     

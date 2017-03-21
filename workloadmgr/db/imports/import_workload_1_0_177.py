@@ -143,8 +143,8 @@ def _adjust_values(cntx, new_version, values, upgrade):
 def import_settings(cntx, new_version, upgrade=True):
     try:
         db = WorkloadMgrDB().db
-        backup_target = vault.get_settings_backup_target()
-        settings = json.loads(backup_target.get_object('settings_db'))
+        (backup_target, path) = vault.get_settings_backup_target()
+        settings = json.loads(backup_target.get_object(path))
         for setting_values in settings:
             try:
                 if 'key' in setting_values:

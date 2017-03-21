@@ -32,9 +32,9 @@ db = WorkloadMgrDB().db
 def upload_settings_db_entry(cntx):
     #use context as none since we want settings of all users/tenants
     #TODO: implement settings persistance per user/tenant
-    backup_target = vault.get_settings_backup_target()
+    (backup_target, path) = vault.get_settings_backup_target()
 
-    settings_db = db.setting_get_all(None, read_deleted = 'no')
+    settings_db = db.setting_get_all(None, read_deleted = 'no', get_hidden=True)
     for setting in settings_db:
         if 'password' in setting.name.lower():
             setting.value = '******'

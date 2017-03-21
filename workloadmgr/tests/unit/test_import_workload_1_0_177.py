@@ -173,9 +173,9 @@ class BaseVaultTestCase(test.TestCase):
             return workload
  
         def create_setting(cntx):
-            backup_target = vault.get_settings_backup_target() 
+            (backup_target, path) = vault.get_settings_backup_target() 
             settings_db = [{"status": "available", "category": "job_scheduler", "user_id": cntx.user_id, "description": "Controls job scheduler status", "deleted": False, "value": "1", "name": "global-job-scheduler", "version": "2.3.1", "hidden": False, "project_id": cntx.project_id, "type": "job-scheduler-setting", "public": False, "metadata": []}]
-            backup_target.put_object('settings_db', json.dumps(settings_db))
+            backup_target.put_object(path, json.dumps(settings_db))
 
         def delete_workload(workload):
             for meta in workload['metadata']:
