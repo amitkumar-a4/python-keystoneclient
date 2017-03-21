@@ -283,12 +283,16 @@ class KeystoneClientV3(KeystoneClientBase):
 
     def get_project_list_for_import(self, context):
         try:
+            projects = []
             if (context.user == CONF.get('nova_admin_username')):
                 projects = self.client_instance.projects.list()
             else:
-                user = self.client_instance.users.get(context.user_id)
-                projects = self.client_instance.projects.list(user=user)
-
+                #user = self.client_instance.users.get(context.user_id)
+                #projects = self.client_instance.projects.list(user=user)
+                project_list = self.client_instance.projects.list()
+                for project in project_list:
+                    if self.user_exist_in_tenant(project.id, context.user_id):
+                       projects.append(project)
             return projects
         except Exception as ex:
             LOG.exception(ex)
