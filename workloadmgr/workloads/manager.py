@@ -633,6 +633,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                      'snapshot_id' : snapshot.id})
             except Exception as ex:
                 LOG.exception(ex) 
+   
+            try:
+                snapshot = self.db.snapshot_get(context, snapshot_id)
+                self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+            except Exception as ex:
+                LOG.exception(ex)
 
             try:
                 import gc
@@ -648,13 +654,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             except Exception as ex:
                 LOG.exception(ex)
                         
-            #unlock the workload
-            try:                
-                snapshot = self.db.snapshot_get(context, snapshot_id)            
-                self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
-            except Exception as ex:
-                LOG.exception(ex)
-                            
     @autolog.log_method(logger=Logger)
     def workload_reset(self, context, workload_id):
         """

@@ -462,6 +462,7 @@ def workload_type_delete(context, id):
 
 #### Workloads ################################################################
 """ workload functions """
+
 def _set_metadata_for_workload(context, workload_ref, metadata,
                                purge_metadata, session):
     """
@@ -850,6 +851,8 @@ def snapshot_mark_incomplete_as_error(context, host):
         if snapshot.status == 'restoring':
             values =  { 'status': 'available' }
             snapshot.save(session=session)
+
+        workload_update(context, snapshot.workload_id, {'status':'available'})
            
     snapshots =  model_query(context, models.Snapshots, session=session).\
                             all()
