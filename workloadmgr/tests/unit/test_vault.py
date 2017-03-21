@@ -116,7 +116,7 @@ class BaseVaultTestCase(test.TestCase):
                  with open(os.path.join(backup_target.mount_path,
                                         CONF.cloud_unique_id, "settings_db"), "w") as f:
                       f.write(json.dumps([]))
-                 settings_backup = workloadmgr.vault.vault.get_settings_backup_target()
+                 (settings_backup, path) = workloadmgr.vault.vault.get_settings_backup_target()
                  self.assertEqual(settings_backup.backup_endpoint, 'server3:nfsshare3')
 
     @patch('subprocess.check_call')
