@@ -45,14 +45,14 @@
   	<div style="margin-left:auto; margin-right:auto; padding:20px">	
     <div class="container">
         <!-- Example row of columns -->
-        <div class="row">
+        <!--div class="row">
             <div style="margin-left:auto; margin-right:auto; padding:20px; text-align:left;">
                 <a href="/tvault/tvaultlogs">Basic</a>
             </div>
-        </div>
+        </div-->
         <div class="row">
 	        <div style="margin-left:auto; margin-right:auto; padding:20px; text-align:left;">
-	                <a href="/tvault/tvaultlogs_all">Complete</a>
+	                <a href="/tvault/tvaultlogs_all">Download Complete Zip</a>
 	        </div>
 	    </div>        
     </div>
@@ -61,7 +61,7 @@
 		<div class="panel panel-default" id="panel1">
 		    <div class="panel-heading">
 		      <h4 class="panel-title">
-		        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">A La Carte</a>
+		        <a data-toggle="collapse" data-target="#collapseOne" href="#collapseOne">Download Service Logs</a>
 		      </h4>
 		    </div>
 	 	    <div id="collapseOne" class="panel-collapse collapse in">
@@ -72,10 +72,12 @@
 				<br><br>
 				<a href="tvault/workloadmgr/workloadmgr-workloads.log">workloadmgr-workloads.log</a>
 				<br><br>
-				<a href="tvault/nova/nova-api.log">inventory-service.log</a>
+                                <a href="upstart/tvault-config.log">tvault-config.log</a>
+                                <br><br>
+				<!--a href="tvault/nova/nova-api.log">inventory-service.log</a>
 				<br><br>
 				<a href="tvault/tvault-gui/web-1.log">tvault-gui-web-1.log</a>
-				<br><br>															    
+				<br><br-->															    
 		      </div>
 		    </div>
 		</div>
