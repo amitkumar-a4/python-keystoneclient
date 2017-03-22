@@ -784,6 +784,7 @@ class LibvirtDriver(driver.ComputeDriver):
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
         # Always attempt with a new token to avoid timeouts
 
+        cntx = nova._get_tenant_context(cntx)
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
