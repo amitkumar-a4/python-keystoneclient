@@ -525,7 +525,7 @@ def _authenticate_with_keystone():
          endpoint = keystone.endpoints.find(service_id=keystone.services.find(type='identity').id,
                                                    region=config_data['region_name'])
          keystone_public_url = endpoint.publicurl
-         keystone_internal_url = endpoint.publicurl
+         keystone_internal_url = endpoint.internalurl
          keystone_admin_url = endpoint.adminurl
 
     if keystone_admin_url != config_data['keystone_admin_url']:
@@ -1747,7 +1747,7 @@ def configure_form_openstack():
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
     if 'storage_nfs_options' not in config_data:
-       config_data['storage_nfs_options'] = 'nolock'
+       config_data['storage_nfs_options'] = 'nolock,soft,timeo=180,intr'
     roles = ['_member_','Member','member']
     config_data['roles'] = roles
     if 'trustee_role' not in config_data:
@@ -2725,7 +2725,7 @@ def configure_openstack():
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
 
-        config_data['storage_nfs_options'] = 'nolock'
+        config_data['storage_nfs_options'] = 'nolock,soft,timeo=180,intr'
         config_data['storage_nfs_export'] = ''
         config_data['swift_auth_url'] = ''
         config_data['swift_username'] = ''
