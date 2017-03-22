@@ -289,10 +289,13 @@ class KeystoneClientV3(KeystoneClientBase):
             else:
                 #user = self.client_instance.users.get(context.user_id)
                 #projects = self.client_instance.projects.list(user=user)
-                project_list = self.client_instance.projects.list()
-                for project in project_list:
-                    if self.user_exist_in_tenant(project.id, context.user_id):
-                       projects.append(project)
+                user = self.client_instance.users.get(context.user_id)
+                project_list = self.client_instance.role_assignments.list(user=user)
+                for proj in project_list:
+                    if 'project' in proj.__dict__['scope'].keys():
+                        project_id = proj.__dict__['scope']['project']['id']
+                        project = self.client_instance.projects.get(project_id)
+                        projects.append(project)
             return projects
         except Exception as ex:
             LOG.exception(ex)
