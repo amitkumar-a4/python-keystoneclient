@@ -525,7 +525,7 @@ def _authenticate_with_keystone():
          endpoint = keystone.endpoints.find(service_id=keystone.services.find(type='identity').id,
                                                    region=config_data['region_name'])
          keystone_public_url = endpoint.publicurl
-         keystone_internal_url = endpoint.publicurl
+         keystone_internal_url = endpoint.internalurl
          keystone_admin_url = endpoint.adminurl
 
     if keystone_admin_url != config_data['keystone_admin_url']:
