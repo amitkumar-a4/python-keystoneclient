@@ -1406,12 +1406,11 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def workload_ensure_global_job_scheduler(self, context):
-
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
         try:
-            global_scheduler = [sch for sch in self.db.setting_get_all(context) if sch['name'] == 'global-job-scheduler']
+            global_scheduler = [sch for sch in self.db.setting_get_all(context, get_hidden=True) if sch['name'] == 'global-job-scheduler']
             if len(global_scheduler) == 0 or global_scheduler[0]['value'] == '1':
                 self._scheduler.start()
             else:

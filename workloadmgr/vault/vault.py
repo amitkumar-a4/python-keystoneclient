@@ -925,23 +925,21 @@ def get_backup_target(backup_endpoint):
 
 
 def get_settings_backup_target():
-    settings_path = os.path.join(CONF.cloud_unique_id,"settings_db")
+    settings_path_new = os.path.join(CONF.cloud_unique_id,"settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
         get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
-        if backup_target.object_exists(settings_path):
-            return (backup_target, settings_path)
+        if backup_target.object_exists(settings_path_new):
+            return (backup_target, settings_path_new)
 
-    
-    triliovault_backup_targets.values()[0].put_object(settings_path,
+    triliovault_backup_targets.values()[0].put_object(settings_path_new,
                                                       json.dumps([]))
     settings_path = "settings_db"
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
         if backup_target.object_exists(settings_path):
             return (backup_target, settings_path)
 
-    return triliovault_backup_targets.values()[0]
-
+    return (triliovault_backup_targets.values()[0], settings_path_new)
 
 def get_capacities_utilizations(context):
     def fill_capacity_utilization(context, backup_target, stats):
