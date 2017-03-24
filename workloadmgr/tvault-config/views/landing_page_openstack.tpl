@@ -125,14 +125,21 @@
                     </div>
                 </ol>
 
+                <h2>TrilioVault Documentation</h2>
+                <ol>
+                    <div class="well">
+                        <b>Product Documentation Portal 
+                           <script>document.write("<a href=http://" + window.location.host + ":8181/doc/index.php/Main_Page>")</script>
+                           {{version}}</a></b><br>
+                         <br>
+                    </div>
+                </ol>
 
                 <h2>Support</h2>
                 <ol>
                     <div class="well"><a>support@triliodata.com</a>
                     </div>
                 </ol>
-           
-                
             </div>
         </div>
     </div>
