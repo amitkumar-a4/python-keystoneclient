@@ -892,7 +892,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             qs = parse_qs(req.environ['QUERY_STRING'])
-            migrate_cloud = bool(qs.get('migrate_cloud')[0])
+            migrate_cloud = qs.get('migrate_cloud')[0]
             try:
                 workloads = self.workload_api.get_orphaned_workloads_list(context, migrate_cloud)
                 return self._view_builder.detail_list(req, workloads)
