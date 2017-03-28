@@ -608,8 +608,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 status = 'cancelled'
                 for vm in self.db.workload_vms_get(context, workload.id):
                     self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
-            else:       
-                msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
+            else:
+                if hasattr(ex, 'code') and ex.code == 401:
+                   if hasattr(context, 'tenant') and context.tenant != '' and context.tenant != None:
+                      tenant = context.tenant
+                   else:
+                      tenant = context.project_id
+                   msg = _("Failed creating workload snapshot: Make sure trustee role "\
+                            +CONF.trustee_role +" assigned to tenant "+tenant)
+                else:
+                   msg = _("Failed creating workload snapshot: %(exception)s") %{'exception': ex}
                 LOG.error(msg)
                 status = 'error'
             
