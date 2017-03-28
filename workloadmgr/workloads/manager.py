@@ -610,10 +610,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     self.db.snapshot_vm_update(context, vm.vm_id, snapshot_id, {'status': status,})
             else:
                 if hasattr(ex, 'code') and ex.code == 401:
-                   if context.tenant == '' or context.tenant == None:
-                      tenant = context.project_id
-                   else:
+                   if hasattr(context, 'tenant') and context.tenant != '' and context.tenant != None:
                       tenant = context.tenant
+                   else:
+                      tenant = context.project_id
                    msg = _("Failed creating workload snapshot: Make sure trustee role "\
                             +CONF.trustee_role +" assigned to tenant "+tenant)
                 else:
