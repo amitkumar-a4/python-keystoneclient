@@ -674,7 +674,9 @@ class RestoreInstanceFromVolume(task.Task):
     
         restored_security_group_ids = []
         for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
+            if db.snapshot_vm_resource_get_by_resource_name(self.cntx, instance_options['id'], snapshot_obj.id, \
+                          restored_security_group_id) is not None:
+               restored_security_group_ids.append(restored_security_group_id)
                      
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
 
@@ -770,7 +772,9 @@ class RestoreInstanceFromImage(task.Task):
     
         restored_security_group_ids = []
         for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
+            if db.snapshot_vm_resource_get_by_resource_name(self.cntx, instance_options['id'], snapshot_obj.id, \
+                          restored_security_group_id) is not None:
+               restored_security_group_ids.append(restored_security_group_id)
 
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
         self.restored_instance = restored_instance = \
