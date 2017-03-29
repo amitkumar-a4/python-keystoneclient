@@ -768,7 +768,7 @@ class RestoreInstanceFromImage(task.Task):
                                              'status': 'restoring'
                                             })  
 
-        availability_zone = get_availebility_zone(instance_options)
+        availability_zone = get_availability_zone(instance_options)
     
         restored_security_group_ids = []
         for pit_id, restored_security_group_id in restored_security_groups.iteritems():
