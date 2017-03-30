@@ -1460,9 +1460,9 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         _restorevmflow.add(childflow)
 
     # create nova from image id
-    childflow = AdjustInstanceSecurityGroups(cntx, instance, snapshot_obj, restore['id'])
-    if childflow:
-        _restorevmflow.add(childflow)
+    #childflow = AdjustInstanceSecurityGroups(cntx, instance, snapshot_obj, restore['id'])
+    #if childflow:
+    #    _restorevmflow.add(childflow)
 
     # power off the restored instance until all volumes are attached
     childflow = PowerOffInstanceFlow(cntx)
