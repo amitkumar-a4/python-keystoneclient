@@ -75,7 +75,7 @@ import_map = [
      'getter_method' : 'vm_network_resource_snaps_get',
      'getter_method_params' : ['vm_network_resource_snap_id']
      },
-    {'file': 'security_db',
+    {'file': 'security_group_db',
      'model_class': 'VMSecurityGroupRuleSnaps',
      'metadata_model_class': 'VMSecurityGroupRuleSnapMetadata',
      'getter_method' : 'vm_security_group_rule_snaps_get',
@@ -240,7 +240,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         'resources_db': [],
         'network_db': [],
         'disk_db': [],
-        'security_db': []
+        'security_group_db': []
     }
 
     try:
@@ -265,8 +265,8 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                         db_files_map['network_db'].append(os.path.join(path, name))
                     elif name.endswith("disk_db"):
                         db_files_map['disk_db'].append(os.path.join(path, name))
-                    elif name.endswith("security_db"):
-                        db_files_map['security_db'].append(os.path.join(path, name))
+                    elif name.endswith("security_group_db"):
+                        db_files_map['security_group_db'].append(os.path.join(path, name))
 
         # Creating a map for each workload with workload_backup_media_size.
         for snap in db_files_map['snapshot_db']:
