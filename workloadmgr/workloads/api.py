@@ -2491,11 +2491,11 @@ class API(base.Base):
             keystone_client = KeystoneClient(context)
 
             reassigned_workloads = []
-            workload_to_update = []
-            workload_to_import = []
             projects = keystone_client.client.get_project_list_for_import(context)
             tenant_list = [project.id for project in projects]
             for tenant_map in tenant_maps:
+                workload_to_update = []
+                workload_to_import = []
                 workload_ids = tenant_map['workload_ids']
                 old_tenant_ids = tenant_map['old_tenant_ids']
                 new_tenant_id = tenant_map['new_tenant_id']
@@ -2578,7 +2578,7 @@ class API(base.Base):
                                                   jobscheduler_map, new_tenant_id, user_id)
                         reassigned_workloads.extend(updated_workloads)
 
-                    return reassigned_workloads
+            return reassigned_workloads
 
         except Exception as ex:
             LOG.exception(ex)
