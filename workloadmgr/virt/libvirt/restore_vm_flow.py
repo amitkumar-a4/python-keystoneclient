@@ -129,11 +129,14 @@ class PrepareBackupImage(task.Task):
         except:
                pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
-        
+
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
-            #upload the bottom of the chain to glance
-            restore_file_path = image_info.backing_file
+            # upload the bottom of the chain to glance
+            while image_info.backing_file:
+                image_info = qemuimages.qemu_img_info(image_info.backing_file)
+
+            restore_file_path = image_info.image
             image_overlay_file_path = resource_snap_path
             image_virtual_size = image_info.virtual_size
         else:
