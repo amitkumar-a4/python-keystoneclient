@@ -1085,12 +1085,16 @@ def get_workloads_for_tenant(context, tenant_ids):
         try:
             backup_target = get_backup_target(backup_endpoint)
             for workload_url in backup_target.get_workloads(context):
-                workload_values = json.loads(backup_target.get_object(\
-                        os.path.join(workload_url, 'workload_db')))
-                project_id = workload_values.get('project_id')
-                workload_id = workload_values.get('id')
-                if project_id in tenant_ids:
-                    workload_ids.append(workload_id)
+                path = os.path.join(workload_url, 'workload_db')
+                if os.path.exists(path):
+                   workload_values = json.loads(backup_target.get_object(path))
+                   project_id = workload_values.get('project_id')
+                   workload_id = workload_values.get('id')
+                   if project_id in tenant_ids:
+                      workload_ids.append(workload_id)
+                else:
+                   missed_workload = workload_url.split('workload_')[1]
+                   LOG.warning("workload_db file not found for workload : %s" % missed_workload)
         except Exception as ex:
             LOG.exception(ex)
     return  workload_ids
