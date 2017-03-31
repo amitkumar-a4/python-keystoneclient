@@ -2512,8 +2512,8 @@ class API(base.Base):
                         workload_to_update.extend(workload_ids)
 
                     if len(workloads) != len(workload_ids) and migrate_cloud is not True:
-                        raise Exception("Workload id's doesn't belong to \
-                               current cloud, to reassign them set migrate_cloud option to True")
+                        raise Exception("Workload id's doesn't belong to current cloud. "\
+                              "To reassign them from another cloud ,set migrate_cloud option to True.")
 
                     # In case workload id's are provided and some are in DB and
                     # some need to import then filter those workloads here.
