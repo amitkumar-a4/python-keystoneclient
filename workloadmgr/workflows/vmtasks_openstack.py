@@ -391,6 +391,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
 
     def _snapshot_neutron_security_groups():
         security_group_ids = []
+        vm_map = {}
         for instance in instances:
             server_security_group_ids = network_service.server_security_groups(
                 cntx, instance['vm_id'])
@@ -407,8 +408,10 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     'resource_pit_id': security_group['id'],
                     'metadata': {'name': security_group['name'],
                                  'security_group_type': 'neutron',
-                                 'description': security_group['description']},
+                                 'description': security_group['description'],
+                                 'vm_id': instance['vm_id']},
                     'status': 'available'}
+                vm_map[security_group_id] = instance['vm_id']
                 db.snapshot_vm_resource_create(
                     cntx, snapshot_vm_resource_values)
 
@@ -426,8 +429,10 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                 'resource_pit_id': security_group['id'],
                 'metadata': {'name': security_group['name'],
                              'security_group_type': 'neutron',
-                             'description': security_group['description']},
+                             'description': security_group['description'],
+                             'vm_id': vm_map[security_group_id]},
                 'status': 'available'}
+            
             vm_security_group_snap = db.snapshot_vm_resource_create(
                 cntx,  vm_security_group_snap_values)
 
@@ -452,6 +457,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
     def _snapshot_nova_security_groups():
         security_group_ids = []
         security_groups = compute_service.get_security_groups(cntx)
+        vm_map = {}
         for instance in instances:
             server = compute_service.get_server_by_id(cntx, instance['vm_id'])
 
@@ -468,8 +474,10 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                             'resource_pit_id': group.id,
                             'metadata': {'name': group.name,
                                          'security_group_type': 'nova',
-                                         'description': group.description},
+                                         'description': group.description,
+                                         'vm_id': instance['vm_id']},
                             'status': 'available'}
+                        vm_map[secgrp['name']] = instance['vm_id']
                         db.snapshot_vm_resource_create(
                             cntx,  snapshot_vm_resource_values)
                         break
@@ -489,7 +497,8 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                         'metadata': {
                              'name': group.name,
                              'security_group_type': 'nova',
-                             'description': group.description},
+                             'description': group.description,
+                             'vm_id': vm_map[security_group_id]},
                         'status': 'available'}
                     vm_security_group_snap = db.snapshot_vm_resource_create(
                         cntx,  vm_security_group_snap_values)
@@ -1324,7 +1333,6 @@ def restore_vm_security_groups(cntx, db, restore):
         cntx, restore['snapshot_id'], restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'security_group':
-
             security_group_type = db.get_metadata_value(
                 snapshot_vm_resource.metadata,
                 'security_group_type')
@@ -1339,17 +1347,21 @@ def restore_vm_security_groups(cntx, db, restore):
                 snapshot_vm_resource.metadata, 'name')
             description = 'snapshot - ' + db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'description')
-            security_group = network_service.security_group_create(
-                cntx, name, description).get('security_group')
-            restored_security_groups[snapshot_vm_resource.resource_pit_id] = \
+            security_group_obj = network_service.security_group_create(
+                cntx, name, description)
+            security_group = security_group_obj.get('security_group')
+            restored_security_groups[security_group['id']] = \
                 security_group['id']
             restored_vm_resource_values = \
-                {'id': security_group['id'],
-                 'vm_id': restore['id'],
+                {'id': str(uuid.uuid4()),
+                 'vm_id': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id'),
                  'restore_id': restore['id'],
                  'resource_type': 'security_group',
-                 'resource_name':  security_group['name'],
-                 'metadata': {},
+                 'resource_name':  security_group['id'],
+                 'resource_pit_id': security_group['id'],
+                 'metadata': {'name': security_group['name'],
+                              'security_group_type': 'neutron',
+                              'description': security_group['description']},
                  'status': 'available'}
             db.restored_vm_resource_create(
                 cntx, restored_vm_resource_values)
@@ -1372,7 +1384,7 @@ def restore_vm_security_groups(cntx, db, restore):
 
                 network_service.security_group_rule_create(
                     cntx,
-                    restored_security_groups[snapshot_vm_resource.resource_pit_id],
+                    restored_security_groups[security_group['id']],
                     vm_security_group_rule_values['direction'],
                     vm_security_group_rule_values['ethertype'],
                     vm_security_group_rule_values['protocol'],
