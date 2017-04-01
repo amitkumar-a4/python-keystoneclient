@@ -1348,8 +1348,11 @@ def restore_vm_security_groups(cntx, db, restore):
                  'vm_id': restore['id'],
                  'restore_id': restore['id'],
                  'resource_type': 'security_group',
-                 'resource_name':  security_group['name'],
-                 'metadata': {},
+                 'resource_name':  security_group['id'],
+                 'resource_pit_id': security_group['id'],
+                 'metadata': {'name': security_group['name'],
+                              'security_group_type': 'neutron',
+                              'description': security_group['description']},
                  'status': 'available'}
             db.restored_vm_resource_create(
                 cntx, restored_vm_resource_values)
