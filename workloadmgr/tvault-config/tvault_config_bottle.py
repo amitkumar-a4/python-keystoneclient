@@ -821,7 +821,6 @@ def _register_workloadtypes():
     # Python code here to register workloadtypes
     if config_data['nodetype'] == 'controller':
         time.sleep(5)
-
         wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
@@ -1687,16 +1686,16 @@ def troubleshooting_vmware():
     return values
 
 @bottle.route('/logs')
+@bottle.view('logs_page_vmware')
 @authorize()
 def logs():
-    bottle.redirect("/logs_vmware")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
 
-@bottle.route('/logs_vmware')
+@bottle.route('/logs_openstack')
 @bottle.view('logs_page_vmware')
 @authorize()
-def logs_vmware():
+def logs_openstack():
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
             
@@ -1704,7 +1703,6 @@ def logs_vmware():
 @authorize()
 def configure_form():
     bottle.redirect(bottle.request.url + '_' + TVAULT_CONFIGURATION_TYPE)
-
 
 @bottle.route('/configure_vmware')
 @bottle.view('configure_form_vmware')
