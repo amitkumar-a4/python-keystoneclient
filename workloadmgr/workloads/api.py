@@ -248,6 +248,10 @@ class API(base.Base):
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
 
+    @autolog.log_method(logger=Logger)
+    def search(self, context):
+        import pdb;pdb.set_trace()
+        return
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
