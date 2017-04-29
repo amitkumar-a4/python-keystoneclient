@@ -1376,7 +1376,9 @@ def restore_vm_security_groups(cntx, db, restore):
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(
                     str(vm_security_group_rule.pickle))
-                if vm_security_group_rule_values['remote_group_id']:
+                if vm_security_group_rule_values['remote_group_id'] and \
+                    vm_security_group_rule_values['remote_group_id'] in \
+                    restored_security_groups:
                     remote_group_id = restored_security_groups[
                         vm_security_group_rule_values['remote_group_id']]
                 else:
