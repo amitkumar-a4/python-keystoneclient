@@ -1490,11 +1490,11 @@ def service_action(service_display_name, action):
 @bottle.route('/services')
 @authorize()
 def services():
-    bottle.redirect("/services_vmware")
+    bottle.redirect("/services_openstack")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])                         
 
-@bottle.route('/services_vmware')
+@bottle.route('/services_openstack')
 @bottle.view('services_page_vmware')
 @authorize()
 def services_vmware():
@@ -1502,8 +1502,7 @@ def services_vmware():
     services = {'api_service' : 'wlm-api',
                 'scheduler_service' : 'wlm-scheduler',
                 'workloads_service' : 'wlm-workloads',
-                'inventory_service' : 'nova-api',
-                'tvault_gui_service' :'tvault-gui',} 
+                } 
     
     config_status = 'not_configured'
     nodetype = 'not_configured'
