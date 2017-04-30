@@ -24,7 +24,7 @@ from workloadmgr.vault import vault
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '2.3.59'
+DB_VERSION = '2.3.60'
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
