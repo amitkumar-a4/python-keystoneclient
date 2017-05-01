@@ -249,12 +249,19 @@ class API(base.Base):
             self.workload_ensure_global_job_scheduler(context)
 
     @autolog.log_method(logger=Logger)
-    def search(self, context):
-        options = {'vm_id': '1234',
+    def search(self, context, data):
+        options = {'vm_id': data['vm_id'],
                    'project_id': context.project_id,
                    'user_id': context.user_id,
+                   'filepath': data['filepath'],
                    'status': 'searching',}
         search = self.db.file_search_create(context, options)
+        self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
+        return search
+
+    @autolog.log_method(logger=Logger)
+    def search_show(self, context, search_id):
+        search = self.db.file_search_get(context, search_id)
         return search
     
     @autolog.log_method(logger=Logger)    

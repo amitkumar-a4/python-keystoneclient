@@ -437,6 +437,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       {'status': 'error',
                                        'error_msg': str(err)})
 
+    @autolog.log_method(logger=Logger)
+    def file_search(self, context, search_id):
+        """
+        File search
+        """
+        try:
+            self.db.file_search_update(context,search_id,{'host': self.host,
+                                       'status': 'searching'})
+        except Exception as ex:
+               self.db.file_search_update(context,search_id,{'status': 'error'})
+                
+
+
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):

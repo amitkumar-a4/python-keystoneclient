@@ -34,10 +34,10 @@ class FileSearchController(wsgi.Controller):
         self.ext_mgr = ext_mgr
         super(FileSearchController, self).__init__()
 
-    def index(self, req, id):
+    def show(self, req, search_id):
         try:
             context = req.environ['workloadmgr.context']
-            search = self.workload_api.search_show(context, search_id=id)
+            search = self.workload_api.search_show(context, search_id=search_id)
             return self._view_builder.detail(req, search)
         except exception.FileSearchNotFound as error:
             LOG.exception(error)
@@ -49,7 +49,7 @@ class FileSearchController(wsgi.Controller):
     def search(self, req, body):
         try:
             context = req.environ['workloadmgr.context']
-            search = self.workload_api.search(context)
+            search = self.workload_api.search(context, body['file_search'])
             return self._view_builder.detail(req, search)
         except Exception as error:
             LOG.exception(error)

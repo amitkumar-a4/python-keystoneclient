@@ -339,7 +339,7 @@ def _file_search_get(context, search_id, session):
         context,
         models.FileSearch,
         session=session).\
-        filter_by(id=id).\
+        filter_by(id=search_id).\
         first()
     if not result:
         raise exception.FileSearchNotFound(search_id=search_id)

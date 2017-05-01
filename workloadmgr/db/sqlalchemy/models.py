@@ -165,9 +165,12 @@ class FileSearch(BASE, WorkloadsBase):
     vm_id = Column(String(100), nullable=False)
     project_id = Column(String(255), nullable=False)
     user_id = Column(String(255), nullable=False)
-
+    filepath = Column(String(255), nullable=False)
+    snapshot_ids = Column(Text)
     json_resp = Column(Text)
+    host = Column(String(100))
     status = Column(String(10))
+    scheduled_at = Column(DateTime) 
     
 class WorkloadTypes(BASE, WorkloadsBase):
     """Types of workloads"""

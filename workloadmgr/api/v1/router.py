@@ -47,7 +47,7 @@ class APIRouter(workloadmgr.api.APIRouter):
         mapper.connect("file_search",
                        "/{project_id}/search/{search_id}",
                        controller=self.resources['file_search'],
-                       action='index',
+                       action='show',
                        conditions={"method": ['GET']})
 
         #post file search
