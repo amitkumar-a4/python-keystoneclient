@@ -254,7 +254,7 @@ class API(base.Base):
                    'project_id': context.project_id,
                    'user_id': context.user_id,
                    'filepath': data['filepath'],
-                   'status': 'searching',}
+                   'status': 'executing',}
         search = self.db.file_search_create(context, options)
         self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
         return search
