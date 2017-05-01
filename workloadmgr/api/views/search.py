@@ -19,11 +19,11 @@ class ViewBuilder(common.ViewBuilder):
 
     def detail(self, request, search):
         return {
-            'search': {
+            'file_search': {
                 'created_at': search.get('created_at'),
                 'updated_at': search.get('updated_at'),
                 'id': search.get('id'),
-                'finished_at': search.get('finished_at'),
+                'deleted_at': search.get('deleted_at'),
                 'status': search.get('status'),
             }
         }

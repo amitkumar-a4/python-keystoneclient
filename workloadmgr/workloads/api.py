@@ -250,8 +250,12 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def search(self, context):
-        import pdb;pdb.set_trace()
-        return
+        options = {'vm_id': '1234',
+                   'project_id': context.project_id,
+                   'user_id': context.user_id,
+                   'status': 'searching',}
+        search = self.db.file_search_create(context, options)
+        return search
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):

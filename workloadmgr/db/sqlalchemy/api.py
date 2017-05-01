@@ -319,6 +319,49 @@ def service_update(context, service_id, values):
         service_ref.save(session=session)
 
 
+######### File search ###############
+
+@require_admin_context
+def file_search_delete(context, search_id):
+    session = get_session()
+    with session.begin():
+        ref = _file_search_get(context, search_id, session=session)
+        ref.delete(session=session)
+
+@require_admin_context
+def file_search_get(context, search_id):
+    session = get_session()
+    return _file_search_get(context, search_id, session)
+
+@require_admin_context
+def _file_search_get(context, search_id, session):
+    result = model_query(
+        context,
+        models.FileSearch,
+        session=session).\
+        filter_by(id=id).\
+        first()
+    if not result:
+        raise exception.FileSearchNotFound(search_id=search_id)
+
+    return result
+
+@require_admin_context
+def file_search_create(context, values):
+    session = get_session()
+    ref = models.FileSearch()
+    ref.update(values)
+    ref.save()
+    return ref
+
+@require_admin_context
+def file_search_update(context, search_id, values):
+    session = get_session()
+    with session.begin():
+        ref = _file_search_get(context, search_id, session=session)
+        ref.update(values)
+        ref.save(session=session)
+
 #### Work load Types #################
 """ workload_type functions """
 @require_context

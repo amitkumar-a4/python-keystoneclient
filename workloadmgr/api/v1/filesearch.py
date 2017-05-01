@@ -50,7 +50,7 @@ class FileSearchController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             search = self.workload_api.search(context)
-            return search
+            return self._view_builder.detail(req, search)
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))

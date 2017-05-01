@@ -153,6 +153,21 @@ class VaultStorageMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
         
+class FileSearch(BASE, WorkloadsBase):
+    """Types of workloads"""
+    __tablename__ = 'file_search'
+    id = Column(Integer, primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    vm_id = Column(String(100), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    user_id = Column(String(255), nullable=False)
+
+    json_resp = Column(Text)
+    status = Column(String(10))
     
 class WorkloadTypes(BASE, WorkloadsBase):
     """Types of workloads"""
