@@ -1350,7 +1350,7 @@ def restore_vm_security_groups(cntx, db, restore):
             security_group_obj = network_service.security_group_create(
                 cntx, name, description)
             security_group = security_group_obj.get('security_group')
-            restored_security_groups[security_group['id']] = \
+            restored_security_groups[snapshot_vm_resource.resource_pit_id] = \
                 security_group['id']
             restored_vm_resource_values = \
                 {'id': str(uuid.uuid4()),
@@ -1371,14 +1371,21 @@ def restore_vm_security_groups(cntx, db, restore):
                 network_service.security_group_rule_delete(
                     cntx, security_group_rule['id'])
 
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type == 'security_group':
+            security_group_type = db.get_metadata_value(
+                snapshot_vm_resource.metadata,
+                'security_group_type')
+            if security_group_type != 'neutron':
+                continue
+            security_group_id = restored_security_groups[snapshot_vm_resource.resource_pit_id]
+            security_group = network_service.security_group_get(cntx, security_group_id)
             vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
                 cntx, snapshot_vm_resource.id)
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(
                     str(vm_security_group_rule.pickle))
-                if vm_security_group_rule_values.get('remote_group_id', None) and \
-                    vm_security_group_rule_values['remote_group_id'] in \
-                    restored_security_groups:
+                if vm_security_group_rule_values.get('remote_group_id', None):
                     remote_group_id = restored_security_groups[
                         vm_security_group_rule_values['remote_group_id']]
                 else:
@@ -1386,7 +1393,7 @@ def restore_vm_security_groups(cntx, db, restore):
 
                 network_service.security_group_rule_create(
                     cntx,
-                    restored_security_groups[security_group['id']],
+                    security_group_id,
                     vm_security_group_rule_values['direction'],
                     vm_security_group_rule_values['ethertype'],
                     vm_security_group_rule_values['protocol'],
