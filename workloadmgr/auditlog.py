@@ -66,8 +66,8 @@ class AuditLog(object):
                 object = {}
 
             auditlogmsg = timeutils.utcnow().strftime("%d-%m-%Y %H:%M:%S.%f")
-            user = getattr(context, "user", context.user_id)
-            tenant = getattr(context, "tenant", context.project_id)
+            user = getattr(context, "user", context.user_id) or context.user_id
+            tenant = getattr(context, "tenant", context.project_id) or context.project_id
             auditlogmsg = auditlogmsg + ',' + user + ',' + context.user_id
             display_name = object.get('display_name', 'NA')
             if not display_name:

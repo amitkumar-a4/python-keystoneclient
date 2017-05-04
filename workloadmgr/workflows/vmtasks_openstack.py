@@ -399,21 +399,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
             for security_group_id in server_security_group_ids:
                 security_group = network_service.security_group_get(
                     cntx, security_group_id)
-                snapshot_vm_resource_values = {
-                    'id': str(uuid.uuid4()),
-                    'vm_id': instance['vm_id'],
-                    'snapshot_id': snapshot['id'],
-                    'resource_type': 'security_group',
-                    'resource_name':  security_group['id'],
-                    'resource_pit_id': security_group['id'],
-                    'metadata': {'name': security_group['name'],
-                                 'security_group_type': 'neutron',
-                                 'description': security_group['description'],
-                                 'vm_id': instance['vm_id']},
-                    'status': 'available'}
                 vm_map[security_group_id] = instance['vm_id']
-                db.snapshot_vm_resource_create(
-                    cntx, snapshot_vm_resource_values)
 
         unique_security_group_ids = list(set(security_group_ids))
         for security_group_id in unique_security_group_ids:
@@ -422,7 +408,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
             security_group_rules = security_group['security_group_rules']
             vm_security_group_snap_values = {
                 'id': str(uuid.uuid4()),
-                'vm_id': snapshot['id'],
+                'vm_id': vm_map[security_group_id],
                 'snapshot_id': snapshot['id'],
                 'resource_type': 'security_group',
                 'resource_name':  security_group['id'],
@@ -452,7 +438,9 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     if (security_group_rule['remote_group_id'] in
                        unique_security_group_ids) is False:
                         unique_security_group_ids.append(
-                            vm_security_group_snap['remote_group_id'])
+                            security_group_rule['remote_group_id'])
+                        vm_map[security_group_rule['remote_group_id']] = \
+                            vm_map[security_group_id]
 
     def _snapshot_nova_security_groups():
         security_group_ids = []
@@ -1329,8 +1317,8 @@ def restore_vm_security_groups(cntx, db, restore):
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(
-        cntx, restore['snapshot_id'], restore['snapshot_id'])
+    snapshot_vm_resources = db.snapshot_resources_get(
+        cntx, restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'security_group':
             security_group_type = db.get_metadata_value(
