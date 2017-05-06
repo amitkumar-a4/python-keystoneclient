@@ -442,6 +442,7 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                         vm_map[security_group_rule['remote_group_id']] = \
                             vm_map[security_group_id]
 
+
     def _snapshot_nova_security_groups():
         security_group_ids = []
         security_groups = compute_service.get_security_groups(cntx)
@@ -1293,6 +1294,11 @@ def restore_vm_security_groups(cntx, db, restore):
 
         vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
             cntx, snapshot_vm_resource.id)
+
+        # looks like some bug in the security_group_list where individual
+        # sec grp rules are not correct. Use the get function to get the
+        # sec grp definition correctly
+        existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
            len(existinggroup['security_group_rules']):
             return False
@@ -1364,8 +1370,13 @@ def restore_vm_security_groups(cntx, db, restore):
             security_group_type = db.get_metadata_value(
                 snapshot_vm_resource.metadata,
                 'security_group_type')
+
             if security_group_type != 'neutron':
                 continue
+
+            if  security_group_exists(snapshot_vm_resource):
+                continue
+
             security_group_id = restored_security_groups[snapshot_vm_resource.resource_pit_id]
             security_group = network_service.security_group_get(cntx, security_group_id)
             vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
