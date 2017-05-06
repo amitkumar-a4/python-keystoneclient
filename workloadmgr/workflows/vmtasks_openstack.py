@@ -1365,41 +1365,34 @@ def restore_vm_security_groups(cntx, db, restore):
                 network_service.security_group_rule_delete(
                     cntx, security_group_rule['id'])
 
-    for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type == 'security_group':
-            security_group_type = db.get_metadata_value(
-                snapshot_vm_resource.metadata,
-                'security_group_type')
+    for pit_id, security_group_id in restored_security_groups.iteritems():
+        if  pit_id == security_group_id:
+            continue
 
-            if security_group_type != 'neutron':
-                continue
+        security_group_id = restored_security_groups[snapshot_vm_resource.resource_pit_id]
+        security_group = network_service.security_group_get(cntx, security_group_id)
+        vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
+            cntx, snapshot_vm_resource.id)
+        for vm_security_group_rule in vm_security_group_rule_snaps:
+            vm_security_group_rule_values = pickle.loads(
+                str(vm_security_group_rule.pickle))
+            if vm_security_group_rule_values.get('remote_group_id', None):
+                remote_group_id = restored_security_groups[
+                    vm_security_group_rule_values['remote_group_id']]
+            else:
+                remote_group_id = None
 
-            if  security_group_exists(snapshot_vm_resource):
-                continue
+            network_service.security_group_rule_create(
+                cntx,
+                security_group_id,
+                vm_security_group_rule_values['direction'],
+                vm_security_group_rule_values['ethertype'],
+                vm_security_group_rule_values['protocol'],
+                vm_security_group_rule_values['port_range_min'],
+                vm_security_group_rule_values['port_range_max'],
+                vm_security_group_rule_values['remote_ip_prefix'],
+                remote_group_id)
 
-            security_group_id = restored_security_groups[snapshot_vm_resource.resource_pit_id]
-            security_group = network_service.security_group_get(cntx, security_group_id)
-            vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-                cntx, snapshot_vm_resource.id)
-            for vm_security_group_rule in vm_security_group_rule_snaps:
-                vm_security_group_rule_values = pickle.loads(
-                    str(vm_security_group_rule.pickle))
-                if vm_security_group_rule_values.get('remote_group_id', None):
-                    remote_group_id = restored_security_groups[
-                        vm_security_group_rule_values['remote_group_id']]
-                else:
-                    remote_group_id = None
-
-                network_service.security_group_rule_create(
-                    cntx,
-                    security_group_id,
-                    vm_security_group_rule_values['direction'],
-                    vm_security_group_rule_values['ethertype'],
-                    vm_security_group_rule_values['protocol'],
-                    vm_security_group_rule_values['port_range_min'],
-                    vm_security_group_rule_values['port_range_max'],
-                    vm_security_group_rule_values['remote_ip_prefix'],
-                    remote_group_id)
     return restored_security_groups
 
 
