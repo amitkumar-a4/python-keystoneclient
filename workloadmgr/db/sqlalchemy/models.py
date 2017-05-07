@@ -168,7 +168,10 @@ class FileSearch(BASE, WorkloadsBase):
     filepath = Column(String(255), nullable=False)
     snapshot_ids = Column(Text)
     json_resp = Column(Text)
+    start = Column(Integer)
+    end = Column(Integer)
     host = Column(String(100))
+    error_msg = Column(String(255)) 
     status = Column(String(10))
     scheduled_at = Column(DateTime) 
     

@@ -445,8 +445,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         try:
             self.db.file_search_update(context,search_id,{'host': self.host,
                                        'status': 'searching'})
-        except Exception as ex:
-               self.db.file_search_update(context,search_id,{'status': 'error'})
+        except Exception as err:
+               self.db.file_search_update(context,search_id,{'status': 'error', 'error_msg': str(err)})
                 
 
 

@@ -250,10 +250,19 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def search(self, context, data):
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
+        if len(vm_found) == 0:
+           msg = _('vm_id not existing with this tenant')
+           raise wlm_exceptions.Invalid(reason=msg)
+        if type(data['snapshot_ids']) is list:
+           data['snapshot_ids'] = ",".join(data['snapshot_ids'])
         options = {'vm_id': data['vm_id'],
                    'project_id': context.project_id,
                    'user_id': context.user_id,
                    'filepath': data['filepath'],
+                   'snapshot_ids': data['snapshot_ids'],
+                   'start': data['start'],
+                   'end': data['end'],
                    'status': 'executing',}
         search = self.db.file_search_create(context, options)
         self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
