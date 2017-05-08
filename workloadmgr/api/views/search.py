@@ -25,5 +25,8 @@ class ViewBuilder(common.ViewBuilder):
                 'id': search.get('id'),
                 'deleted_at': search.get('deleted_at'),
                 'status': search.get('status'),
+                'error_msg': search.get('error_msg'),
+                'filepath': search.get('filepath'),
+                'json_resp': search.get('json_resp'),
             }
         }

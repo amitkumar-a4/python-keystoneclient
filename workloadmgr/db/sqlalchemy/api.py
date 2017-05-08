@@ -1085,7 +1085,15 @@ def snapshot_get_all(context, **kwargs):
     else:
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
-    return qs.order_by(models.Snapshots.created_at.desc()).all() 
+    if 'status' in kwargs:
+       qs = qs.filter_by(status=kwargs['status'])
+
+    qs = qs.order_by(models.Snapshots.created_at.desc())
+    if 'end' in kwargs and kwargs['end'] != 0:
+       qs = qs.limit(kwargs['end'])
+    if 'start' in kwargs and kwargs['start'] != 0:
+       qs = qs.offset(kwargs['start'])
+    return qs.all() 
 
 @require_context                            
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
