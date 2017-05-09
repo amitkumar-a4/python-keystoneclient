@@ -1085,7 +1085,7 @@ def snapshot_get_all(context, **kwargs):
     else:
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
-    if 'status' in kwargs:
+    if 'status' in kwargs and kwargs['status'] is not None:
        qs = qs.filter_by(status=kwargs['status'])
 
     qs = qs.order_by(models.Snapshots.created_at.desc())
