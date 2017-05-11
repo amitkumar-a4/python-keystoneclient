@@ -28,5 +28,6 @@ class ViewBuilder(common.ViewBuilder):
                 'error_msg': search.get('error_msg'),
                 'filepath': search.get('filepath'),
                 'json_resp': search.get('json_resp'),
+                'vm_id': search.get('vm_id'),
             }
         }

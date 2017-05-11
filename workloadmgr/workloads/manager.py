@@ -461,7 +461,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                       raise wlm_exceptions.InvalidState(reason=msg)
                search_list_snapshots = filtered_snapshots 
             elif search.end != 0 or search.start != 0:
-                 kwargs = {'workload_id':workload_id, 'get_all': False, 'start': start, 'end': end, 'status':'available'}
+                 kwargs = {'workload_id':workload_id, 'get_all': False, 'start': search.start, 'end': search.end, 'status':'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
             else:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'status': 'available'}
@@ -486,6 +486,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.file_search_update(context,search_id,{'status': 'completed', 'json_resp': out})
         except Exception as err:
                self.db.file_search_update(context,search_id,{'status': 'error', 'error_msg': str(err)})
+               LOG.exception(err)
                 
 
 

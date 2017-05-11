@@ -65,6 +65,8 @@ class FileSearchController(wsgi.Controller):
                file_search['start'] = 0
             if file_search.get('end', None) is None:
                file_search['end'] = 0
+            file_search['start'] = int(file_search['start'])
+            file_search['end'] = int(file_search['end'])
             search = self.workload_api.search(context, file_search)
             return self._view_builder.detail(req, search)
         except Exception as error:

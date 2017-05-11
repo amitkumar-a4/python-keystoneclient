@@ -34,6 +34,7 @@ def f(data):
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   
+    g.close()
     return dt
 
 
