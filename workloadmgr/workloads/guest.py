@@ -16,8 +16,9 @@ def f(data):
     snapshot_id = drives[0]
     drives.pop(0)
     for drive in drives:
-        g.add_drive_opts(drive, readonly=1)
+        g.add_drive_opts(drive, format="qcow2", readonly=1)
     g.set_backend("libvirt")
+    g.set_path("/home/nova")
     g.launch()
     dt = {}
     roots = g.list_filesystems()
@@ -31,6 +32,9 @@ def f(data):
         val = g.glob_expand(filepath)
         disk = {}
         disk[root] = val
+        if len(val) > 0:
+           for path in val:
+               disk[path] = g.stat(path)
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   

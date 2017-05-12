@@ -454,12 +454,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             backup_target = vault.get_backup_target(backup_endpoint)
             if search.snapshot_ids != '' and len(search.snapshot_ids) > 1:
                filtered_snapshots = search.snapshot_ids.split(',')
+               search_list_snapshots = []
                for filtered_snapshot in filtered_snapshots:
                    filter_snapshot = self.db.snapshot_get(context, filtered_snapshot)
                    if filter_snapshot.workload_id != workload_id:
                       msg = _('Invalid snapshot_ids provided')
                       raise wlm_exceptions.InvalidState(reason=msg)
-               search_list_snapshots = filtered_snapshots 
+                   search_list_snapshots.append(filtered_snapshot)
             elif search.end != 0 or search.start != 0:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'start': search.start, 'end': search.end, 'status':'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
