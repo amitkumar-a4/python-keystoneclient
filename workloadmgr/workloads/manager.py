@@ -186,8 +186,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         try:
             self.db.snapshot_mark_incomplete_as_error(ctxt, self.host)
             self.db.restore_mark_incomplete_as_error(ctxt, self.host)
+            kwargs = {'host': self.host, 'status': 'completed'}
+            list_search = self.db.file_search_get_all(ctxt, **kwargs)
+            for search in list_search:
+                self.db.file_search_update(ctxt,search.id,{'status': 'error', 
+                                'error_msg': 'Search did not finish successfully'})
         except Exception as ex:
             LOG.exception(ex)
+
+    @manager.periodic_task
+    def file_search_delete(self, context):
+        try:
+            kwargs = {'host': self.host, 'time_in_minutes': 24 * 60}
+            list_search = self.db.file_search_get_all(context, **kwargs)
+            if len(list_search) > 0:
+               for search in list_search:
+                   self.db.file_search_delete(context, search.id)
+        except Exception as ex:
+               LOG.exception(ex)
     
     @autolog.log_method(logger=Logger)    
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):

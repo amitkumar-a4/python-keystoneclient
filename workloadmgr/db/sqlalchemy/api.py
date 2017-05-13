@@ -322,11 +322,27 @@ def service_update(context, service_id, values):
 ######### File search ###############
 
 @require_admin_context
+def file_search_get_all(context, **kwargs):
+    status = kwargs.get('status',None)
+    time_in_minutes = kwargs.get('time_in_minutes',None)
+    host = kwargs.get('host', None)
+    query =  model_query(context, models.FileSearch, **kwargs)
+    if time_in_minutes is not None:
+       now = timeutils.utcnow()
+       minutes_ago = now - timedelta(minutes=int(time_in_minutes))
+       query = query.filter(models.FileSearch.created_at < minutes_ago)
+    if host is not None:
+       query = query.filter_by(host=host)
+    if status is not None:
+       query = query.filter(and_(models.FileSearch.status != status, models.FileSearch.status != 'error'))
+    return query.all()   
+
+@require_admin_context
 def file_search_delete(context, search_id):
     session = get_session()
     with session.begin():
         ref = _file_search_get(context, search_id, session=session)
-        ref.delete(session=session)
+        session.delete(ref)
 
 @require_admin_context
 def file_search_get(context, search_id):
@@ -2877,7 +2893,6 @@ def task_get_all_by_project(context, project_id, **kwargs):
     return model_query(context, models.Tasks, **kwargs).\
                             options(sa_orm.joinedload(models.Tasks.status_messages)).\
                             filter_by(project_id=project_id).all()
-        
 
 @require_context
 def task_show(context, task_id):

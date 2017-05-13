@@ -1,5 +1,6 @@
 import sys
 import guestfs
+import multiprocessing
 from multiprocessing import Process
 from multiprocessing import Pool, TimeoutError
 #from pathos.multiprocessing import ProcessingPool as Pool
@@ -43,7 +44,8 @@ def f(data):
 
 
 def main(argv):
-    pool = Pool(processes=4)
+    processes = max(4, multiprocessing.cpu_count())
+    pool = Pool(processes=processes)
     data = argv[0].split('|-|')
     print pool.map(f, data)
 

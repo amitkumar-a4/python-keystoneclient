@@ -102,6 +102,10 @@ def service_update(context, service_id, values):
 
 ###################
 
+def file_search_get_all(context, **kwargs):
+    """Get all file search for a given host."""
+    return IMPL.file_search_get_all(context, **kwargs)
+
 def file_search_delete(context, search_id):
     """Destroy the search or raise if it does not exist."""
     return IMPL.file_search_delete(context, search_id)
