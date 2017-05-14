@@ -335,7 +335,7 @@ def file_search_get_all(context, **kwargs):
     if vm_id is not None:
        query = query.filter_by(vm_id=vm_id)
     if host is not None:
-       query = query.filter_by(host=host)
+       query = query.filter(or_(models.FileSearch.host == host, models.FileSearch.host == None))
     if status is not None:
        query = query.filter(and_(models.FileSearch.status != status, models.FileSearch.status != 'error'))
     return query.all()   
