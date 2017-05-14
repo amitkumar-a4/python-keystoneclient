@@ -326,11 +326,14 @@ def file_search_get_all(context, **kwargs):
     status = kwargs.get('status',None)
     time_in_minutes = kwargs.get('time_in_minutes',None)
     host = kwargs.get('host', None)
+    vm_id = kwargs.get('vm_id', None)
     query =  model_query(context, models.FileSearch, **kwargs)
     if time_in_minutes is not None:
        now = timeutils.utcnow()
        minutes_ago = now - timedelta(minutes=int(time_in_minutes))
        query = query.filter(models.FileSearch.created_at < minutes_ago)
+    if vm_id is not None:
+       query = query.filter_by(vm_id=vm_id)
     if host is not None:
        query = query.filter_by(host=host)
     if status is not None:

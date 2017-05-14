@@ -254,6 +254,11 @@ class API(base.Base):
         if len(vm_found) == 0:
            msg = _('vm_id not existing with this tenant')
            raise wlm_exceptions.Invalid(reason=msg)
+        kwargs = {'vm_id': data['vm_id'], 'status': 'completed'}
+        search_list = self.db.file_search_get_all(context, **kwargs)
+        if len(search_list) > 0:
+           msg = _('Search with this vm_id already in exceution')
+           raise wlm_exceptions.Invalid(reason=msg)
         if type(data['snapshot_ids']) is list:
            data['snapshot_ids'] = ",".join(data['snapshot_ids'])
         options = {'vm_id': data['vm_id'],
