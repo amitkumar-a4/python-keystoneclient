@@ -1431,9 +1431,56 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                   instance_options)
 
 
+@autolog.log_method(Logger, 'vmtasks_openstack.poweroff_vm')
+def poweroff_vm(cntx, instance, restore, restored_instance):
+    compute_service = nova.API(production=True))
+
+    compute_service.stop(cntx, instance['vm_id'])
+
+    inst =  compute_service.get_server_by_id(self.cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'SHUTOFF':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to shutoff' )
+        time.sleep(10)
+        inst = compute_service.get_server_by_id(self.cntx,
+                                                 inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot from volume')
+
+
 @autolog.log_method(Logger, 'vmtasks_openstack.poweron_vm')
 def poweron_vm(cntx, instance, restore, restored_instance):
-    pass
+    compute_service = nova.API(production=True))
+
+    compute_service.start(cntx, instance['vm_id'])
+
+    inst =  compute_service.get_server_by_id(self.cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'ACTIVE':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to boot' )
+        time.sleep(10)
+        inst =  compute_service.get_server_by_id(self.cntx,
+                                                 inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot from volume')
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.set_vm_metadata')
