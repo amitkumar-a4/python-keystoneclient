@@ -1378,12 +1378,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     restored_security_group_ids = {}
     vm_id = instance['vm_id']
     for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
-        if db.snapshot_vm_resource_get_by_resource_name(cntx, vm_id, snapshot_obj.id, \
-                          restored_security_group_id) is not None:
-           restored_security_group_ids[pit_id] = restored_security_group_id
-        if db.restored_vm_resource_get_by_resource_name(cntx, vm_id, restore['id'], \
-                          restored_security_group_id) is not None:
-           restored_security_group_ids[pit_id] = restored_security_group_id
+        restored_security_group_ids[pit_id] = restored_security_group_id
+
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
     restore_dict.pop('created_at')
