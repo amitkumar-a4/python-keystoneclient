@@ -80,6 +80,8 @@ class BaseFileSearchTestCase(test.TestCase):
         self.subprocess_patch.stop()
         self.subprocess_patch_output.stop()
         self.stderr_patch.stop()
+
+        super(BaseFileSearchTestCase, self).tearDown()
         
 
     @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.get_total_capacity')
@@ -156,6 +158,83 @@ class BaseFileSearchTestCase(test.TestCase):
         self.workloadManager.db.snapshot_vm_resources_get = mock.MagicMock()
         self.workloadManager.db.snapshot_vm_resources_get.return_value = vm_resource_obj_list
         self.workloadManager.file_search(self.context, search.id)
+        search = self.workloadAPI.search_show(self.context, search.id)
+        self.assertEqual(search.status, 'completed')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+
+    def test_file_search_api_and_manager_with_snapshot_filter(self):
+        workload, backup_target = self.create_workload()
+        snapshot_ids = []
+        for i in range(5): 
+            snapshot = self.create_snapshot(workload)
+            snapshot_ids.append(snapshot['id'])
+        del snapshot_ids[0]
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': snapshot_ids, 'start': 0, 'end': 0}
+        search = self.workloadAPI.search(self.context, data)
+        self.assertEqual(search.status, 'executing')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        search = self.workloadAPI.search_show(self.context, search.id)
+        self.assertEqual(search.status, 'executing')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        self.assertEqual(",".join(snapshot_ids), search.snapshot_ids)
+        try:
+            search = self.workloadAPI.search(self.context, data)
+        except Exception as ex:
+               self.assertEqual(1, 1)
+        disks = mock.Mock()
+        disks.vault_url = str(uuid.uuid4())
+        self.workloadManager.db.vm_disk_resource_snap_get_top = mock.MagicMock()
+        self.workloadManager.db.vm_disk_resource_snap_get_top.return_value = disks
+        vault.get_backup_target = mock.MagicMock()
+        vault.get_backup_target.return_value = backup_target
+        vm_resource_obj = mock.Mock()
+        vm_resource_obj.resource_type = 'disk'
+        vm_resource_obj.id = str(uuid.uuid4())
+        vm_resource_obj_list = []
+        vm_resource_obj_list.append(vm_resource_obj)
+        self.workloadManager.db.snapshot_vm_resources_get = mock.MagicMock()
+        self.workloadManager.db.snapshot_vm_resources_get.return_value = vm_resource_obj_list
+        self.workloadManager.file_search(self.context, search.id)
+        search = self.workloadAPI.search_show(self.context, search.id)
+        self.assertEqual(search.status, 'completed')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        self.assertEqual(",".join(snapshot_ids), search.snapshot_ids)
+
+    def test_file_search_api_and_manager_with_range_filter(self):
+        workload, backup_target = self.create_workload()
+        snapshot_ids = []
+        for i in range(5):
+            snapshot = self.create_snapshot(workload)
+            snapshot_ids.append(snapshot['id'])
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 1, 'end': 2}
+        search = self.workloadAPI.search(self.context, data)
+        self.assertEqual(search.status, 'executing')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        search = self.workloadAPI.search_show(self.context, search.id)
+        self.assertEqual(search.status, 'executing')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        self.assertEqual(search.start, 1)
+        self.assertEqual(search.end, 2)
+        try:
+            search = self.workloadAPI.search(self.context, data)
+        except Exception as ex:
+               self.assertEqual(1, 1)
+        disks = mock.Mock()
+        disks.vault_url = str(uuid.uuid4())
+        self.workloadManager.db.vm_disk_resource_snap_get_top = mock.MagicMock()
+        self.workloadManager.db.vm_disk_resource_snap_get_top.return_value = disks
+        vault.get_backup_target = mock.MagicMock()
+        vault.get_backup_target.return_value = backup_target
+        vm_resource_obj = mock.Mock()
+        vm_resource_obj.resource_type = 'disk'
+        vm_resource_obj.id = str(uuid.uuid4())
+        vm_resource_obj_list = []
+        vm_resource_obj_list.append(vm_resource_obj)
+        self.workloadManager.db.snapshot_vm_resources_get = mock.MagicMock()
+        self.workloadManager.db.snapshot_vm_resources_get.return_value = vm_resource_obj_list
+        self.workloadManager.file_search(self.context, search.id)
+        args = self.SubProcessOutputMockMethod.call_args[0]
+        self.assertEqual(len(args[0][2].split('|-|')), 2)
         search = self.workloadAPI.search_show(self.context, search.id)
         self.assertEqual(search.status, 'completed')
         self.assertEqual(search.vm_id, self.context.vm_id)

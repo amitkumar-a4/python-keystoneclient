@@ -506,7 +506,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                LOG.exception(err)
                 
 
-
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
     def workload_snapshot(self, context, snapshot_id):
