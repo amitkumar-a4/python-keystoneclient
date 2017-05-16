@@ -321,13 +321,14 @@ def service_update(context, service_id, values):
 
 ######### File search ###############
 
-@require_admin_context
+@require_context
 def file_search_get_all(context, **kwargs):
     status = kwargs.get('status',None)
     time_in_minutes = kwargs.get('time_in_minutes',None)
     host = kwargs.get('host', None)
     vm_id = kwargs.get('vm_id', None)
     query =  model_query(context, models.FileSearch, **kwargs)
+    query = query.filter_by(project_id=context.project_id)
     if time_in_minutes is not None:
        now = timeutils.utcnow()
        minutes_ago = now - timedelta(minutes=int(time_in_minutes))
@@ -340,19 +341,19 @@ def file_search_get_all(context, **kwargs):
        query = query.filter(and_(models.FileSearch.status != status, models.FileSearch.status != 'error'))
     return query.all()   
 
-@require_admin_context
+@require_context
 def file_search_delete(context, search_id):
     session = get_session()
     with session.begin():
         ref = _file_search_get(context, search_id, session=session)
         session.delete(ref)
 
-@require_admin_context
+@require_context
 def file_search_get(context, search_id):
     session = get_session()
     return _file_search_get(context, search_id, session)
 
-@require_admin_context
+@require_context
 def _file_search_get(context, search_id, session):
     result = model_query(
         context,

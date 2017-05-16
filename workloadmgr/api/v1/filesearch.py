@@ -12,7 +12,6 @@ from workloadmgr.api import common
 from workloadmgr.api import wsgi
 from workloadmgr.api import xmlutil
 from workloadmgr import exception
-from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
@@ -21,8 +20,6 @@ from workloadmgr.api.views import search as search_views
 
 LOG = logging.getLogger(__name__)
 
-
-FLAGS = flags.FLAGS
 
 class FileSearchController(wsgi.Controller):
     """The file search API controller for the workload manager API."""
