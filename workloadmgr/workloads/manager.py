@@ -721,6 +721,86 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
 
     @autolog.log_method(logger=Logger)
+    def _validate_inplace_restore_options(self, context, restore, options):
+        snapshot_id = restore.snapshot_id
+        snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
+        if options.get('type', "") is not "openstack":
+            msg = _("'type' field in options is not set to 'openstack'")
+            raise wlm_exceptions.InvalidRestoreOptionType(message=msg)
+
+        if 'openstack' not in options:
+            msg = _("'openstack' field is not in options")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        assert options.get("restore_type", None) is 'inplace'
+
+        # If instances is not available should we restore entire snapshot?
+        if 'instances' not in options['openstack']:
+            msg = _("'instances' field is not in found " \
+                    "in options['instances']")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        compute_service = nova.API(production=True)                
+        volume_service = cinder.API()
+        for inst in options['openstack']['instances']:
+            vm_id = inst.get('id', None)
+            if not vm_id:
+                msg = _("'instances' contain an element that does "
+                        "not include 'id' field")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            try:
+                nova_inst = compute_service.get_server_by_id(context, vm_id, admin=False)
+                if not nova_inst:
+                    msg = _("instance '%s' in nova is not found" % vm_id)
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+            except Exception as ex:
+                LOG.exception(ex)
+                msg = _("instance '%s' in nova is not found" % vm_id)
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            # get attached references
+            attached_devices = getattr(nova_inst, 'os-extended-volumes:volumes_attached')
+            attached_devices = set([v.id for v in attached_devices])
+
+            snapshot_vm_resources = self.db.snapshot_vm_resources_get(
+                context, vm_id, snapshot_id)
+            vol_snaps = {}
+            for res_snap in snapshot_vm_resources:
+                if snapshot_vm_resource.resource_type != 'disk':
+                    continue
+                vol_snaps[res_snap.pit_id] = {'size': res_snap.size}
+
+            # TODO: How do we handle boot disks
+            for vdisk in inst.get('vdisks', None):
+                # make sure that vdisk exists in cinder and
+                # is attached to the instance
+                if vdisk.get('id', None) not in attached_devices:
+                    msg = _("'vdisks' contain an element that does "
+                            "not include 'id' field")
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+                try:
+                    vol_obj = volume_service.get(context, vdisk.get('id', None),
+                                                 no_translate=True)
+                    if not vol_obj:
+                        raise wlm_exceptions.InvalidRestoreOptions()
+                except Exception as ex:
+                    LOG.exception(ex)
+                    msg = _("'%s' is not a valid cinder volume" %
+                            vdisk.get('id'))
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+                if vol_obj.size != vol_snaps[vol_obj.id]['size']:
+                    msg = _("'%s' current volume size %d does not match with "
+                            "backup volume size %d" %
+                            (vdisk.get('id'), vol_obj.size,
+                             vol_snaps[vol_obj.id]['size']))
+                            vdisk.get('id'))
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+        return
+
+    @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
@@ -814,7 +894,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             context = nova._get_tenant_context(context)
 
-            target_platform = 'vmware'
+            target_platform = 'openstack'
             if hasattr(restore, 'pickle'):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
                 if options and 'type' in options:
