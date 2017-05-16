@@ -359,6 +359,7 @@ def _file_search_get(context, search_id, session):
         context,
         models.FileSearch,
         session=session).\
+        filter_by(project_id=context.project_id).\
         filter_by(id=search_id).\
         first()
     if not result:
@@ -366,7 +367,7 @@ def _file_search_get(context, search_id, session):
 
     return result
 
-@require_admin_context
+@require_context
 def file_search_create(context, values):
     session = get_session()
     ref = models.FileSearch()
@@ -374,7 +375,7 @@ def file_search_create(context, values):
     ref.save()
     return ref
 
-@require_admin_context
+@require_context
 def file_search_update(context, search_id, values):
     session = get_session()
     with session.begin():
