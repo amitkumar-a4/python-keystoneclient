@@ -198,9 +198,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               )))
     return flow
 
-def restore_vm_data(cntx, db, instance, restore, restored_net_resources,
-                    restored_security_groups, restored_compute_flavor,
-                    restored_nics, instance_options):
+def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     restore_obj = db.restore_get(cntx, restore['id'])
     snapshot_obj = db.snapshot_get(cntx, restore_obj.snapshot_id)
@@ -211,7 +209,8 @@ def restore_vm_data(cntx, db, instance, restore, restored_net_resources,
 
     backup_target = vault.get_backup_target(backup_endpoint)
 
-    msg = 'Uploading VM "' + instance['vm_id'] + '" data from snapshot ' + snapshot_obj.id
+    msg = 'Uploading VM "' + instance['vm_id'] + \
+          '" data from snapshot ' + snapshot_obj.id
     db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
 
     # refresh the token so we are attempting each VM restore with a new token

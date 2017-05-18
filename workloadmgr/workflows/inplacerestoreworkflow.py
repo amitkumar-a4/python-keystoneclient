@@ -113,7 +113,7 @@ class InplaceRestoreWorkflow(object):
         self._store['instances'] =  get_vms(cntx, self._store['restore']['id'])
         for index,item in enumerate(self._store['instances']):
             self._store['instance_'+str(index)] = item
-
+            self._store['restored_instance_'+str(index)] = item
 
     def initflow(self, pre_poweron=None, post_poweron=None):
         self._flow = lf.Flow('InplaceRestoreFlow')
@@ -124,8 +124,8 @@ class InplaceRestoreWorkflow(object):
         #linear poweroff VMs
         self._flow.add(vmtasks.LinearPowerOffVMs(self._store['instances']))
 
-        #linear restore VMs
-        self._flow.add(vmtasks.UnorderedRestoreVMs(self._store['instances']))
+        #unordered inplace restore VMs
+        #self._flow.add(vmtasks.UnorderedRestoreVMs(self._store['instances']))
 
         if pre_poweron:
             self._flow.add(pre_poweron)
@@ -136,10 +136,6 @@ class InplaceRestoreWorkflow(object):
         if post_poweron:
             self._flow.add(post_poweron)        
 
-        # unordered post restore 
-        self._flow.add(vmtasks.UnorderedPostRestore(self._store['instances'])) 
-    
-          
     def execute(self):
         result = engines.run(self._flow, engine_conf='parallel', backend={'connection': self._store['connection'] }, store=self._store)
         restore = pickle.loads(self._store['restore']['pickle'].encode('ascii','ignore'))

@@ -1431,6 +1431,25 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                   instance_options)
 
 
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_data')
+def restore_vm_data(cntx, db, instance, restore):
+
+    restore_obj = db.restore_get(cntx, restore['id'])
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = utils.get_instance_restore_options(restore_options,
+                                                          instance['vm_id'],
+                                                          'openstack')
+
+    if instance_options.get('availability_zone', None) is None:
+        instance_options['availability_zone'] = restore_options.get('zone', None)
+    virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+
+    # call with new context
+    cntx = nova._get_tenant_context(cntx)
+    return virtdriver.restore_vm_data(cntx, db, instance, restore,
+                                      instance_options)
+
+
 @autolog.log_method(Logger, 'vmtasks_openstack.poweroff_vm')
 def poweroff_vm(cntx, instance, restore, restored_instance):
     restored_instance_id = restored_instance['vm_id']

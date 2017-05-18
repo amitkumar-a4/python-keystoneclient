@@ -136,8 +136,8 @@ def get_workflow_class(context, workload_type_id, restore=False):
     module = ".".join(parts[:-1])
     workflow_class = __import__( module )
     for comp in parts[1:]:
-        workflow_class = getattr(workflow_class, comp)            
-    return workflow_class        
+        workflow_class = getattr(workflow_class, comp)
+    return workflow_class
 
 workloadlock = Lock()
 def synchronized(lock):
@@ -770,7 +770,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if res_snap.resource_type != 'disk':
                     continue
                 vol_id = self._get_metadata_value(res_snap, 'volume_id')
-                vol_size = self._get_metadata_value(res_snap, 'volume_size') or -1
+                vol_size = self._get_metadata_value(res_snap, 'volume_size') or "-1"
+                vol_size = int(vol_size)
                 if vol_id:
                     vol_snaps[vol_id] = {'size': vol_size}
 
@@ -942,6 +943,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                  })
 
             values = {'status': 'executing'}
+            workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
             if rtype == 'oneclick':
                 restore_user_selected_value = 'Oneclick Restore'
                 # Override traget platfrom for clinets not specified on oneclick
@@ -964,6 +966,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             raise wlm_exceptions.InvalidState(reason=msg)
 
             elif rtype == 'inplace':
+                workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
                 self._validate_inplace_restore_options(context, restore, options)
 
             restore = self.db.restore_update(context, restore.id, values)
@@ -988,7 +991,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'restore': dict(restore.iteritems()),   # restore dictionary
                 'target_platform': target_platform,                
             }
-            workflow_class = get_workflow_class(context, workload.workload_type_id, True)
+
+            parts = workflow_class_name.split('.')
+            module = ".".join(parts[:-1])
+            workflow_class = __import__( module )
+            for comp in parts[1:]:
+                workflow_class = getattr(workflow_class, comp)            
+
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
             workflow.execute()
