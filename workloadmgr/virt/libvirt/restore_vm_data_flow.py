@@ -172,15 +172,22 @@ class CopyBackupImageToVolume(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass
 
-def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
+def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
+                              volumes_to_restore):
+
     flow = lf.Flow("copybackupimagestovolumeslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
                                          instance['vm_id'], snapshot_obj.id)
+
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
+  
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+
+        if volume_id and volume_id in volumes_to_restore:
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
                                   rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id),
                                               volume_type='volume_type_'+str(snapshot_vm_resource.id),
@@ -188,6 +195,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               )))
+        """
         elif db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
                                   rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id),
@@ -196,6 +204,8 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               )))
+        """
+
     return flow
 
 def restore_vm_data(cntx, db, instance, restore, instance_options):
@@ -209,7 +219,7 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     backup_target = vault.get_backup_target(backup_endpoint)
 
-    msg = 'Uploading VM "' + instance['vm_id'] + \
+    msg = 'Replaces VM "' + instance['vm_id'] + \
           '" data from snapshot ' + snapshot_obj.id
     db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
 
@@ -222,6 +232,12 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'],
                                                          snapshot_obj.id)
+
+    volumes_to_restore = []
+    for vdisk in instance_options['vdisks']:
+        volumes_to_restore.append(vdisk['id'])
+
+    volumes_to_restore = set(volumes_to_restore)
 
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
@@ -245,30 +261,22 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
         if snapshot_vm_resource.resource_type == 'disk':
 
-            progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
-                                         'resource_id' : snapshot_vm_resource.id}
-
-            progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
-            if volume_id:
-                volume_type = db.get_metadata_value(
-                    snapshot_vm_resource.metadata, 'volume_type') or "None"
-                new_volume_type = get_new_volume_type(instance_options,
-                                                      volume_id.lower(),
-                                                      volume_type)
-                store['volume_type_'+snapshot_vm_resource.id] = new_volume_type
-            else:
-                store['volume_type_'+snapshot_vm_resource.id] = None
+            if volume_id in volumes_to_restore:
+                progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
+                                             'resource_id' : snapshot_vm_resource.id}
 
-            store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
+                progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
+
+                store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
 
 
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
 
     # copy data if the volumes are iscsi volumes
-    childflow = CopyBackupImagesToVolumes(cntx, instance,
-                                          snapshot_obj, restore['id'])
+    childflow = CopyBackupImagesToVolumes(cntx, instance, snapshot_obj,
+                                          restore['id'], volumes_to_restore)
     if childflow:
         _restorevmflow.add(childflow)
 

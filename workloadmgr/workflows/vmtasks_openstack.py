@@ -1434,6 +1434,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_data')
 def restore_vm_data(cntx, db, instance, restore):
 
+    import pdb;pdb.set_trace()
     restore_obj = db.restore_get(cntx, restore['id'])
     restore_options = pickle.loads(str(restore_obj.pickle))
     instance_options = utils.get_instance_restore_options(restore_options,

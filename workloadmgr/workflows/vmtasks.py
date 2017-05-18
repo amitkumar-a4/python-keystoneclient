@@ -1255,9 +1255,8 @@ def LinearRestoreVMs(instances):
 def LinearRestoreVMsData(instances):
     flow = lf.Flow("restorevmdatalf")
     for index,item in enumerate(instances):
-        flow.add(RestoreVMData("RestoreVMData_" + item['vm_id'], 
-                               rebind=dict(instance = "instance_" + str(index)),
-                               provides='restored_instance_' + str(index)))
+        flow.add(RestoreVMData("RestoreVMData_" + item['vm_id'],
+                               rebind=dict(instance="instance_" + str(index))))
     
     return flow
 
