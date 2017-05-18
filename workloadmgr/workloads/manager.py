@@ -724,15 +724,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     def _validate_inplace_restore_options(self, context, restore, options):
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
-        if options.get('type', "") is not "openstack":
+        if options.get('type', "") != "openstack":
             msg = _("'type' field in options is not set to 'openstack'")
-            raise wlm_exceptions.InvalidRestoreOptionType(message=msg)
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
 
         if 'openstack' not in options:
             msg = _("'openstack' field is not in options")
             raise wlm_exceptions.InvalidRestoreOptions(message=msg)
 
-        assert options.get("restore_type", None) is 'inplace'
+        assert options.get("restore_type", None) == 'inplace'
 
         # If instances is not available should we restore entire snapshot?
         if 'instances' not in options['openstack']:
@@ -761,18 +761,21 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             # get attached references
             attached_devices = getattr(nova_inst, 'os-extended-volumes:volumes_attached')
-            attached_devices = set([v.id for v in attached_devices])
+            attached_devices = set([v['id'] for v in attached_devices])
 
             snapshot_vm_resources = self.db.snapshot_vm_resources_get(
                 context, vm_id, snapshot_id)
             vol_snaps = {}
             for res_snap in snapshot_vm_resources:
-                if snapshot_vm_resource.resource_type != 'disk':
+                if res_snap.resource_type != 'disk':
                     continue
-                vol_snaps[res_snap.pit_id] = {'size': res_snap.size}
+                vol_id = self._get_metadata_value(res_snap, 'volume_id')
+                vol_size = self._get_metadata_value(res_snap, 'volume_size') or -1
+                if vol_id:
+                    vol_snaps[vol_id] = {'size': vol_size}
 
             # TODO: How do we handle boot disks
-            for vdisk in inst.get('vdisks', None):
+            for vdisk in inst.get('vdisks', []):
                 # make sure that vdisk exists in cinder and
                 # is attached to the instance
                 if vdisk.get('id', None) not in attached_devices:
@@ -796,7 +799,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             "backup volume size %d" %
                             (vdisk.get('id'), vol_obj.size,
                              vol_snaps[vol_obj.id]['size']))
-                            vdisk.get('id'))
                     raise wlm_exceptions.InvalidRestoreOptions(message=msg)
         return
 
@@ -899,7 +901,26 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
                 if options and 'type' in options:
                     target_platform = options['type']
-            
+
+            if target_platform != 'openstack':
+                msg = _("'type' field in restore options must be 'openstack'")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            if not options:
+                options = {}
+
+            if options.get('oneclickrestore', False):
+                rtype = 'oneclick'
+            else:
+                rtype = 'selective'
+
+            rtype = options.get('restore_type', rtype)
+
+            if rtype not in ('selective', 'oneclick', 'inplace'):
+                msg = _("'restore_type' field in restore options must be "
+                        "'selective' or 'inplace' or 'oneclick'")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
             restore_type = restore.restore_type
             if restore_type == 'test':
                 restore = self.db.restore_update(context,
@@ -921,18 +942,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                  })
 
             values = {'status': 'executing'}
-            if options and 'oneclickrestore' in options and options['oneclickrestore']:
+            if rtype == 'oneclick':
                 restore_user_selected_value = 'Oneclick Restore'
                 # Override traget platfrom for clinets not specified on oneclick
                 if workload.source_platform != target_platform:
-                   target_platform = workload.source_platform
+                    target_platform = workload.source_platform
                 # Fill the restore options from the snapshot instances metadata
                 options = self._oneclick_restore_options(context, restore, options)
                 values['pickle'] = pickle.dumps(options, 0)
 
-            restore = self.db.restore_update(context, restore.id, values)
-            if options and 'oneclickrestore' in options and \
-               options['oneclickrestore'] and target_platform == 'openstack':
                 compute_service = nova.API(production=True)                
                 for vm in self.db.snapshot_vms_get(context, restore.snapshot_id):
                     instance_options = utils.get_instance_restore_options(options, vm.vm_id, target_platform)
@@ -944,6 +962,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             msg = _('Original instance ' +  vm.vm_name + ' is still present. '
                                     'Please delete this instance and try again.')
                             raise wlm_exceptions.InvalidState(reason=msg)
+
+            elif rtype == 'inplace':
+                self._validate_inplace_restore_options(context, restore, options)
+
+            restore = self.db.restore_update(context, restore.id, values)
 
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':
