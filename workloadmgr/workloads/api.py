@@ -254,6 +254,10 @@ class API(base.Base):
         if len(vm_found) == 0:
            msg = _('vm_id not existing with this tenant')
            raise wlm_exceptions.Invalid(reason=msg)
+        workload = self.db.workload_get(context, vm_found[0].workload_id)
+        if workload['status'] != 'available':
+           msg = _('Vm workload is not in available state to perform search')
+           raise wlm_exceptions.Invalid(reason=msg)
         kwargs = {'vm_id': data['vm_id'], 'status': 'completed'}
         search_list = self.db.file_search_get_all(context, **kwargs)
         if len(search_list) > 0:
