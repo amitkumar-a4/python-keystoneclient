@@ -125,7 +125,6 @@ class InplaceRestoreWorkflow(object):
         self._flow.add(vmtasks.LinearPowerOffVMs(self._store['instances']))
 
         #unordered inplace restore VMs
-        import pdb;pdb.set_trace()
         self._flow.add(vmtasks.LinearRestoreVMsData(self._store['instances']))
 
         if pre_poweron:

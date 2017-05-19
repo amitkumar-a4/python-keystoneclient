@@ -51,7 +51,6 @@ Logger = autolog.Logger(LOG)
 
 FLAGS = flags.FLAGS
 CONF = cfg.CONF
-CONF.register_opts(restore_vm_opts)
  
 class CopyBackupImageToVolume(task.Task):
     """
@@ -172,6 +171,59 @@ class CopyBackupImageToVolume(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass
 
+
+class PrepareBackupImage(task.Task):
+    """
+       Downloads objects in the backup chain and creates linked qcow2 image
+    """
+
+    def execute(self, context, restore_id, vm_resource_id, volume_type):
+        return self.execute_with_log(context, restore_id, vm_resource_id, volume_type)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'PrepareBackupImage.execute')
+    def execute_with_log(self, context, restore_id, vm_resource_id, volume_type):
+        db = WorkloadMgrDB().db
+        self.cntx = amqp.RpcContext.from_dict(context)
+
+        restore_obj = db.restore_get(self.cntx, restore_id)
+        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
+        workload_obj = db.workload_get(self.cntx, snapshot_obj.workload_id)
+
+        backup_endpoint = db.get_metadata_value(workload_obj.metadata,
+                                                'backup_media_target')
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+
+        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
+        resource_snap_path = os.path.join(backup_target.mount_path,
+                                          vm_disk_resource_snap.vault_url.strip(os.sep))
+        image_info = qemuimages.qemu_img_info(resource_snap_path)
+
+        if snapshot_vm_resource.resource_name == 'vda' and \
+            db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
+            # upload the bottom of the chain to glance
+            while image_info.backing_file:
+                image_info = qemuimages.qemu_img_info(image_info.backing_file)
+
+            restore_file_path = image_info.image
+            image_overlay_file_path = resource_snap_path
+            image_virtual_size = image_info.virtual_size
+        else:
+            restore_file_path = resource_snap_path
+            image_overlay_file_path = 'not-applicable'
+            image_virtual_size = image_info.virtual_size
+
+        return restore_file_path, image_overlay_file_path, image_virtual_size
+
+    @autolog.log_method(Logger, 'PrepareBackupImage.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+
 def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
                               volumes_to_restore):
 
@@ -207,6 +259,31 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
         """
 
     return flow
+
+
+def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restore_id,
+                              volumes_to_restore):
+    flow = lf.Flow("processbackupimageslf")
+    db = WorkloadMgrDB().db
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
+                                         instance['vm_id'], snapshotobj.id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+
+        if volume_id and volume_id in volumes_to_restore:
+            flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
+                                        rebind=dict(vm_resource_id=snapshot_vm_resource.id,
+                                                    volume_type='volume_type_'+snapshot_vm_resource.id),
+                                        provides=('restore_file_path_' + str(snapshot_vm_resource.id),
+                                                  'image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                                  'image_virtual_size_' + str(snapshot_vm_resource.id))))
+
+    return flow
+
 
 def restore_vm_data(cntx, db, instance, restore, instance_options):
 
@@ -249,6 +326,7 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
                 'restore': restore_dict,
                 'restore_id': restore['id'],
                 'vmid': instance['vm_id'],
+                'restored_instance_id': instance['vm_id'],
                 'vmname': instance['vm_name'],
                 'keyname': 'keyname' in instance and instance['keyname'] or None,
                 'snapshot_id': snapshot_obj.id,
@@ -262,6 +340,7 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
         if snapshot_vm_resource.resource_type == 'disk':
 
             volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
             if volume_id in volumes_to_restore:
                 progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
                                              'resource_id' : snapshot_vm_resource.id}
@@ -269,10 +348,18 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
                 progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
 
                 store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
+                store['volume_id_'+snapshot_vm_resource.id] = volume_id
+                store['volume_type_'+snapshot_vm_resource.id] = volume_type
 
 
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
+
+    childflow = LinearPrepareBackupImages(cntx, instance, instance_options,
+                                          snapshot_obj, restore['id'],
+                                          volumes_to_restore)
+    if childflow:
+        _restorevmflow.add(childflow)
 
     # copy data if the volumes are iscsi volumes
     childflow = CopyBackupImagesToVolumes(cntx, instance, snapshot_obj,
@@ -285,26 +372,28 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     if result and 'restored_instance_id' in result:
         restored_instance_id = result['restored_instance_id']
-        compute_service = nova.API(production = (not test))
-        restored_instance = compute_service.get_server_by_id(cntx,
-                                         restored_instance_id)
-        
+        compute_service = nova.API(production=True)
+        restored_instance = compute_service.get_server_by_id(
+            cntx, restored_instance_id)
+
         restored_vm_values = {'vm_id': restored_instance_id,
                               'vm_name':  restored_instance.name,    
                               'restore_id': restore['id'],
-                              'metadata' : {'production' : restored_net_resources[mac_address]['production'], 'instance_id': instance['vm_id']},
-                              'status': 'available'}
+                              'metadata' : {'instance_id':instance['vm_id']},
+                              'status': 'available'
+                             }
         restored_vm = db.restored_vm_create(cntx, restored_vm_values)    
-        
+
         LOG.debug(_("VM Data Restore Completed"))
-         
+
         db.restore_update(cntx, restore_obj.id, 
                           {'progress_msg': 'Restored VM "' + instance['vm_id'] + \
                                            '" data from snapshot ' + snapshot_obj.id,
                            'status': 'executing'
                           })
-        db.restore_update( cntx, restore_obj.id,
-                           {'progress_msg': 'Restored VM:' + restored_vm['vm_id'], 'status': 'executing'})
+        db.restore_update(cntx, restore_obj.id,
+                          {'progress_msg': 'Restored VM:' + restored_vm['vm_id'],
+                           'status': 'executing'})
         return restored_vm
     else:
         raise Exception("Restoring VM data failed")
