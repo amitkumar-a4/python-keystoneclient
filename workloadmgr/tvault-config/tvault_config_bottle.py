@@ -2824,7 +2824,7 @@ def reinitialize():
                 context.tenant = 'System'
                 context.user_id = 'System'
                 context.project_id = 'System'
-                context.vault_storage_nfs_export = 'TrilioVault'
+                context.vault_storage_nfs_export = ''
                 if config_data['backup_target_type'] == 'NFS':
                    context.vault_storage_nfs_export = config_data['storage_nfs_export']
                 context.cloud_unique_id = config_data['cloud_unique_id']
