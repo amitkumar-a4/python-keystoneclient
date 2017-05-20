@@ -247,8 +247,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               )))
-        """
-        elif db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
                                   rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id),
                                               image_type='image_type_'+str(snapshot_vm_resource.id),
@@ -256,13 +255,12 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               )))
-        """
 
     return flow
 
 
 def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restore_id,
-                              volumes_to_restore):
+                              volumes_to_restore, restore_boot_disk):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
@@ -274,7 +272,8 @@ def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, 
         volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
         image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
 
-        if volume_id and volume_id in volumes_to_restore:
+        if (volume_id and volume_id in volumes_to_restore) or \
+            image_id and restore_boot_disk:
             flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
                                         rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                     volume_type='volume_type_'+snapshot_vm_resource.id),
@@ -311,10 +310,11 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
                                                          snapshot_obj.id)
 
     volumes_to_restore = []
-    for vdisk in instance_options['vdisks']:
+    for vdisk in instance_options.get('vdisks', []):
         volumes_to_restore.append(vdisk['id'])
 
     volumes_to_restore = set(volumes_to_restore)
+    restore_boot_disk = instance_options.get('restore_boot_disk', False)
 
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
@@ -337,19 +337,28 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
-        if snapshot_vm_resource.resource_type == 'disk':
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
 
-            volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
-            volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
-            if volume_id in volumes_to_restore:
-                progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
-                                             'resource_id' : snapshot_vm_resource.id}
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
 
-                progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
+        progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
+                                     'resource_id' : snapshot_vm_resource.id}
 
-                store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
-                store['volume_id_'+snapshot_vm_resource.id] = volume_id
-                store['volume_type_'+snapshot_vm_resource.id] = volume_type
+        progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
+        if volume_id in volumes_to_restore:
+
+            store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
+            store['volume_id_'+snapshot_vm_resource.id] = volume_id
+            store['volume_type_'+snapshot_vm_resource.id] = volume_type
+
+        if image_id and restore_boot_disk:
+            store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
+            store['image_id_'+snapshot_vm_resource.id] = image_id
+            store['image_type_'+snapshot_vm_resource.id] = 'qcow2'
+            store['volume_type_'+snapshot_vm_resource.id] = None
 
 
     LOG.info(_('Processing disks'))
@@ -357,7 +366,8 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     childflow = LinearPrepareBackupImages(cntx, instance, instance_options,
                                           snapshot_obj, restore['id'],
-                                          volumes_to_restore)
+                                          volumes_to_restore,
+                                          restore_boot_disk)
     if childflow:
         _restorevmflow.add(childflow)
 

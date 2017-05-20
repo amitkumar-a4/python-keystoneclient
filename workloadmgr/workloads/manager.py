@@ -742,6 +742,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         compute_service = nova.API(production=True)                
         volume_service = cinder.API()
+
+        flavors = compute_service.get_flavors(context)
         for inst in options['openstack']['instances']:
             vm_id = inst.get('id', None)
             if not vm_id:
@@ -754,6 +756,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if not nova_inst:
                     msg = _("instance '%s' in nova is not found" % vm_id)
                     raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
             except Exception as ex:
                 LOG.exception(ex)
                 msg = _("instance '%s' in nova is not found" % vm_id)
@@ -766,16 +769,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot_vm_resources = self.db.snapshot_vm_resources_get(
                 context, vm_id, snapshot_id)
             vol_snaps = {}
+            image_id = None
             for res_snap in snapshot_vm_resources:
                 if res_snap.resource_type != 'disk':
                     continue
+
                 vol_id = self._get_metadata_value(res_snap, 'volume_id')
+                if not image_id:
+                    image_id = self._get_metadata_value(res_snap, 'image_id')
                 vol_size = self._get_metadata_value(res_snap, 'volume_size') or "-1"
                 vol_size = int(vol_size)
                 if vol_id:
                     vol_snaps[vol_id] = {'size': vol_size}
 
-            # TODO: How do we handle boot disks
+            if image_id and image_id != nova_inst.image['id']:
+                msg = _("instance '%s' image id is different than the "
+                        "backup image id %s" % (vm_id, nova_inst.image['id']))
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
             for vdisk in inst.get('vdisks', []):
                 # make sure that vdisk exists in cinder and
                 # is attached to the instance
