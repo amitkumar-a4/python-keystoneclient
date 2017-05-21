@@ -258,6 +258,59 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
 
     return flow
 
+class CinderSnapshot(task.Task):
+    """
+       Create a cinder snapshot before overwriting the data
+    """
+
+    def execute(self, context, restore_id, vm_resource_id, volume_id):
+        return self.execute_with_log(context, restore_id, vm_resource_id, volume_id)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+
+    @autolog.log_method(Logger, 'CreateSnapshot.execute')
+    def execute_with_log(self, context, restore_id, vm_resource_id, volume_id):
+        db = WorkloadMgrDB().db
+        self.cntx = amqp.RpcContext.from_dict(context)
+
+        restore_obj = db.restore_get(self.cntx, restore_id)
+        snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
+
+        volume_service = cinder.API()
+        
+        volume = volume_service.get(self.cntx, volume_id)
+        if not volume:
+            raise exception.VolumeNotFound(volume_id=volume_id)
+
+        volume_service.create_snapshot_force(
+            self.cntx, volume, "TriliVault-Inplace_Snapshot",
+            "Snapshot created as a result of inplace restore '%s'" % restore_id)
+
+    @autolog.log_method(Logger, 'CreateSnapshot.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+def LinearCinderSnapshots(context, instance, instance_options, snapshotobj, restore_id,
+                          volumes_to_restore):
+    flow = lf.Flow("createsnapshotslf")
+    db = WorkloadMgrDB().db
+    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
+                                         instance['vm_id'], snapshotobj.id)
+    for snapshot_vm_resource in snapshot_vm_resources:
+        if snapshot_vm_resource.resource_type != 'disk':
+            continue
+
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+
+        if volume_id and volume_id in volumes_to_restore:
+            flow.add(CinderSnapshot("CinderSnapshot" + snapshot_vm_resource.id,
+                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id,
+                                                volume_id='volume_id_'+snapshot_vm_resource.id)))
+
+    return flow
+
 
 def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restore_id,
                               volumes_to_restore, restore_boot_disk):
@@ -368,6 +421,12 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
                                           snapshot_obj, restore['id'],
                                           volumes_to_restore,
                                           restore_boot_disk)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    childflow = LinearCinderSnapshots(cntx, instance, instance_options,
+                                      snapshot_obj, restore['id'],
+                                      volumes_to_restore)
     if childflow:
         _restorevmflow.add(childflow)
 
