@@ -47,6 +47,7 @@ def periodic_task(*args, **kwargs):
         f._ticks_between_runs = kwargs.pop('ticks_between_runs', 0)
         return f
 
+
     if kwargs:
         return decorator
     else:
