@@ -531,6 +531,10 @@ def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_o
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
+                if snapshot_vm_resource.snapshot_type == 'full' and \
+                   snapshot_vm_resource.status != 'deleted' and all_disks_deleted == True:
+                   db.snapshot_vm_resource_delete(cntx, snapshot_vm_resource.id) 
+                   continue 
                 if snapshot_vm_resource.status != 'deleted':
                     all_disks_deleted = False
                 else:
