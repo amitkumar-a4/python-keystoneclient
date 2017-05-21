@@ -1499,8 +1499,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         restored_vm_values = {'vm_id': restored_instance_id,
                               'vm_name':  restored_instance.name,    
                               'restore_id': restore['id'],
-                              'metadata' : {'production' : restored_net_resources[mac_address]['production'],
-                                            'instance_id': instance['vm_id']},
+                              'metadata' : {'production' : restored_net_resources[mac_address]['production'], 'instance_id': instance['vm_id']},
                               'status': 'available'}
         restored_vm = db.restored_vm_create(cntx, restored_vm_values)    
         
