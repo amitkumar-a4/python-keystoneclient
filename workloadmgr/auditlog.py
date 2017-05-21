@@ -12,6 +12,7 @@ from oslo.config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.vault import vault
+import base64
  
 auditlog_opts = [
     cfg.StrOpt('auditlog_admin_user',
@@ -35,8 +36,15 @@ CONF.register_opts(auditlog_opts)
 _auditloggers = {}
 lock = threading.Lock()
 
-def getAuditLogger(name='auditlog', version='unknown', filepath=None):
- 
+def getAuditLogger(name='auditlog', version='unknown', filepath=None, CONF1=None):
+    if CONF1 is not None:
+       for backup_endpoint in CONF1.vault_storage_nfs_export.split(','):
+           base64encode = base64.b64encode(backup_endpoint)
+           mountpath = os.path.join(CONF.vault_data_directory,
+                                    base64encode)
+           filepath = os.path.join(mountpath, CONF1.cloud_unique_id)
+           filepath = os.path.join(filepath, CONF.audit_log_file)
+           break
     if filepath is None:
         (backup_target, path) = vault.get_settings_backup_target()
         filepath = os.path.join(backup_target.mount_path, CONF.cloud_unique_id)
