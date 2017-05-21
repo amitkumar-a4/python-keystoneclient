@@ -23,6 +23,29 @@ def upgrade(migrate_engine):
 
     #pickle_coltype = PickleType(pickle.HIGHEST_PROTOCOL)
 
+    file_search = Table(
+        'file_search', meta,
+        Column('created_at', DateTime),
+        Column('updated_at', DateTime),
+        Column('deleted_at', DateTime),
+        Column('deleted', Boolean),
+        Column('version', String(length=255)),
+        Column('id', Integer, primary_key=True, nullable=False),
+        Column('vm_id', String, nullable=False),
+        Column('project_id', String, nullable=False),
+        Column('user_id', String, nullable=False),
+        Column('filepath', String, nullable=False),
+        Column('snapshot_ids', Text),
+        Column('json_resp', Text),
+        Column('start', Integer),
+        Column('end', Integer),
+        Column('host', String),
+        Column('error_msg', String),
+        Column('status', String(10)),
+        Column('scheduled_at', DateTime),
+        mysql_engine='InnoDB'
+    )
+
     services = Table(
         'services', meta,
         Column('created_at', DateTime),
@@ -600,7 +623,8 @@ def upgrade(migrate_engine):
     
     # create all tables
     # Take care on create order for those with FK dependencies
-    tables = [services,
+    tables = [file_search,
+              services,
               vault_storages,
               vault_storage_metadata,              
               workload_types,
@@ -643,7 +667,8 @@ def upgrade(migrate_engine):
             raise
 
     if migrate_engine.name == "mysql":
-        tables = [  "services",
+        tables = [  "file_search",
+                    "services",
                     "vault_storages",
                     "vault_storage_metadata",
                     "workload_types",

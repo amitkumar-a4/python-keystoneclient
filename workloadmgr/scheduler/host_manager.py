@@ -88,6 +88,7 @@ class HostState(object):
         # Mutable available resources.
         # These will change as new snapshot jobs are scheduled
         self.running_snapshots = 0
+        self.running_file_search = 0
 
         self.updated = None
 
@@ -119,6 +120,12 @@ class HostState(object):
         """Incrementally update host state snapshot request"""
         self.updated = timeutils.utcnow()
         self.running_snapshots += 1
+        pass
+
+    def consume_from_file_search(self, search):
+        """Incrementally update host state search request"""
+        self.updated = timeutils.utcnow()
+        self.running_file_search += 1
         pass
 
     def __repr__(self):
@@ -268,7 +275,6 @@ class HostManager(object):
                                                  service=
                                                  dict(service.iteritems()))
             # update host_state
-      
             if host in self.host_state_running.keys():
                host_state.running_snapshots = self.host_state_running[host]
             else: 
