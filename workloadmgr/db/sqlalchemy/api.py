@@ -319,6 +319,70 @@ def service_update(context, service_id, values):
         service_ref.save(session=session)
 
 
+######### File search ###############
+
+@require_context
+def file_search_get_all(context, **kwargs):
+    status = kwargs.get('status',None)
+    time_in_minutes = kwargs.get('time_in_minutes',None)
+    host = kwargs.get('host', None)
+    vm_id = kwargs.get('vm_id', None)
+    query =  model_query(context, models.FileSearch, **kwargs)
+    query = query.filter_by(project_id=context.project_id)
+    if time_in_minutes is not None:
+       now = timeutils.utcnow()
+       minutes_ago = now - timedelta(minutes=int(time_in_minutes))
+       query = query.filter(models.FileSearch.created_at < minutes_ago)
+    if vm_id is not None:
+       query = query.filter_by(vm_id=vm_id)
+    if host is not None:
+       query = query.filter(or_(models.FileSearch.host == host, models.FileSearch.host == None))
+    if status is not None:
+       query = query.filter(and_(models.FileSearch.status != status, models.FileSearch.status != 'error'))
+    return query.all()   
+
+@require_context
+def file_search_delete(context, search_id):
+    session = get_session()
+    with session.begin():
+        ref = _file_search_get(context, search_id, session=session)
+        session.delete(ref)
+
+@require_context
+def file_search_get(context, search_id):
+    session = get_session()
+    return _file_search_get(context, search_id, session)
+
+@require_context
+def _file_search_get(context, search_id, session):
+    result = model_query(
+        context,
+        models.FileSearch,
+        session=session).\
+        filter_by(project_id=context.project_id).\
+        filter_by(id=search_id).\
+        first()
+    if not result:
+        raise exception.FileSearchNotFound(search_id=search_id)
+
+    return result
+
+@require_context
+def file_search_create(context, values):
+    session = get_session()
+    ref = models.FileSearch()
+    ref.update(values)
+    ref.save()
+    return ref
+
+@require_context
+def file_search_update(context, search_id, values):
+    session = get_session()
+    with session.begin():
+        ref = _file_search_get(context, search_id, session=session)
+        ref.update(values)
+        ref.save(session=session)
+
 #### Work load Types #################
 """ workload_type functions """
 @require_context
@@ -1042,7 +1106,15 @@ def snapshot_get_all(context, **kwargs):
     else:
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
-    return qs.order_by(models.Snapshots.created_at.desc()).all() 
+    if 'status' in kwargs and kwargs['status'] is not None:
+       qs = qs.filter_by(status=kwargs['status'])
+
+    qs = qs.order_by(models.Snapshots.created_at.desc())
+    if 'end' in kwargs and kwargs['end'] != 0:
+       qs = qs.limit(kwargs['end'])
+    if 'start' in kwargs and kwargs['start'] != 0:
+       qs = qs.offset(kwargs['start'])
+    return qs.all() 
 
 @require_context                            
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
@@ -2826,7 +2898,6 @@ def task_get_all_by_project(context, project_id, **kwargs):
     return model_query(context, models.Tasks, **kwargs).\
                             options(sa_orm.joinedload(models.Tasks.status_messages)).\
                             filter_by(project_id=project_id).all()
-        
 
 @require_context
 def task_show(context, task_id):
