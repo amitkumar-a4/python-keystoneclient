@@ -48,9 +48,12 @@ from workloadmgr.db.sqlalchemy import models
 from pytz import all_timezones
 from tzlocal import get_localzone
 
+from workloadmgr import auditlog
+
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
+
 
 module_dir = os.path.dirname(__file__)
 if module_dir:
@@ -422,7 +425,7 @@ def _authenticate_with_swift(config_data):
                          'os_domain_id': config_data['swift_domain_id'], 'prefix': None, 'auth_version': '2.0', 
                          'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
                          'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
-                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': None, 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
@@ -437,13 +440,14 @@ def _authenticate_with_swift(config_data):
                          'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'], 
                          'os_domain_id': config_data['swift_domain_id'],'prefix': None, 'auth_version': '3', 
                          'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None, 
-                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
-                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': config_data['swift_tenantname'], 
+                         'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': config_data['swift_domain_id'], 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
-                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
-                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
+                         'os_options': {'project_name': config_data['swift_tenantname'], 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 
+                                        'user_domain_name': None, 
+                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': config_data['swift_domain_id'], 'user_id': None, 
                                         'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],
                                         'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
@@ -454,7 +458,7 @@ def _authenticate_with_swift(config_data):
                          'os_tenant_name': None, 'os_user_domain_id': None, 'prefix': None, 'auth_version': '1.0', 
                          'ssl_compression': True, 'os_password': None, 'os_user_id': None, 'os_project_id': None, 
                          'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None, 
-                         'os_service_type': None, 'insecure': False, 'os_help': None, 'os_project_domain_id': None, 
+                         'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': None, 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': None, 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
                          'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
@@ -463,7 +467,7 @@ def _authenticate_with_swift(config_data):
                                         'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None, 
                                         'auth_token': None, 'project_domain_name': None}, 
                          'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
-                
+               
             with SwiftService(options=_opts) as swift:
                 try:
                     stats_parts_gen = swift.list()
@@ -511,6 +515,36 @@ def _authenticate_with_keystone():
     except Exception as e:
            raise Exception( "KeystoneError:Unable to connect to keystone Admin URL "+e.message  )
 
+    if keystone.version == 'v3':
+       keystone_endpoints = keystone.endpoints.list(service=keystone.services.find(type='identity').id, region=config_data['region_name'])
+       for endpoint in keystone_endpoints:
+           if endpoint.interface == 'public':
+              keystone_public_url = endpoint.url
+           elif endpoint.interface == 'internal':
+                keystone_internal_url = endpoint.url
+           elif endpoint.interface == 'admin':
+                keystone_admin_url = endpoint.url
+    else:
+         endpoint = keystone.endpoints.find(service_id=keystone.services.find(type='identity').id,
+                                                   region=config_data['region_name'])
+         keystone_public_url = endpoint.publicurl
+         keystone_internal_url = endpoint.internalurl
+         keystone_admin_url = endpoint.adminurl
+
+    if keystone_admin_url != config_data['keystone_admin_url']:
+       raise Exception( "KeystoneError:Please enter correct keystone admin url ")
+
+    
+    if keystone_public_url == config_data['keystone_public_url']:
+       config_data['endpoint_type'] = 'publicURL'
+       v3_str = 'public'
+    elif keystone_internal_url == config_data['keystone_public_url']:
+         config_data['endpoint_type'] = 'internalURL'
+         v3_str = 'internal'
+
+    if 'endpoint_type' not in config_data:
+       raise Exception( "KeystoneError:Please enter correct keystone public/internal url ")
+  
     for tenant in tenants:
         if tenant.name == 'service' or tenant.name == 'services':
             config_data['service_tenant_id'] = tenant.id
@@ -554,10 +588,10 @@ def _authenticate_with_keystone():
     #image
     if keystone.version == 'v3':
         image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                   region=config_data['region_name'], interface='public').url
+                                                   region=config_data['region_name'], interface=v3_str).url
     else:
-        image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
-                                                   region=config_data['region_name']).publicurl
+        image_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='image').id, 
+                                                   region=config_data['region_name']), v3_str+"url")
 
     parse_result = urlparse(image_public_url)
     config_data['glance_production_api_servers'] = image_public_url
@@ -569,10 +603,10 @@ def _authenticate_with_keystone():
     try:
         if keystone.version == 'v3':
            network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
-                                                        region=config_data['region_name'], interface='public').url
+                                                        region=config_data['region_name'], interface=v3_str).url
         else:
-             network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
-                                                          region=config_data['region_name']).publicurl
+             network_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='network').id, 
+                                                          region=config_data['region_name']), v3_str+"url")
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
         config_data['neutron_production_url'] = "unavailable"
@@ -585,10 +619,10 @@ def _authenticate_with_keystone():
     #compute
     if keystone.version == 'v3':
         compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id, 
-                                                     region=config_data['region_name'], interface='public').url
+                                                     region=config_data['region_name'], interface=v3_str).url
     else:
-        compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
-                                                     region=config_data['region_name']).publicurl
+        compute_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
+                                                     region=config_data['region_name']), v3_str+"url")
 
   
     def _get_service_endpoint(public_url):
@@ -607,10 +641,10 @@ def _authenticate_with_keystone():
         #volume
         if keystone.version == 'v3':
             volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                       region=config_data['region_name'], interface='public').url
+                                                       region=config_data['region_name'], interface=v3_str).url
         else:
-            volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                        region=config_data['region_name']).publicurl
+            volume_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
+                                                        region=config_data['region_name']), v3_str+"url")
 
         config_data['cinder_production_endpoint_template'] = \
             _get_service_endpoint(volume_public_url)
@@ -623,10 +657,10 @@ def _authenticate_with_keystone():
         #object
         if keystone.version == 'v3':
             object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                       region=config_data['region_name'], interface='public').url
+                                                       region=config_data['region_name'], interface=v3_str).url
         else:
-            object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
-                                                        region=config_data['region_name']).publicurl
+            object_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id, 
+                                                        region=config_data['region_name']), v3_str+"url")
 
         config_data['vault_swift_url'] = object_public_url.replace(
                                              object_public_url.split("/")[-1], 'AUTH_') 
@@ -790,7 +824,6 @@ def _register_workloadtypes():
     # Python code here to register workloadtypes
     if config_data['nodetype'] == 'controller':
         time.sleep(5)
-
         wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
@@ -1460,11 +1493,11 @@ def service_action(service_display_name, action):
 @bottle.route('/services')
 @authorize()
 def services():
-    bottle.redirect("/services_vmware")
+    bottle.redirect("/services_openstack")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])                         
 
-@bottle.route('/services_vmware')
+@bottle.route('/services_openstack')
 @bottle.view('services_page_vmware')
 @authorize()
 def services_vmware():
@@ -1472,8 +1505,7 @@ def services_vmware():
     services = {'api_service' : 'wlm-api',
                 'scheduler_service' : 'wlm-scheduler',
                 'workloads_service' : 'wlm-workloads',
-                'inventory_service' : 'nova-api',
-                'tvault_gui_service' :'tvault-gui',} 
+                } 
     
     config_status = 'not_configured'
     nodetype = 'not_configured'
@@ -1656,16 +1688,16 @@ def troubleshooting_vmware():
     return values
 
 @bottle.route('/logs')
+@bottle.view('logs_page_vmware')
 @authorize()
 def logs():
-    bottle.redirect("/logs_vmware")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
 
-@bottle.route('/logs_vmware')
+@bottle.route('/logs_openstack')
 @bottle.view('logs_page_vmware')
 @authorize()
-def logs_vmware():
+def logs_openstack():
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
             
@@ -1673,7 +1705,6 @@ def logs_vmware():
 @authorize()
 def configure_form():
     bottle.redirect(bottle.request.url + '_' + TVAULT_CONFIGURATION_TYPE)
-
 
 @bottle.route('/configure_vmware')
 @bottle.view('configure_form_vmware')
@@ -1716,7 +1747,7 @@ def configure_form_openstack():
     config_data['timezones'] = all_timezones
     config_data['timezone'] = timezone
     if 'storage_nfs_options' not in config_data:
-       config_data['storage_nfs_options'] = 'nolock'
+       config_data['storage_nfs_options'] = 'nolock,soft,timeo=180,intr'
     roles = ['_member_','Member','member']
     config_data['roles'] = roles
     if 'trustee_role' not in config_data:
@@ -1816,13 +1847,13 @@ def configure_host():
 
         def cleanup_mount(path):
             try:
-                command = ['sudo', 'umount', path]
+                command = ['sudo', 'umount', '-f', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass
         
             try:
-                command = ['sudo', 'umount', path]
+                command = ['sudo', 'umount', '-f', path]
                 subprocess.call(command, shell=False)
             except Exception as exception:
                 pass           
@@ -1874,6 +1905,10 @@ def configure_host():
                     command = ['sudo', '-u', WLM_USER, 'rm', '-rf', temp_file_name]
                     subprocess.check_call(command, shell=False)
                     raise Exception("Failed to verify R/W permissions of the NFS export: " + nfsshare)
+
+        tmpfs_path = os.path.join(config_data['vault_data_directory_old'], "tmpfs")
+        if os.path.exists(tmpfs_path) and os.path.ismount(tmpfs_path):
+            cleanup_mount(tmpfs_path)
 
         if os.path.exists(config_data['vault_data_directory_old']) and \
             os.path.ismount(config_data['vault_data_directory_old']):
@@ -2215,6 +2250,10 @@ def configure_service():
                      'project_domain_id = ' + config_data['service_tenant_domain_id'],
                      starts_with=True)
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'endpoint_type = ',
+                     'endpoint_type = ' + config_data['endpoint_type'],
+                     starts_with=True)
+
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
@@ -2291,6 +2330,11 @@ def start_service():
 @authorize()
 def start_swift_service():
     try:
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop'];
+            subprocess.call(command, shell=False)
+        except:
+               pass
         try:
             shutil.rmtree(config_data['vault_data_directory'])
         except:
@@ -2614,8 +2658,7 @@ def configure_openstack():
     global config_data
     config_data = {}
     bottle.request.environ['beaker.session']['error_message'] = ''
-    
-    try:    
+    try:
         config_inputs = bottle.request.POST
 
         config_data['configuration_type'] = 'openstack'
@@ -2624,6 +2667,17 @@ def configure_openstack():
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress'].strip()
         if config_data['nodetype'] == 'controller':
             config_data['tvault_primary_node'] = config_data['floating_ipaddress'].strip()
+        elif config_data['nodetype'] == 'additional':
+             sql_connection = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+             engine = create_engine(sql_connection)
+             rows = engine.execute(select([models.Settings.__table__]).where(models.Settings.__table__.columns.project_id=='Configurator'))
+             if not int(rows.rowcount) >= 0:
+                raise Exception("Invalid controller node")
+             for row in rows:
+                 items = dict(row.items())
+                 if items['name'] == 'tvault_ipaddress':
+                    if items['value'] == config_data['tvault_ipaddress']:
+                       raise Exception("Additional node IP address cannot be Controller node, Enter Controller node Ip address")
         config_data['name_server'] = config_inputs['name-server'].strip()
         config_data['domain_search_order'] = config_inputs['domain-search-order'].strip()        
         
@@ -2670,38 +2724,40 @@ def configure_openstack():
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
-        config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
-        if 'storage-nfs-options' in config_inputs:
-           config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
-        else:
-             config_data['storage_nfs_options'] = 'nolock'
-       
-        if 'swift-auth-version' in config_inputs:
-            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
-        else:
-             config_data['swift_auth_version'] = 'NONE'
 
-         
-        if config_data['swift_auth_version'] == 'TEMPAUTH':
-           config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
-           config_data['swift_username'] = config_inputs['swift-username'].strip()
-           config_data['swift_password'] = config_inputs['swift-password'].strip()
-           config_data['swift_tenantname'] = ''
-           config_data['swift_domain_id'] = ''
-        elif config_data['swift_auth_version'] == 'KEYSTONE':
-             config_data['swift_auth_url'] = config_data['keystone_public_url']
-             config_data['swift_username'] = config_data['admin_username']
-             config_data['swift_password'] = config_data['admin_password']
-             config_data['swift_tenantname'] = config_data['admin_tenant_name']
-             config_data['swift_domain_id'] = ''
-             if config_data['keystone_auth_version'] == 3:
-                config_data['swift_domain_id'] = config_data['domain_name']
+        config_data['storage_nfs_options'] = 'nolock,soft,timeo=180,intr'
+        config_data['storage_nfs_export'] = ''
+        config_data['swift_auth_url'] = ''
+        config_data['swift_username'] = ''
+        config_data['swift_password'] = ''
+        config_data['swift_tenantname'] = ''
+        config_data['swift_domain_id'] = ''
+        config_data['swift_auth_version'] = 'NONE'
+
+        config_data['backup_target_type'] = config_inputs['backup_target_type']
+        if config_data['backup_target_type'] == 'NFS':
+            config_data['storage_nfs_export'] = config_inputs['storage-nfs-export'].strip()
+
+            if 'storage-nfs-options' in config_inputs:
+                config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
+
         else:
-             config_data['swift_auth_url'] = ''
-             config_data['swift_username'] = ''
-             config_data['swift_password'] = ''
-             config_data['swift_tenantname'] = ''
-             config_data['swift_domain_id'] = ''
+            config_data['swift_auth_version'] = config_inputs['swift-auth-version']
+
+            if config_data['swift_auth_version'] == 'TEMPAUTH':
+                config_data['swift_auth_url'] = config_inputs['swift-auth-url'].strip()
+                config_data['swift_username'] = config_inputs['swift-username'].strip()
+                config_data['swift_password'] = config_inputs['swift-password'].strip()
+                config_data['swift_tenantname'] = ''
+                config_data['swift_domain_id'] = ''
+            elif config_data['swift_auth_version'] == 'KEYSTONE':
+                config_data['swift_auth_url'] = config_data['keystone_public_url']
+                config_data['swift_username'] = config_data['admin_username']
+                config_data['swift_password'] = config_data['admin_password']
+                config_data['swift_tenantname'] = config_data['admin_tenant_name']
+                config_data['swift_domain_id'] = ''
+                if config_data['keystone_auth_version'] == 3:
+                    config_data['swift_domain_id'] = config_data['domain_name']
 
         config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         
@@ -2762,6 +2818,20 @@ def reinitialize():
            connection.execute("SET FOREIGN_KEY_CHECKS=1") 
            trans.commit()
            bottle.request.environ['beaker.session']['success_message'] = 'Reinitialized successfully'
+           try:
+                context = bottle.request.environ['beaker.session']
+                context.user = 'System'
+                context.tenant = 'System'
+                context.user_id = 'System'
+                context.project_id = 'System'
+                context.vault_storage_nfs_export = ''
+                if config_data['backup_target_type'] == 'NFS':
+                   context.vault_storage_nfs_export = config_data['storage_nfs_export']
+                context.cloud_unique_id = config_data['cloud_unique_id']
+                AUDITLOG = auditlog.getAuditLogger(CONF1=context)
+                AUDITLOG.log(context,'Reinitialized database', None)
+           except Exception as ex:
+                  pass               
         else:
              bottle.request.environ['beaker.session']['error_message'] = 'No database found'
     except Exception as exception:

@@ -15,6 +15,47 @@
 <script src="js/bootstrap-tagsinput.min.js"></script>
 <script type="text/javascript">
 IsV3 = false
+function validate_swift_credentials(inputelement) {
+    public_url = $('[name="keystone-public-url"]')[0].value
+    project_name = $('[name="admin-tenant-name"]')[0].value
+    username = $('[name="admin-username"]')[0].value
+    password = $('[name="admin-password"]')[0].value
+    domain_id = $('[name="domain-name"]')[0].value
+    swift_auth_url = $('[name="swift-auth-url"]')[0].value
+    swift_username = $('[name="swift-username"]')[0].value
+    swift_password = $('[name="swift-password"]')[0].value
+    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+    if (inputelement.name != 'swift-auth-version' || inputelement == 'custom') {
+       inputelement = obj
+    }
+    swift_auth_version = obj.val()
+    $.ajax({
+        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
+              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
+        }
+    });
+}
+
+
 function setRequired(val) {
     if(val.includes('v3')) {
        IsV3 = true
@@ -27,10 +68,38 @@ function setRequired(val) {
 function findForm() {
   setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
   setRequired($("#configure_openstack input[name='keystone-public-url']").val())
-  obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-  setSwiftRequired(obj.attr('checked'), obj.val())
+  hideshowstorages()
 }
+
+function hideshowstorages() {
+  backup_target_type = $('[name="backup_target_type"]:checked').val()
+  if (typeof backup_target_type == "undefined") {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');
+     $($('#nfsstorage-panel')[0]).addClass('hidden');
+  }
+  if (backup_target_type == 'NFS') {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');
+     setSwiftRequired(true, 'NFS')
+  }
+  if (backup_target_type == 'SWIFT') {
+     $($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');
+     obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+     setSwiftRequired(obj.attr('checked'), obj.val())
+     validate_swift_credentials('custom')
+  }
+}
+
 function setSwiftRequired(checked, val) {
+     storage_nfs_export  = $('#storage-nfs-export').val()
+     val_length = storage_nfs_export.split(",").length
+     if (val == "decide") {
+         obj = $("#configure_openstack input[name='swift-auth-version']:checked")
+         if (typeof obj == "undefined") {
+             $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+             return
+         }
+         val = obj.val()
+     }
      if((checked==true || checked=='checked') && val=='TEMPAUTH') {
         $('[name="swift-auth-url"]').attr("required", "true");
         $('[name="swift-username"]').attr("required", "true");
@@ -48,14 +117,12 @@ function setSwiftRequired(checked, val) {
         $('[name="swift-password"]').removeAttr('required')
      }
      if(val == 'TEMPAUTH' || val == 'KEYSTONE') {
-       $('[name="storage-nfs-export"]').removeAttr('required')
-       $('[name="storage-nfs-options"]').removeAttr('required')        
+       $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
      }
      else {
-       $('[name="storage-nfs-export"]').attr("required", "true");
-       $('[name="storage-nfs-options"]').attr("required", "true");
+       if(storage_nfs_export == "")
+         $('[placeholder="server:/var/nfs"]').first().attr("required", "true");
      }
-
 }
 </script>
 </head>
@@ -91,7 +158,7 @@ function setSwiftRequired(checked, val) {
  		</div>
   % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
-  <form role="form" id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
+  <form role="form"  id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
 	%if 'nodetype' in locals() and nodetype == 'additional':
 		<input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node
 		<input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
@@ -101,7 +168,7 @@ function setSwiftRequired(checked, val) {
 	%end  
 		   
     <div class="form-group">
-    	<label class="control-label">Floating IP Address	<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
+    	<label class="control-label">TrilioVault Controller IP Address<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
     	<input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control">
     </div>
     <div class="form-group">
@@ -110,7 +177,7 @@ function setSwiftRequired(checked, val) {
         <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
-    	<label class="control-label">Keystone Public Url<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
+    	<label class="control-label">Keystone Url (Public/Internal)<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
     	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
@@ -196,21 +263,49 @@ function setSwiftRequired(checked, val) {
 	    </div>
 	  </div>
 	</div> 
-	
-	<div class="panel-group" id="accordion">
-	  <div class="panel panel-default" id="panel3">
+
+	<div class="panel-group" id="backend-choice">
+	  <div class="panel panel-default" id="panel9">
+             <div class="panel-heading">
+                <h4 class="panel-title">
+                  <a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree"> Choose Backup Target </a>
+                </h4>
+             </div>
+          </div>
+          <div id="collapsebackendtype" class="panel-collapse collapse in">
+            <div class="panel-body">
+             <label class="radio-inline">
+             %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
+             %else:
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')" required>NFS
+             %end 
+             </label>
+             <label class="radio-inline">
+             %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
+             %else:
+                <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
+             %end 
+             </label>
+             <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
+
+            %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
+	    <div class="panel-group" id="nfsstorage-panel">
+             %else:
+	    <div class="panel-group hidden" id="nfsstorage-panel">
+             %end 
+	       <div class="panel panel-default" id="panel3">
 		<div class="panel-heading">
 		  <h4 class="panel-title">
-			<a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree">
-			  NFS Storage
-			</a>
+                     <a data-toggle="collapse" data-target="#collapseThree" href="#collapseThree"> NFS Storage </a>
 		  </h4>
 		</div>
 		<div id="collapseThree" class="panel-collapse collapse in">
 		  <div class="panel-body">
 			<div class="form-group" >
 		        <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
-			<input name="storage-nfs-export" {{'value=' + storage_nfs_export if defined('storage_nfs_export') else ''}} id="storage-nfs-export" type="text" required placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
+			<input name="storage-nfs-export" {{'value='+storage_nfs_export if (defined('storage_nfs_export') and len(storage_nfs_export)) else ''}} id="storage-nfs-export" type="text" placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                         <span id="nfs_helpblock" class="help-block">Please enter list of NFS shares separated by commas</span>
 			</div>
                         <div class="form-group">
@@ -220,52 +315,54 @@ function setSwiftRequired(checked, val) {
                         </div>
 		  </div>
 		</div>
-	  </div>
-	</div>
-
-        <div class="panel-group" id="accordion">
-		  <div class="panel panel-default" id="panel5">
-		    <div class="panel-heading">
-		      <h4 class="panel-title">
-		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive">
-		          Swift Object Storage
-		        </a>
-		      </h4>
-		    </div>
-		    <div id="collapseFive" class="panel-collapse collapse in">
-		    <div class="panel-body">
-                    <div class="input-group">
-                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
-                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="NONE" onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
-                %else:
-                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="NONE" checked onchange="setSwiftRequired(this.checked, this.value)">  NONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
-                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
-                %end 
-                     <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
-                </div>
-                <div class="input-group" id="swift-auth-url-div">
-                    <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                    <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
-                </div><br>
-                <div class="input-group" id="swift-username-div">
-                    <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                    <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
-                </div><br>
-                <div class="input-group" id="swift-password-div">
-                    <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-                    <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
-                    <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                </div><br>
-	 	</div>
-		</div>
 	      </div>
+	    </div>
+
+            %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
+            <div class="panel-group" id="swiftstorage-panel">
+            %else:
+            <div class="panel-group hidden" id="swiftstorage-panel">
+            %end 
+               <div class="panel panel-default" id="panel5">
+                  <div class="panel-heading">
+                     <h4 class="panel-title">
+		        <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive"> Swift Object Storage </a>
+		     </h4>
+		  </div>
+		  <div id="collapseFive" class="panel-collapse collapse in">
+		     <div class="panel-body">
+                       <div class="input-group">
+                %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
+                %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
+                %else:
+                         <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                         <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
+                %end 
+                         <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
+                       </div>
+                       <div class="input-group" id="swift-auth-url-div">
+                         <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                         <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
+                       </div><br>
+                       <div class="input-group" id="swift-username-div">
+                          <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                          <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                       </div><br>
+                       <div class="input-group" id="swift-password-div">
+                         <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                         <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
+                         <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                       </div><br>
+	 	     </div>
+		  </div>
+	        </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="panel-group" id="accordion">
@@ -306,7 +403,7 @@ function setSwiftRequired(checked, val) {
   </form>
 
 <script>
-$(document).ready(function(){
+//$(document).ready(function(){
 $('#ntp-enabled').click(function(){
 if($(this).is(':checked'))
 {
@@ -316,7 +413,6 @@ else
 {
 $('#ntp-servers').removeAttr('required');
 }
-});
 });
 
 function validate_url_versions() {
@@ -392,51 +488,30 @@ function validate_keystone_credentials(inputelement) {
     });
 }
 
-function validate_swift_credentials(inputelement) {
-    public_url = $('[name="keystone-public-url"]')[0].value
-    project_name = $('[name="admin-tenant-name"]')[0].value
-    username = $('[name="admin-username"]')[0].value
-    password = $('[name="admin-password"]')[0].value
-    domain_id = $('[name="domain-name"]')[0].value
-    swift_auth_url = $('[name="swift-auth-url"]')[0].value
-    swift_username = $('[name="swift-username"]')[0].value
-    swift_password = $('[name="swift-password"]')[0].value
-    obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-    swift_auth_version = obj.val()
-    $.ajax({
-        url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
-              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
-        beforeSend: function() {
-           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-           $(spinelement[0]).removeClass("hidden")
-           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
-           $($(inputelement).parent()[0]).removeClass("has-error")
-           $($(inputelement).parent()[0]).removeClass("has-success")
-        },
-        complete: function(result) {
-           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
-           $(spinelement[0]).addClass("hidden")
-        },
-        error: function(result) {
-           $($(inputelement).parent()[0]).addClass("has-error")
-           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
-           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
-        },
-        success: function(result) {
-           $($(inputelement).parent()[0]).addClass("has-success")
-           options = ""
-        }
-    });
-}
-
 /*$('[name="storage-nfs-options"]').tagsinput({
   allowDuplicates: true
 });*/
+
+$('[name="storage-nfs-export"]').on('itemRemoved', function(event) {
+  storage_nfs_export = $('#storage-nfs-export').val()
+  val_length = storage_nfs_export.split(",").length
+  if(val_length >= 1 && storage_nfs_export != "") {
+      $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+  }
+  if(storage_nfs_export == "") {
+    $('[placeholder="server:/var/nfs"]').first().attr("required", "true");
+  }
+});
 
 $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 //function validate_nfsshare(inputelement) {
 //}
     //nfsshare = $('[name="storage-nfs-export"]')[0].value
+    storage_nfs_export = $('#storage-nfs-export').val()
+    val_length = storage_nfs_export.split(",").length
+    if(val_length >= 1 && storage_nfs_export != "") {
+      $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+    }
     nfsshare = event.item
     inputelement = this
     $.ajax({
@@ -466,7 +541,7 @@ $('[name="storage-nfs-export"]').on('itemAdded', function(event) {
 if ($('input:radio[name=nodetype]:checked').val() == "additional") {
     $("#panel4")[0].hidden=true
 }
-
+//});
 </script>
 </body>
 </html>

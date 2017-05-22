@@ -174,6 +174,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         self._wrapped_conn = None
         self.read_only = read_only
+        self.snaps_data = {}
 
 
     def has_min_version(self, lv_ver=None, hv_ver=None, hv_type=None):
@@ -621,7 +622,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
                   now = timeutils.utcnow()
                   if (now - start_time) > datetime.timedelta(minutes=5) and CONF.vault_storage_type == 'swift-s':
-                     async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata})
+                     try:
+                         async_task_status_swift = compute_service.vast_async_task_status(cntx, instance_id, {'metadata': progress_tracker_metadata, 'fetched': True})
+                     except:
+                            async_task_status_swift = None
                      start_time = timeutils.utcnow()
                      if async_task_status_swift and 'status' in async_task_status_swift and len(async_task_status_swift['status']):
                         for line in async_task_status['status']:
@@ -635,6 +639,7 @@ class LibvirtDriver(driver.ComputeDriver):
                           if async_task_status_swift and 'disks_info' in async_task_status_swift and len(async_task_status_swift['disks_info']):
                              if len(async_task_status_swift['disks_info'][0]) > 2:
                                 operation_completed = True
+                                self.snaps_data[instance_id] = {'fetched': True, 'snaps': async_task_status_swift}
                                 return async_task_status_swift
               except nova_unauthorized as ex:
                      LOG.exception(ex)
@@ -671,20 +676,25 @@ class LibvirtDriver(driver.ComputeDriver):
                                            progress_tracker_metadata,
                                            instance['vm_id'],
                                            backup_endpoint)
-
-        if ret is not True and ret is not False:
-           snapshot_data = ret
-        else:
-             try:
-                 snapshot_data = compute_service.vast_async_task_status(cntx,
+        #if ret is not True and ret is not False:
+        #   snapshot_data = ret
+        if instance['vm_id'] in self.snaps_data and \
+           self.snaps_data[instance['vm_id']]['fetched'] is True:
+               
+           snapshot_data = self.snaps_data[instance['vm_id']]['snaps']
+           self.snaps_data.pop(instance['vm_id'])
+           return snapshot_data
+       
+        try:
+             snapshot_data = compute_service.vast_async_task_status(cntx,
                                                                  instance['vm_id'],
-                                                                 {'metadata': progress_tracker_metadata})
-             except nova_unauthorized as ex:
-                    LOG.exception(ex)
-                    cntx = nova._get_tenant_context(cntx)
-             except Exception as ex:
-                    LOG.exception(ex)
-                    raise ex
+                                                                 {'metadata': progress_tracker_metadata, 'fetched': True})
+        except nova_unauthorized as ex:
+                LOG.exception(ex)
+                cntx = nova._get_tenant_context(cntx)
+        except Exception as ex:
+                LOG.exception(ex)
+                raise ex
 
         return snapshot_data
 
@@ -774,6 +784,7 @@ class LibvirtDriver(driver.ComputeDriver):
     def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
         # Always attempt with a new token to avoid timeouts
 
+        cntx = nova._get_tenant_context(cntx)
         snapshot_obj = db.snapshot_get(cntx, snapshot['id'])
         workload_obj = db.workload_get(cntx, snapshot_obj.workload_id)
         compute_service = nova.API(production=True)
@@ -787,7 +798,6 @@ class LibvirtDriver(driver.ComputeDriver):
         cinder_volumes = []
         for volume in getattr(nova_instance, 'os-extended-volumes:volumes_attached'):
             cinder_volumes.append(volume_service.get(cntx, volume['id'], no_translate=True))
-        
         
         for disk_info in snapshot_data_ex['disks_info']:
             # Always attempt with a new token to avoid timeouts
@@ -1117,6 +1127,8 @@ class LibvirtDriver(driver.ComputeDriver):
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                                     'backup_media_target')
             backup_target = vault.get_backup_target(backup_endpoint)
+
+            instance_ids = [instance['vm_id'] for instance in instances]
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
                 for snap in snapshots_to_delete:
                     workload_utils.common_apply_retention_snap_delete(cntx, snap, workload_obj)
@@ -1139,6 +1151,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
                         vm_disk_resource_snap = vm_disk_resource_snap_to_commit = db.vm_disk_resource_snap_get_bottom(
                                                                                          cntx, snapshot_vm_resource.id)
+
                         if vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
                                                        vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
@@ -1169,18 +1182,33 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'snapshot_id': snapshot_to_commit.id
                                      }
 
-                                status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
+                                status = {'result': 'retry'}
+
+                                #After one click restore snapshot_vm_resource['vm_id'] would be addressing to
+                                #old vm_id which doesn't exist in Nova DB. So it will give ServerNotFound error
+                                #To overcome this issue creating a check for vm_id. if it's not existing then
+                                #passing a existing vm_id.
+                                server_id = snapshot_vm_resource['vm_id']
+                                if server_id not in instance_ids:
+                                    server_id = instance_ids[0]
+
+                                while status['result'] == 'retry':
+                                      status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
                                                                              cntx,
-                                                                             snapshot_vm_resource['vm_id'],
+                                                                             server_id,
                                                                              {'commit_image_list': commit_image_list,
                                                                               'metadata': metadata
                                                                               })
+                                      if status['result'] == 'retry':
+                                         LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
+                                         time.sleep(60)
+
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
                                                                    backup_endpoint)
-                                for snapshot in snap_to_del:
-                                    db.vm_disk_resource_snap_delete(cntx, snapshot)
+                                for snapshot_del in snap_to_del:
+                                    db.vm_disk_resource_snap_delete(cntx, snapshot_del)
 
                                 if vm_disk_resource_snap_to_commit_backing:
                                     backing_vault_path = os.path.join(backup_target.mount_path,
@@ -1201,7 +1229,16 @@ class LibvirtDriver(driver.ComputeDriver):
                 workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)
 
         except Exception as ex:
+            msg = ''
             LOG.exception(ex)
+            if hasattr(ex, 'kwargs'):
+               if 'reason' in ex.kwargs:
+                   msg = ex.kwargs['reason']
+            elif hasattr(ex,'message') and ex.message != '':
+               msg = ex.message
+            elif hasattr(ex,'strerror') and ex.strerror != '':
+               msg = ex.strerror
+
             db.snapshot_update(cntx, snapshot['id'],
-                               {'warning_msg': 'Failed to apply retention policy - ' + ex.message})
+                               {'warning_msg': 'Failed to apply retention policy - ' + msg})
 

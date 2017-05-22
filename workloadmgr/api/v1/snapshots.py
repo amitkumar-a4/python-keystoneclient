@@ -177,28 +177,36 @@ class SnapshotsController(wsgi.Controller):
         
     def _get_snapshots(self, req, is_detail):
         """Returns a list of snapshots, transformed through view builder."""
+        try:
+            context = req.environ['workloadmgr.context']
+            workload_id = req.GET.get('workload_id', None)
+            host = req.GET.get('host', None)
+            get_all = bool(req.GET.get('all', False))
 
-        context = req.environ['workloadmgr.context']
-        workload_id = req.GET.get('workload_id', None)
-        host = req.GET.get('host', None)
-        get_all = bool(req.GET.get('all', False))
+            date_from = req.GET.get('date_from', None)
+            date_to = req.GET.get('date_to', None)
+            status = req.GET.get('status', None)
 
-        date_from = req.GET.get('date_from', None)
-        date_to = req.GET.get('date_to', None)
-        
-        search_opts={'workload_id':workload_id,\
-                     'host':host, 'get_all':get_all,\
-                     'date_from':date_from, 'date_to':date_to}
+            #verify workload exists
+            if workload_id:
+               self.workload_api.workload_get(context, workload_id)
+
+            search_opts={'workload_id':workload_id,\
+                         'host':host, 'get_all':get_all,\
+                         'date_from':date_from, 'date_to':date_to, 'status':status}
  
-        snapshots_all = self.workload_api.snapshot_get_all(context, search_opts)
+            snapshots_all = self.workload_api.snapshot_get_all(context, search_opts)
    
-        limited_list = common.limited(snapshots_all, req)
+            limited_list = common.limited(snapshots_all, req)
         
-        if is_detail:
-            snapshots = self._view_builder.detail_list(req, snapshots_all)
-        else:
-            snapshots = self._view_builder.summary_list(req, snapshots_all)
-        return snapshots
+            if is_detail:
+                snapshots = self._view_builder.detail_list(req, snapshots_all)
+            else:
+                snapshots = self._view_builder.summary_list(req, snapshots_all)
+            return snapshots
+        except Exception as ex:
+            LOG.exception(ex)
+            raise ex
 
     def _restore(self, context, id, workload_id=None, body=None, test=False):
         """Restore an existing snapshot"""
@@ -210,8 +218,11 @@ class SnapshotsController(wsgi.Controller):
                 description = body['testbubble'].get('description', None)
                 options = body['testbubble'].get('options', {})
             elif (body and 'restore' in body):
-                name = body['restore'].get('name', None)
-                description = body['restore'].get('description', None)
+                name = body['restore'].get('name', "") or 'restore'
+                name = name.strip() or "restore"
+                description = body['restore'].get('description', "") or 'no-description'
+                description = description.strip() or "no-description"
+
                 options = body['restore'].get('options', {})
             if not options:
                 options = {'type' : 'openstack'}                

@@ -101,6 +101,29 @@ def service_update(context, service_id, values):
     return IMPL.service_update(context, service_id, values)
 
 ###################
+
+def file_search_get_all(context, **kwargs):
+    """Get all file search for a given host."""
+    return IMPL.file_search_get_all(context, **kwargs)
+
+def file_search_delete(context, search_id):
+    """Destroy the search or raise if it does not exist."""
+    return IMPL.file_search_delete(context, search_id)
+
+def file_search_get(context, search_id):
+    """Get a search or raise if it does not exist."""
+    return IMPL.file_search_get(context, search_id)
+
+def file_search_create(context, values):
+    """Create a search from the values dictionary."""
+    return IMPL.file_search_create(context, values)
+
+def file_search_update(context, search_id, values):
+    """Set the given properties on an search and update it.
+    """
+    return IMPL.file_search_update(context, search_id, values)
+
+###################
 def workload_type_create(context, values):
     return IMPL.workload_type_create(context, values)
 

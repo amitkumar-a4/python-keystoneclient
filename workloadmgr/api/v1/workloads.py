@@ -175,8 +175,12 @@ class WorkloadMgrsController(wsgi.Controller):
             if (full and full == '1'):
                 snapshot_type = 'full'
             if (body and 'snapshot' in body):
-                name = body['snapshot'].get('name', 'Snapshot')
-                description = body['snapshot'].get('description', '')
+
+                name = body['snapshot'].get('name', "") or 'Snapshot'
+                name = name.strip() or 'Snapshot'
+                description = body['snapshot'].get('description', "") or 'no-description'
+                description = description.strip() or 'no-description'
+
                 snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
             new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
             return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
@@ -268,10 +272,15 @@ class WorkloadMgrsController(wsgi.Controller):
             except KeyError:
                 msg = _("Incorrect request body format")
                 raise exc.HTTPBadRequest(explanation=msg)
-            name = workload.get('name', None)
-            description = workload.get('description', None)
+
+            name = workload.get('name', "") or 'workload'
+            name = name.strip() or "workload"
+            description = workload.get('description', "") or 'no-description'
+            description = description.strip() or "no-description"
+
             workload_type_id = workload.get('workload_type_id', None)
-            source_platform = workload.get('source_platform', "openstack")
+            source_platform = workload.get('source_platform', "") or 'openstack'
+            source_platform = source_platform.strip() or "openstack"
             jobdefaults = {'fullbackup_interval': '-1',
                            'start_time': '09:00 PM',
                            'interval': u'24hr',
@@ -369,31 +378,6 @@ class WorkloadMgrsController(wsgi.Controller):
                                'retention_policy_value': '30'}
 
                 jobschedule = workload.get('jobschedule', jobdefaults)
-                # IF user is intended to modify the job schedule
-                # then fill in the default values if user did not specify 
-                # any of them
-                if jobschedule:
-                    if not 'fullbackup_interval' in jobschedule:
-                        jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
-
-                    if not 'start_time' in jobschedule:
-                        jobschedule['start_time'] = jobdefaults['start_time']
-
-                    if not 'interval' in jobschedule:
-                        jobschedule['interval'] = jobdefaults['interval']
-
-                    if not 'enabled' in jobschedule:
-                        jobschedule['enabled'] = jobdefaults['enabled']
-
-                    if not 'start_date' in jobschedule:
-                        jobschedule['start_date'] = jobdefaults['start_date']
-                
-                    if not 'retention_policy_type' in jobschedule:
-                        jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']                  
-                
-                    if not 'retention_policy_value' in jobschedule:
-                        jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
-
                 self.workload_api.workload_modify(context, id, body['workload'])
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -775,16 +759,23 @@ class WorkloadMgrsController(wsgi.Controller):
         """settings"""
         try:
             context = req.environ['workloadmgr.context']
+            get_hidden = False
+            if ('QUERY_STRING' in req.environ) :
+               qs=parse_qs(req.environ['QUERY_STRING'])
+               var = parse_qs(req.environ['QUERY_STRING'])
+               get_hidden = var.get('get_hidden',[''])[0]
+               get_hidden = escape(get_hidden)                
+               if get_hidden.lower() == 'true':
+                  get_hidden = True
             Config = ConfigParser.RawConfigParser()
             Config.read('/var/triliovault/settings/workloadmgr-settings.conf')
-            
             settings = None            
             if (body and 'settings' in body):
                 settings = settings_module.set_settings(context, body['settings'])
             if (body and 'page_size' in body['settings']):
                 settings = self.workload_api.setting_get(context,'page_size')                
             if not settings:
-                settings = settings_module.get_settings(context)
+                settings = settings_module.get_settings(context, get_hidden)
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
@@ -803,13 +794,13 @@ class WorkloadMgrsController(wsgi.Controller):
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'
             try:
-                 settings = settings_module.get_settings() 
+                 settings = settings_module.get_settings(context) 
                  import re
                  for setting in settings:
                      if setting.strip().find('smtp_') >= 0:
-                        value = settings_module.get_settings().get(setting)
+                        value = settings_module.get_settings(context).get(setting)
                         if (value == "" or len(value) <= 1) and setting != 'smtp_email_enable':
-                           if settings_module.get_settings().get('smtp_server_name') == 'localhost' and (setting == 'smtp_server_password' or setting == 'smtp_server_username'):
+                           if settings_module.get_settings(context).get('smtp_server_name') == 'localhost' and (setting == 'smtp_server_password' or setting == 'smtp_server_username'):
                               continue
                            else:
                                  raise exception.ErrorOccurred("Mandatory field "+setting+" cannot be empty") 
@@ -819,23 +810,23 @@ class WorkloadMgrsController(wsgi.Controller):
                              raise exception.ErrorOccurred(setting+" cannot be greater than 10") 
 
                  msg = MIMEMultipart('alternative')
-                 msg['From'] = settings_module.get_settings().get('smtp_default_sender')
-                 if settings_module.get_settings().get('smtp_default_recipient') is None: 
+                 msg['From'] = settings_module.get_settings(context).get('smtp_default_sender')
+                 if settings_module.get_settings(context).get('smtp_default_recipient') is None: 
                     msg['To'] = msg['From']
                  else:
-                      msg['To'] =  settings_module.get_settings().get('smtp_default_recipient')
+                      msg['To'] =  settings_module.get_settings(context).get('smtp_default_recipient')
  
                  msg['Subject'] = 'Testing email configuration'
                  part2 = MIMEText(html, 'html')
                  msg.attach(part2)
                  try:
-                     socket.setdefaulttimeout(int(settings_module.get_settings().get('smtp_timeout')))
-                     s = smtplib.SMTP(settings_module.get_settings().get('smtp_server_name'),int(settings_module.get_settings().get('smtp_port')))
-                     if settings_module.get_settings().get('smtp_server_name') != 'localhost':
+                     socket.setdefaulttimeout(int(settings_module.get_settings(context).get('smtp_timeout')))
+                     s = smtplib.SMTP(settings_module.get_settings(context).get('smtp_server_name'),int(settings_module.get_settings(context).get('smtp_port')))
+                     if settings_module.get_settings(context).get('smtp_server_name') != 'localhost':
                         s.ehlo()
                         s.starttls()
                         s.ehlo
-                        s.login(settings_module.get_settings().get('smtp_server_username'),settings_module.get_settings().get('smtp_server_password'))
+                        s.login(settings_module.get_settings(context).get('smtp_server_username'),settings_module.get_settings(context).get('smtp_server_password'))
                      s.sendmail(msg['From'], msg['To'], msg.as_string())
                      s.quit()
                  except smtplib.SMTPException as ex:
@@ -898,7 +889,11 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             qs = parse_qs(req.environ['QUERY_STRING'])
-            migrate_cloud = bool(qs.get('migrate_cloud')[0])
+            migrate = qs.get('migrate_cloud')[0]
+            if migrate == 'True' or migrate == 'true':
+                migrate_cloud = True
+            else:
+                migrate_cloud = False
             try:
                 workloads = self.workload_api.get_orphaned_workloads_list(context, migrate_cloud)
                 return self._view_builder.detail_list(req, workloads)
@@ -931,9 +926,14 @@ class WorkloadMgrsController(wsgi.Controller):
                 new_tenant_id = tenant_map['new_tenant_id']
                 user_id = tenant_map['user_id']
                 if workload_ids and old_tenant_ids:
-                    raise exc.HTTPBadRequest("Please provide only one parameter among workload_ids and old_tenant_ids")
-                if new_tenant_id == None or user_id == None:
-                    raise exc.HTTPBadRequest("Please provide required parameters: new_tenant_id and user_id.")
+                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
+                          "only one parameter among workload_ids and old_tenant_ids."))
+                if new_tenant_id == None:
+                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
+                          "required parameters: new_tenant_id."))
+                if user_id == None:
+                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
+                          "required parameters: user_id."))
             try:
                 workloads = self.workload_api.workloads_reassign(context, tenant_maps)
                 return self._view_builder.detail_list(req, workloads)

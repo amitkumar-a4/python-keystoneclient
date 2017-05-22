@@ -398,9 +398,13 @@ class Service(object):
                                          'report_count': 0,
                                          'availability_zone': zone})
         except Exception as ex:
-               service_ref = db.service_get_by_args(ctxt,
+               ctl = context
+               ctl.read_deleted = 'yes'
+               service_ref = db.service_get_by_args(ctl,
                                                  self.host,
                                                  self.binary)
+               if service_ref.deleted == 1:
+                  db.service_update(context,service_ref.id, {'deleted': 0})
                
         self.service_id = service_ref['id']
 

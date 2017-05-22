@@ -498,6 +498,9 @@ class VaultStorageNotFound(NotFound):
 class TaskNotFound(NotFound):
     message = _("Task %(task_id)s could not be found.")
 
+class FileSearchNotFound(NotFound):
+    message = _("File Search %(search_id)s could not be found.")
+
 class InvalidLicense(Invalid):
     pass
 
@@ -525,3 +528,6 @@ class ProjectNotFound(NotFound):
 class UserNotFound(NotFound):
     message = _("User %(user_id)s could not be found.")
 
+class RoleNotFound(NotFound):
+    message = _("User %(user_id)s does not have role '%(role_name)s' on "
+                "project %(project_id)s")

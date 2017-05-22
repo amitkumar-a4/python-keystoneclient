@@ -20,8 +20,8 @@ from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
+from workloadmgr import settings as settings_module
 LOG = logging.getLogger(__name__)
-
 
 FLAGS = flags.FLAGS
 
@@ -80,9 +80,9 @@ class SettingsController(wsgi.Controller):
 
     def show(self, req, name):
         """Return data about the given setting."""
-        keystone_client = KeystoneClient()
         try:
             context = req.environ['workloadmgr.context']
+            keystone_client = KeystoneClient(context)
             get_hidden = False
             if ('QUERY_STRING' in req.environ) :
                 qs=parse_qs(req.environ['QUERY_STRING'])
@@ -100,6 +100,11 @@ class SettingsController(wsgi.Controller):
 
             try:
                 setting = self.workload_api.setting_get(context, name, get_hidden)
+                if setting is None:
+                   settings = settings_module.get_settings(context)
+                   for setting_loop in settings:
+                       if setting_loop == name:
+                          setting = {'name':setting_loop,'value':settings[setting_loop],'type':'Default setting'}
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
             return {'setting' : setting }

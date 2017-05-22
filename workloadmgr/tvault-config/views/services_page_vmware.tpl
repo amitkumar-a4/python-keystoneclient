@@ -101,7 +101,7 @@
 		        <td>None</td>		        
 	        %end
 	      </tr>
-	      <tr>
+	      <!--tr>
 	        <td>tVault Inventory Service</td>
 			%if 'inventory_service' in locals() and inventory_service == 'Running':
 		        <td style="color:green">Running</td>
@@ -132,7 +132,7 @@
 		        <td>Not Applicable</td>
 		        <td>None</td>		        
 	        %end
-	      </tr>			      			      
+	      </tr-->			      			      
 	    </tbody>
 	  </table>
 	<br>

@@ -129,10 +129,13 @@ class PrepareBackupImage(task.Task):
         except:
                pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
-        
+
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
-            #upload the bottom of the chain to glance
+            # upload the bottom of the chain to glance
+            while image_info.backing_file:
+                image_info = qemuimages.qemu_img_info(image_info.backing_file)
+
             restore_file_path = image_info.image
             image_overlay_file_path = resource_snap_path
             image_virtual_size = image_info.virtual_size
@@ -244,7 +247,7 @@ class UploadImageToGlance(task.Task):
         try:
             org_image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
             org_glance_image = self.image_service.show(self.cntx, org_image_id)
-            if org_glance_image:
+            if org_glance_image and org_glance_image['deleted'] is False:
                 return org_glance_image['id'], org_glance_image['disk_format']
         except:
             pass
@@ -672,10 +675,6 @@ class RestoreInstanceFromVolume(task.Task):
 
         availability_zone = get_availability_zone(instance_options)
     
-        restored_security_group_ids = []
-        for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
-                     
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
 
         self.volume_service = volume_service = cinder.API()
@@ -693,7 +692,7 @@ class RestoreInstanceFromVolume(task.Task):
                                                    None, restored_compute_flavor, 
                                                    nics=restored_nics,
                                                    block_device_mapping=block_device_mapping,
-                                                   security_groups=restored_security_group_ids, 
+                                                   security_groups=[], 
                                                    key_name=keyname,
                                                    availability_zone=availability_zone)
 
@@ -765,22 +764,17 @@ class RestoreInstanceFromImage(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })  
-
+        
         availability_zone = get_availability_zone(instance_options)
     
-        restored_security_group_ids = []
-        for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
-
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
         self.restored_instance = restored_instance = \
                      compute_service.create_server(self.cntx, restored_instance_name, 
                                                    restored_compute_image, restored_compute_flavor, 
                                                    nics=restored_nics,
-                                                   security_groups=restored_security_group_ids, 
+                                                   security_groups=[],
                                                    key_name=keyname,
                                                    availability_zone=availability_zone)
-
         if not restored_instance:
             raise Exception("Cannot create instance from image")
         
@@ -834,11 +828,9 @@ class AdjustSG(task.Task):
         
             self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
             sec_groups = compute_service.list_security_group(self.cntx, restored_instance_id)
-
             sec_group_ids = [sec.id for sec in sec_groups]
             ids_to_remove = set(sec_group_ids) - set(restored_security_groups.values())
             ids_to_add = set(restored_security_groups.values()) - set(sec_group_ids)
-
             # remove security groups that were not asked for
             for sec in ids_to_remove:
                 compute_service.remove_security_group(self.cntx, restored_instance_id,
@@ -1383,6 +1375,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'],
                                                                  snapshot_obj.id)
 
+    restored_security_group_ids = {}
+    vm_id = instance['vm_id']
+    for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
+        restored_security_group_ids[pit_id] = restored_security_group_id
+
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
     restore_dict.pop('created_at')
@@ -1398,7 +1395,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'snapshot_id': snapshot_obj.id,
                 'restore_type': restore['restore_type'],
                 'restored_net_resources': restored_net_resources,    
-                'restored_security_groups': restored_security_groups,
+                'restored_security_groups': restored_security_group_ids,
                 'restored_compute_flavor_id': restored_compute_flavor.id,
                 'restored_nics': restored_nics,
                 'instance_options': instance_options,

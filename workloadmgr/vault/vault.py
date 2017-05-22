@@ -257,22 +257,15 @@ class TrilioVaultBackupTarget(object):
     ##
     # purge staging area functions
     ##
-    def purge_staging_area(self, context):
-        pass
-
-    def purge_workload_from_staging_area(self, context, workload_metadata):
-        pass
-
     def purge_snapshot_from_staging_area(self, context, snapshot_metadata):
+        directory = self.get_progress_tracker_directory(snapshot_metadata)
+        shutil.rmtree(directory)
         pass
 
     def purge_snapshot_vm_from_staging_area(self, context, snapshot_vm_metadata):
         pass
 
     def purge_snapshot_vm_resource_from_staging_area(self, context, snapshot_vm_resource_metadata):
-        pass
-
-    def purge_restore_from_staging_area(self, context, restore_metadata):
         pass
 
     def purge_restore_vm_from_staging_area(self, context, restore_vm_metadata):
@@ -932,17 +925,21 @@ def get_backup_target(backup_endpoint):
 
 
 def get_settings_backup_target():
-    settings_path = os.path.join(CONF.cloud_unique_id,"settings_db")
+    settings_path_new = os.path.join(CONF.cloud_unique_id,"settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
         get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
-        if backup_target.object_exists(settings_path):
-            return backup_target
+        if backup_target.object_exists(settings_path_new):
+            return (backup_target, settings_path_new)
 
-    triliovault_backup_targets.values()[0].put_object(settings_path,
+    triliovault_backup_targets.values()[0].put_object(settings_path_new,
                                                       json.dumps([]))
-    return triliovault_backup_targets.values()[0]
+    settings_path = "settings_db"
+    for endpoint, backup_target in triliovault_backup_targets.iteritems():
+        if backup_target.object_exists(settings_path):
+            return (backup_target, settings_path)
 
+    return (triliovault_backup_targets.values()[0], settings_path_new)
 
 def get_capacities_utilizations(context):
     def fill_capacity_utilization(context, backup_target, stats):
@@ -1101,6 +1098,7 @@ def get_workloads_for_tenant(context, tenant_ids):
 def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
 
     workload_urls = []
+    jobscheduler_map = {}
 
     try:
         #Get list of workload directory path for workloads need to update
@@ -1126,8 +1124,18 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
                             db_values['tenant_id'] = new_tenant_id
                         db_values['user_id'] = user_id
 
+                        if db_values.get('jobschedule', None) is not None:
+                            jobschedule = pickle.loads(db_values['jobschedule'])
+                            if jobschedule['enabled'] is True:
+                               jobschedule['enabled'] = False
+                               db_values['jobschedule'] = pickle.dumps(jobschedule)
+                            jobscheduler_map[db_values['id']] = db_values['jobschedule']
+
                         with open(os.path.join(path, name), 'w') as file:
                             json.dump(db_values, file)
+
+        return jobscheduler_map
+
     except Exception as ex:
         LOG.exception(ex)
 
