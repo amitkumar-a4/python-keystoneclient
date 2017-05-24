@@ -11,6 +11,7 @@ from operator import itemgetter
 import cPickle as pickle
 import shutil
 import tempfile
+from oslo.config import cfg
 
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import workloads as workloadAPI
@@ -24,6 +25,7 @@ from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
 from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 
+CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 DBSession = get_session()
 
@@ -229,6 +231,33 @@ def update_workload_metadata(workload_values):
     except Exception as ex:
         LOG.exception(ex)
 
+def update_backup_media_target(file_path):
+    try:
+        with open(file_path, 'r') as file_db:
+            file_data = file_db.read()
+        json_obj = json.loads(file_data)
+
+        metadata = json_obj.get('metadata', None)
+        if metadata:
+            for meta in metadata:
+                if meta['key'] == 'backup_media_target':
+                    backup_endpoint = meta['value']
+                    backup_target = vault.get_backup_target(backup_endpoint)
+                    # check workload is on the same backup_target
+                    if (backup_target is None) or (not file_path.startswith(backup_target.mount_path)):
+                        for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
+                            backup_target = None
+                            backup_target = vault.get_backup_target(backup_endpoint)
+                            if file_path.startswith(backup_target.mount_path):
+                                meta['value'] = backup_target.backup_endpoint
+                                break;
+            json_obj['metadata'] = metadata
+            with open(file_path, 'w') as outfile:
+                json.dump(json_obj, outfile)
+
+    except Exception as ex:
+        LOG.exception(ex)
+
 def get_json_files(context, workload_ids, db_dir, upgrade):
 
     # Map to store all path of all JSON files for a  resource
@@ -282,6 +311,9 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
             db_json = []
 
             for file in files:
+                if db == 'workload_db' or db == 'snapshot_db':
+                   update_backup_media_target(file)
+
                 with open(file, 'r') as file_db:
                     file_data = file_db.read()
                 json_obj = json.loads(file_data)
