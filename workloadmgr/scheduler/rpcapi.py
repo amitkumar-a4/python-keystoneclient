@@ -32,6 +32,16 @@ class SchedulerAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
             topic=FLAGS.scheduler_topic,
             default_version=self.RPC_API_VERSION)
 
+    def file_search(self, ctxt, topic, search_id,
+                    request_spec=None, filter_properties=None):
+        request_spec_p = jsonutils.to_primitive(request_spec)
+        return self.cast(ctxt, self.make_msg(
+                                  'file_search', topic=topic,
+                                  search_id=search_id,
+                                  request_spec=request_spec_p,
+                                  filter_properties=filter_properties),
+                                  version='1.2')
+
     def workload_snapshot(self, ctxt, topic, snapshot_id,
                           request_spec=None, filter_properties=None):
         request_spec_p = jsonutils.to_primitive(request_spec)

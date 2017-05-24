@@ -248,6 +248,39 @@ class API(base.Base):
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
 
+    @autolog.log_method(logger=Logger)
+    def search(self, context, data):
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
+        if len(vm_found) == 0:
+           msg = _('vm_id not existing with this tenant')
+           raise wlm_exceptions.Invalid(reason=msg)
+        workload = self.db.workload_get(context, vm_found[0].workload_id)
+        if workload['status'] != 'available':
+           msg = _('Vm workload is not in available state to perform search')
+           raise wlm_exceptions.Invalid(reason=msg)
+        kwargs = {'vm_id': data['vm_id'], 'status': 'completed'}
+        search_list = self.db.file_search_get_all(context, **kwargs)
+        if len(search_list) > 0:
+           msg = _('Search with this vm_id already in exceution')
+           raise wlm_exceptions.Invalid(reason=msg)
+        if type(data['snapshot_ids']) is list:
+           data['snapshot_ids'] = ",".join(data['snapshot_ids'])
+        options = {'vm_id': data['vm_id'],
+                   'project_id': context.project_id,
+                   'user_id': context.user_id,
+                   'filepath': data['filepath'],
+                   'snapshot_ids': data['snapshot_ids'],
+                   'start': data['start'],
+                   'end': data['end'],
+                   'status': 'executing',}
+        search = self.db.file_search_create(context, options)
+        self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
+        return search
+
+    @autolog.log_method(logger=Logger)
+    def search_show(self, context, search_id):
+        search = self.db.file_search_get(context, search_id)
+        return search
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):

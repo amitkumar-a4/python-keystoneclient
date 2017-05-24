@@ -24,7 +24,7 @@ from workloadmgr.vault import vault
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '2.3.48'
+DB_VERSION = '2.4.2'
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
@@ -153,6 +153,27 @@ class VaultStorageMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
         
+class FileSearch(BASE, WorkloadsBase):
+    """Types of workloads"""
+    __tablename__ = 'file_search'
+    id = Column(Integer, primary_key=True)
+
+    @property
+    def name(self):
+        return FLAGS.workload_name_template % self.id
+
+    vm_id = Column(String(100), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    user_id = Column(String(255), nullable=False)
+    filepath = Column(String(255), nullable=False)
+    snapshot_ids = Column(Text)
+    json_resp = Column(Text)
+    start = Column(Integer)
+    end = Column(Integer)
+    host = Column(String(100))
+    error_msg = Column(String(255)) 
+    status = Column(String(10))
+    scheduled_at = Column(DateTime) 
     
 class WorkloadTypes(BASE, WorkloadsBase):
     """Types of workloads"""

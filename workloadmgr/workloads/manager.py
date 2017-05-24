@@ -24,6 +24,7 @@ import uuid
 import cPickle as pickle
 import json
 from threading import Lock
+import sys
 import subprocess
 from subprocess import check_output
 import shutil
@@ -31,7 +32,6 @@ import shutil
 import smtplib
 import socket
 import os
-
 # Import the email modules
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -186,8 +186,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         try:
             self.db.snapshot_mark_incomplete_as_error(ctxt, self.host)
             self.db.restore_mark_incomplete_as_error(ctxt, self.host)
+            kwargs = {'host': self.host, 'status': 'completed'}
+            list_search = self.db.file_search_get_all(ctxt, **kwargs)
+            for search in list_search:
+                self.db.file_search_update(ctxt,search.id,{'status': 'error', 
+                                'error_msg': 'Search did not finish successfully'})
         except Exception as ex:
             LOG.exception(ex)
+
+    @manager.periodic_task
+    def file_search_delete(self, context):
+        try:
+            kwargs = {'host': self.host, 'time_in_minutes': 24 * 60}
+            list_search = self.db.file_search_get_all(context, **kwargs)
+            if len(list_search) > 0:
+               for search in list_search:
+                   self.db.file_search_delete(context, search.id)
+        except Exception as ex:
+               LOG.exception(ex)
     
     @autolog.log_method(logger=Logger)    
     def _get_snapshot_size_of_vm(self, context, snapshot_vm):
@@ -436,6 +452,59 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 self.db.workload_update(context, workload_id,
                                       {'status': 'error',
                                        'error_msg': str(err)})
+
+    @autolog.log_method(logger=Logger)
+    def file_search(self, context, search_id):
+        """
+        File search
+        """
+        try:
+            self.db.file_search_update(context,search_id,{'host': self.host,
+                                       'status': 'searching'})
+            search = self.db.file_search_get(context, search_id)
+            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id)
+            workload_id = vm_found[0].workload_id
+            workload_obj = self.db.workload_get(context, workload_id)
+            backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
+                                                'backup_media_target')
+            backup_target = vault.get_backup_target(backup_endpoint)
+            if search.snapshot_ids != '' and len(search.snapshot_ids) > 1:
+               filtered_snapshots = search.snapshot_ids.split(',')
+               search_list_snapshots = []
+               for filtered_snapshot in filtered_snapshots:
+                   filter_snapshot = self.db.snapshot_get(context, filtered_snapshot)
+                   if filter_snapshot.workload_id != workload_id:
+                      msg = _('Invalid snapshot_ids provided')
+                      raise wlm_exceptions.InvalidState(reason=msg)
+                   search_list_snapshots.append(filtered_snapshot)
+            elif search.end != 0 or search.start != 0:
+                 kwargs = {'workload_id':workload_id, 'get_all': False, 'start': search.start, 'end': search.end, 'status':'available'}
+                 search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
+            else:
+                 kwargs = {'workload_id':workload_id, 'get_all': False, 'status': 'available'}
+                 search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
+            guestfs_input = []
+            for search_list_snapshot in search_list_snapshots:
+                search_list_snapshot_id = search_list_snapshot
+                if not isinstance(search_list_snapshot, (str, unicode)):
+                   search_list_snapshot_id = search_list_snapshot.id
+                snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, search.vm_id, search_list_snapshot_id)
+                guestfs_input_str = search.filepath+','+search_list_snapshot_id
+                for snapshot_vm_resource in snapshot_vm_resources:
+                    if snapshot_vm_resource.resource_type != 'disk':
+                       continue
+                    vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
+                    resource_snap_path = os.path.join(backup_target.mount_path,
+                                          vm_disk_resource_snap.vault_url.strip(os.sep)) 
+                    guestfs_input_str = guestfs_input_str+','+resource_snap_path                                
+                guestfs_input.append(guestfs_input_str)
+            guestfs_input_str = "|-|".join(guestfs_input)
+            out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])
+            self.db.file_search_update(context,search_id,{'status': 'completed', 'json_resp': out})
+        except Exception as err:
+               self.db.file_search_update(context,search_id,{'status': 'error', 'error_msg': str(err)})
+               LOG.exception(err)
+                
 
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)

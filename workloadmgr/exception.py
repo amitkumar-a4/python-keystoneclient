@@ -501,6 +501,9 @@ class VaultStorageNotFound(NotFound):
 class TaskNotFound(NotFound):
     message = _("Task %(task_id)s could not be found.")
 
+class FileSearchNotFound(NotFound):
+    message = _("File Search %(search_id)s could not be found.")
+
 class InvalidLicense(Invalid):
     pass
 
