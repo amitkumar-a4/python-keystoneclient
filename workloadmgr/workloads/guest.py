@@ -39,6 +39,8 @@ def f(data):
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   
+    if len(drives) == 0:
+       dt[snapshot_id] = 'Snapshot VM deleted'
     g.close()
     return dt
 
