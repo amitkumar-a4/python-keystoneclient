@@ -55,7 +55,10 @@ restore_vm_opts = [
     cfg.StrOpt('nfs_volume_type_substr',
                default='nfs,netapp',
                help='Dir where the nfs volume is mounted for restore'),                   
-
+    cfg.IntOpt('progress_tracking_update_interval',
+               default=600,
+               help='Number of seconds to wait for progress tracking file '
+                    'updated before we call contego crash'),
     ]
 
 LOG = logging.getLogger(__name__)
@@ -971,7 +974,7 @@ class CopyBackupImageToVolume(task.Task):
                     if progstat.st_mtime > basestat.st_mtime:
                         basestat = progstat
                         basetime = time.time()
-                    elif time.time() - basetime > 600:
+                    elif time.time() - basetime > CONF.progress_tracking_update_interval:
                         raise Exception("No update to %s modified time for last 10 minutes. "
                                         "Contego may have errored. Aborting Operation" % 
                                         progress_tracking_file_path)
