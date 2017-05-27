@@ -1177,7 +1177,6 @@ class FreezeVM(task.Task):
         try:
             self.cntx = amqp.RpcContext.from_dict(context)
             db = WorkloadMgrDB().db
-            import pdb;pdb.set_trace()
             self.compute_service = compute_service = nova.API(production = True)
             restored_instance = compute_service.get_server_by_id(
                 self.cntx, restored_instance_id)
@@ -1219,14 +1218,13 @@ class ThawVM(task.Task):
     def execute_with_log(self, context, restored_instance_id):
         # thaw an instance
         try:
-            import pdb;pdb.set_trace()
             # give few seconds before invoking thaw
             time.sleep(10)
             self.cntx = amqp.RpcContext.from_dict(context)
             db = WorkloadMgrDB().db
 
             instance = {'hypervisor_type': 'QEMU',
-                        'vm_id': kwargs['restored_instance_id']}
+                        'vm_id': restored_instance_id}
             return vmtasks_openstack.thaw_vm(self.cntx, db, instance)
         except Exception as ex:
             LOG.exception(ex)
