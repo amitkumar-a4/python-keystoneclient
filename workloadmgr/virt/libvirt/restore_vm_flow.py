@@ -975,9 +975,9 @@ class CopyBackupImageToVolume(task.Task):
                         basestat = progstat
                         basetime = time.time()
                     elif time.time() - basetime > CONF.progress_tracking_update_interval:
-                        raise Exception("No update to %s modified time for last 10 minutes. "
+                        raise Exception("No update to %s modified time for last %d minutes. "
                                         "Contego may have errored. Aborting Operation" % 
-                                        progress_tracking_file_path)
+                                        (progress_tracking_file_path, CONF.progress_tracking_update_interval/60))
                 else:
                     # For swift based backup media
                     async_task_status = compute_service.vast_async_task_status(cntx, 
