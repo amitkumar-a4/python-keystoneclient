@@ -25,6 +25,7 @@ def f(data):
     roots = g.list_filesystems()
     lt_drives = []
     for root in roots:
+        root = root.replace('s', 'v')
         try:
             g.mount_ro(root, '/')
         except RuntimeError as msg:
@@ -39,6 +40,8 @@ def f(data):
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   
+    if len(drives) == 0:
+       dt[snapshot_id] = 'Snapshot VM deleted'
     g.close()
     return dt
 
