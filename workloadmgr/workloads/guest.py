@@ -25,7 +25,6 @@ def f(data):
     roots = g.list_filesystems()
     lt_drives = []
     for root in roots:
-        root = root.replace('s', 'v')
         try:
             g.mount_ro(root, '/')
         except RuntimeError as msg:
@@ -33,6 +32,7 @@ def f(data):
                continue
         val = g.glob_expand(filepath)
         disk = {}
+        root = root.replace('s', 'v')
         disk[root] = val
         if len(val) > 0:
            for path in val:
