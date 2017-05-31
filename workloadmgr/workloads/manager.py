@@ -92,7 +92,17 @@ FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
 
 CONF = cfg.CONF
-       
+
+
+def workflow_lookup_class(class_name):
+    parts = class_name.split('.')
+    module = ".".join(parts[:-1])
+    workflow_class = __import__( module )
+    for comp in parts[1:]:
+        workflow_class = getattr(workflow_class, comp)
+    return workflow_class
+
+
 @autolog.log_method(logger=Logger)
 def get_workflow_class(context, workload_type_id, restore=False):
     #TODO(giri): implement a driver model for the workload types
@@ -131,13 +141,8 @@ def get_workflow_class(context, workload_type_id, restore=False):
         else:
             kwargs = {'workload_type_id': workload_type_id}
             raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
-                      
-    parts = workflow_class_name.split('.')
-    module = ".".join(parts[:-1])
-    workflow_class = __import__( module )
-    for comp in parts[1:]:
-        workflow_class = getattr(workflow_class, comp)
-    return workflow_class
+
+    return workflow_lookup_class(workflow_class_name)
 
 workloadlock = Lock()
 def synchronized(lock):
@@ -1073,16 +1078,12 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'target_platform': target_platform,                
             }
 
-            parts = workflow_class_name.split('.')
-            module = ".".join(parts[:-1])
-            workflow_class = __import__( module )
-            for comp in parts[1:]:
-                workflow_class = getattr(workflow_class, comp)            
-
+            workflow_class = workflow_lookup_class(workflow_class_name)
+   
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
             workflow.execute()
-            
+
             compute_service = nova.API(production=True)
             restore_data_transfer_time = 0
             restore_object_store_transfer_time = 0            
