@@ -1711,6 +1711,27 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
+    def _validate_restore_options(self, options):
+        if options.get('type', "") != "openstack":
+            msg = _("'type' field in options is not set to 'openstack'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if 'openstack' not in options:
+            msg = _("'openstack' field is not in options")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) not in ('inplace', 'selective', 'oneclick'):
+            msg = _("'restore_type' field must be one of 'inplace', 'selective', 'oneclick'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) in ('inplace', 'selective'):
+        # If instances is not available should we restore entire snapshot?
+            if 'instances' not in options['openstack']:
+                msg = _("'instances' field is not in found " \
+                        "in options['instances']")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
 
@@ -1718,11 +1739,14 @@ class API(base.Base):
         Make the RPC call to restore a snapshot.
         """
         try:
+            self._validate_restore_options(options)
+
             snapshot = self.snapshot_get(context, snapshot_id)
             workload = self.workload_get(context, snapshot['workload_id'])
             workload_display_name = workload['display_name']
             snapshot_display_name = snapshot['display_name']
             snapshot_snapshot_type = snapshot['snapshot_type']
+
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'

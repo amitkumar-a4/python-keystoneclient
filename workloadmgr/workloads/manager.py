@@ -1048,6 +1048,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif rtype == 'inplace':
                 workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
                 self._validate_inplace_restore_options(context, restore, options)
+                self.workload_reset(context, snapshot.workload_id)
 
             restore = self.db.restore_update(context, restore.id, values)
 
