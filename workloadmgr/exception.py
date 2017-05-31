@@ -528,3 +528,9 @@ class UserNotFound(NotFound):
 class RoleNotFound(NotFound):
     message = _("User %(user_id)s does not have role '%(role_name)s' on "
                 "project %(project_id)s")
+
+class OpenStackWorkload(WorkloadMgrException):
+    message = _("%(message)")
+
+class OpenStackWorkloadNotFound(NotFound):
+    message = _("OpenStack Workload %(id)s could not be found.")

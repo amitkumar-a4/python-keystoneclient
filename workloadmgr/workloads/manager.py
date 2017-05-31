@@ -1519,3 +1519,75 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             LOG.exception(ex)
             pass
+
+    def _create_snapshot_directory(self, context, services, snapshot_directory_path):
+        try:
+            fileutils.ensure_tree(snapshot_directory_path)
+            for service,config_path in  services.iteritems():
+                service_name = service
+                fileutils.ensure_tree(os.path.join(snapshot_directory_path,service_name))
+        except Exception as ex:
+            LOG.error("Error while creating folder structer for snapshot :%s" %ex.message)
+            LOG.exception(ex)
+
+    @autolog.log_method(Logger, 'WorkloadMgrManager.openstack_config_workload')
+    def openstack_config_workload(self, context, openstack_workload_id):
+        """
+        Create a scheduled OpenStack workload in the scheduler.
+        """
+        try:
+            self.db.openstack_workload_update(context,
+                                    {
+                                     'status': 'available',
+                                    },openstack_workload_id)
+            workload_utils.upload_openstack_workload_db_entry(context, openstack_workload_id)
+    
+        except Exception as err:
+            with excutils.save_and_reraise_exception():
+                self.db.openstack_workload_update(context, openstack_workload_id,
+                                        {'status': 'error',
+                                         'error_msg': str(err)})
+
+    def openstack_config_snapshot(self, context, services_to_snapshot, openstack_snapshot_id):
+        try:
+            snapshot = self.db.openstack_config_snapshot_update(context,
+                                               {'host': self.host,
+                                                'progress_msg': 'Snapshot of workload is starting',
+                                                'status': 'starting'},openstack_snapshot_id)
+            #import pdb;pdb.set_trace() 
+            openstack_workload = self.db.openstack_workload_get(context, snapshot.openstack_workload_id)
+            vault_storage_path = openstack_workload.get('vault_storage_path')
+            if os.path.exists(vault_storage_path):
+               snapshot_vault_storage_path = os.path.join(vault_storage_path, "snapshot_" + str(snapshot.get('id')))
+            #backup_endpoint = self.db.get_metadata_value(workload.metadata,
+            #                                             'backup_media_target')
+    
+            #backup_target = vault.get_backup_target(backup_endpoint)
+            #create entry on backend and update_db_file
+            #Create folder structure on backend
+            self._create_snapshot_directory(context, services_to_snapshot, snapshot_vault_storage_path)
+            self.db.openstack_config_snapshot_update(context,
+                                    {#'progress_percent': 0,
+                                     'progress_msg': 'Initializing Snapshot Workflow',
+                                     'status': 'executing',
+                                     'vault_storage_path': snapshot_vault_storage_path
+                                     }, openstack_snapshot_id)
+    
+            #request contego for config files
+            #request contego for DB
+            #import pdb;pdb.set_trace()
+            params = {'services_to_snapshot': services_to_snapshot, 'snapshot_directory': snapshot_vault_storage_path,
+                      'backend_endpoint': '192.168.1.33:/mnt/tvault', 'snapshot_id': snapshot.get('id')}
+            compute_service = nova.API(production=True)
+            result = compute_service.vast_config_snapshot(context, openstack_snapshot_id, params)
+            #self._wait_for_nova_process(openstack_snapshot_id, params, result)
+            self.db.openstack_config_snapshot_update(context, 
+                                    {#'progress_percent': 100, 
+                                     'progress_msg': 'Snapshot of workload is complete',
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': 'available',
+                                     }, openstack_snapshot_id)
+    
+        except Exception as ex:
+            LOG.exception(ex)
+

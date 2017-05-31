@@ -21,7 +21,7 @@ from workloadmgr.api.v1 import trusts
 from workloadmgr.api.v1 import tasks
 from workloadmgr.api.v1 import workload_transfer as transfers
 from workloadmgr.api.v1 import global_job_scheduler
-
+from workloadmgr.api.v1 import openstack_config_backup
 LOG = logging.getLogger(__name__)
 
 
@@ -648,4 +648,39 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/tasks",
                        controller=self.resources['tasks'],
                        action='get_tasks',
+                       conditions={"method": ['GET']})
+
+        ###################################################################################################
+        #Openstack configuration backup
+        self.resources['openstack_config_backup'] = openstack_config_backup.create_resource(ext_mgr)
+        
+        # reassign workloads
+        mapper.connect("openstack_config_workload_update",
+                       "/{project_id}/openstack_config",
+                       controller=self.resources['openstack_config_backup'],
+                       action='openstack_config_workload',
+                       conditions={"method": ['POST']})
+
+        mapper.connect("openstack_config_workload_show",
+                       "/{project_id}/openstack_config_show",
+                       controller=self.resources['openstack_config_backup'],
+                       action='openstack_config_workload_show',
+                       conditions={"method": ['GET']})
+
+        mapper.connect("openstack_config_snapshot",
+                       "/{project_id}/openstack_config_snapshot/{id}",
+                       controller=self.resources['openstack_config_backup'],
+                       action='openstack_config_snapshot',
+                       conditions={"method": ['POST']})
+
+        mapper.connect("openstack_config_snapshot_show",
+                       "/{project_id}/openstack_config_snapshot/{id}",
+                       controller=self.resources['openstack_config_backup'],
+                       action='openstack_config_snapshot_show',
+                       conditions={"method": ['GET']})
+
+        mapper.connect("openstack_config_snapshot_list",
+                       "/{project_id}/openstack_config_snapshots",
+                       controller=self.resources['openstack_config_backup'],
+                       action='openstack_config_snapshot_list',
                        conditions={"method": ['GET']})

@@ -3265,3 +3265,117 @@ def purge_workload(context, id):
 
     except Exception as ex:
         LOG.exception(ex)
+
+@require_context
+def openstack_workload_update(context, values,  openstack_workload_id):
+    session = get_session()
+    return _openstack_workload_update(context, values, openstack_workload_id, session)
+
+@require_context
+def openstack_workload_get(context, openstack_workload_id, **kwargs):
+    session = get_session()
+    return _openstack_workload_get(context, openstack_workload_id, session, **kwargs)
+
+@require_context
+def _openstack_workload_update(context, values, id, session):
+    try:
+        openstack_workload_ref = _openstack_workload_get(context, id, session)
+    except Exception as ex:
+        openstack_workload_ref = models.OpenstackWorkload()
+        if not values.get('id'):
+            values['id'] = id
+
+    openstack_workload_ref.update(values)
+    openstack_workload_ref.save(session)
+
+    return openstack_workload_ref
+
+@require_context
+def _openstack_workload_get(context, id, session, **kwargs):
+    try:
+        openstack_workload = model_query(
+            context, models.OpenstackWorkload, session=session, **kwargs).\
+            filter_by(id=id).first()
+
+        if openstack_workload is None:
+            raise exception.OpenStackWorkloadNotFound(id=id)
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.OpenStackWorkloadNotFound(id=id)
+
+    return openstack_workload
+
+@require_context
+def openstack_config_snapshot_create(context, values):
+    session = get_session()
+    return _openstack_config_snapshot_update(context, values, None, session)
+
+@require_context
+def openstack_config_snapshot_update(context, values, snapshot_id ):
+    session = get_session()
+    return _openstack_config_snapshot_update(context, values, snapshot_id, session)
+
+
+def _openstack_config_snapshot_update(context, values, snapshot_id, session):
+    try:
+        lock.acquire()
+        metadata = values.pop('metadata', {})
+
+        if snapshot_id:
+            snapshot_ref = model_query(context, models.OpenstackSnapshot, session=session, read_deleted="yes"). \
+                filter_by(id=snapshot_id).first()
+            if not snapshot_ref:
+                lock.release()
+                raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
+        else:
+            snapshot_ref = models.OpenstackSnapshot()
+            if not values.get('id'):
+                values['id'] = str(uuid.uuid4())
+            if not values.get('size'):
+                values['size'] = 0
+        snapshot_ref.update(values)
+        snapshot_ref.save(session)
+
+        #if metadata:
+        #    _set_metadata_for_snapshot(context, snapshot_ref, metadata, purge_metadata, session=session)
+
+        return snapshot_ref
+    finally:
+        lock.release()
+    return snapshot_ref
+
+@require_context
+def _openstack_config_snapshot_get(context, snapshot_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    result = model_query(   context, models.OpenstackSnapshot, **kwargs).\
+                            filter_by(id=snapshot_id).\
+                            first()
+
+    if not result:
+        raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
+
+    return result
+
+@require_context
+def openstack_config_snapshot_get(context, snapshot_id, **kwargs):
+    if kwargs.get('session') == None:
+        kwargs['session'] = get_session()
+    return _openstack_config_snapshot_get(context, snapshot_id, **kwargs)
+
+
+@require_context
+def openstack_config_snapshot_get_all(context, **kwargs):
+    qs = model_query(context, models.OpenstackSnapshot, **kwargs)
+    if 'openstack_workload_id' in kwargs and kwargs['openstack_workload_id'] is not None and kwargs['openstack_workload_id'] != '':
+       qs = qs.filter_by(openstack_workload_id=kwargs['openstack_workload_id'])
+    if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
+       if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
+           date_to = kwargs['date_to']
+       else:
+            date_to = datetime.now()
+       qs = qs.filter(and_(models.OpenstackSnapshot.created_at >= func.date_format(kwargs['date_from'],'%y-%m-%dT%H:%i:%s'),\
+                      models.OpenstackSnapshot.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
+
+    return qs.order_by(models.OpenstackSnapshot.created_at.desc()).all()
+

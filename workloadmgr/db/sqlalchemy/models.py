@@ -598,7 +598,38 @@ class SettingMetadata(BASE, WorkloadsBase):
     settings = relationship(Settings, backref=backref('metadata', cascade="all, delete-orphan"))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
-    
+
+class OpenstackWorkload(BASE, WorkloadsBase):
+    """Represents a OpenStack configuration backup object."""
+    __tablename__ = 'openstack_workload'
+
+    id = Column(String(36), primary_key=True)
+    status = Column(String(255))
+    jobschedule = Column(String(4096))
+    storage_backend = Column(String(36))
+    vault_storage_path = Column(String(4096))
+    backup_media_target = Column(String(2046))
+    error_msg = Column(String(4096))
+
+class OpenstackSnapshot(BASE, WorkloadsBase):
+    """Represents a OpenStack configuration snapshot object."""
+    __tablename__ = 'openstack_snapshot'
+    id = Column(String(36), primary_key=True)
+    finished_at = Column(DateTime)
+    openstack_workload_id = Column(String(36), ForeignKey('openstack_workload.id'), nullable=False)
+    display_name = Column(String(255))
+    display_description = Column(String(255))
+    size = Column(BigInteger)
+    host = Column(String(255))
+    progress_msg = Column(String(255))
+    warning_msg = Column(String(4096))
+    error_msg = Column(String(4096))
+    time_taken = Column(BigInteger, default=0)
+    vault_storage_path = Column(String(4096))
+    scheduled_at = Column(DateTime)
+    status = Column(String(255), nullable=False)
+   
+ 
 def register_models():
     """Register Models and create metadata.
 
@@ -637,7 +668,9 @@ def register_models():
               Tasks,
               TaskStatusMessages,
               Settings,
-              SettingMetadata             
+              SettingMetadata,
+              OpenstackWorkload,
+              OpenstackSnapshot
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

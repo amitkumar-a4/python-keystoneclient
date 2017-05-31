@@ -484,6 +484,12 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             'workload_%s' % (workload_metadata['workload_id']))
         return workload_path
 
+    @ensure_mounted()
+    def get_openstack_workload_path(self, workload_metadata):
+        workload_path = os.path.join(self.mount_path,
+                        'workload_%s' % (workload_metadata['workload_id']))
+        return workload_path
+    
     def get_snapshot_path(self, snapshot_metadata):                 
         workload_path = self.get_workload_path(snapshot_metadata)
         snapshot_path = os.path.join(workload_path,

@@ -150,3 +150,49 @@ class SchedulerManager(manager.Manager):
 
         notifier.notify(context, notifier.publisher_id("scheduler"),
                         'scheduler.' + method, notifier.ERROR, payload)
+
+    def openstack_config_snapshot(self, context, topic, openstack_snapshot_id,
+                                    request_spec=None, filter_properties=None):
+        try:
+            #import pdb;pdb.set_trace()
+            #if request_spec is None:
+            #    request_spec = {}
+    
+            request_spec.update({'openstack_snapshot_id': openstack_snapshot_id, 'snapshot_properties': {}})
+    
+            self.driver.schedule_openstack_config_snapshot(context, request_spec,
+                                                            filter_properties)
+        except exception.NoValidHost as ex:
+            snapshot_state = {'status': {'status': 'error'}}
+            self._set_snapshot_state_and_notify('openstack_config_snapshot',
+                                                snapshot_state,
+                                                context, ex, request_spec)
+        except Exception as ex:
+            with excutils.save_and_reraise_exception():
+                snapshot_state = {'status': {'status': 'error'}}
+                self._set_snapshot_state_and_notify('openstack_config_snapshot',
+                                                    snapshot_state,
+                                                    context, ex, request_spec)
+    
+    
+    def _set_openstack_snapshot_state_and_notify(self, method, updates, context, ex,
+                                       request_spec):
+        LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
+    
+        snapshot_status = updates['status']
+        properties = request_spec.get('snapshot_properties', {})
+    
+        openstack_snapshot_id = request_spec.get('openstack_snapshot_id', None)
+    
+        if openstack_snapshot_id:
+            db.openstack_config_snapshot_update(context, snapshot_status, openstack_snapshot_id)
+    
+        payload = dict(request_spec=request_spec,
+                       snapshot_properties=properties,
+                       openstack_snapshot_id=openstack_snapshot_id,
+                       state=snapshot_status,
+                       method=method,
+                       reason=ex)
+    
+        notifier.notify(context, notifier.publisher_id("scheduler"),
+                        'scheduler.' + method, notifier.ERROR, payload)

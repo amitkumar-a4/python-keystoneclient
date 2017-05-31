@@ -84,6 +84,26 @@ class FilterScheduler(driver.Scheduler):
 
         self.workloads_rpcapi.snapshot_restore(context, host, restore_id)
 
+    def schedule_openstack_config_snapshot(self, context, request_spec, filter_properties):
+        #import pdb;pdb.set_trace()
+        weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
+    
+        if not weighed_host:
+            raise exception.NoValidHost(reason="")
+    
+        host = weighed_host.obj.host
+        openstack_snapshot_id = request_spec['openstack_snapshot_id']
+    
+        updated_snapshot = driver.openstack_snapshot_update_db(context, openstack_snapshot_id, host)
+        self._post_select_populate_filter_properties(filter_properties,
+                                                     weighed_host.obj)
+    
+        # context is not serializable
+        if filter_properties:
+            filter_properties.pop('context', None)
+    
+        self.workloads_rpcapi.openstack_config_snapshot(context, host, openstack_snapshot_id, request_spec['services_to_snapshot'])
+
     def _post_select_populate_filter_properties(self, filter_properties,
                                                 host_state):
         """Add additional information to the filter properties after a host has

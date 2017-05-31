@@ -147,6 +147,22 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             security_group_json = jsonutils.dumps(security_group)
             backup_target.put_object(path, security_group_json)
 
+def upload_openstack_workload_db_entry(cntx, openstack_workload_id):
+    #TODO Ask Murali why we are using these settings
+    #upload_settings_db_entry(cntx)
+    try:
+        openstack_workload_db = db.openstack_workload_get(cntx, openstack_workload_id)
+        backup_endpoint = openstack_workload_db['backup_media_target']
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        parent = openstack_workload_db['vault_storage_path']
+
+        openstack_workload_json = jsonutils.dumps(openstack_workload_db)
+        path = os.path.join(parent, "openstack_workload_db")
+        db.openstack_workload_update(cntc, {''})
+        backup_target.put_object(path, openstack_workload_json)
+    except Exception as ex:
+        LOG.exception(ex)
 
 @autolog.log_method(logger=Logger)
 def _remove_data(context, snapshot_id):
