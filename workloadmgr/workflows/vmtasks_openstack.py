@@ -1480,7 +1480,7 @@ def poweroff_vm(cntx, instance, restore, restored_instance):
         now = timeutils.utcnow()
         if (now - start_time) > datetime.timedelta(minutes=10):
             raise exception.ErrorOccurred(reason='Timeout waiting for '\
-                                          'the instance to boot from volume')
+                                          'the instance to boot')
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.poweron_vm')
@@ -1510,7 +1510,7 @@ def poweron_vm(cntx, instance, restore, restored_instance):
         now = timeutils.utcnow()
         if (now - start_time) > datetime.timedelta(minutes=10):
             raise exception.ErrorOccurred(reason='Timeout waiting for '\
-                                          'the instance to boot from volume')
+                                          'the instance to boot')
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.set_vm_metadata')

@@ -1081,12 +1081,7 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.exception(ex)
             raise
         finally:
-            try:
-                workload_utils.purge_restore_vm_from_staging_area(
-                    cntx, restore_obj.id, restore_obj.snapshot_id,
-                    instance['vm_id'])
-            except Exception as ex:
-                LOG.exception(ex)               
+            pass
 
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
     def vast_finalize(self, cntx, compute_service, db,

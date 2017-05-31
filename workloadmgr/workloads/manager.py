@@ -795,7 +795,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
 
     @autolog.log_method(logger=Logger)
-    def _validate_inplace_restore_options(self, context, restore, options):
+    def _validate_restore_options(self, context, restore, options):
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
         if options.get('type', "") != "openstack":
@@ -806,13 +806,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _("'openstack' field is not in options")
             raise wlm_exceptions.InvalidRestoreOptions(message=msg)
 
-        assert options.get("restore_type", None) == 'inplace'
 
         # If instances is not available should we restore entire snapshot?
         if 'instances' not in options['openstack']:
             msg = _("'instances' field is not in found " \
                     "in options['instances']")
             raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) in ('selective'):
+            return
 
         compute_service = nova.API(production=True)                
         volume_service = cinder.API()
@@ -1052,8 +1054,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             elif rtype == 'inplace':
                 workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
-                self._validate_inplace_restore_options(context, restore, options)
+                self._validate_restore_options(context, restore, options)
                 self.workload_reset(context, snapshot.workload_id)
+            elif rtype == 'selective':
+                self._validate_restore_options(context, restore, options)
 
             restore = self.db.restore_update(context, restore.id, values)
 
