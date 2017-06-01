@@ -225,7 +225,7 @@ class PrepareBackupImage(task.Task):
 
 
 def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
-                              volumes_to_restore):
+                              volumes_to_restore, restore_boot_disk):
 
     flow = lf.Flow("copybackupimagestovolumeslf")
     db = WorkloadMgrDB().db
@@ -247,7 +247,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               )))
-        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
+        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') and restore_boot_disk:
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
                                   rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id),
                                               image_type='image_type_'+str(snapshot_vm_resource.id),
@@ -432,7 +432,8 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     # copy data if the volumes are iscsi volumes
     childflow = CopyBackupImagesToVolumes(cntx, instance, snapshot_obj,
-                                          restore['id'], volumes_to_restore)
+                                          restore['id'], volumes_to_restore,
+                                          restore_boot_disk)
     if childflow:
         _restorevmflow.add(childflow)
 
