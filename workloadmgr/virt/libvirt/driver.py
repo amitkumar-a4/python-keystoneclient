@@ -61,6 +61,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 from nbd import NbdMount as nbd
 import restore_vm_flow
+import restore_vm_data_flow
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -1065,6 +1066,22 @@ class LibvirtDriver(driver.ComputeDriver):
                 workload_utils.purge_restore_vm_from_staging_area(cntx, restore_obj.id, restore_obj.snapshot_id, instance['vm_id'])
             except Exception as ex:
                 LOG.exception(ex)               
+
+    @autolog.log_method(Logger, 'libvirt.driver.restore_vm_data')
+    def restore_vm_data(self, cntx, db, instance, restore, instance_options):
+        """
+        Inplace restore specified instance from a snapshot
+        """
+        try:
+            restore_obj = db.restore_get(cntx, restore['id'])
+            result = restore_vm_data_flow.restore_vm_data(cntx, db, instance,
+                                                          restore, instance_options)
+            return result
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+        finally:
+            pass
 
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
     def vast_finalize(self, cntx, compute_service, db,
