@@ -561,7 +561,6 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def is_online(self):
         status = False
         try:
-            import pdb;pdb.set_trace()
             nfsshare = self.backup_endpoint
             nfsserver = nfsshare.split(":")[0]
             rpcinfo = utils.execute("rpcinfo", "-s", nfsserver)
