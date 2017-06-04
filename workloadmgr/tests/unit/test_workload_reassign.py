@@ -49,7 +49,8 @@ class BaseReassignAPITestCase(test.TestCase):
         self.KeystoneClient = self.keystone_client.start()
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
-        self.ProjectListMockMethod = self.project_list_for_import.start()
+        #self.ProjectListMockMethod = self.project_list_for_import.start()
+        self.ProjectListMockMethod = self.KeystoneClient().client.get_project_list_for_import
         self.UserExistMockMethod = self.user_exist_in_tenant.start()
         self.UserRoleMockMethod = self.user_role.start()
         self.ProjectListMockMethodV3 = self.project_list_for_importV3.start()
@@ -88,7 +89,7 @@ class BaseReassignAPITestCase(test.TestCase):
 
         self.is_online_patch.stop()
         self.subprocess_patch.stop()
-        self.project_list_for_import.stop()
+        #self.project_list_for_import.stop()
         self.user_exist_in_tenant.stop()
         self.user_role.stop()
         self.project_list_for_importV3.stop()
@@ -108,7 +109,9 @@ class BaseReassignAPITestCase(test.TestCase):
         capacity_mock.return_value = None
         capacity_mock.side_effect = values
         type_id = tests_utils.create_workload_type(self.context)
-        jobschedule =  pickle.dumps({'start_date': '06/05/2014',
+        jobschedule =  pickle.dumps({
+                            'enabled': True,
+                            'start_date': '06/05/2014',
                             'end_date': '07/05/2015',
                             'interval': '1 hr',
                             'start_time': '2:30 PM',
