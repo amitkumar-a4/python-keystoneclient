@@ -260,11 +260,11 @@ def build_hypervisors():
     return hypervisors
 
 def get_instances():
-    instances = [{u'instance-id': u'4f92587b-cf3a-462a-89d4-0f5634293477', 'instance-name': 'vm1'},
-                 {u'instance-id': u'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132', 'instance-name': 'vm2'},
-                 {u'instance-id': u'd4e6e988-21ca-497e-940a-7b2f36426797', 'instance-name': 'vm3'},
-                 {u'instance-id': u'1b3a8734-b476-49f9-a959-ea909026b25f', 'instance-name': 'vm4'},
-                 {u'instance-id': u'9634ba8c-8d4f-49cb-9b6f-6b915c09fe42', 'instance-name': 'vm5'}]
+    instances = [{u'instance-id': u'4f92587b-cf3a-462a-89d4-0f5634293477', u'vm_id': u'4f92587b-cf3a-462a-89d4-0f5634293477', 'instance-name': 'vm1'},
+                 {u'instance-id': u'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132', u'vm_id': u'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132', 'instance-name': 'vm2'},
+                 {u'instance-id': u'd4e6e988-21ca-497e-940a-7b2f36426797', u'vm_id': u'd4e6e988-21ca-497e-940a-7b2f36426797', 'instance-name': 'vm3'},
+                 {u'instance-id': u'1b3a8734-b476-49f9-a959-ea909026b25f', u'vm_id': u'1b3a8734-b476-49f9-a959-ea909026b25f', 'instance-name': 'vm4'},
+                 {u'instance-id': u'9634ba8c-8d4f-49cb-9b6f-6b915c09fe42', u'vm_id': u'9634ba8c-8d4f-49cb-9b6f-6b915c09fe42', 'instance-name': 'vm5'}]
     return instances
 
 

@@ -584,7 +584,7 @@ class BaseLibvirtDriverTestCase(test.TestCase):
         from workloadmgr.workloads import workload_utils
         from workloadmgr.virt import driver
 
-        vast_async_task_status_mock.return_value = {'status': 'Completed'}
+        vast_async_task_status_mock.return_value = {'status': ['Completed']}
         get_routers_mock.side_effect = tests_utils._routers_data
         get_interfaces_mock.side_effect = tests_utils._get_interfaces
         get_port_mock.side_effect = tests_utils._port_data
@@ -638,7 +638,6 @@ class BaseLibvirtDriverTestCase(test.TestCase):
 
                         def _get_tenant_context(context):
                             return context
-
                         mock_method4.side_effect = _get_tenant_context
                         workload_type = tests_utils.create_workload_type(self.context,
                                                          display_name='Serial',

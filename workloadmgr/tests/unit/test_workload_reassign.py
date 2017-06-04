@@ -38,6 +38,7 @@ class BaseReassignAPITestCase(test.TestCase):
 
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
+        self.keystone_client = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient')
         self.project_list_for_import = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.get_project_list_for_import')
         self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.user_exist_in_tenant')
         self.user_role = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.check_user_role')
@@ -45,6 +46,7 @@ class BaseReassignAPITestCase(test.TestCase):
         self.user_exist_in_tenantV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.user_exist_in_tenant')
         self.user_roleV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.check_user_role')
 
+        self.KeystoneClient = self.keystone_client.start()
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.ProjectListMockMethod = self.project_list_for_import.start()
@@ -93,6 +95,7 @@ class BaseReassignAPITestCase(test.TestCase):
         self.user_exist_in_tenantV3.stop()
         self.user_roleV3.stop()
         self.stderr_patch.stop()
+        self.KeystoneClient.stop()
 
         super(BaseReassignAPITestCase, self).tearDown()
 
@@ -105,7 +108,13 @@ class BaseReassignAPITestCase(test.TestCase):
         capacity_mock.return_value = None
         capacity_mock.side_effect = values
         type_id = tests_utils.create_workload_type(self.context)
-        jobschedule = pickle.dumps({'test': 'schedule'})
+        jobschedule =  pickle.dumps({'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': -1,
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'})
         workload = tests_utils.create_workload(self.context, workload_type_id=type_id.id, jobschedule=jobschedule)
         workload = workload.__dict__
         workload.pop('_sa_instance_state')

@@ -40,14 +40,17 @@ class BaseReassignAPITestCase(test.TestCase):
         self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.user_exist_in_tenant')
         self.project_list_for_importV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.get_project_list_for_import')
         self.user_exist_in_tenantV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.user_exist_in_tenant')
-        self.user_list_patach = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient.get_user_list')
+        self.user_list_patch = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient.get_user_list')
+        self.keystone_client_patch = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient')
+
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.ProjectListMockMethod = self.project_list_for_import.start()
         self.UserExistMockMethod = self.user_exist_in_tenant.start()
         self.ProjectListMockMethodV3 = self.project_list_for_importV3.start()
         self.UserExistMockMethodV3 = self.user_exist_in_tenantV3.start()
-        self.UserListMockMethod = self.user_list_patach.start()
+        self.UserListMockMethod = self.user_list_patch.start()
+        self.KeystoneClientMock = self.keystone_client_patch.start()
 
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
@@ -81,6 +84,7 @@ class BaseReassignAPITestCase(test.TestCase):
         self.stderr_patch.stop()
         self.project_list_for_importV3.stop()
         self.user_exist_in_tenantV3.stop()
+        self.keystone_client_patch.stop()
 
         super(BaseReassignAPITestCase, self).tearDown()
 
@@ -93,7 +97,13 @@ class BaseReassignAPITestCase(test.TestCase):
         capacity_mock.return_value = None
         capacity_mock.side_effect = values
         type_id = tests_utils.create_workload_type(self.context)
-        jobschedule = pickle.dumps({'test': 'schedule'})
+        jobschedule = pickle.dumps({'start_date': '06/05/2014',
+                                    'end_date': '07/05/2015',
+                                    'interval': '1 hr',
+                                    'start_time': '2:30 PM',
+                                    'fullbackup_interval': -1,
+                                    'retention_policy_type': 'Number of Snapshots to Keep',
+                                    'retention_policy_value': '30'})
         workload = tests_utils.create_workload(self.context, workload_type_id=type_id.id, jobschedule=jobschedule)
         workload = workload.__dict__
         workload.pop('_sa_instance_state')
@@ -127,7 +137,8 @@ class BaseReassignAPITestCase(test.TestCase):
             f.write(json.dumps(snapshot))
         return snapshot
 
-    def test_orphan_workload_list_with_existing_tenant_and_user(self):
+    @patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient')
+    def test_orphan_workload_list_with_existing_tenant_and_user(self, keysstoneclient):
 
         tenant_list = [bunchify({'id': self.context.project_id })]
         self.ProjectListMockMethod.return_value = tenant_list
@@ -145,7 +156,7 @@ class BaseReassignAPITestCase(test.TestCase):
                 self.create_snapshot(workload)
 
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context)
-        self.assertEqual(workloads, [])
+        self.assertEqual(len(workloads), 5)
 
     def test_orphan_workload_list_with_non_existing_tenant(self):
 
@@ -209,7 +220,7 @@ class BaseReassignAPITestCase(test.TestCase):
                 self.db.snapshot_delete(self.context, snapshot['id'])
             self.db.workload_delete(self.context, workload['id'])
         workloads = self.workloadAPI.get_orphaned_workloads_list(self.context, migrate_cloud=True)
-        self.assertEqual(workloads, [])
+        self.assertEqual(len(workloads), 5)
 
     def test_orphan_workload_list_with_non_exist_tenant_with_migrate_cloud(self):
 

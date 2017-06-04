@@ -39,10 +39,6 @@ class BaseWorkloadTestCase(test.TestCase):
         CONF.set_default('vault_storage_nfs_export',
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
-        patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
-        patch('sys.stderr').start()
-        patch('workloadmgr.autolog.log_method').start()
-
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
 
@@ -50,6 +46,10 @@ class BaseWorkloadTestCase(test.TestCase):
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
+
+        patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
+        patch('sys.stderr').start()
+        patch('workloadmgr.autolog.log_method').start()
 
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import *
@@ -507,6 +507,7 @@ class BaseWorkloadTestCase(test.TestCase):
                             'retention_policy_type': 'Number of Snapshots to Keep',
                             'retention_policy_value': '30'}),
             'host': CONF.host,}
+
         with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
                           'is_mounted', return_value=True) as mock_method1:
             with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
@@ -574,6 +575,7 @@ class BaseWorkloadTestCase(test.TestCase):
                                       db.workload_get,
                                       self.context,
                                       workload_id)
+
     def test_create_workload_with_invalid_workload_type(self):
         """Test workload can be created and deleted."""
         pass

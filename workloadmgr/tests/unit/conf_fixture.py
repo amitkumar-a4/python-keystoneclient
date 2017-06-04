@@ -5,7 +5,7 @@
 #
 
 from oslo.config import cfg
-
+import workloadmgr.vault.vault
 
 CONF = cfg.CONF
 
