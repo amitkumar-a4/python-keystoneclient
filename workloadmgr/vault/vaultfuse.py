@@ -1514,7 +1514,8 @@ def main(mountpoint, cacheroot):
                       repository=SwiftRepository(cacheroot))
     FUSE(tvaultplugin, mountpoint,
          nothreads=True, foreground=True, nonempty=True,
-         big_writes=True, direct_io=True)
+         big_writes=True, direct_io=True, allow_other=True)
 
 if __name__ == '__main__':
+    fuse_conf()
     main(CONF.vault_data_directory, CONF.vault_data_directory_old )
