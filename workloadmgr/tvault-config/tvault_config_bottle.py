@@ -48,9 +48,12 @@ from workloadmgr.db.sqlalchemy import models
 from pytz import all_timezones
 from tzlocal import get_localzone
 
+from workloadmgr import auditlog
+
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
+
 
 module_dir = os.path.dirname(__file__)
 if module_dir:
@@ -2815,6 +2818,20 @@ def reinitialize():
            connection.execute("SET FOREIGN_KEY_CHECKS=1") 
            trans.commit()
            bottle.request.environ['beaker.session']['success_message'] = 'Reinitialized successfully'
+           try:
+                context = bottle.request.environ['beaker.session']
+                context.user = 'System'
+                context.tenant = 'System'
+                context.user_id = 'System'
+                context.project_id = 'System'
+                context.vault_storage_nfs_export = ''
+                if config_data['backup_target_type'] == 'NFS':
+                   context.vault_storage_nfs_export = config_data['storage_nfs_export']
+                context.cloud_unique_id = config_data['cloud_unique_id']
+                AUDITLOG = auditlog.getAuditLogger(CONF1=context)
+                AUDITLOG.log(context,'Reinitialized database', None)
+           except Exception as ex:
+                  pass               
         else:
              bottle.request.environ['beaker.session']['error_message'] = 'No database found'
     except Exception as exception:

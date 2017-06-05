@@ -1108,7 +1108,10 @@ def snapshot_get_all(context, **kwargs):
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter(models.Snapshots.project_id == context.project_id)
     if 'status' in kwargs and kwargs['status'] is not None:
-       qs = qs.filter(models.Snapshots.status == kwargs['status'])
+       if kwargs['status'] == 'available':
+          qs = qs.filter(or_(models.Snapshots.status == 'available', models.Snapshots.status == 'mounted'))
+       else:
+            qs = qs.filter_by(status=kwargs['status'])
 
     qs = qs.order_by(models.Snapshots.created_at.desc())
     if 'end' in kwargs and kwargs['end'] != 0:
@@ -1141,7 +1144,7 @@ def snapshot_get_all_by_workload(context, workload_id, **kwargs):
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
+       kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\

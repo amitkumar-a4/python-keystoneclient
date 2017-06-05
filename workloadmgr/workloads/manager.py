@@ -92,7 +92,17 @@ FLAGS = flags.FLAGS
 FLAGS.register_opts(workloads_manager_opts)
 
 CONF = cfg.CONF
-       
+
+
+def workflow_lookup_class(class_name):
+    parts = class_name.split('.')
+    module = ".".join(parts[:-1])
+    workflow_class = __import__( module )
+    for comp in parts[1:]:
+        workflow_class = getattr(workflow_class, comp)
+    return workflow_class
+
+
 @autolog.log_method(logger=Logger)
 def get_workflow_class(context, workload_type_id, restore=False):
     #TODO(giri): implement a driver model for the workload types
@@ -131,13 +141,8 @@ def get_workflow_class(context, workload_type_id, restore=False):
         else:
             kwargs = {'workload_type_id': workload_type_id}
             raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
-                      
-    parts = workflow_class_name.split('.')
-    module = ".".join(parts[:-1])
-    workflow_class = __import__( module )
-    for comp in parts[1:]:
-        workflow_class = getattr(workflow_class, comp)            
-    return workflow_class        
+
+    return workflow_lookup_class(workflow_class_name)
 
 workloadlock = Lock()
 def synchronized(lock):
@@ -793,6 +798,102 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
 
     @autolog.log_method(logger=Logger)
+    def _validate_restore_options(self, context, restore, options):
+        snapshot_id = restore.snapshot_id
+        snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
+        if options.get('type', "") != "openstack":
+            msg = _("'type' field in options is not set to 'openstack'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if 'openstack' not in options:
+            msg = _("'openstack' field is not in options")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+
+        # If instances is not available should we restore entire snapshot?
+        if 'instances' not in options['openstack']:
+            msg = _("'instances' field is not in found " \
+                    "in options['instances']")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) in ('selective'):
+            return
+
+        compute_service = nova.API(production=True)                
+        volume_service = cinder.API()
+
+        flavors = compute_service.get_flavors(context)
+        for inst in options['openstack']['instances']:
+            vm_id = inst.get('id', None)
+            if not vm_id:
+                msg = _("'instances' contain an element that does "
+                        "not include 'id' field")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            try:
+                nova_inst = compute_service.get_server_by_id(context, vm_id, admin=False)
+                if not nova_inst:
+                    msg = _("instance '%s' in nova is not found" % vm_id)
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            except Exception as ex:
+                LOG.exception(ex)
+                msg = _("instance '%s' in nova is not found" % vm_id)
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            # get attached references
+            attached_devices = getattr(nova_inst, 'os-extended-volumes:volumes_attached')
+            attached_devices = set([v['id'] for v in attached_devices])
+
+            snapshot_vm_resources = self.db.snapshot_vm_resources_get(
+                context, vm_id, snapshot_id)
+            vol_snaps = {}
+            image_id = None
+            for res_snap in snapshot_vm_resources:
+                if res_snap.resource_type != 'disk':
+                    continue
+
+                vol_id = self._get_metadata_value(res_snap, 'volume_id')
+                if not image_id:
+                    image_id = self._get_metadata_value(res_snap, 'image_id')
+                vol_size = self._get_metadata_value(res_snap, 'volume_size') or "-1"
+                vol_size = int(vol_size)
+                if vol_id:
+                    vol_snaps[vol_id] = {'size': vol_size}
+
+            if image_id and image_id != nova_inst.image['id']:
+                msg = _("instance '%s' image id is different than the "
+                        "backup image id %s" % (vm_id, nova_inst.image['id']))
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            for vdisk in inst.get('vdisks', []):
+                # make sure that vdisk exists in cinder and
+                # is attached to the instance
+                if vdisk.get('id', None) not in attached_devices:
+                    msg = _("'vdisks' contain an element that does "
+                            "not include 'id' field")
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+                try:
+                    vol_obj = volume_service.get(context, vdisk.get('id', None),
+                                                 no_translate=True)
+                    if not vol_obj:
+                        raise wlm_exceptions.InvalidRestoreOptions()
+                except Exception as ex:
+                    LOG.exception(ex)
+                    msg = _("'%s' is not a valid cinder volume" %
+                            vdisk.get('id'))
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+                if vol_obj.size != vol_snaps[vol_obj.id]['size']:
+                    msg = _("'%s' current volume size %d does not match with "
+                            "backup volume size %d" %
+                            (vdisk.get('id'), vol_obj.size,
+                             vol_snaps[vol_obj.id]['size']))
+                    raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+        return
+
+    @autolog.log_method(logger=Logger)
     def _oneclick_restore_options(self, context, restore, options):
         snapshot_id = restore.snapshot_id
         snapshotvms = self.db.snapshot_vms_get(context, restore.snapshot_id)
@@ -886,12 +987,31 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             context = nova._get_tenant_context(context)
 
-            target_platform = 'vmware'
+            target_platform = 'openstack'
             if hasattr(restore, 'pickle'):
                 options = pickle.loads(restore['pickle'].encode('ascii','ignore'))
                 if options and 'type' in options:
                     target_platform = options['type']
-            
+
+            if target_platform != 'openstack':
+                msg = _("'type' field in restore options must be 'openstack'")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+            if not options:
+                options = {}
+
+            if options.get('oneclickrestore', False):
+                rtype = 'oneclick'
+            else:
+                rtype = 'selective'
+
+            rtype = options.get('restore_type', rtype)
+
+            if rtype not in ('selective', 'oneclick', 'inplace'):
+                msg = _("'restore_type' field in restore options must be "
+                        "'selective' or 'inplace' or 'oneclick'")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
             restore_type = restore.restore_type
             if restore_type == 'test':
                 restore = self.db.restore_update(context,
@@ -913,18 +1033,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                                  })
 
             values = {'status': 'executing'}
-            if options and 'oneclickrestore' in options and options['oneclickrestore']:
+            workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
+            if rtype == 'oneclick':
                 restore_user_selected_value = 'Oneclick Restore'
                 # Override traget platfrom for clinets not specified on oneclick
                 if workload.source_platform != target_platform:
-                   target_platform = workload.source_platform
+                    target_platform = workload.source_platform
                 # Fill the restore options from the snapshot instances metadata
                 options = self._oneclick_restore_options(context, restore, options)
                 values['pickle'] = pickle.dumps(options, 0)
 
-            restore = self.db.restore_update(context, restore.id, values)
-            if options and 'oneclickrestore' in options and \
-               options['oneclickrestore'] and target_platform == 'openstack':
                 compute_service = nova.API(production=True)                
                 for vm in self.db.snapshot_vms_get(context, restore.snapshot_id):
                     instance_options = utils.get_instance_restore_options(options, vm.vm_id, target_platform)
@@ -936,6 +1054,15 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             msg = _('Original instance ' +  vm.vm_name + ' is still present. '
                                     'Please delete this instance and try again.')
                             raise wlm_exceptions.InvalidState(reason=msg)
+
+            elif rtype == 'inplace':
+                workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
+                self._validate_restore_options(context, restore, options)
+                self.workload_reset(context, snapshot.workload_id)
+            elif rtype == 'selective':
+                self._validate_restore_options(context, restore, options)
+
+            restore = self.db.restore_update(context, restore.id, values)
 
             restore_size = vmtasks_openstack.get_restore_data_size( context, self.db, dict(restore.iteritems()))
             if restore_type == 'test':
@@ -957,11 +1084,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'restore': dict(restore.iteritems()),   # restore dictionary
                 'target_platform': target_platform,                
             }
-            workflow_class = get_workflow_class(context, workload.workload_type_id, True)
+
+            workflow_class = workflow_lookup_class(workflow_class_name)
+   
             workflow = workflow_class(restore.display_name, store)
             workflow.initflow()
             workflow.execute()
-            
+
             compute_service = nova.API(production=True)
             restore_data_transfer_time = 0
             restore_object_store_transfer_time = 0            

@@ -61,6 +61,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 
 from nbd import NbdMount as nbd
 import restore_vm_flow
+import restore_vm_data_flow
 
 native_threading = patcher.original("threading")
 native_Queue = patcher.original("Queue")
@@ -1066,6 +1067,22 @@ class LibvirtDriver(driver.ComputeDriver):
             except Exception as ex:
                 LOG.exception(ex)               
 
+    @autolog.log_method(Logger, 'libvirt.driver.restore_vm_data')
+    def restore_vm_data(self, cntx, db, instance, restore, instance_options):
+        """
+        Inplace restore specified instance from a snapshot
+        """
+        try:
+            restore_obj = db.restore_get(cntx, restore['id'])
+            result = restore_vm_data_flow.restore_vm_data(cntx, db, instance,
+                                                          restore, instance_options)
+            return result
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+        finally:
+            pass
+
     @autolog.log_method(Logger, 'libvirt.driver.vast_finalize')
     def vast_finalize(self, cntx, compute_service, db,
                       instance, snapshot,
@@ -1127,7 +1144,6 @@ class LibvirtDriver(driver.ComputeDriver):
             backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                                     'backup_media_target')
             backup_target = vault.get_backup_target(backup_endpoint)
-
             instance_ids = [instance['vm_id'] for instance in instances]
             if snapshot_to_commit and snapshot_to_commit.snapshot_type == 'full':
                 for snap in snapshots_to_delete:
@@ -1151,7 +1167,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
                         vm_disk_resource_snap = vm_disk_resource_snap_to_commit = db.vm_disk_resource_snap_get_bottom(
                                                                                          cntx, snapshot_vm_resource.id)
-
                         if vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                             vm_disk_resource_snap_to_commit_backing = db.vm_disk_resource_snap_get(cntx,
                                                        vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id)
@@ -1160,7 +1175,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
                                 _add_to_commit_list(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing)
                                 snap_to_del.append(vm_disk_resource_snap_to_commit.id)
-
                                 vm_disk_resource_snap_to_commit = vm_disk_resource_snap_to_commit_backing
                                 while vm_disk_resource_snap_to_commit and vm_disk_resource_snap_to_commit.vm_disk_resource_snap_backing_id:
                                     if vm_disk_resource_snap_to_commit.snapshot_vm_resource_id == \
@@ -1171,7 +1185,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
                                         _add_to_commit_list(vm_disk_resource_snap_to_commit, vm_disk_resource_snap_to_commit_backing)
                                         snap_to_del.append(vm_disk_resource_snap_to_commit.id)
-
                                         vm_disk_resource_snap_to_commit = vm_disk_resource_snap_to_commit_backing
                                     else:
                                         break
@@ -1202,7 +1215,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                       if status['result'] == 'retry':
                                          LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
                                          time.sleep(60)
-
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
@@ -1223,10 +1235,12 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                                                   vm_disk_resource_snap_to_commit_backing,
                                                                                                   affected_snapshots)
 
-                    workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
-
+                    #workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
             for snapshot_id in affected_snapshots:
                 workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)
+
+            for snap in snapshots_to_delete:
+                workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
 
         except Exception as ex:
             msg = ''
