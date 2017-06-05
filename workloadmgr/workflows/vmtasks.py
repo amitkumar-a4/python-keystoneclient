@@ -703,9 +703,9 @@ class FreezeVM(task.Task):
         db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if source_platform == 'openstack':
-            return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
+            return vmtasks_openstack.freeze_vm(cntx, db, instance)
         else:
-            return vmtasks_vcloud.freeze_vm(cntx, db, instance, snapshot)
+            return vmtasks_vcloud.freeze_vm(cntx, db, instance)
 
 
     @autolog.log_method(Logger, 'FreezeVM.revert')
@@ -739,9 +739,9 @@ class ThawVM(task.Task):
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
         if source_platform == 'openstack':
-            return vmtasks_openstack.thaw_vm(cntx, db, instance, snapshot)
+            return vmtasks_openstack.thaw_vm(cntx, db, instance)
         else:
-            return vmtasks_vcloud.thaw_vm(cntx, db, instance, snapshot)
+            return vmtasks_vcloud.thaw_vm(cntx, db, instance)
 
     @autolog.log_method(Logger, 'ThawVM.revert')
     def revert_with_log(self, *args, **kwargs):

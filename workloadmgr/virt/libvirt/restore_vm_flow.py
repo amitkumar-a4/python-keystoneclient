@@ -38,6 +38,7 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.workloads import workload_utils
+from workloadmgr.workflows import vmtasks_openstack
 
 from workloadmgr.vault import vault
 
@@ -1098,7 +1099,7 @@ class PowerOnInstance(task.Task):
                     raise Exception(_("Error creating instance " + \
                                         restored_instance_id))
             now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=4):
+            if (now - start_time) > datetime.timedelta(minutes=5):
                 raise exception.ErrorOccurred(reason='Timeout waiting for '\
                                            'the instance to boot from volume')                   
 
@@ -1158,6 +1159,77 @@ class AssignFloatingIP(task.Task):
         return
 
     @autolog.log_method(Logger, 'AssignFloatingIP.revert')
+    def revert_with_log(self, *args, **kwargs):
+        pass
+
+
+class FreezeVM(task.Task):
+
+    def execute(self, context, restored_instance_id):
+        return self.execute_with_log(context, restored_instance_id)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'FreezeVM.execute')
+    def execute_with_log(self, context, restored_instance_id):
+        # freeze an instance
+        try:
+            self.cntx = amqp.RpcContext.from_dict(context)
+            db = WorkloadMgrDB().db
+            self.compute_service = compute_service = nova.API(production = True)
+            restored_instance = compute_service.get_server_by_id(
+                self.cntx, restored_instance_id)
+ 
+            from workloadmgr.workflows.vmtasks import POWER_STATES
+            if POWER_STATES[restored_instance.__dict__['OS-EXT-STS:power_state']] != 'RUNNING':
+                return        
+  
+            instance = {'hypervisor_type': 'QEMU',
+                        'vm_id': restored_instance_id}
+            return vmtasks_openstack.freeze_vm(self.cntx, db, instance)
+        except Exception as ex:
+            LOG.exception(ex)
+
+
+    @autolog.log_method(Logger, 'FreezeVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            instance = {'hypervisor_type': 'QEMU',
+                        'vm_id': kwargs['restored_instance_id']}
+            return vmtasks_openstack.thaw_vm(cntx, db, instance)
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
+
+
+class ThawVM(task.Task):
+
+    def execute(self, context, restored_instance_id):
+        return self.execute_with_log(context, restored_instance_id)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'ThawVM.execute')
+    def execute_with_log(self, context, restored_instance_id):
+        # thaw an instance
+        try:
+            # give few seconds before invoking thaw
+            time.sleep(10)
+            self.cntx = amqp.RpcContext.from_dict(context)
+            db = WorkloadMgrDB().db
+
+            instance = {'hypervisor_type': 'QEMU',
+                        'vm_id': restored_instance_id}
+            return vmtasks_openstack.thaw_vm(self.cntx, db, instance)
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(Logger, 'ThawVM.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
 
@@ -1346,6 +1418,14 @@ def AssignFloatingIPFlow(context):
 
     return flow
 
+def FreezeNThawFlow(context):
+
+    flow = lf.Flow("freezenthawlf")
+    flow.add(FreezeVM("FreezeVM"))
+    flow.add(ThawVM("ThawVM"))
+
+    return flow
+
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
                restored_nics, instance_options):
@@ -1481,6 +1561,10 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # Assign floating IP address
     childflow = AssignFloatingIPFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    childflow = FreezeNThawFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 
