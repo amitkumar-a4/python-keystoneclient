@@ -3,7 +3,6 @@ import guestfs
 import multiprocessing
 from multiprocessing import Process
 from multiprocessing import Pool, TimeoutError
-from workloadmgr.virt import qemuimages
 #from pathos.multiprocessing import ProcessingPool as Pool
 import os
 import pwd
@@ -18,11 +17,7 @@ def f(data):
     snapshot_id = drives[0]
     drives.pop(0)
     for drive in drives:
-        image_info = qemuimages.qemu_img_info(drive)
-        fmt = "qcow2"
-        if image_info.file_format == "raw" or not image_info.backing_file:
-           fmt = "raw"
-        g.add_drive_opts(drive, format=fmt, readonly=1)
+        g.add_drive_opts(drive, format="qcow2", readonly=1)
     g.set_backend("libvirt")
     g.set_path("/home/nova")
     g.launch()
