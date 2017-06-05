@@ -489,6 +489,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'status': 'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
             guestfs_input = []
+            if len(search_list_snapshots) == 0:
+               self.db.file_search_update(context,search_id,{'status': 'error', 'error_msg': 'There are not any valid snapshots available for search'})
+               return
             for search_list_snapshot in search_list_snapshots:
                 search_list_snapshot_id = search_list_snapshot
                 if not isinstance(search_list_snapshot, (str, unicode)):
