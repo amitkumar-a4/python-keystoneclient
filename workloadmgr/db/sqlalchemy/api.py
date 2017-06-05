@@ -1091,7 +1091,7 @@ def snapshot_get_all(context, **kwargs):
                     options(sa_orm.joinedload(models.Snapshots.metadata))
     #qs = qs.join(models.SnapshotVMs, models.Snapshots.id == models.SnapshotVMs.snapshot_id)
     if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':  
-       qs = qs.filter(models.Snapshots.workload_id == kwargs['workload_id'])
+       qs = qs.filter_by(workload_id=kwargs['workload_id'])
     if 'host' in kwargs and kwargs['host'] is not None and kwargs['host'] != '':
        qs = qs.filter(models.Snapshots.host == kwargs['host'])
     if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
@@ -1103,10 +1103,10 @@ def snapshot_get_all(context, **kwargs):
                       models.Snapshots.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
 
     if not is_admin_context(context):
-       qs = qs.filter(models.Snapshots.project_id == context.project_id)
+       qs = qs.filter_by(project_id=context.project_id)
     else:
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
-            qs = qs.filter(models.Snapshots.project_id == context.project_id)
+            qs = qs.qs.filter_by(project_id=context.project_id)
     if 'status' in kwargs and kwargs['status'] is not None:
        if kwargs['status'] == 'available':
           qs = qs.filter(or_(models.Snapshots.status == 'available', models.Snapshots.status == 'mounted'))
