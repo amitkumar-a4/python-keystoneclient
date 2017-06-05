@@ -1106,7 +1106,7 @@ def snapshot_get_all(context, **kwargs):
        qs = qs.filter_by(project_id=context.project_id)
     else:
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
-            qs = qs.qs.filter_by(project_id=context.project_id)
+            qs = qs.filter_by(project_id=context.project_id)
     if 'status' in kwargs and kwargs['status'] is not None:
        if kwargs['status'] == 'available':
           qs = qs.filter(or_(models.Snapshots.status == 'available', models.Snapshots.status == 'mounted'))
