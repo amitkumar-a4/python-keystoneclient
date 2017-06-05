@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 import zlib
+import re
 
 from M2Crypto import DSA
 
@@ -250,6 +251,9 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def search(self, context, data):
+        if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
+           msg = _('Provide valid linux filepath to search')
+           raise wlm_exceptions.Invalid(reason=msg)
         vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
         if len(vm_found) == 0:
            msg = _('vm_id not existing with this tenant')
