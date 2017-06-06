@@ -685,19 +685,19 @@ class PreSnapshot(task.Task):
         
 class FreezeVM(task.Task):
 
-    def execute(self, context, source_platform, instance, snapshot):
-        return self.execute_with_log(context, source_platform, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot, **kwargs):
+        return self.execute_with_log(context, source_platform, instance, snapshot, **kwargs)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'FreezeVM.execute')
-    def execute_with_log(self, context, source_platform, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot, **kwargs):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-        if source_platform == instance:
-           restored_instance_id = instance
+        if 'restored_instance_id' in kwargs:
+           restored_instance_id = kwargs['restored_instance_id']
            source_platform = "openstack"
            self.compute_service = compute_service = nova.API(production = True)
            restored_instance = compute_service.get_server_by_id(
@@ -736,20 +736,19 @@ class FreezeVM(task.Task):
 
 class ThawVM(task.Task):
 
-    def execute(self, context, source_platform, instance, snapshot):
-        return self.execute_with_log(context, source_platform, instance, snapshot)
+    def execute(self, context, source_platform, instance, snapshot, **kwargs):
+        return self.execute_with_log(context, source_platform, instance, snapshot, **kwargs)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'ThawVM.execute')
-    def execute_with_log(self, context, source_platform, instance, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot, **kwargs):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-
-        if source_platform == instance:       
-           restored_instance_id = instance
+        if 'restored_instance_id' in kwargs:
+           restored_instance_id = kwargs['restored_instance_id']
            source_platform = "openstack"
            instance = {'hypervisor_type': 'QEMU',
                         'vm_id': restored_instance_id} 

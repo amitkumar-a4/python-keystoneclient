@@ -1351,8 +1351,10 @@ def AssignFloatingIPFlow(context):
 def FreezeNThawFlow(context):
 
     flow = lf.Flow("freezenthawlf")
-    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 'source_platform': 'restored_instance_id'}))
-    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 'source_platform': 'restored_instance_id'}))
+    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
 
     return flow
 
