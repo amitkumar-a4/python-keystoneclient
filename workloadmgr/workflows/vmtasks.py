@@ -1,4 +1,4 @@
-#secgroup vim: tabstop=4 shiftwidth=4 softtabstop=4
+#secgroup vim: tabstop=4 shiftwidth=4 softtabstop=from workloadmgr.workflows.vmtasks import POWER_STATES
 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
@@ -685,22 +685,35 @@ class PreSnapshot(task.Task):
         
 class FreezeVM(task.Task):
 
-    def execute(self, context, source_platform, instance, snapshot):
-        return self.execute_with_log(context, source_platform, instance, snapshot)
+    def execute(self, context, instance, source_platform, snapshot):
+        return self.execute_with_log(context, instance, source_platform, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'FreezeVM.execute')
-    def execute_with_log(self, context, source_platform, instance, snapshot):
+    def execute_with_log(self, context, instance, source_platform, snapshot):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
+        import pdb;pdb.set_trace()
+        if source_platform == instance:
+           restored_instance_id = instance
+           source_platform = "openstack"
+           self.compute_service = compute_service = nova.API(production = True)
+           restored_instance = compute_service.get_server_by_id(
+                               cntx, restored_instance_id)
+           if POWER_STATES[restored_instance.__dict__['OS-EXT-STS:power_state']] != 'RUNNING':
+                 return        
+   
+           instance = {'hypervisor_type': 'QEMU',
+                        'vm_id': restored_instance_id}
         
-        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
-            return        
+        else:
+             if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+                return        
 
-        db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
+             db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if source_platform == 'openstack':
             return vmtasks_openstack.freeze_vm(cntx, db, instance)
@@ -735,9 +748,15 @@ class ThawVM(task.Task):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-        
-        if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
-            return        
+
+        if source_platform == instance:       
+           restored_instance_id = instance
+           source_platform = "openstack"
+           instance = {'hypervisor_type': 'QEMU',
+                        'vm_id': restored_instance_id} 
+        else:
+             if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
+                return        
         if source_platform == 'openstack':
             return vmtasks_openstack.thaw_vm(cntx, db, instance)
         else:
