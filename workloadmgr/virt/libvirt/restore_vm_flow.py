@@ -46,6 +46,7 @@ from workloadmgr import utils
 from workloadmgr import flags
 from workloadmgr import autolog
 from workloadmgr import exception
+from workloadmgr.workflows.vmtasks import FreezeVM, ThawVM
 
 
 restore_vm_opts = [
@@ -1163,77 +1164,6 @@ class AssignFloatingIP(task.Task):
         pass
 
 
-class FreezeVM(task.Task):
-
-    def execute(self, context, restored_instance_id):
-        return self.execute_with_log(context, restored_instance_id)
-    
-    def revert(self, *args, **kwargs):
-        return self.revert_with_log(*args, **kwargs)
-    
-    @autolog.log_method(Logger, 'FreezeVM.execute')
-    def execute_with_log(self, context, restored_instance_id):
-        # freeze an instance
-        try:
-            self.cntx = amqp.RpcContext.from_dict(context)
-            db = WorkloadMgrDB().db
-            self.compute_service = compute_service = nova.API(production = True)
-            restored_instance = compute_service.get_server_by_id(
-                self.cntx, restored_instance_id)
- 
-            from workloadmgr.workflows.vmtasks import POWER_STATES
-            if POWER_STATES[restored_instance.__dict__['OS-EXT-STS:power_state']] != 'RUNNING':
-                return        
-  
-            instance = {'hypervisor_type': 'QEMU',
-                        'vm_id': restored_instance_id}
-            return vmtasks_openstack.freeze_vm(self.cntx, db, instance)
-        except Exception as ex:
-            LOG.exception(ex)
-
-
-    @autolog.log_method(Logger, 'FreezeVM.revert')
-    def revert_with_log(self, *args, **kwargs):
-        try:
-            cntx = amqp.RpcContext.from_dict(kwargs['context'])
-            db = WorkloadMgrDB().db
-            instance = {'hypervisor_type': 'QEMU',
-                        'vm_id': kwargs['restored_instance_id']}
-            return vmtasks_openstack.thaw_vm(cntx, db, instance)
-        except Exception as ex:
-            LOG.exception(ex)
-        finally:
-            pass
-
-
-class ThawVM(task.Task):
-
-    def execute(self, context, restored_instance_id):
-        return self.execute_with_log(context, restored_instance_id)
-    
-    def revert(self, *args, **kwargs):
-        return self.revert_with_log(*args, **kwargs)
-    
-    @autolog.log_method(Logger, 'ThawVM.execute')
-    def execute_with_log(self, context, restored_instance_id):
-        # thaw an instance
-        try:
-            # give few seconds before invoking thaw
-            time.sleep(10)
-            self.cntx = amqp.RpcContext.from_dict(context)
-            db = WorkloadMgrDB().db
-
-            instance = {'hypervisor_type': 'QEMU',
-                        'vm_id': restored_instance_id}
-            return vmtasks_openstack.thaw_vm(self.cntx, db, instance)
-        except Exception as ex:
-            LOG.exception(ex)
-
-    @autolog.log_method(Logger, 'ThawVM.revert')
-    def revert_with_log(self, *args, **kwargs):
-        pass
-
-
 def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, restore_id):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
@@ -1421,8 +1351,10 @@ def AssignFloatingIPFlow(context):
 def FreezeNThawFlow(context):
 
     flow = lf.Flow("freezenthawlf")
-    flow.add(FreezeVM("FreezeVM"))
-    flow.add(ThawVM("ThawVM"))
+    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
 
     return flow
 
