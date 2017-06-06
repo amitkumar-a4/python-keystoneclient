@@ -249,7 +249,39 @@ class RestoreVM(task.Task):
             LOG.exception(ex)
         finally:
             pass        
+
+
+class RestoreVMData(task.Task):
+
+    def execute(self, context, target_platform, instance, restore):
+        return self.execute_with_log(context, target_platform, instance, restore)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'RestoreVM.execute')
+    def execute_with_log(self, context, target_platform, instance, restore):
+        # Restore the VM Data
+        cntx = amqp.RpcContext.from_dict(context)
+        db = WorkloadMgrDB().db
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
+        ret_val = vmtasks_openstack.restore_vm_data(cntx, db, instance, restore)
         
+        return {'vm_name':ret_val.vm_name, 'vm_id': ret_val.vm_id, 'uuid': ret_val.vm_id}
+    
+    @autolog.log_method(Logger, 'RestoreVMData.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass        
+
+
 class PowerOnVM(task.Task):
 
     def execute(self, context, target_platform, instance, restore, restored_instance):
@@ -281,8 +313,41 @@ class PowerOnVM(task.Task):
             LOG.exception(ex)
         finally:
             pass
-               
-             
+
+
+class PowerOffVM(task.Task):
+
+    def execute(self, context, target_platform, instance, restore, restored_instance):
+        return self.execute_with_log(context, target_platform, instance, restore, restored_instance)
+    
+    def revert(self, *args, **kwargs):
+        return self.revert_with_log(*args, **kwargs)
+    
+    @autolog.log_method(Logger, 'PowerOffVM.execute')
+    def execute_with_log(self, context, target_platform, instance, restore, restored_instance):
+        # PowerOff the VM
+        db = WorkloadMgrDB().db
+        cntx = amqp.RpcContext.from_dict(context)
+
+        db.restore_get_metadata_cancel_flag(cntx, restore['id'])
+
+        if target_platform == 'openstack':
+            return vmtasks_openstack.poweroff_vm(cntx, instance, restore, restored_instance)
+        else:
+            return vmtasks_vcloud.poweroff_vm(cntx, instance, restore, restored_instance)
+
+    @autolog.log_method(Logger, 'PowerOffVM.revert')
+    def revert_with_log(self, *args, **kwargs):
+        try:
+            cntx = amqp.RpcContext.from_dict(kwargs['context'])
+            db = WorkloadMgrDB().db
+            db.restore_update(cntx, kwargs['restore']['id'], {'status': 'error',})
+        except Exception as ex:
+            LOG.exception(ex)
+        finally:
+            pass
+
+
 class SetVMMetadata(task.Task):
 
     def execute(self, context, target_platform, instance, restore, restored_instance):
@@ -638,9 +703,9 @@ class FreezeVM(task.Task):
         db.snapshot_get_metadata_cancel_flag(cntx, snapshot['id'])
 
         if source_platform == 'openstack':
-            return vmtasks_openstack.freeze_vm(cntx, db, instance, snapshot)
+            return vmtasks_openstack.freeze_vm(cntx, db, instance)
         else:
-            return vmtasks_vcloud.freeze_vm(cntx, db, instance, snapshot)
+            return vmtasks_vcloud.freeze_vm(cntx, db, instance)
 
 
     @autolog.log_method(Logger, 'FreezeVM.revert')
@@ -674,9 +739,9 @@ class ThawVM(task.Task):
         if POWER_STATES[instance['vm_power_state']] != 'RUNNING':
             return        
         if source_platform == 'openstack':
-            return vmtasks_openstack.thaw_vm(cntx, db, instance, snapshot)
+            return vmtasks_openstack.thaw_vm(cntx, db, instance)
         else:
-            return vmtasks_vcloud.thaw_vm(cntx, db, instance, snapshot)
+            return vmtasks_vcloud.thaw_vm(cntx, db, instance)
 
     @autolog.log_method(Logger, 'ThawVM.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -1184,11 +1249,30 @@ def LinearRestoreVMs(instances):
     
     return flow
 
+# Assume there is dependency between instances
+# snapshot each VM in the order that appears in the array.
+
+def LinearRestoreVMsData(instances):
+    flow = lf.Flow("restorevmdatalf")
+    for index,item in enumerate(instances):
+        flow.add(RestoreVMData("RestoreVMData_" + item['vm_id'],
+                               rebind=dict(instance="instance_" + str(index))))
+    
+    return flow
+
+
 def LinearPowerOnVMs(instances):
     flow = lf.Flow("poweronvmlf")
     for index,item in enumerate(instances):
         rebind_dict = dict(restored_instance = "restored_instance_" + str(index), instance = "instance_" + str(index))
         flow.add(PowerOnVM("PowerOnVM_" + item['vm_id'], rebind=rebind_dict))
+    return flow
+
+def LinearPowerOffVMs(instances):
+    flow = lf.Flow("poweroffvmlf")
+    for index,item in enumerate(instances):
+        rebind_dict = dict(restored_instance = "restored_instance_" + str(index), instance = "instance_" + str(index))
+        flow.add(PowerOffVM("PowerOffVM_" + item['vm_id'], rebind=rebind_dict))
     return flow
 
 def LinearSetVMsMetadata(instances):
