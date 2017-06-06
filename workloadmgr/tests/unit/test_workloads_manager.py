@@ -380,6 +380,7 @@ class BaseWorkloadTestCase(test.TestCase):
                     for meta in workload.metadata:
                         if meta.key == 'backup_media_target':
                             self.assertEqual(meta.value, 'server1:nfsshare1')
+                            break
                      
                     self.assertEqual(workload.status, 'available')
                     expected = {
