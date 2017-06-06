@@ -1,4 +1,4 @@
-#secgroup vim: tabstop=4 shiftwidth=4 softtabstop=from workloadmgr.workflows.vmtasks import POWER_STATES
+#secgroup vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
@@ -685,18 +685,17 @@ class PreSnapshot(task.Task):
         
 class FreezeVM(task.Task):
 
-    def execute(self, context, instance, source_platform, snapshot):
-        return self.execute_with_log(context, instance, source_platform, snapshot)
+    def execute(self, context, source_platform, instance, snapshot):
+        return self.execute_with_log(context, source_platform, instance, snapshot)
     
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
     
     @autolog.log_method(Logger, 'FreezeVM.execute')
-    def execute_with_log(self, context, instance, source_platform, snapshot):
+    def execute_with_log(self, context, source_platform, instance, snapshot):
         # freeze an instance
         cntx = amqp.RpcContext.from_dict(context)
         db = WorkloadMgrDB().db
-        import pdb;pdb.set_trace()
         if source_platform == instance:
            restored_instance_id = instance
            source_platform = "openstack"
