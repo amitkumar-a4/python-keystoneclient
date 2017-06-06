@@ -726,9 +726,9 @@ class FreezeVM(task.Task):
             cntx = amqp.RpcContext.from_dict(kwargs['context'])
             db = WorkloadMgrDB().db
             if kwargs['source_platform'] == 'openstack':
-                return vmtasks_openstack.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
+                return vmtasks_openstack.thaw_vm(cntx, db, kwargs['instance'])
             else:
-                return vmtasks_vcloud.thaw_vm(cntx, db, kwargs['instance'], kwargs['snapshot'])
+                return vmtasks_vcloud.thaw_vm(cntx, db, kwargs['instance'])
         except Exception as ex:
             LOG.exception(ex)
         finally:
