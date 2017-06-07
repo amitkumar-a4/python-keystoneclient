@@ -659,7 +659,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/openstack_config",
                        controller=self.resources['openstack_config_backup'],
                        action='openstack_config_workload',
-                       conditions={"method": ['POST']})
+                       conditions={"method": ['PUT']})
 
         mapper.connect("openstack_config_workload_show",
                        "/{project_id}/openstack_config_show",
@@ -668,7 +668,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})
 
         mapper.connect("openstack_config_snapshot",
-                       "/{project_id}/openstack_config_snapshot/{id}",
+                       "/{project_id}/openstack_config_snapshot",
                        controller=self.resources['openstack_config_backup'],
                        action='openstack_config_snapshot',
                        conditions={"method": ['POST']})
@@ -684,3 +684,10 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['openstack_config_backup'],
                        action='openstack_config_snapshot_list',
                        conditions={"method": ['GET']})
+
+        mapper.connect("openstack_config_snapshot_delete",
+                       "/{project_id}/openstack_config_snapshot/{id}",
+                       controller=self.resources['openstack_config_backup'],
+                       action='openstack_config_snapshot_delete',
+                       conditions={"method": ['DELETE']})
+

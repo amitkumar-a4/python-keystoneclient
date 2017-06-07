@@ -3336,9 +3336,6 @@ def _openstack_config_snapshot_update(context, values, snapshot_id, session):
         snapshot_ref.update(values)
         snapshot_ref.save(session)
 
-        #if metadata:
-        #    _set_metadata_for_snapshot(context, snapshot_ref, metadata, purge_metadata, session=session)
-
         return snapshot_ref
     finally:
         lock.release()
@@ -3379,3 +3376,14 @@ def openstack_config_snapshot_get_all(context, **kwargs):
 
     return qs.order_by(models.OpenstackSnapshot.created_at.desc()).all()
 
+
+@require_context
+def openstack_config_snapshot_delete(context, snapshot_id):
+    session = get_session()
+    with session.begin():
+        session.query(models.OpenstackSnapshot).\
+            filter_by(id=snapshot_id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})

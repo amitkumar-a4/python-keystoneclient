@@ -189,3 +189,11 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         LOG.debug("create queue topic=%s", topic)
         self.cast(ctxt,
                   self.make_msg('openstack_config_snapshot',  openstack_snapshot_id=openstack_snapshot_id, services_to_snapshot=services_to_snapshot), topic=topic)
+
+    @autolog.log_method(logger=Logger)
+    def openstack_config_snapshot_delete(self, ctxt, host, snapshot_id, task_id):
+        LOG.debug("openstack_config_snapshot rpcapi openstack_snapshot_id:%s", snapshot_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        self.cast(ctxt,
+                  self.make_msg('openstack_config_snapshot_delete', snapshot_id=snapshot_id,
+                                task_id=task_id), topic=topic)

@@ -489,7 +489,19 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         workload_path = os.path.join(self.mount_path,
                         'workload_%s' % (workload_metadata['workload_id']))
         return workload_path
+   
+    @ensure_mounted()
+    def get_openstack_config_workload_path(self, workload_metadata):
+        workload_path = os.path.join(self.mount_path,
+                                     'openstack_workload_%s' % (workload_metadata['openstack_workload_id']))
+        return workload_path
     
+    def get_openstack_config_snapshot_path(self, snapshot_metadata):
+        workload_path = self.get_openstack_config_workload_path(snapshot_metadata)
+        snapshot_path = os.path.join(workload_path,
+                                     'snapshot_%s' % (snapshot_metadata['snapshot_id']))
+        return snapshot_path
+ 
     def get_snapshot_path(self, snapshot_metadata):                 
         workload_path = self.get_workload_path(snapshot_metadata)
         snapshot_path = os.path.join(workload_path,
@@ -776,6 +788,15 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         except Exception as ex:
             LOG.exception(ex)
 
+    @autolog.log_method(logger=Logger)
+    def openstack_config_snapshot_delete(self, context, snapshot_metadata):
+        try:
+            snapshot_path = self.get_openstack_config_snapshot_path(snapshot_metadata)
+            if os.path.isdir(snapshot_path):
+                shutil.rmtree(snapshot_path)
+        except Exception as ex:
+            LOG.exception(ex)
+
     ##
     # Object specific operations
     @autolog.log_method(logger=Logger) 
@@ -877,6 +898,22 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         except Exception as ex:
             LOG.exception(ex)
 
+    @autolog.log_method(logger=Logger)
+    def snapshot_delete(self, context, snapshot_metadata):
+        try:
+            snapshot_path = self.get_openstack_config_snapshot_path(snapshot_metadata)
+            retry = 0
+            while os.path.isdir(snapshot_path):
+                try:
+                    command = ['rm', '-rf', snapshot_path]
+                    subprocess.check_call(command, shell=False)
+                except:
+                    pass
+                retry += 1
+                if retry >= 1:
+                    break
+        except Exception as ex:
+            LOG.exception(ex)
     @autolog.log_method(logger=Logger)
     def get_total_capacity(self, context):
         """

@@ -31,14 +31,13 @@ class ViewBuilder(common.ViewBuilder):
             'openstack_snapshot': {
                 'id': openstack_snapshot.get('id'),
                 'created_at': openstack_snapshot.get('created_at'),
-                'updated_at': openstack_snapshot.get('updated_at'),
-                'finished_at': openstack_snapshot.get('finished_at'),
                 'status': openstack_snapshot.get('status'),
+                'name': openstack_snapshot.get('display_name'),
+                'description': openstack_snapshot.get('display_description'),
                 'openstack_workload_id': openstack_snapshot.get('openstack_workload_id'),
-                'name': openstack_snapshot.get('name'),
-                'size': openstack_snapshot.get('size'),
-                'start_date': openstack_snapshot.get('interval'),
+                'services_to_backup': openstack_snapshot.get('services_to_backup'),
             }}
+      
 
     def detail(self, request, openstack_snapshot):
         """Detailed view of a single snapshot."""
@@ -49,15 +48,23 @@ class ViewBuilder(common.ViewBuilder):
                 'updated_at': openstack_snapshot.get('updated_at'),
                 'finished_at': openstack_snapshot.get('finished_at'),
                 'status': openstack_snapshot.get('status'),
+                'name': openstack_snapshot.get('display_name'),
+                'description': openstack_snapshot.get('display_description'),
                 'openstack_workload_id': openstack_snapshot.get('openstack_workload_id'),
-                'name': openstack_snapshot.get('name'),
+                'services_to_backup': openstack_snapshot.get('services_to_backup'),
+                'host': openstack_snapshot.get('host'),
                 'size': openstack_snapshot.get('size'),
-                'start_date': openstack_snapshot.get('interval'),
+                'progress_msg': openstack_snapshot.get('progress_msg'),
+                'warning_msg': openstack_snapshot.get('warning_msg'),
+                'error_msg': openstack_snapshot.get('error_msg'),
+                'upload_summary': openstack_snapshot.get('upload_summary'),
+                'time_taken': openstack_snapshot.get('time_taken'),
+                'vault_storage_path': openstack_snapshot.get('vault_storage_path'),
+                'services_to_backup': openstack_snapshot.get('services_to_backup')
             }}
 
     def _list_view(self, func, request, snapshots):
         """Provide a view for a list of snapshots."""
-        #import pdb;pdb.set_trace()
         snapshots_list = [func(request, snapshot)['openstack_snapshot'] for snapshot in snapshots]
 
         snapshots_list = sorted(snapshots_list,

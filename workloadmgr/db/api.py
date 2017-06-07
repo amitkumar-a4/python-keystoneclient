@@ -484,6 +484,10 @@ def openstack_config_snapshot_get(context, snapshot_id, **kwargs):
     """get a snappshot for OpenStack config"""
     return IMPL.openstack_config_snapshot_get(context, snapshot_id, **kwargs)
 
-def openstack_config_snapshot_get_all(context,  **kwargs):
+def openstack_config_snapshot_get_all(context, **kwargs):
     """get all snappshots for OpenStack config"""
     return IMPL.openstack_config_snapshot_get_all(context, **kwargs)
+
+def openstack_config_snapshot_delete(context, snapshot_id, **kwargs):
+    """get all snappshots for OpenStack config"""
+    return IMPL.openstack_config_snapshot_delete(context, snapshot_id, **kwargs)

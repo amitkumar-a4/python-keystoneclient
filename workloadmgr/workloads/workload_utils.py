@@ -159,10 +159,25 @@ def upload_openstack_workload_db_entry(cntx, openstack_workload_id):
 
         openstack_workload_json = jsonutils.dumps(openstack_workload_db)
         path = os.path.join(parent, "openstack_workload_db")
-        db.openstack_workload_update(cntc, {''})
         backup_target.put_object(path, openstack_workload_json)
     except Exception as ex:
         LOG.exception(ex)
+
+def upload_config_snapshot_db_entry(cntx, snapshot_id):
+    try:
+        snapshot_db = db.openstack_config_snapshot_get(cntx, snapshot_id)
+        openstack_workload_db = db.openstack_workload_get(cntx, snapshot_db['openstack_workload_id'])
+        backup_endpoint = openstack_workload_db['backup_media_target']
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        parent = snapshot_db['vault_storage_path']
+
+        snapshot_json = jsonutils.dumps(snapshot_db)
+        path = os.path.join(parent, "config_snapshot_db")
+        backup_target.put_object(path, snapshot_json)
+    except Exception as ex:
+        LOG.exception(ex)
+
 
 @autolog.log_method(logger=Logger)
 def _remove_data(context, snapshot_id):
@@ -621,3 +636,38 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
         affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
 
     return affected_snapshots
+
+@autolog.log_method(logger=Logger)
+def _remove_data(context, snapshot_id):
+    snapshot_with_data = db.openstack_config_snapshot_get(context, snapshot_id, read_deleted='yes')
+    if snapshot_with_data.status != 'deleted':
+        return;
+
+    if snapshot_with_data.data_deleted == True:
+        return;
+
+    try:
+        LOG.info(_('Deleting the data of openstack config snapshot %s ') % (snapshot_with_data.id))
+        openstack_workload_obj = db.openstack_workload_get(context, snapshot_with_data['openstack_workload_id'])
+        backup_endpoint = openstack_workload_obj['backup_media_target']
+        backup_target = vault.get_backup_target(backup_endpoint)
+        backup_target.openstack_config_snapshot_delete(context,
+            {'openstack_workload_id': snapshot_with_data.openstack_workload_id,
+             'snapshot_id': snapshot_with_data.id})
+
+        #TODO enable it after updatingg the schema
+        #db.snapshot_update(context, snapshot_with_data.id, {'data_deleted':True})
+    except Exception as ex:
+        LOG.exception(ex)
+
+@autolog.log_method(logger=Logger)
+def openstack_config_snapshot_delete(context, snapshot_id):
+    """
+    Delete an existing OpenStack config snapshot
+    """
+    try:
+        db.openstack_config_snapshot_delete(context, snapshot_id)
+        _remove_data(context, snapshot_id)
+    except Exception as ex:
+        LOG.exception(ex)
+

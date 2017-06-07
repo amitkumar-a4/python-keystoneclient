@@ -8,7 +8,6 @@
 from webob import exc
 import time
 import pickle
-import pdb
 import os
 import yaml
 from workloadmgr.api import wsgi
@@ -26,16 +25,23 @@ FLAGS = flags.FLAGS
 CONFIG_FILES_PATH = "/opt/stack/workloadmgr/workloadmgr/templates/openstack_config.yaml"
 
 services_to_snapshot = {
-    'ceilometer': ['/etc/ceilometer'], 
-    'compute': ['/etc/nova', "/var/lib/nova'"], 
-    'keystone': ['/etc/keystone', '/var/lib/keystone'],
-    'Orchestration': ['/etc/heat/'], 
-    'cinder': ['/etc/cinder', '/var/lib/cinder'], 
-    'glance': ['/etc/glance', '/var/lib/glance'], 
-    'swift': ['/etc/swift'], 
-    'neutron': ['/etc/neutron', '/var/lib/neutron']
+    'ceilometer': {'config_path': ['/etc/ceilometer'],
+                    'database': 'gnocchi'},
+    'compute': {'config_path': ['/etc/nova', "/var/lib/nova'"],
+                    'database': ['nova', 'nova_api']},
+    'keystone': {'config_path': ['/etc/keystone', '/var/lib/keystone'],
+                    'database': 'keystone'},
+    'Orchestration': {'config_path': ['/etc/heat/'],
+                    'database': 'heat'},
+    'cinder': {'config_path': ['/etc/cinder', '/var/lib/cinder'],
+                    'database': 'cinder'},
+    'glance': {'config_path': ['/etc/glance', '/var/lib/glance'],
+                    'database': 'glance'},
+    'swift': {'config_path': ['/etc/swift'],
+                    'database': 'swift'},
+    'neutron': {'config_path': ['/etc/neutron', '/var/lib/neutron'],
+                    'database': 'neutron'}
     }
-
 
 class OpenStackConfigBackupController(wsgi.Controller):
     """The OpenStack config backup API controller for the workload manager API."""
@@ -66,11 +72,12 @@ class OpenStackConfigBackupController(wsgi.Controller):
             if not existing_openstack_workload and jobschedule.get('enabled', '').lower() != 'true':
                 message = "OpenStack configuration backup is not enabled. First enable it."
                 raise wlm_exceptions.OpenStackWorkload(message=message)
+
             #If Openstack backup scheduler is disabled then user can't update this
             elif existing_openstack_workload:
-                existing_jobschedule = pickle.loads(existing_openstack_workload['jobschedule'])
-                if existing_jobschedule['enabled'].lower() == 'false' and \
-                   jobschedule.get('enabled', '').lower() != 'true':
+                existing_jobschedule = existing_openstack_workload['jobschedule']
+                if str(existing_jobschedule['enabled']).lower() == 'false' and \
+                   str(jobschedule.get('enabled', '')).lower() != 'true':
                    message = "Can not update OpenStack configuration backup in disabled state."
                    raise wlm_exceptions.OpenStackWorkload(message=message) 
 
@@ -107,12 +114,12 @@ class OpenStackConfigBackupController(wsgi.Controller):
                 jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
 
             try:
-                new_openstack_workload = self.workload_api.openstack_config_workload(context,
+                openstack_workload = self.workload_api.openstack_config_workload(context,
                                                                            jobschedule)
             except Exception as error:
                 raise exc.HTTPServerError(explanation=unicode(error))
 
-            retval = self._view_builder.summary(req, new_openstack_workload)
+            retval = self._view_builder.summary(req, openstack_workload)
             return retval
         except exc.HTTPNotFound as error:
             raise error
@@ -125,13 +132,11 @@ class OpenStackConfigBackupController(wsgi.Controller):
 
     def openstack_config_workload_show(self, req):
         """Show OpenStack workload object"""
-        #import pdb;pdb.set_trace()
         try:
             context = req.environ['workloadmgr.context']
-
             openstack_workload = self.workload_api.openstack_config_workload_show(context)
             if openstack_workload:
-                return {'openstack_workload': openstack_workload}
+                return openstack_workload
             else:
                 message = "OpenStack coniguration backup is not enabled."
                 raise wlm_exceptions.OpenStackWorkload(message=message)
@@ -144,20 +149,21 @@ class OpenStackConfigBackupController(wsgi.Controller):
         except Exception as error:
             raise exc.HTTPServerError(explanation=unicode(error))
 
-    def openstack_config_snapshot(self, req, id, body=None):
+    def openstack_config_snapshot(self, req, body=None):
         """snapshot a openstack workload."""
-        #import pdb;pdb.set_trace()
         try:
             context = req.environ['workloadmgr.context']
-    
             openstack_workload = self.workload_api.openstack_config_workload_show(context)
-            if not openstack_workload:
-               message = "OpenStack coniguration backup is not enabled."
-               LOG.error(message)
-               raise wlm_exceptions.OpenStackWorkload(message=message)
 
-            #Read list of services to snapshot from default file
-            #Create a check here if after reaading from file it's empty then read from above map
+            if not openstack_workload:
+               #Create OpenStack workload 
+               workload_body = {"jobschedule":{"enabled":"true"}}
+               self.openstack_config_workload(req, workload_body)
+              
+               #Disable Scheduler
+               workload_body = {"jobschedule":{"enabled":"false"}}
+               self.openstack_config_workload(req, workload_body)
+
             #Read list of services to snapshot from default file
             if os.path.exists(CONFIG_FILES_PATH):
                 with open(CONFIG_FILES_PATH, 'r') as file:
@@ -168,15 +174,14 @@ class OpenStackConfigBackupController(wsgi.Controller):
                         services_to_snap = services_to_snapshot
             else:
                 services_to_snap = services_to_snapshot
-    
             if (body and 'snapshot' in body):
                 name = body['snapshot'].get('name', "") or 'Snapshot'
                 name = name.strip() or 'Snapshot'
                 description = body['snapshot'].get('description', "") or 'no-description'
                 description = description.strip() or 'no-description'
-    
-            new_snapshot = self.workload_api.openstack_config_snapshot(context, services_to_snap, name, description)
-            return self.snapshot_view_builder.summary(req, dict(new_snapshot.iteritems()))
+   
+            snapshot = self.workload_api.openstack_config_snapshot(context, services_to_snap, name, description)
+            return self.snapshot_view_builder.summary(req, dict(snapshot.iteritems()))
         except wlm_exceptions.WorkloadNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
@@ -227,6 +232,29 @@ class OpenStackConfigBackupController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
+
+    def openstack_config_snapshot_delete(self, req, id):
+        """Delete a snapshot."""
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                snapshot = self.workload_api.openstack_config_snapshot_delete(context, id)
+                return self.snapshot_view_builder.detail(req, snapshot)
+            except wlm_exceptions.NotFound:
+                raise exc.HTTPNotFound()
+            return webob.Response(status_int=202)
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))   
 
 def create_resource(ext_mgr):
     return wsgi.Resource(OpenStackConfigBackupController(ext_mgr))

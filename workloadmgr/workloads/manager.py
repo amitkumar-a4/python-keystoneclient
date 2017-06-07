@@ -94,7 +94,7 @@ FLAGS.register_opts(workloads_manager_opts)
 CONF = cfg.CONF
        
 @autolog.log_method(logger=Logger)
-def get_workflow_class(context, workload_type_id, restore=False):
+def get_workflow_class(context, workload_type_id, restore=False, config_backup=False ):
     #TODO(giri): implement a driver model for the workload types
     if workload_type_id:
         workload_type = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
@@ -131,6 +131,10 @@ def get_workflow_class(context, workload_type_id, restore=False):
         else:
             kwargs = {'workload_type_id': workload_type_id}
             raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
+
+    if config_backup:
+        workflow_class_name = 'workloadmgr.workflows.config_backup_workflow.ConfigBackupWorkflow'
+
                       
     parts = workflow_class_name.split('.')
     module = ".".join(parts[:-1])
@@ -1530,6 +1534,86 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             LOG.error("Error while creating folder structer for snapshot :%s" %ex.message)
             LOG.exception(ex)
 
+    @autolog.log_method(logger=Logger)
+    def apply_retention_policy(self, context, openstack_workload_id):
+        try:
+            openstack_workload = self.db.openstack_workload_get(context, openstack_workload_id)
+            jobschedule = pickle.loads(str(openstack_workload['jobschedule']))
+    
+            snapshots_to_keep = int(jobschedule['retention_policy_value'])
+    
+            snapshots = self.db.openstack_config_snapshot_get_all(context)
+    
+            if len(snapshots) > snapshots_to_keep:
+                for snapshot in snapshots[snapshots_to_keep:]:
+                    workload_utils.openstack_config_snapshot_delete(context, snapshot.id)
+        except Exception as ex:
+            LOG.exception(ex)
+
+
+    def _wait_for_nova_process(self, openstack_snapshot_id, params, result):
+        try:
+            tracker_metadata = {'snapshot_id' : params['snapshot_id']}
+            backup_target = vault.get_backup_target(params['backend_endpoint'])
+            progress_tracking_directory = backup_target.get_progress_tracker_directory(tracker_metadata)
+            hosts = result['hosts']
+            snapshot_status = {}
+            start_time = time.time()
+            base_stat_map = {}
+    
+            #We need to look at progress of multiple hosts. For that we are
+            #continuously watch at progress tracking file for each node
+            #If there is no progress file from any node after 10 minutes then will assume that node is down.
+            #If there is keyword like Down/Error , in that case considering the staus in error.
+            while hosts:
+                for host in hosts:
+                    async_task_status = {}
+                    file_path = os.path.join(progress_tracking_directory, host)
+    
+                    if os.path.exists(file_path):
+    
+                        if not base_stat_map.has_key(host):
+                            base_stat_map[host] = {'base_stat':os.stat(file_path), 'base_time': time.time()}
+    
+                        else:
+                            progstat = os.stat(file_path)
+    
+                            # if we don't see any update to file time for 10 minutes, something is wrong
+                            # deal with it.
+                            #TODO: @Murali How much should we wait. Copying images can take hours.
+                            if progstat.st_mtime > base_stat_map[host]['base_stat'].st_mtime:
+                                base_stat_map[host]['base_stat'] = progstat
+                                base_stat_map[host]['base_time'] = time.time()
+                            elif time.time() - base_stat_map[host]['base_time'] > 600:
+                                snapshot_status[host] = ("No update to %s modified time for last 10 minutes. "
+                                                         "Contego may have errored. Aborting Operation")
+                                hosts.remove(host)
+                                continue
+    
+                        with open(file_path, 'r') as progress_tracking_file:
+                            async_task_status['status'] = progress_tracking_file.readlines()
+                            if async_task_status and 'status' in async_task_status and len(async_task_status['status']):
+                                for line in async_task_status['status']:
+                                    if 'Down' in line:
+                                        snapshot_status[host] = "Contego service Unreachable - " + line
+                                        hosts.remove(host)
+                                    if 'Error' in line:
+                                        snapshot_status[host] = "Data transfer failed - " + line
+                                        hosts.remove(host)
+                                    if 'Completed' in line:
+                                        snapshot_status[host] = "Completed"
+                                        hosts.remove(host)
+                    else:
+                        # If no progress file for any node in next ten minutes then marking status down for that node.
+                        diff = time.time() - start_time
+                        if diff >= 600:
+                            hosts.remove(host)
+                            snapshot_status[host] = "Contego service Unreachable."
+            return snapshot_status
+        except Exception as ex:
+            LOG.exception(ex)
+
+
     @autolog.log_method(Logger, 'WorkloadMgrManager.openstack_config_workload')
     def openstack_config_workload(self, context, openstack_workload_id):
         """
@@ -1550,44 +1634,100 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     def openstack_config_snapshot(self, context, services_to_snapshot, openstack_snapshot_id):
         try:
+            #import pdb;pdb.set_trace()
             snapshot = self.db.openstack_config_snapshot_update(context,
                                                {'host': self.host,
                                                 'progress_msg': 'Snapshot of workload is starting',
                                                 'status': 'starting'},openstack_snapshot_id)
-            #import pdb;pdb.set_trace() 
+
             openstack_workload = self.db.openstack_workload_get(context, snapshot.openstack_workload_id)
             vault_storage_path = openstack_workload.get('vault_storage_path')
             if os.path.exists(vault_storage_path):
                snapshot_vault_storage_path = os.path.join(vault_storage_path, "snapshot_" + str(snapshot.get('id')))
-            #backup_endpoint = self.db.get_metadata_value(workload.metadata,
-            #                                             'backup_media_target')
-    
-            #backup_target = vault.get_backup_target(backup_endpoint)
-            #create entry on backend and update_db_file
-            #Create folder structure on backend
-            self._create_snapshot_directory(context, services_to_snapshot, snapshot_vault_storage_path)
+   
             self.db.openstack_config_snapshot_update(context,
-                                    {#'progress_percent': 0,
+                                    {
                                      'progress_msg': 'Initializing Snapshot Workflow',
                                      'status': 'executing',
                                      'vault_storage_path': snapshot_vault_storage_path
                                      }, openstack_snapshot_id)
+ 
+            #Create folder structure on backend
+            self._create_snapshot_directory(context, services_to_snapshot, snapshot_vault_storage_path)
+
+            '''
+            self.db.openstack_config_snapshot_update(context,
+                                    {
+                                     'progress_msg': 'Initializing Snapshot Workflow',
+                                     'status': 'uploading',
+                                     'vault_storage_path': snapshot_vault_storage_path
+                                     }, openstack_snapshot_id)
+            '''
     
-            #request contego for config files
-            #request contego for DB
-            #import pdb;pdb.set_trace()
             params = {'services_to_snapshot': services_to_snapshot, 'snapshot_directory': snapshot_vault_storage_path,
-                      'backend_endpoint': '192.168.1.33:/mnt/tvault', 'snapshot_id': snapshot.get('id')}
-            compute_service = nova.API(production=True)
-            result = compute_service.vast_config_snapshot(context, openstack_snapshot_id, params)
-            #self._wait_for_nova_process(openstack_snapshot_id, params, result)
-            self.db.openstack_config_snapshot_update(context, 
-                                    {#'progress_percent': 100, 
+                      'backend_endpoint': openstack_workload['backup_media_target'], 'snapshot_id': snapshot.get('id')}
+            context_dict = dict([('%s' % key, value)
+                              for (key, value) in context.to_dict().iteritems()])
+            context_dict['conf'] =  None # RpcContext object looks for this during init
+            store = {
+                'connection': FLAGS.sql_connection,     # taskflow persistence connection
+                'context': context_dict,                # context dictionary
+                'openstack_snapshot_id': openstack_snapshot_id, # snapshot id
+                'openstack_workload_id': snapshot.openstack_workload_id,
+                'params': params,    
+            }
+
+            workflow_class = get_workflow_class(context, None, config_backup=True)
+            workflow = workflow_class( "config_backup" , store)
+
+            self.db.openstack_config_snapshot_update(context,
+                                    {
+                                     'progress_msg': 'Initializing Snapshot Workflow',
+                                     'status': 'uploading',
+                                     'vault_storage_path': snapshot_vault_storage_path
+                                     }, openstack_snapshot_id)
+            workflow.initflow()
+            workflow.execute()
+
+            time_taken = 0
+            if snapshot:
+                time_taken = int((timeutils.utcnow() - snapshot.created_at).total_seconds())
+            snapshot = self.db.openstack_config_snapshot_update(context, 
+                                    {
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'available',
+                                     'time_taken': time_taken,
                                      }, openstack_snapshot_id)
-    
+            workload_utils.upload_config_snapshot_db_entry(context, openstack_snapshot_id)
         except Exception as ex:
             LOG.exception(ex)
+            msg = _("Failed creating config backup: %(exception)s") %{'exception': ex}
+            time_taken = 0
+            if snapshot:
+                time_taken = int((timeutils.utcnow() - snapshot.created_at).total_seconds())
+            snapshot = self.db.openstack_config_snapshot_update(context,
+                                    {
+                                     'progress_msg': '',
+                                     'error_msg': msg,
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': 'error',
+                                     'time_taken': time_taken,
+                                     'upload_summary' : pickle.dumps(upload_status),
+                                     }, openstack_snapshot_id)
+            workload_utils.upload_config_snapshot_db_entry(context, openstack_snapshot_id) 
 
+    @autolog.log_method(logger=Logger)
+    def openstack_config_snapshot_delete(self, context, snapshot_id, task_id):
+        """
+        Delete an existing openstack config snapshot
+        """
+        def execute(context, snapshot_id, task_id):
+            workload_utils.openstack_config_snapshot_delete(context, snapshot_id)
+            self.db.openstack_config_snapshot_update(context, snapshot_id, {'status': 'deleted'})
+            status_messages = {'message': 'Snapshot delete operation completed'}
+            self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
+                                                   'status_messages': status_messages})
+
+        self.pool.submit(execute, context, snapshot_id, task_id)
+        

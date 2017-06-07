@@ -16,7 +16,6 @@ import threading
 import time
 import uuid
 import zlib
-import pdb
 
 from M2Crypto import DSA
 
@@ -167,7 +166,6 @@ def _openstack_config_snapshot_create_callback(*args, **kwargs):
         tenantcontext = nova._get_tenant_context(kwargs)
 
         workload = workloadmgrapi.openstack_config_workload_show(tenantcontext)
-        #import ppdb;pdb.set_trace()
         # Make sure OpenStack configuration workload is in a created state
         if workload['status'] == 'error':
             LOG.info("OpenStack Workload is in error state. Cannot schedule snapshot operation")
@@ -674,7 +672,6 @@ class API(base.Base):
                  else:
                       user_domain_id = 'default'
                  if is_openstack_config:
-                    #import pdb;pdb.set_trace()
                     self._scheduler.add_workloadmgr_job(_openstack_config_snapshot_create_callback,
                                                     jobschedule,
                                                     jobstore='jobscheduler_store',
@@ -2653,7 +2650,7 @@ class API(base.Base):
             LOG.exception(ex)
             raise ex
 
-    #@check_user(cloud_Admin)
+    #@check_user(Admin) #Add this to policy.json
     @autolog.log_method(logger=Logger)
     @create_trust
     def openstack_config_workload(self,context, jobschedule):
@@ -2667,7 +2664,6 @@ class API(base.Base):
             except Exception as ex:
                 existing_openstack_workload = None
 
-            #Add check for workload available state 
             if not existing_openstack_workload:
                 backup_endpoint = \
                     vault.get_nfs_share_for_workload_by_free_overcommit\
@@ -2677,6 +2673,7 @@ class API(base.Base):
                     + str(CONF.cloud_unique_id))
                 options = {
                     'id': CONF.cloud_unique_id,
+                    'host': socket.gethostname(),
                     'status': 'creating',
                     'jobschedule': pickle.dumps(jobschedule),
                     'vault_storage_path': vault_storage_path,
@@ -2693,10 +2690,27 @@ class API(base.Base):
                                                             socket.gethostname(),
                                                             openstack_workload['id'])
 
-            try:
-                self.workload_add_scheduler_job(jobschedule, openstack_workload, context, is_openstack_config=True)
-            except Exception as ex:
-                LOG.exception(ex)
+            #Check whether configuration backup job is running or not
+            jobs = self._scheduler.get_jobs()
+            found = 0
+            for job in jobs:
+                if job.kwargs['workload_id'] == openstack_workload['id']:
+                    found += 1
+                    break
+            
+            if str(jobschedule['enabled']).lower() == 'true':
+                if not found:
+                    # Add to scheduler jobs
+                    self.workload_add_scheduler_job(jobschedule, openstack_workload, context, is_openstack_config=True)
+                else:
+                    LOG.warning("OpenStack config workload is already enabled.")
+            
+            if str(jobschedule['enabled']).lower() == 'false':
+                if found:
+                    # Remove from scheduler jobs
+                    self._scheduler.unschedule_job(job)
+                else:
+                    LOG.warning("OpenStack config workload is already disabled.")
 
             AUDITLOG.log(context, 'openstack config workload update submitted.', openstack_workload)
             return openstack_workload
@@ -2719,17 +2733,17 @@ class API(base.Base):
 
             openstack_workload_dict = dict(openstack_workload.iteritems())
 
-            #openstack_workload_dict['jobschedule'] = pickle.loads(str(openstack_workload.jobschedule))
-            #openstack_workload_dict['jobschedule']['enabled'] = False
-            #openstack_workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
+            openstack_workload_dict['jobschedule'] = pickle.loads(str(openstack_workload.jobschedule))
+            openstack_workload_dict['jobschedule']['enabled'] = False
+            openstack_workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
             # find the job object based on openstack_workload_id
-            #jobs = self._scheduler.get_jobs()
-            #for job in jobs:
-            #    if job.kwargs['openstack_workload_id'] == openstack_workload['id']:
-            #        openstack_workload_dict['jobschedule']['enabled'] = True
-            #        timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
-            #        openstack_workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
-            #        break
+            jobs = self._scheduler.get_jobs()
+            for job in jobs:
+                if job.kwargs['workload_id'] == openstack_workload['id']:
+                    openstack_workload_dict['jobschedule']['enabled'] = True
+                    timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
+                    openstack_workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
+                    break
 
             return openstack_workload_dict
         except Exception as ex:
@@ -2739,46 +2753,32 @@ class API(base.Base):
     @create_trust
     def openstack_config_snapshot(self, context, services_to_snapshot, name, description):
         """
-        Make the RPC call to snapshot a openstack_workload.
+        Make the RPC call to backup OpenStack configuration.
         """
         try:
-            #workload = self.workload_get(context, workload_id)
-            #snapshot_display_name = ''
             if name and len(name) > 0:
                 snapshot_display_name = name
             else:
                 snapshot_display_name = 'Snapshot'
+
+            if description and len(description) > 0:
+                description = description
+            else:
+                description = 'No description'
+
             AUDITLOG.log(context, 'OpenStack configuration snapshot ' + snapshot_display_name + ' Create Requested', None)
 
-
-            #try:
-            '''
-                #################--------------------TODO add lock unlock API
-                workload_lock.acquire()
-                workload = self.workload_get(context, workload_id)
-                if workload['status'].lower() != 'available':
-                    msg = _("Workload must be in the 'available' state to take a snapshot")
-                    raise wlm_exceptions.InvalidState(reason=msg)
-                self.db.workload_update(context, workload_id, {'status': 'locked'})
-            finally:
-                workload_lock.release()
-            '''
             service_name_list = []
-            #import pdb;pdb.set_trace()
             for service,config_file_path in services_to_snapshot.iteritems():
                 service_name_list.append(service)
-            metadata = {}
-            #metadata.setdefault('cancel_requested', '0')
-            metadata['services_to_snap'] = service_name_list
 
             options = {'openstack_workload_id': CONF.cloud_unique_id,
                        'display_name': name,
                        'display_description': description,
+                       'start_date': time.strftime("%x"),
                        'status': 'creating',
-                       'metadata': metadata,}
-            #TODO need to create metada model for snapshots
+                       'services_to_backup': pickle.dumps(service_name_list)}
 
-            #import pdb;pdb.set_trace()
             snapshot = self.db.openstack_config_snapshot_create(context, options)
             snapshot_display_name = snapshot['display_name']
             AUDITLOG.log(context, 'OpenStack config snapshot ' + snapshot_display_name + ' Create Submitted.', None)
@@ -2802,3 +2802,42 @@ class API(base.Base):
         else:
             snapshots = self.db.openstack_config_snapshot_get_all(context, openstack_workload_id = CONF.cloud_unique_id )
         return snapshots
+
+    @autolog.log_method(logger=Logger)
+    def openstack_config_snapshot_delete(self, context, snapshot_id):
+        """
+        Delete a config snapshot.
+        """
+        try:
+            openstack_config_snapshot = self.get_openstack_config_snapshots(context, snapshot_id)
+            openstack_config_workload = self.openstack_config_workload_show(context)
+            snapshot_display_name = openstack_config_snapshot['display_name']
+
+            AUDITLOG.log(context,
+                         'OpenStack cofig backup  ' + snapshot_display_name + ' Delete Requested',
+                         openstack_config_snapshot)
+            if openstack_config_snapshot['status'] not in ['available', 'error', 'cancelled']:
+                msg = _("Config snapshot status must be 'available' or 'error' or 'cancelled'")
+                raise wlm_exceptions.InvalidState(reason=msg)
+
+            snapshot = self.db.openstack_config_snapshot_update(context, {'status': 'deleting'}, snapshot_id)
+
+            status_messages = {'message': 'Snapshot delete operation starting'}
+            options = {
+                'display_name': "OpenStack config snapshot Delete",
+                'display_description': "Snapshot delete for config snapshot id %s" % snapshot_id,
+                'status': "starting",
+                'status_messages': status_messages,
+            }
+
+            task = self.db.task_create(context, options)
+
+            self.workloads_rpcapi.openstack_config_snapshot_delete(context, openstack_config_workload['host'], snapshot_id, task.id)
+            AUDITLOG.log(context,
+                         'OpenStack cofig backup  ' + snapshot_display_name + ' Delete Submited',
+                         openstack_config_snapshot)
+            return snapshot
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
