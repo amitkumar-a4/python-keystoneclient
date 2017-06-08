@@ -49,6 +49,7 @@ from pytz import all_timezones
 from tzlocal import get_localzone
 
 from workloadmgr import auditlog
+from workloadmgr.openstack.common import timeutils
 
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
