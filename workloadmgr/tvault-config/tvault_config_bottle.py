@@ -831,7 +831,16 @@ def _register_workloadtypes():
                                domain_name=config_data['domain_name'],
                                insecure=SSL_INSECURE,
                                )
-        workload_types = wlm.workload_types.list()
+        start_time = timeutils.utcnow()
+        while 1:
+               try:
+                   workload_types = wlm.workload_types.list()
+                   break
+               except Exception as ex:
+                      sleep(10)
+                      now = timeutils.utcnow()
+                      if (now - start_time) > datetime.timedelta(minutes=10):
+                         raise ex
         
         workload_type_names = {'Hadoop':False,
                                'MongoDB':False,
