@@ -585,27 +585,27 @@ def pre_snapshot_vm(cntx, db, instance, snapshot):
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.freeze_vm')
-def freeze_vm(cntx, db, instance, snapshot):
+def freeze_vm(cntx, db, instance):
     # freeze instance
     if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+        return virtdriver.freeze_vm(cntx, db, instance)
     else:
         virtdriver = driver.load_compute_driver(
             None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+        return virtdriver.freeze_vm(cntx, db, instance)
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.thaw_vm')
-def thaw_vm(cntx, db, instance, snapshot):
+def thaw_vm(cntx, db, instance):
     # thaw instance
     if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+        return virtdriver.thaw_vm(cntx, db, instance)
     else:
         virtdriver = driver.load_compute_driver(
             None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+        return virtdriver.thaw_vm(cntx, db, instance)
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm')
@@ -1434,9 +1434,83 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                   instance_options)
 
 
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_data')
+def restore_vm_data(cntx, db, instance, restore):
+
+    restore_obj = db.restore_get(cntx, restore['id'])
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = utils.get_instance_restore_options(restore_options,
+                                                          instance['vm_id'],
+                                                          'openstack')
+
+    if instance_options.get('availability_zone', None) is None:
+        instance_options['availability_zone'] = restore_options.get('zone', None)
+    virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+
+    # call with new context
+    cntx = nova._get_tenant_context(cntx)
+    return virtdriver.restore_vm_data(cntx, db, instance, restore,
+                                      instance_options)
+
+
+@autolog.log_method(Logger, 'vmtasks_openstack.poweroff_vm')
+def poweroff_vm(cntx, instance, restore, restored_instance):
+    restored_instance_id = restored_instance['vm_id']
+    compute_service = nova.API(production=True)
+
+    try:
+        compute_service.stop(cntx, restored_instance_id)
+    except:
+        pass
+
+    inst =  compute_service.get_server_by_id(cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'SHUTOFF':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to shutoff' )
+        time.sleep(10)
+        inst = compute_service.get_server_by_id(cntx,
+                                                inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot')
+
+
 @autolog.log_method(Logger, 'vmtasks_openstack.poweron_vm')
 def poweron_vm(cntx, instance, restore, restored_instance):
-    pass
+    restored_instance_id = restored_instance['vm_id']
+    compute_service = nova.API(production=True)
+
+    try:
+        compute_service.start(cntx, restored_instance_id)
+    except:
+        pass
+
+    inst =  compute_service.get_server_by_id(cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'ACTIVE':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to boot' )
+        time.sleep(10)
+        inst =  compute_service.get_server_by_id(cntx,
+                                                 inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot')
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.set_vm_metadata')

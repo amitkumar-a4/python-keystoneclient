@@ -185,6 +185,8 @@ class SnapshotsController(wsgi.Controller):
 
             date_from = req.GET.get('date_from', None)
             date_to = req.GET.get('date_to', None)
+            status = req.GET.get('status', None)
+            get_instances = bool(req.GET.get('get_instances', False))
 
             #verify workload exists
             if workload_id:
@@ -192,8 +194,8 @@ class SnapshotsController(wsgi.Controller):
 
             search_opts={'workload_id':workload_id,\
                          'host':host, 'get_all':get_all,\
-                         'date_from':date_from, 'date_to':date_to}
- 
+                         'date_from':date_from, 'date_to':date_to, 'status':status, \
+                         'get_instances': get_instances}
             snapshots_all = self.workload_api.snapshot_get_all(context, search_opts)
    
             limited_list = common.limited(snapshots_all, req)

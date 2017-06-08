@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 import zlib
+import re
 
 from M2Crypto import DSA
 
@@ -248,6 +249,42 @@ class API(base.Base):
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
 
+    @autolog.log_method(logger=Logger)
+    def search(self, context, data):
+        if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
+           msg = _('Provide valid linux filepath to search')
+           raise wlm_exceptions.Invalid(reason=msg)
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
+        if len(vm_found) == 0:
+           msg = _('vm_id not existing with this tenant')
+           raise wlm_exceptions.Invalid(reason=msg)
+        workload = self.db.workload_get(context, vm_found[0].workload_id)
+        if workload['status'] != 'available':
+           msg = _('Vm workload is not in available state to perform search')
+           raise wlm_exceptions.Invalid(reason=msg)
+        kwargs = {'vm_id': data['vm_id'], 'status': 'completed'}
+        search_list = self.db.file_search_get_all(context, **kwargs)
+        if len(search_list) > 0:
+           msg = _('Search with this vm_id already in exceution')
+           raise wlm_exceptions.Invalid(reason=msg)
+        if type(data['snapshot_ids']) is list:
+           data['snapshot_ids'] = ",".join(data['snapshot_ids'])
+        options = {'vm_id': data['vm_id'],
+                   'project_id': context.project_id,
+                   'user_id': context.user_id,
+                   'filepath': data['filepath'],
+                   'snapshot_ids': data['snapshot_ids'],
+                   'start': data['start'],
+                   'end': data['end'],
+                   'status': 'executing',}
+        search = self.db.file_search_create(context, options)
+        self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
+        return search
+
+    @autolog.log_method(logger=Logger)
+    def search_show(self, context, search_id):
+        search = self.db.file_search_get(context, search_id)
+        return search
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
@@ -1678,6 +1715,27 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
+    def _validate_restore_options(self, options):
+        if options.get('type', "") != "openstack":
+            msg = _("'type' field in options is not set to 'openstack'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if 'openstack' not in options:
+            msg = _("'openstack' field is not in options")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) not in ('inplace', 'selective', 'oneclick'):
+            msg = _("'restore_type' field must be one of 'inplace', 'selective', 'oneclick'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) in ('inplace', 'selective'):
+        # If instances is not available should we restore entire snapshot?
+            if 'instances' not in options['openstack']:
+                msg = _("'instances' field is not in found " \
+                        "in options['instances']")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
 
@@ -1685,11 +1743,14 @@ class API(base.Base):
         Make the RPC call to restore a snapshot.
         """
         try:
+            self._validate_restore_options(options)
+
             snapshot = self.snapshot_get(context, snapshot_id)
             workload = self.workload_get(context, snapshot['workload_id'])
             workload_display_name = workload['display_name']
             snapshot_display_name = snapshot['display_name']
             snapshot_snapshot_type = snapshot['snapshot_type']
+
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'

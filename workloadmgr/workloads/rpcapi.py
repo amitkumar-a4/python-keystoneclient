@@ -99,6 +99,15 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
 
     @autolog.log_method(logger=Logger)
+    def file_search(self, ctxt, host, search_id):
+        LOG.debug("file search in rpcapi search_id:%s", search_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        self.cast(ctxt,
+                  self.make_msg('file_search',search_id=search_id),
+                  topic=topic)
+
+    @autolog.log_method(logger=Logger)
     def workload_snapshot(self, ctxt, host, snapshot_id):
         LOG.debug("snapshot workload in rpcapi snapshot_id:%s", snapshot_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
