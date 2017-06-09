@@ -159,12 +159,45 @@ def import_settings(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
+def update_backup_media_target(file_path, backup_endpoint):
+    def _update_metadata(metadata, backup_endpoint, file_path):
+        for meta in metadata:
+            if meta['key'] == 'backup_media_target':
+                if backup_endpoint != meta['value']:
+                    for endpoint in CONF.vault_storage_nfs_export.split(','):
+                        backup_target = vault.get_backup_target(endpoint)
+                        if file_path.startswith(backup_target.mount_path):
+                            meta['value'] = backup_target.backup_endpoint
+                            return
+    try:
+        with open(file_path, 'r') as file_db:
+            file_data = file_db.read()
+        json_obj = json.loads(file_data)
+
+        metadata = json_obj.get('metadata', None)
+        if metadata:
+            _update_metadata(metadata, backup_endpoint, file_path)
+            json_obj['metadata'] = metadata
+            with open(file_path, 'w') as outfile:
+                json.dump(json_obj, outfile)
+
+    except Exception as ex:
+        LOG.exception(ex)
+
 def get_workload_url(context, workload_ids, upgrade):
     '''
     Iterate over all NFS backups mounted for list of workloads available.
     '''
     workload_url_iterate = []
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
+
+        #Update backup media target
+        if os.path.isdir(workload):
+            for path, subdirs, files in os.walk(workload):
+                for name in files:
+                    if name.endswith("workload_db") or name.endswith("snapshot_db"):
+                        update_backup_media_target(os.path.join(path, name), backup_endpoint )
+
         # Check whether workload tenant exist in current cloud or not
         if check_tenant(context, workload, upgrade):
             # update workload_backend_endpoint map
@@ -179,6 +212,7 @@ def get_workload_url(context, workload_ids, upgrade):
 
             for workload in workload_url:
                 workload_id = os.path.split(workload)[1].replace('workload_', '')
+
                 if len(workload_ids) > 0:
                     #If workload found in given workload id's then add to iterate list
                     if workload_id in workload_ids:
@@ -228,33 +262,6 @@ def update_workload_metadata(workload_values):
             workload_values['metadata'][0]['workload_approx_backup_size'] = workload_approx_backup_size
 
         return workload_values
-    except Exception as ex:
-        LOG.exception(ex)
-
-def update_backup_media_target(file_path):
-    try:
-        with open(file_path, 'r') as file_db:
-            file_data = file_db.read()
-        json_obj = json.loads(file_data)
-
-        metadata = json_obj.get('metadata', None)
-        if metadata:
-            for meta in metadata:
-                if meta['key'] == 'backup_media_target':
-                    backup_endpoint = meta['value']
-                    backup_target = vault.get_backup_target(backup_endpoint)
-                    # check workload is on the same backup_target
-                    if (backup_target is None) or (not file_path.startswith(backup_target.mount_path)):
-                        for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
-                            backup_target = None
-                            backup_target = vault.get_backup_target(backup_endpoint)
-                            if file_path.startswith(backup_target.mount_path):
-                                meta['value'] = backup_target.backup_endpoint
-                                break;
-            json_obj['metadata'] = metadata
-            with open(file_path, 'w') as outfile:
-                json.dump(json_obj, outfile)
-
     except Exception as ex:
         LOG.exception(ex)
 
@@ -311,9 +318,6 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
             db_json = []
 
             for file in files:
-                if db == 'workload_db' or db == 'snapshot_db':
-                   update_backup_media_target(file)
-
                 with open(file, 'r') as file_db:
                     file_data = file_db.read()
                 json_obj = json.loads(file_data)
