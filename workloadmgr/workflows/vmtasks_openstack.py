@@ -393,7 +393,6 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
         for instance in instances:
             server_security_group_ids = network_service.server_security_groups(
                 cntx, instance['vm_id'])
-
             unique_security_group_ids = list(set(server_security_group_ids))
             for security_group_id in unique_security_group_ids:
                 security_group = network_service.security_group_get(
@@ -409,7 +408,9 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     'metadata': {'name': security_group['name'],
                                  'security_group_type': 'neutron',
                                  'description': security_group['description'],
-                                 'vm_id': instance['vm_id']},
+                                 'vm_id': instance['vm_id'],
+                                 'vm_attached': security_group_id in server_security_group_ids,
+                                },
                     'status': 'available'}
             
                 vm_security_group_snap = db.snapshot_vm_resource_create(
@@ -1328,6 +1329,7 @@ def restore_vm_security_groups(cntx, db, restore):
             if  security_group_exists(snapshot_vm_resource):
                 restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
                     {'sec_id': snapshot_vm_resource.resource_name,
+                     'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                      'res_id': snapshot_vm_resource.id}
                 continue
 
@@ -1340,6 +1342,7 @@ def restore_vm_security_groups(cntx, db, restore):
             security_group = security_group_obj.get('security_group')
             restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
                 {'sec_id': security_group['id'],
+                 'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                  'res_id': snapshot_vm_resource.id}
             restored_vm_resource_values = \
                 {'id': str(uuid.uuid4()),
@@ -1393,7 +1396,8 @@ def restore_vm_security_groups(cntx, db, restore):
     for vm_id, res_sec_grps in restored_security_groups.iteritems():
         return_values[vm_id] = {}
         for pit_id, res_map in res_sec_grps.iteritems():
-            return_values[vm_id][pit_id] = res_map['sec_id']
+            if res_map['vm_attached'] is True:
+                return_values[vm_id][pit_id] = res_map['sec_id']
 
     return return_values
 

@@ -824,6 +824,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         flavors = compute_service.get_flavors(context)
         for inst in options['openstack']['instances']:
+
+            if inst['include'] is False:
+                continue
+
             vm_id = inst.get('id', None)
             if not vm_id:
                 msg = _("'instances' contain an element that does "
