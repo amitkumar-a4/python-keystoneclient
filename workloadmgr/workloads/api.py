@@ -2426,13 +2426,9 @@ class API(base.Base):
                     backup_target = vault.get_backup_target(backup_endpoint)
                     for workload_url in backup_target.get_workloads(context):
                         try:
-                            path = os.path.join(workload_url, 'workload_db')
-                            if os.path.exists(path):
-                               workload_values = json.loads(backup_target.get_object(path))
-                               _check_workload(context, workload_values)
-                            else:
-                               missed_workload = workload_url.split('workload_')[1]
-                               LOG.warning("workload_db file not found for workload : %s" % missed_workload)
+                            workload_values = json.loads(backup_target.get_object(
+                                os.path.join(workload_url, 'workload_db')))
+                            _check_workload(context, workload_values)
                         except Exception as ex:
                             LOG.exception(ex)
                 except Exception as ex:

@@ -746,8 +746,13 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         workload_urls = []
         try:
             for name in os.listdir(parent_path):
-                if os.path.isdir(os.path.join(parent_path, name)) and name.startswith('workload_'):
-                    workload_urls.append(os.path.join(parent_path, name))
+                workload_url = os.path.join(parent_path, name)
+                if os.path.isdir(workload_url) and name.startswith('workload_'):
+                    if os.path.exists(os.path.join(workload_url, 'workload_db')):
+                        workload_urls.append(workload_url)
+                    else:
+                        workload_id = name.split('_')[1]
+                        LOG.error("Workload %s doesn't contains required database files," %workload_id)
         except Exception as ex:
             LOG.exception(ex)
         return workload_urls  
@@ -1085,16 +1090,12 @@ def get_workloads_for_tenant(context, tenant_ids):
         try:
             backup_target = get_backup_target(backup_endpoint)
             for workload_url in backup_target.get_workloads(context):
-                path = os.path.join(workload_url, 'workload_db')
-                if os.path.exists(path):
-                   workload_values = json.loads(backup_target.get_object(path))
-                   project_id = workload_values.get('project_id')
-                   workload_id = workload_values.get('id')
-                   if project_id in tenant_ids:
-                      workload_ids.append(workload_id)
-                else:
-                   missed_workload = workload_url.split('workload_')[1]
-                   LOG.warning("workload_db file not found for workload : %s" % missed_workload)
+                workload_values = json.loads(backup_target.get_object(\
+                       os.path.join(workload_url, 'workload_db')))
+                project_id = workload_values.get('project_id')
+                workload_id = workload_values.get('id')
+                if project_id in tenant_ids:
+                    workload_ids.append(workload_id)
         except Exception as ex:
             LOG.exception(ex)
     return  workload_ids
