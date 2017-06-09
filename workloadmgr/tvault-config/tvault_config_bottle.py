@@ -838,9 +838,9 @@ def _register_workloadtypes():
                    workload_types = wlm.workload_types.list()
                    break
                except Exception as ex:
-                      sleep(10)
+                      time.sleep(10)
                       now = timeutils.utcnow()
-                      if (now - start_time) > datetime.timedelta(minutes=10):
+                      if (now - start_time) > datetime.timedelta(minutes=8):
                          raise ex
         
         workload_type_names = {'Hadoop':False,
