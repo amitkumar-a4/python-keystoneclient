@@ -800,6 +800,9 @@ class API(base.Base):
         Delete a workload. No RPC call is made
         """
         try:
+            if context.is_admin is False and database_only is True:
+                raise wlm_exceptions.AdminRequired()
+
             workload = self.workload_get(context, workload_id)
             display_name = workload['display_name']
             AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Requested', workload)
