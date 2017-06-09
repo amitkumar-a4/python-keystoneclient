@@ -187,9 +187,9 @@ def _snapshot_delete(context, snapshot_id, database_only=False):
             break
         except Exception as ex:
             LOG.exception(ex)
-    if all_child_snapshots_deleted and not database_only:
+    if all_child_snapshots_deleted and database_only is False:
         _remove_data(context, snapshot_id)
-    if not database_only:
+    if database_only is False:
         upload_snapshot_db_entry(context, snapshot_id)
 
 

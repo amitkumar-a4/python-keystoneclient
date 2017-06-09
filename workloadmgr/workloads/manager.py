@@ -768,7 +768,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Delete an existing workload
         """
         workload = self.db.workload_get(context, workload_id)
-        if not database_only:
+        if database_only is False:
             snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload.id)
             if len(snapshots) > 0:
                 msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
@@ -796,7 +796,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         ["workload_id", 'workload_name'])
             self.db.workload_vms_delete(context, vm.vm_id, workload.id)
 
-        if not database_only:
+        if database_only is False:
             self.db.workload_delete(context, workload.id)
         else:
             snapshots = self.db.snapshot_get_all_by_workload(context, workload_id)
