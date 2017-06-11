@@ -1585,6 +1585,7 @@ class API(base.Base):
                 snapshot_vm['metadata'] = metadata
                 snapshot_vm['nics'] = []
                 snapshot_vm['vdisks'] = []
+                snapshot_vm['security_group'] = []
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm_obj.vm_id, snapshot_id)
                 snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot_id, snapshot_id)                
                 for snapshot_vm_resource in snapshot_vm_resources:                
@@ -1598,9 +1599,9 @@ class API(base.Base):
                                               }
                     """ security group """
                     if snapshot_vm_resource.resource_type == 'security_group':
-                        snapshot_vm['security_group'] = {'name' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
-                                                         'security_group_type' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'security_group_type'),
-                                                        }
+                        if self.db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in (True, '1', None):
+                            snapshot_vm['security_group'].append( {'name' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
+                                                                   'security_group_type' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'security_group_type') })
                     """ nics """
                     if snapshot_vm_resource.resource_type == 'nic':
                         vm_nic_snapshot = self.db.vm_network_resource_snap_get(context, snapshot_vm_resource.id)
