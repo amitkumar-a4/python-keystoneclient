@@ -752,10 +752,22 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                         workload_urls.append(workload_url)
                     else:
                         workload_id = name.split('_')[1]
-                        LOG.error("Workload %s doesn't contains required database files," %workload_id)
+                        LOG.error("Workload %s doesn't contains required database files," % workload_id)
         except Exception as ex:
             LOG.exception(ex)
-        return workload_urls  
+        return workload_urls
+    
+    @autolog.log_method(logger=Logger)
+    def validate_workloads(self, workload_urls):
+        valid_workloads =  []
+        invalid_workloads = []
+        for workload in workload_urls:
+            if os.path.isdir(workload) and os.path.exists(os.path.join(workload, "workload_db"))
+                valid_workloads.append(workload)
+            else:
+                invalid_workloads.append(workload)
+    
+        return {'valid_workloads': valid_workloads, 'invalid_workloads': invalid_workloads}
 
     @autolog.log_method(logger=Logger) 
     def workload_delete(self, context, workload_metadata):
