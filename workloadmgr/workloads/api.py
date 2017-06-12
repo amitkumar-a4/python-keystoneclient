@@ -793,7 +793,7 @@ class API(base.Base):
         workload_utils.upload_workload_db_entry(context, workload_id)
             
         AUDITLOG.log(context,'Workload \'' + workload_obj['display_name'] + '\' Modify Submitted', workload_obj)
-            
+    
     @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_id, database_only=False):
         """
@@ -841,12 +841,28 @@ class API(base.Base):
                     self._scheduler.unschedule_job(job)
                     break
             self.db.workload_update(context, workload_id, {'status': 'deleting'})
-            self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id, database_only)
+
+            if database_only is True:
+                compute_service = nova.API(production=True)
+                workload_vms = self.db.workload_vms_get(context, workload_id)
+                for vm in workload_vms:
+                    compute_service.delete_meta(context, vm.vm_id,
+                                                ["workload_id", 'workload_name'])
+                    self.db.workload_vms_delete(context, vm.vm_id, workload_id)
+
+                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id)
+                for snapshot in snapshots:
+                    workload_utils.snapshot_delete(context, snapshot.id, database_only)
+                    self.db.snapshot_update(context, snapshot.id, {'status': 'deleted'})
+                self.db.workload_delete(context, workload_id)
+            else:
+                self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
             AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
+        
     @autolog.log_method(logger=Logger)
     def workload_reset(self, context, workload_id):
         """

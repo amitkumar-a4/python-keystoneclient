@@ -126,11 +126,11 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   topic=topic)
 
     @autolog.log_method(logger=Logger)
-    def workload_delete(self, ctxt, host, workload_id, database_only):
+    def workload_delete(self, ctxt, host, workload_id):
         LOG.debug("delete_workload  rpcapi workload_id %s", workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         self.cast(ctxt,
-                  self.make_msg('workload_delete', workload_id=workload_id, database_only=database_only),
+                  self.make_msg('workload_delete', workload_id=workload_id),
                   topic=topic)
     
     @autolog.log_method(logger=Logger)
