@@ -11,7 +11,6 @@ from operator import itemgetter
 import cPickle as pickle
 import shutil
 import tempfile
-from oslo.config import cfg
 
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import workloads as workloadAPI
@@ -25,7 +24,6 @@ from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
 from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
 
-CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 DBSession = get_session()
 
