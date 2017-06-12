@@ -160,15 +160,6 @@ def import_settings(cntx, new_version, upgrade=True):
         LOG.exception(ex)
 
 def update_backup_media_target(file_path, backup_endpoint):
-    def _update_metadata(metadata, backup_endpoint, file_path):
-        for meta in metadata:
-            if meta['key'] == 'backup_media_target':
-                if backup_endpoint != meta['value']:
-                    for endpoint in CONF.vault_storage_nfs_export.split(','):
-                        backup_target = vault.get_backup_target(endpoint)
-                        if file_path.startswith(backup_target.mount_path):
-                            meta['value'] = backup_target.backup_endpoint
-                            return
     try:
         with open(file_path, 'r') as file_db:
             file_data = file_db.read()
@@ -176,7 +167,12 @@ def update_backup_media_target(file_path, backup_endpoint):
 
         metadata = json_obj.get('metadata', None)
         if metadata:
-            _update_metadata(metadata, backup_endpoint, file_path)
+            for meta in metadata:
+                if meta['key'] == 'backup_media_target':
+                    if backup_endpoint != meta['value']:
+                        meta['value'] = backup_endpoint
+                        break
+
             json_obj['metadata'] = metadata
             with open(file_path, 'w') as outfile:
                 json.dump(json_obj, outfile)
