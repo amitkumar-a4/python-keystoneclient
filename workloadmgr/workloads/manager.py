@@ -740,7 +740,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
                         
     @autolog.log_method(logger=Logger)
-    def workload_reset(self, context, workload_id):
+    def workload_reset(self, context, workload_id, status_update=True):
         """
         Reset an existing workload
         """
@@ -758,7 +758,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _("Failed to  reset: %(exception)s") %{'exception': ex}
             LOG.error(msg)
         finally:
-            self.db.workload_update(context, workload_id, {'status': 'available'})
+            status_update is True and self.db.workload_update(context, workload_id, {'status': 'available'})
         return
 
 
@@ -1058,7 +1058,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif rtype == 'inplace':
                 workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
                 self._validate_restore_options(context, restore, options)
-                self.workload_reset(context, snapshot.workload_id)
+                self.workload_reset(context, snapshot.workload_id, status_update=False)
             elif rtype == 'selective':
                 self._validate_restore_options(context, restore, options)
 
