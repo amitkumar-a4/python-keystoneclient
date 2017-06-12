@@ -189,10 +189,11 @@ def get_workload_url(context, workload_ids, upgrade):
 
         #Update backup media target
         if os.path.isdir(workload):
-            for path, subdirs, files in os.walk(workload):
-                for name in files:
-                    if name.endswith("workload_db") or name.endswith("snapshot_db"):
-                        update_backup_media_target(os.path.join(path, name), backup_endpoint )
+            update_backup_media_target(os.path.join(workload, "workload_db"), backup_endpoint)
+            for item in os.listdir(workload):
+                 snapshot_db = os.path.join(workload, item, "snapshot_db")
+                 if os.path.exists(snapshot_db):
+                     update_backup_media_target(snapshot_db, backup_endpoint)
 
         # Check whether workload tenant exist in current cloud or not
         if check_tenant(context, workload, upgrade):
