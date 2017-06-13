@@ -793,20 +793,24 @@ class API(base.Base):
         workload_utils.upload_workload_db_entry(context, workload_id)
             
         AUDITLOG.log(context,'Workload \'' + workload_obj['display_name'] + '\' Modify Submitted', workload_obj)
-            
+
     @autolog.log_method(logger=Logger)
-    def workload_delete(self, context, workload_id):
+    def workload_delete(self, context, workload_id, database_only=False):
         """
         Delete a workload. No RPC call is made
         """
         try:
+            if context.is_admin is False and database_only is True:
+                raise wlm_exceptions.AdminRequired()
+
             workload = self.workload_get(context, workload_id)
             display_name = workload['display_name']
-            AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Requested', workload)
+            AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Requested', workload)
             if workload['status'] not in ['available', 'error']:
                 msg = _("Workload status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
-            
+
+            '''
             workloads = self.db.workload_get_all(context)
             for workload in workloads:
                 if workload.deleted:
@@ -820,26 +824,48 @@ class API(base.Base):
                                 for member in flow['children']:
                                     if 'type' in member:
                                         if member['data']['id'] == workload_id:
-                                            msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                            raise wlm_exceptions.InvalidState(reason=msg)              
-    
-            snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
-            if len(snapshots) > 0:
-                msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
-                raise wlm_exceptions.InvalidState(reason=msg)
-                        
+                                            msg = _(
+                                                'Operation not allowed since this workload is a member of a composite workflow')
+                                            raise wlm_exceptions.InvalidState(reason=msg)
+            '''
             # First unschedule the job
             jobs = self._scheduler.get_jobs()
             for job in jobs:
                 if job.kwargs['workload_id'] == workload_id:
                     self._scheduler.unschedule_job(job)
                     break
-            self.db.workload_update(context, workload_id, {'status': 'deleting'}) 
-            self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
-            AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
+            
+            if database_only is True:
+                self.db.workload_update(context, workload_id, {'status': 'deleting'})
+
+                #Remove workload entry from workload_vm's
+                compute_service = nova.API(production=True)
+                workload_vms = self.db.workload_vms_get(context, workload_id)
+                for vm in workload_vms:
+                    compute_service.delete_meta(context, vm.vm_id,
+                                                ["workload_id", 'workload_name'])
+                    self.db.workload_vms_delete(context, vm.vm_id, workload_id)
+
+                #Remove all snapshots from workload
+                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id)
+                for snapshot in snapshots:
+                    workload_utils.snapshot_delete(context, snapshot.id, database_only)
+                    self.db.snapshot_update(context, snapshot.id, {'status': 'deleted'})
+                self.db.workload_delete(context, workload_id)
+
+            else:
+                snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
+                if len(snapshots) > 0:
+                    msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
+                    raise wlm_exceptions.InvalidState(reason=msg)
+
+                self.db.workload_update(context, workload_id, {'status': 'deleting'})
+                self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
+
+            AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
     def workload_reset(self, context, workload_id):
