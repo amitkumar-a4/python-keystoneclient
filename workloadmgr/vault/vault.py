@@ -746,13 +746,8 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         workload_urls = []
         try:
             for name in os.listdir(parent_path):
-                workload_url = os.path.join(parent_path, name)
-                if os.path.isdir(workload_url) and name.startswith('workload_'):
-                    if os.path.exists(os.path.join(workload_url, 'workload_db')):
-                        workload_urls.append(workload_url)
-                    else:
-                        workload_id = name.split('_')[1]
-                        LOG.error("Workload %s doesn't contains required database files," % workload_id)
+                if os.path.isdir(os.path.join(parent_path, name)) and name.startswith('workload_'):
+                     workload_urls.append(os.path.join(parent_path, name))
         except Exception as ex:
             LOG.exception(ex)
         return workload_urls
