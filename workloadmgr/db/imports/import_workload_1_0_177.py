@@ -157,12 +157,19 @@ def import_settings(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
-def get_workload_url(context, workload_ids, upgrade):
+def get_workload_url(context, workload_ids, failed_workloads, upgrade):
     '''
     Iterate over all NFS backups mounted for list of workloads available.
     '''
     workload_url_iterate = []
+    workload_ids_to_import = list(workload_ids)
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
+        #Before adding the workload check whether workload is valid or not
+        if vault.validate_workload(workload) is False:
+           failed_workloads.append(workload_id)
+           LOG.error("Workload %s doesn't contains required database files," %workload_id)
+           return
+
         # Check whether workload tenant exist in current cloud or not
         if check_tenant(context, workload, upgrade):
             # update workload_backend_endpoint map
@@ -179,7 +186,8 @@ def get_workload_url(context, workload_ids, upgrade):
                 workload_id = os.path.split(workload)[1].replace('workload_', '')
                 if len(workload_ids) > 0:
                     #If workload found in given workload id's then add to iterate list
-                    if workload_id in workload_ids:
+                    if workload_id in workload_ids_to_import:
+                        workload_ids_to_import.remove(workload_id)
                         add_workload(context, workload_id, workload, backup_endpoint, upgrade)
                 else:
                     add_workload(context, workload_id, workload, backup_endpoint, upgrade)
@@ -189,6 +197,10 @@ def get_workload_url(context, workload_ids, upgrade):
 
         finally:
             pass
+
+    if len(workload_ids_to_import) > 0:
+        failed_workloads.extend(workload_ids_to_import)
+
     return workload_url_iterate
 
 def update_workload_metadata(workload_values):
@@ -229,7 +241,7 @@ def update_workload_metadata(workload_values):
     except Exception as ex:
         LOG.exception(ex)
 
-def get_json_files(context, workload_ids, db_dir, upgrade):
+def get_json_files(context, workload_ids, db_dir, failed_workloads, upgrade):
 
     # Map to store all path of all JSON files for a  resource
     db_files_map = {
@@ -244,7 +256,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
     }
 
     try:
-        workload_url_iterate = get_workload_url(context, workload_ids, upgrade)
+        workload_url_iterate = get_workload_url(context, workload_ids, failed_workloads, upgrade)
 
         # Create list of all files related to a common resource
         #TODO:Find alternate for os.walk
@@ -408,10 +420,11 @@ def import_workload(cntx, workload_ids, new_version, upgrade=True):
     try:
         # Create temporary folder to store JSON files.
         db_dir = tempfile.mkdtemp()
+        failed_workloads = []
 
         del workloads[:]
         DBSession.autocommit = False
-        get_json_files(cntx, workload_ids, db_dir, upgrade)
+        get_json_files(cntx, workload_ids, db_dir, failed_workloads, upgrade)
         for resource_map in import_map:
             import_resources(cntx, resource_map, new_version, db_dir, upgrade)
         DBSession.autocommit = True
@@ -421,6 +434,7 @@ def import_workload(cntx, workload_ids, new_version, upgrade=True):
         #Remove temporary folder
         if os.path.exists(db_dir):
            shutil.rmtree(db_dir, ignore_errors=True)
-    return workloads
+
+    return {'workloads':{'imported_workloads': workloads, 'failed_workloads': failed_workloads}}
 
 

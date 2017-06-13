@@ -756,18 +756,6 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         except Exception as ex:
             LOG.exception(ex)
         return workload_urls
-    
-    @autolog.log_method(logger=Logger)
-    def validate_workloads(self, workload_urls):
-        valid_workloads =  []
-        invalid_workloads = []
-        for workload in workload_urls:
-            if os.path.isdir(workload) and os.path.exists(os.path.join(workload, "workload_db"))
-                valid_workloads.append(workload)
-            else:
-                invalid_workloads.append(workload)
-    
-        return {'valid_workloads': valid_workloads, 'invalid_workloads': invalid_workloads}
 
     @autolog.log_method(logger=Logger) 
     def workload_delete(self, context, workload_metadata):
@@ -999,6 +987,13 @@ def get_workloads(context):
         workloads += backup_target.get_workloads(context)
 
     return workloads
+
+def validate_workload(workload_url):
+    if os.path.isdir(workload_url) and os.path.exists(os.path.join(workload_url, "workload_db")):
+        return True
+    else:
+        return False
+
 
 def get_all_workload_transfers(context):
     transfers = []
