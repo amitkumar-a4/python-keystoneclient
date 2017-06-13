@@ -828,13 +828,14 @@ class API(base.Base):
                                                 'Operation not allowed since this workload is a member of a composite workflow')
                                             raise wlm_exceptions.InvalidState(reason=msg)
             '''
+            # First unschedule the job
+            jobs = self._scheduler.get_jobs()
+            for job in jobs:
+                if job.kwargs['workload_id'] == workload_id:
+                    self._scheduler.unschedule_job(job)
+                    break
+            
             if database_only is True:
-                # First unschedule the job
-                jobs = self._scheduler.get_jobs()
-                for job in jobs:
-                    if job.kwargs['workload_id'] == workload_id:
-                        self._scheduler.unschedule_job(job)
-                        break
                 self.db.workload_update(context, workload_id, {'status': 'deleting'})
 
                 #Remove workload entry from workload_vm's
@@ -858,14 +859,7 @@ class API(base.Base):
                     msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
                     raise wlm_exceptions.InvalidState(reason=msg)
 
-                # First unschedule the job
-                jobs = self._scheduler.get_jobs()
-                for job in jobs:
-                    if job.kwargs['workload_id'] == workload_id:
-                        self._scheduler.unschedule_job(job)
-                        break
                 self.db.workload_update(context, workload_id, {'status': 'deleting'})
-
                 self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
 
             AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Submitted', workload)
