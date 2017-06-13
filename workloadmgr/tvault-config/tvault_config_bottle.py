@@ -1799,7 +1799,6 @@ def configure_host():
         new_file = open(abs_path,'w')
         new_file.write('127.0.0.1 localhost\n')
         new_file.write('127.0.0.1 '+socket.gethostname()+'\n')
-        new_file.write('192.168.1.92 controller\n')
         new_file.write(config_data['floating_ipaddress']+' '+socket.gethostname()+'\n')
         #close temp file
         new_file.close()
