@@ -882,10 +882,6 @@ class SwiftRepository(ObjectRepository):
         pass
 
     def object_unlink(self, object_name, leave_segments=False):
-        import traceback
-        LOG.debug("-------------------------------------------------------------")
-        LOG.debug("Deleting object: %s" % str(object_name))
-        LOG.debug("Tracees : %s" % str( traceback.format_stack()))
         container, obj = self.split_head_tail(object_name)
         options['leave_segments'] = leave_segments
         _opts = options.copy()
