@@ -178,7 +178,7 @@ def update_backup_media_target(file_path, backup_endpoint):
     except Exception as ex:
         LOG.exception(ex)
 
-def get_workload_url(context, workload_ids, upgrade):
+def get_workload_url(context, workload_ids, failed_workloads, upgrade):
     '''
     Iterate over all NFS backups mounted for list of workloads available.
     '''
