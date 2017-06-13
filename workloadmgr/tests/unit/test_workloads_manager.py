@@ -39,17 +39,17 @@ class BaseWorkloadTestCase(test.TestCase):
         CONF.set_default('vault_storage_nfs_export',
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
+        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
+        self.MockMethod = self.is_online_patch.start()
+        self.MockMethod.return_value = True
+
+        self.subprocess_patch = patch('subprocess.check_call')
+        self.SubProcessMockMethod = self.subprocess_patch.start()
+        self.SubProcessMockMethod.return_value = True
+
         patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
         patch('sys.stderr').start()
         patch('workloadmgr.autolog.log_method').start()
-
-        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
-        self.subprocess_patch = patch('subprocess.check_call')
-
-        self.MockMethod = self.is_online_patch.start()
-        self.SubProcessMockMethod = self.subprocess_patch.start()
-        self.MockMethod.return_value = True
-        self.SubProcessMockMethod.return_value = True
 
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import *
