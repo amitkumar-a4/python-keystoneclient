@@ -458,7 +458,10 @@ class RestoredVMResourceWithNameNotFound(NotFound):
 class RestoredVMResourceWithIdNotFound(NotFound):
     message = _("RestoredVMResource %(id)s is not be found.")
 
-    
+class InvalidRestoreOptions(Invalid):
+    message = _("Invalid restore options.")
+
+
 class SwiftConnectionFailed(WorkloadMgrException):
     message = _("Connection to swift failed") + ": %(reason)s"
 
@@ -497,6 +500,9 @@ class VaultStorageNotFound(NotFound):
 
 class TaskNotFound(NotFound):
     message = _("Task %(task_id)s could not be found.")
+
+class FileSearchNotFound(NotFound):
+    message = _("File Search %(search_id)s could not be found.")
 
 class InvalidLicense(Invalid):
     pass

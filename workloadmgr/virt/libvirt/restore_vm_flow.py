@@ -38,6 +38,7 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.workloads import workload_utils
+from workloadmgr.workflows import vmtasks_openstack
 
 from workloadmgr.vault import vault
 
@@ -45,6 +46,7 @@ from workloadmgr import utils
 from workloadmgr import flags
 from workloadmgr import autolog
 from workloadmgr import exception
+from workloadmgr.workflows.vmtasks import FreezeVM, ThawVM
 
 
 restore_vm_opts = [
@@ -55,7 +57,10 @@ restore_vm_opts = [
     cfg.StrOpt('nfs_volume_type_substr',
                default='nfs,netapp',
                help='Dir where the nfs volume is mounted for restore'),                   
-
+    cfg.IntOpt('progress_tracking_update_interval',
+               default=600,
+               help='Number of seconds to wait for progress tracking file '
+                    'updated before we call contego crash'),
     ]
 
 LOG = logging.getLogger(__name__)
@@ -129,11 +134,14 @@ class PrepareBackupImage(task.Task):
         except:
                pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
-        
+
         if snapshot_vm_resource.resource_name == 'vda' and \
             db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
-            #upload the bottom of the chain to glance
-            restore_file_path = image_info.backing_file
+            # upload the bottom of the chain to glance
+            while image_info.backing_file:
+                image_info = qemuimages.qemu_img_info(image_info.backing_file)
+
+            restore_file_path = image_info.image
             image_overlay_file_path = resource_snap_path
             image_virtual_size = image_info.virtual_size
         else:
@@ -672,10 +680,6 @@ class RestoreInstanceFromVolume(task.Task):
 
         availability_zone = get_availability_zone(instance_options)
     
-        restored_security_group_ids = []
-        for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
-                     
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
 
         self.volume_service = volume_service = cinder.API()
@@ -693,7 +697,7 @@ class RestoreInstanceFromVolume(task.Task):
                                                    None, restored_compute_flavor, 
                                                    nics=restored_nics,
                                                    block_device_mapping=block_device_mapping,
-                                                   security_groups=restored_security_group_ids, 
+                                                   security_groups=[], 
                                                    key_name=keyname,
                                                    availability_zone=availability_zone)
 
@@ -765,22 +769,17 @@ class RestoreInstanceFromImage(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })  
-
+        
         availability_zone = get_availability_zone(instance_options)
     
-        restored_security_group_ids = []
-        for pit_id, restored_security_group_id in restored_security_groups.iteritems():
-            restored_security_group_ids.append(restored_security_group_id)
-
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
         self.restored_instance = restored_instance = \
                      compute_service.create_server(self.cntx, restored_instance_name, 
                                                    restored_compute_image, restored_compute_flavor, 
                                                    nics=restored_nics,
-                                                   security_groups=restored_security_group_ids, 
+                                                   security_groups=[],
                                                    key_name=keyname,
                                                    availability_zone=availability_zone)
-
         if not restored_instance:
             raise Exception("Cannot create instance from image")
         
@@ -834,11 +833,9 @@ class AdjustSG(task.Task):
         
             self.compute_service = compute_service = nova.API(production = (restore_type == 'restore'))
             sec_groups = compute_service.list_security_group(self.cntx, restored_instance_id)
-
             sec_group_ids = [sec.id for sec in sec_groups]
             ids_to_remove = set(sec_group_ids) - set(restored_security_groups.values())
             ids_to_add = set(restored_security_groups.values()) - set(sec_group_ids)
-
             # remove security groups that were not asked for
             for sec in ids_to_remove:
                 compute_service.remove_security_group(self.cntx, restored_instance_id,
@@ -979,10 +976,10 @@ class CopyBackupImageToVolume(task.Task):
                     if progstat.st_mtime > basestat.st_mtime:
                         basestat = progstat
                         basetime = time.time()
-                    elif time.time() - basetime > 600:
-                        raise Exception("No update to %s modified time for last 10 minutes. "
+                    elif time.time() - basetime > CONF.progress_tracking_update_interval:
+                        raise Exception("No update to %s modified time for last %d minutes. "
                                         "Contego may have errored. Aborting Operation" % 
-                                        progress_tracking_file_path)
+                                        (progress_tracking_file_path, CONF.progress_tracking_update_interval/60))
                 else:
                     # For swift based backup media
                     async_task_status = compute_service.vast_async_task_status(cntx, 
@@ -1106,7 +1103,7 @@ class PowerOnInstance(task.Task):
                     raise Exception(_("Error creating instance " + \
                                         restored_instance_id))
             now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=4):
+            if (now - start_time) > datetime.timedelta(minutes=5):
                 raise exception.ErrorOccurred(reason='Timeout waiting for '\
                                            'the instance to boot from volume')                   
 
@@ -1354,6 +1351,16 @@ def AssignFloatingIPFlow(context):
 
     return flow
 
+def FreezeNThawFlow(context):
+
+    flow = lf.Flow("freezenthawlf")
+    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+
+    return flow
+
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
                restored_nics, instance_options):
@@ -1383,6 +1390,11 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'],
                                                                  snapshot_obj.id)
 
+    restored_security_group_ids = {}
+    vm_id = instance['vm_id']
+    for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
+        restored_security_group_ids[pit_id] = restored_security_group_id
+
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
     restore_dict.pop('created_at')
@@ -1398,7 +1410,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'snapshot_id': snapshot_obj.id,
                 'restore_type': restore['restore_type'],
                 'restored_net_resources': restored_net_resources,    
-                'restored_security_groups': restored_security_groups,
+                'restored_security_groups': restored_security_group_ids,
                 'restored_compute_flavor_id': restored_compute_flavor.id,
                 'restored_nics': restored_nics,
                 'instance_options': instance_options,
@@ -1484,6 +1496,10 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # Assign floating IP address
     childflow = AssignFloatingIPFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    childflow = FreezeNThawFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 

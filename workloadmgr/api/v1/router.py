@@ -19,6 +19,7 @@ from workloadmgr.api.v1 import workloadtypes
 from workloadmgr.api.v1 import settings
 from workloadmgr.api.v1 import trusts
 from workloadmgr.api.v1 import tasks
+from workloadmgr.api.v1 import filesearch
 from workloadmgr.api.v1 import workload_transfer as transfers
 from workloadmgr.api.v1 import global_job_scheduler
 
@@ -39,6 +40,23 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='show')
 
         mapper.redirect("", "/")
+  
+        ##################################################################################################
+        self.resources['file_search'] = filesearch.create_resource(ext_mgr)
+        #get status of file search
+        mapper.connect("file_search",
+                       "/{project_id}/search/{search_id}",
+                       controller=self.resources['file_search'],
+                       action='show',
+                       conditions={"method": ['GET']})
+
+        #post file search
+        mapper.connect("file_search",
+                       "/{project_id}/search",
+                       controller=self.resources['file_search'],
+                       action='search',
+                       conditions={"method": ['POST']})
+
         ###################################################################################################
         self.resources['workload_types'] = workloadtypes.create_resource(ext_mgr)
         self.resources['tasks'] = tasks.create_resource(ext_mgr)

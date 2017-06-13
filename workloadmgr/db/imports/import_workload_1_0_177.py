@@ -75,7 +75,7 @@ import_map = [
      'getter_method' : 'vm_network_resource_snaps_get',
      'getter_method_params' : ['vm_network_resource_snap_id']
      },
-    {'file': 'security_db',
+    {'file': 'security_group_db',
      'model_class': 'VMSecurityGroupRuleSnaps',
      'metadata_model_class': 'VMSecurityGroupRuleSnapMetadata',
      'getter_method' : 'vm_security_group_rule_snaps_get',
@@ -157,12 +157,42 @@ def import_settings(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
+def update_backup_media_target(file_path, backup_endpoint):
+    try:
+        with open(file_path, 'r') as file_db:
+            file_data = file_db.read()
+        json_obj = json.loads(file_data)
+
+        metadata = json_obj.get('metadata', None)
+        if metadata:
+            for meta in metadata:
+                if meta['key'] == 'backup_media_target':
+                    if backup_endpoint != meta['value']:
+                        meta['value'] = backup_endpoint
+                        break
+
+            json_obj['metadata'] = metadata
+            with open(file_path, 'w') as outfile:
+                json.dump(json_obj, outfile)
+
+    except Exception as ex:
+        LOG.exception(ex)
+
 def get_workload_url(context, workload_ids, upgrade):
     '''
     Iterate over all NFS backups mounted for list of workloads available.
     '''
     workload_url_iterate = []
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
+
+        #Update backup media target
+        if os.path.isdir(workload):
+            update_backup_media_target(os.path.join(workload, "workload_db"), backup_endpoint)
+            for item in os.listdir(workload):
+                 snapshot_db = os.path.join(workload, item, "snapshot_db")
+                 if os.path.exists(snapshot_db):
+                     update_backup_media_target(snapshot_db, backup_endpoint)
+
         # Check whether workload tenant exist in current cloud or not
         if check_tenant(context, workload, upgrade):
             # update workload_backend_endpoint map
@@ -177,6 +207,7 @@ def get_workload_url(context, workload_ids, upgrade):
 
             for workload in workload_url:
                 workload_id = os.path.split(workload)[1].replace('workload_', '')
+
                 if len(workload_ids) > 0:
                     #If workload found in given workload id's then add to iterate list
                     if workload_id in workload_ids:
@@ -240,7 +271,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         'resources_db': [],
         'network_db': [],
         'disk_db': [],
-        'security_db': []
+        'security_group_db': []
     }
 
     try:
@@ -265,8 +296,8 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                         db_files_map['network_db'].append(os.path.join(path, name))
                     elif name.endswith("disk_db"):
                         db_files_map['disk_db'].append(os.path.join(path, name))
-                    elif name.endswith("security_db"):
-                        db_files_map['security_db'].append(os.path.join(path, name))
+                    elif name.endswith("security_group_db"):
+                        db_files_map['security_group_db'].append(os.path.join(path, name))
 
         # Creating a map for each workload with workload_backup_media_size.
         for snap in db_files_map['snapshot_db']:

@@ -48,9 +48,13 @@ from workloadmgr.db.sqlalchemy import models
 from pytz import all_timezones
 from tzlocal import get_localzone
 
+from workloadmgr import auditlog
+from workloadmgr.openstack.common import timeutils
+
 logging.basicConfig(format='localhost - - [%(asctime)s] %(message)s', level=logging.WARNING)
 log = logging.getLogger(__name__)
 bottle.debug(True)
+
 
 module_dir = os.path.dirname(__file__)
 if module_dir:
@@ -821,7 +825,6 @@ def _register_workloadtypes():
     # Python code here to register workloadtypes
     if config_data['nodetype'] == 'controller':
         time.sleep(5)
-
         wlm = wlmclient.Client(auth_url=config_data['keystone_public_url'], 
                                username=config_data['admin_username'], 
                                password=config_data['admin_password'], 
@@ -829,7 +832,16 @@ def _register_workloadtypes():
                                domain_name=config_data['domain_name'],
                                insecure=SSL_INSECURE,
                                )
-        workload_types = wlm.workload_types.list()
+        start_time = timeutils.utcnow()
+        while 1:
+               try:
+                   workload_types = wlm.workload_types.list()
+                   break
+               except Exception as ex:
+                      time.sleep(10)
+                      now = timeutils.utcnow()
+                      if (now - start_time) > datetime.timedelta(minutes=8):
+                         raise ex
         
         workload_type_names = {'Hadoop':False,
                                'MongoDB':False,
@@ -1491,11 +1503,11 @@ def service_action(service_display_name, action):
 @bottle.route('/services')
 @authorize()
 def services():
-    bottle.redirect("/services_vmware")
+    bottle.redirect("/services_openstack")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])                         
 
-@bottle.route('/services_vmware')
+@bottle.route('/services_openstack')
 @bottle.view('services_page_vmware')
 @authorize()
 def services_vmware():
@@ -1503,8 +1515,7 @@ def services_vmware():
     services = {'api_service' : 'wlm-api',
                 'scheduler_service' : 'wlm-scheduler',
                 'workloads_service' : 'wlm-workloads',
-                'inventory_service' : 'nova-api',
-                'tvault_gui_service' :'tvault-gui',} 
+                } 
     
     config_status = 'not_configured'
     nodetype = 'not_configured'
@@ -1687,16 +1698,16 @@ def troubleshooting_vmware():
     return values
 
 @bottle.route('/logs')
+@bottle.view('logs_page_vmware')
 @authorize()
 def logs():
-    bottle.redirect("/logs_vmware")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message']) 
 
-@bottle.route('/logs_vmware')
+@bottle.route('/logs_openstack')
 @bottle.view('logs_page_vmware')
 @authorize()
-def logs_vmware():
+def logs_openstack():
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
             
@@ -1704,7 +1715,6 @@ def logs_vmware():
 @authorize()
 def configure_form():
     bottle.redirect(bottle.request.url + '_' + TVAULT_CONFIGURATION_TYPE)
-
 
 @bottle.route('/configure_vmware')
 @bottle.view('configure_form_vmware')
@@ -2818,6 +2828,20 @@ def reinitialize():
            connection.execute("SET FOREIGN_KEY_CHECKS=1") 
            trans.commit()
            bottle.request.environ['beaker.session']['success_message'] = 'Reinitialized successfully'
+           try:
+                context = bottle.request.environ['beaker.session']
+                context.user = 'System'
+                context.tenant = 'System'
+                context.user_id = 'System'
+                context.project_id = 'System'
+                context.vault_storage_nfs_export = ''
+                if config_data['backup_target_type'] == 'NFS':
+                   context.vault_storage_nfs_export = config_data['storage_nfs_export']
+                context.cloud_unique_id = config_data['cloud_unique_id']
+                AUDITLOG = auditlog.getAuditLogger(CONF1=context)
+                AUDITLOG.log(context,'Reinitialized database', None)
+           except Exception as ex:
+                  pass               
         else:
              bottle.request.environ['beaker.session']['error_message'] = 'No database found'
     except Exception as exception:

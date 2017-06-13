@@ -390,15 +390,15 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
     network_service = neutron.API(production=True)
 
     def _snapshot_neutron_security_groups():
-        security_group_ids = []
         for instance in instances:
             server_security_group_ids = network_service.server_security_groups(
                 cntx, instance['vm_id'])
-            security_group_ids += server_security_group_ids
-            for security_group_id in server_security_group_ids:
+            unique_security_group_ids = list(set(server_security_group_ids))
+            for security_group_id in unique_security_group_ids:
                 security_group = network_service.security_group_get(
                     cntx, security_group_id)
-                snapshot_vm_resource_values = {
+                security_group_rules = security_group['security_group_rules']
+                vm_security_group_snap_values = {
                     'id': str(uuid.uuid4()),
                     'vm_id': instance['vm_id'],
                     'snapshot_id': snapshot['id'],
@@ -407,51 +407,37 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     'resource_pit_id': security_group['id'],
                     'metadata': {'name': security_group['name'],
                                  'security_group_type': 'neutron',
-                                 'description': security_group['description']},
+                                 'description': security_group['description'],
+                                 'vm_id': instance['vm_id'],
+                                 'vm_attached': security_group_id in server_security_group_ids,
+                                },
                     'status': 'available'}
-                db.snapshot_vm_resource_create(
-                    cntx, snapshot_vm_resource_values)
+            
+                vm_security_group_snap = db.snapshot_vm_resource_create(
+                    cntx,  vm_security_group_snap_values)
 
-        unique_security_group_ids = list(set(security_group_ids))
-        for security_group_id in unique_security_group_ids:
-            security_group = network_service.security_group_get(
-                cntx, security_group_id)
-            security_group_rules = security_group['security_group_rules']
-            vm_security_group_snap_values = {
-                'id': str(uuid.uuid4()),
-                'vm_id': snapshot['id'],
-                'snapshot_id': snapshot['id'],
-                'resource_type': 'security_group',
-                'resource_name':  security_group['id'],
-                'resource_pit_id': security_group['id'],
-                'metadata': {'name': security_group['name'],
-                             'security_group_type': 'neutron',
-                             'description': security_group['description']},
-                'status': 'available'}
-            vm_security_group_snap = db.snapshot_vm_resource_create(
-                cntx,  vm_security_group_snap_values)
+                for security_group_rule in security_group_rules:
+                    vm_security_group_rule_snap_metadata = {
+                        'security_group_type': 'neutron', }
+                    vm_security_group_rule_snap_values = {
+                        'id': str(uuid.uuid4()),
+                        'vm_security_group_snap_id': vm_security_group_snap.id,
+                        'pickle': pickle.dumps(security_group_rule, 0),
+                        'metadata': vm_security_group_rule_snap_metadata,
+                        'status': 'available'}
 
-            for security_group_rule in security_group_rules:
-                vm_security_group_rule_snap_metadata = {
-                    'security_group_type': 'neutron', }
-                vm_security_group_rule_snap_values = {
-                    'id': str(uuid.uuid4()),
-                    'vm_security_group_snap_id': vm_security_group_snap.id,
-                    'pickle': pickle.dumps(security_group_rule, 0),
-                    'metadata': vm_security_group_rule_snap_metadata,
-                    'status': 'available'}
-
-                db.vm_security_group_rule_snap_create(
-                        cntx, vm_security_group_rule_snap_values)
-                if security_group_rule['remote_group_id']:
-                    if (security_group_rule['remote_group_id'] in
-                       unique_security_group_ids) is False:
-                        unique_security_group_ids.append(
-                            vm_security_group_snap['remote_group_id'])
+                    db.vm_security_group_rule_snap_create(
+                            cntx, vm_security_group_rule_snap_values)
+                    if security_group_rule['remote_group_id']:
+                        if (security_group_rule['remote_group_id'] in
+                           unique_security_group_ids) is False:
+                            unique_security_group_ids.append(
+                                security_group_rule['remote_group_id'])
 
     def _snapshot_nova_security_groups():
         security_group_ids = []
         security_groups = compute_service.get_security_groups(cntx)
+        vm_map = {}
         for instance in instances:
             server = compute_service.get_server_by_id(cntx, instance['vm_id'])
 
@@ -468,8 +454,10 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                             'resource_pit_id': group.id,
                             'metadata': {'name': group.name,
                                          'security_group_type': 'nova',
-                                         'description': group.description},
+                                         'description': group.description,
+                                         'vm_id': instance['vm_id']},
                             'status': 'available'}
+                        vm_map[secgrp['name']] = instance['vm_id']
                         db.snapshot_vm_resource_create(
                             cntx,  snapshot_vm_resource_values)
                         break
@@ -489,7 +477,8 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                         'metadata': {
                              'name': group.name,
                              'security_group_type': 'nova',
-                             'description': group.description},
+                             'description': group.description,
+                             'vm_id': vm_map[security_group_id]},
                         'status': 'available'}
                     vm_security_group_snap = db.snapshot_vm_resource_create(
                         cntx,  vm_security_group_snap_values)
@@ -597,27 +586,27 @@ def pre_snapshot_vm(cntx, db, instance, snapshot):
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.freeze_vm')
-def freeze_vm(cntx, db, instance, snapshot):
+def freeze_vm(cntx, db, instance):
     # freeze instance
     if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+        return virtdriver.freeze_vm(cntx, db, instance)
     else:
         virtdriver = driver.load_compute_driver(
             None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+        return virtdriver.freeze_vm(cntx, db, instance)
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.thaw_vm')
-def thaw_vm(cntx, db, instance, snapshot):
+def thaw_vm(cntx, db, instance):
     # thaw instance
     if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+        return virtdriver.thaw_vm(cntx, db, instance)
     else:
         virtdriver = driver.load_compute_driver(
             None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+        return virtdriver.thaw_vm(cntx, db, instance)
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm')
@@ -1296,6 +1285,11 @@ def restore_vm_security_groups(cntx, db, restore):
 
         vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
             cntx, snapshot_vm_resource.id)
+
+        # looks like some bug in the security_group_list where individual
+        # sec grp rules are not correct. Use the get function to get the
+        # sec grp definition correctly
+        existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
            len(existinggroup['security_group_rules']):
             return False
@@ -1320,36 +1314,46 @@ def restore_vm_security_groups(cntx, db, restore):
     network_service =  neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(
-        cntx, restore['snapshot_id'], restore['snapshot_id'])
+    snapshot_vm_resources = db.snapshot_resources_get(
+        cntx, restore['snapshot_id'])
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type == 'security_group':
-
             security_group_type = db.get_metadata_value(
                 snapshot_vm_resource.metadata,
                 'security_group_type')
             if security_group_type != 'neutron':
                 continue
+            vm_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id')
+            if vm_id not in restored_security_groups:
+                restored_security_groups[vm_id] = {}
             if  security_group_exists(snapshot_vm_resource):
-                restored_security_groups[snapshot_vm_resource.resource_pit_id] = \
-                    snapshot_vm_resource.resource_name
+                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
+                    {'sec_id': snapshot_vm_resource.resource_name,
+                     'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
+                     'res_id': snapshot_vm_resource.id}
                 continue
 
             name = 'snap_of_' + db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'name')
             description = 'snapshot - ' + db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'description')
-            security_group = network_service.security_group_create(
-                cntx, name, description).get('security_group')
-            restored_security_groups[snapshot_vm_resource.resource_pit_id] = \
-                security_group['id']
+            security_group_obj = network_service.security_group_create(
+                cntx, name, description)
+            security_group = security_group_obj.get('security_group')
+            restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
+                {'sec_id': security_group['id'],
+                 'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
+                 'res_id': snapshot_vm_resource.id}
             restored_vm_resource_values = \
-                {'id': security_group['id'],
-                 'vm_id': restore['id'],
+                {'id': str(uuid.uuid4()),
+                 'vm_id': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id'),
                  'restore_id': restore['id'],
                  'resource_type': 'security_group',
-                 'resource_name':  security_group['name'],
-                 'metadata': {},
+                 'resource_name':  security_group['id'],
+                 'resource_pit_id': security_group['id'],
+                 'metadata': {'name': security_group['name'],
+                              'security_group_type': 'neutron',
+                              'description': security_group['description']},
                  'status': 'available'}
             db.restored_vm_resource_create(
                 cntx, restored_vm_resource_values)
@@ -1359,20 +1363,27 @@ def restore_vm_security_groups(cntx, db, restore):
                 network_service.security_group_rule_delete(
                     cntx, security_group_rule['id'])
 
+    for vm_id, restored_security_groups_per_vm in restored_security_groups.iteritems():
+        for pit_id, res_map in restored_security_groups_per_vm.iteritems():
+            if  pit_id == res_map['sec_id']:
+                continue
+
+            security_group_id = res_map['sec_id']
+            security_group = network_service.security_group_get(cntx, security_group_id)
             vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-                cntx, snapshot_vm_resource.id)
+                cntx, res_map['res_id'])
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(
                     str(vm_security_group_rule.pickle))
-                if vm_security_group_rule_values['remote_group_id']:
-                    remote_group_id = restored_security_groups[
-                        vm_security_group_rule_values['remote_group_id']]
+                if vm_security_group_rule_values.get('remote_group_id', None):
+                    remote_group_id = restored_security_groups_per_vm[
+                        vm_security_group_rule_values['remote_group_id']]['sec_id']
                 else:
                     remote_group_id = None
 
                 network_service.security_group_rule_create(
                     cntx,
-                    restored_security_groups[snapshot_vm_resource.resource_pit_id],
+                    security_group_id,
                     vm_security_group_rule_values['direction'],
                     vm_security_group_rule_values['ethertype'],
                     vm_security_group_rule_values['protocol'],
@@ -1380,7 +1391,15 @@ def restore_vm_security_groups(cntx, db, restore):
                     vm_security_group_rule_values['port_range_max'],
                     vm_security_group_rule_values['remote_ip_prefix'],
                     remote_group_id)
-    return restored_security_groups
+
+    return_values = {}
+    for vm_id, res_sec_grps in restored_security_groups.iteritems():
+        return_values[vm_id] = {}
+        for pit_id, res_map in res_sec_grps.iteritems():
+            if res_map['vm_attached'] is True:
+                return_values[vm_id][pit_id] = res_map['sec_id']
+
+    return return_values
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.delete_vm_security_groups')
@@ -1419,9 +1438,83 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                   instance_options)
 
 
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_data')
+def restore_vm_data(cntx, db, instance, restore):
+
+    restore_obj = db.restore_get(cntx, restore['id'])
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = utils.get_instance_restore_options(restore_options,
+                                                          instance['vm_id'],
+                                                          'openstack')
+
+    if instance_options.get('availability_zone', None) is None:
+        instance_options['availability_zone'] = restore_options.get('zone', None)
+    virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+
+    # call with new context
+    cntx = nova._get_tenant_context(cntx)
+    return virtdriver.restore_vm_data(cntx, db, instance, restore,
+                                      instance_options)
+
+
+@autolog.log_method(Logger, 'vmtasks_openstack.poweroff_vm')
+def poweroff_vm(cntx, instance, restore, restored_instance):
+    restored_instance_id = restored_instance['vm_id']
+    compute_service = nova.API(production=True)
+
+    try:
+        compute_service.stop(cntx, restored_instance_id)
+    except:
+        pass
+
+    inst =  compute_service.get_server_by_id(cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'SHUTOFF':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to shutoff' )
+        time.sleep(10)
+        inst = compute_service.get_server_by_id(cntx,
+                                                inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot')
+
+
 @autolog.log_method(Logger, 'vmtasks_openstack.poweron_vm')
 def poweron_vm(cntx, instance, restore, restored_instance):
-    pass
+    restored_instance_id = restored_instance['vm_id']
+    compute_service = nova.API(production=True)
+
+    try:
+        compute_service.start(cntx, restored_instance_id)
+    except:
+        pass
+
+    inst =  compute_service.get_server_by_id(cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'ACTIVE':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to boot' )
+        time.sleep(10)
+        inst =  compute_service.get_server_by_id(cntx,
+                                                 inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot')
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.set_vm_metadata')

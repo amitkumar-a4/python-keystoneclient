@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 import zlib
+import re
 
 from M2Crypto import DSA
 
@@ -248,6 +249,42 @@ class API(base.Base):
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
 
+    @autolog.log_method(logger=Logger)
+    def search(self, context, data):
+        if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
+           msg = _('Provide valid linux filepath to search')
+           raise wlm_exceptions.Invalid(reason=msg)
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
+        if len(vm_found) == 0:
+           msg = _('vm_id not existing with this tenant')
+           raise wlm_exceptions.Invalid(reason=msg)
+        workload = self.db.workload_get(context, vm_found[0].workload_id)
+        if workload['status'] != 'available':
+           msg = _('Vm workload is not in available state to perform search')
+           raise wlm_exceptions.Invalid(reason=msg)
+        kwargs = {'vm_id': data['vm_id'], 'status': 'completed'}
+        search_list = self.db.file_search_get_all(context, **kwargs)
+        if len(search_list) > 0:
+           msg = _('Search with this vm_id already in exceution')
+           raise wlm_exceptions.Invalid(reason=msg)
+        if type(data['snapshot_ids']) is list:
+           data['snapshot_ids'] = ",".join(data['snapshot_ids'])
+        options = {'vm_id': data['vm_id'],
+                   'project_id': context.project_id,
+                   'user_id': context.user_id,
+                   'filepath': data['filepath'],
+                   'snapshot_ids': data['snapshot_ids'],
+                   'start': data['start'],
+                   'end': data['end'],
+                   'status': 'executing',}
+        search = self.db.file_search_create(context, options)
+        self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
+        return search
+
+    @autolog.log_method(logger=Logger)
+    def search_show(self, context, search_id):
+        search = self.db.file_search_get(context, search_id)
+        return search
     
     @autolog.log_method(logger=Logger)    
     def workload_type_get(self, context, workload_type_id):
@@ -756,20 +793,24 @@ class API(base.Base):
         workload_utils.upload_workload_db_entry(context, workload_id)
             
         AUDITLOG.log(context,'Workload \'' + workload_obj['display_name'] + '\' Modify Submitted', workload_obj)
-            
+
     @autolog.log_method(logger=Logger)
-    def workload_delete(self, context, workload_id):
+    def workload_delete(self, context, workload_id, database_only=False):
         """
         Delete a workload. No RPC call is made
         """
         try:
+            if context.is_admin is False and database_only is True:
+                raise wlm_exceptions.AdminRequired()
+
             workload = self.workload_get(context, workload_id)
             display_name = workload['display_name']
-            AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Requested', workload)
+            AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Requested', workload)
             if workload['status'] not in ['available', 'error']:
                 msg = _("Workload status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
-            
+
+            '''
             workloads = self.db.workload_get_all(context)
             for workload in workloads:
                 if workload.deleted:
@@ -783,26 +824,48 @@ class API(base.Base):
                                 for member in flow['children']:
                                     if 'type' in member:
                                         if member['data']['id'] == workload_id:
-                                            msg = _('Operation not allowed since this workload is a member of a composite workflow')
-                                            raise wlm_exceptions.InvalidState(reason=msg)              
-    
-            snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
-            if len(snapshots) > 0:
-                msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
-                raise wlm_exceptions.InvalidState(reason=msg)
-                        
+                                            msg = _(
+                                                'Operation not allowed since this workload is a member of a composite workflow')
+                                            raise wlm_exceptions.InvalidState(reason=msg)
+            '''
             # First unschedule the job
             jobs = self._scheduler.get_jobs()
             for job in jobs:
                 if job.kwargs['workload_id'] == workload_id:
                     self._scheduler.unschedule_job(job)
                     break
-            self.db.workload_update(context, workload_id, {'status': 'deleting'}) 
-            self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
-            AUDITLOG.log(context,'Workload \'' + display_name + '\' Delete Submitted', workload)
+            
+            if database_only is True:
+                self.db.workload_update(context, workload_id, {'status': 'deleting'})
+
+                #Remove workload entry from workload_vm's
+                compute_service = nova.API(production=True)
+                workload_vms = self.db.workload_vms_get(context, workload_id)
+                for vm in workload_vms:
+                    compute_service.delete_meta(context, vm.vm_id,
+                                                ["workload_id", 'workload_name'])
+                    self.db.workload_vms_delete(context, vm.vm_id, workload_id)
+
+                #Remove all snapshots from workload
+                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id)
+                for snapshot in snapshots:
+                    workload_utils.snapshot_delete(context, snapshot.id, database_only)
+                    self.db.snapshot_update(context, snapshot.id, {'status': 'deleted'})
+                self.db.workload_delete(context, workload_id)
+
+            else:
+                snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
+                if len(snapshots) > 0:
+                    msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
+                    raise wlm_exceptions.InvalidState(reason=msg)
+
+                self.db.workload_update(context, workload_id, {'status': 'deleting'})
+                self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
+
+            AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))         
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
     def workload_reset(self, context, workload_id):
@@ -1548,6 +1611,7 @@ class API(base.Base):
                 snapshot_vm['metadata'] = metadata
                 snapshot_vm['nics'] = []
                 snapshot_vm['vdisks'] = []
+                snapshot_vm['security_group'] = []
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm_obj.vm_id, snapshot_id)
                 snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot_id, snapshot_id)                
                 for snapshot_vm_resource in snapshot_vm_resources:                
@@ -1561,9 +1625,9 @@ class API(base.Base):
                                               }
                     """ security group """
                     if snapshot_vm_resource.resource_type == 'security_group':
-                        snapshot_vm['security_group'] = {'name' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
-                                                         'security_group_type' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'security_group_type'),
-                                                        }
+                        if self.db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in (True, '1', None):
+                            snapshot_vm['security_group'].append( {'name' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
+                                                                   'security_group_type' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'security_group_type') })
                     """ nics """
                     if snapshot_vm_resource.resource_type == 'nic':
                         vm_nic_snapshot = self.db.vm_network_resource_snap_get(context, snapshot_vm_resource.id)
@@ -1678,6 +1742,27 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
         
     @autolog.log_method(logger=Logger)
+    def _validate_restore_options(self, options):
+        if options.get('type', "") != "openstack":
+            msg = _("'type' field in options is not set to 'openstack'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if 'openstack' not in options:
+            msg = _("'openstack' field is not in options")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) not in ('inplace', 'selective', 'oneclick'):
+            msg = _("'restore_type' field must be one of 'inplace', 'selective', 'oneclick'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) in ('inplace', 'selective'):
+        # If instances is not available should we restore entire snapshot?
+            if 'instances' not in options['openstack']:
+                msg = _("'instances' field is not in found " \
+                        "in options['instances']")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
 
@@ -1685,11 +1770,14 @@ class API(base.Base):
         Make the RPC call to restore a snapshot.
         """
         try:
+            self._validate_restore_options(options)
+
             snapshot = self.snapshot_get(context, snapshot_id)
             workload = self.workload_get(context, snapshot['workload_id'])
             workload_display_name = workload['display_name']
             snapshot_display_name = snapshot['display_name']
             snapshot_snapshot_type = snapshot['snapshot_type']
+
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
@@ -2491,11 +2579,11 @@ class API(base.Base):
             keystone_client = KeystoneClient(context)
 
             reassigned_workloads = []
-            workload_to_update = []
-            workload_to_import = []
             projects = keystone_client.client.get_project_list_for_import(context)
             tenant_list = [project.id for project in projects]
             for tenant_map in tenant_maps:
+                workload_to_update = []
+                workload_to_import = []
                 workload_ids = tenant_map['workload_ids']
                 old_tenant_ids = tenant_map['old_tenant_ids']
                 new_tenant_id = tenant_map['new_tenant_id']
@@ -2512,8 +2600,8 @@ class API(base.Base):
                         workload_to_update.extend(workload_ids)
 
                     if len(workloads) != len(workload_ids) and migrate_cloud is not True:
-                        raise Exception("Workload id's doesn't belong to \
-                               current cloud, to reassign them set migrate_cloud option to True")
+                        raise Exception("Workload id's doesn't belong to current cloud. "\
+                              "To reassign them from another cloud ,set migrate_cloud option to True.")
 
                     # In case workload id's are provided and some are in DB and
                     # some need to import then filter those workloads here.
@@ -2578,7 +2666,7 @@ class API(base.Base):
                                                   jobscheduler_map, new_tenant_id, user_id)
                         reassigned_workloads.extend(updated_workloads)
 
-                    return reassigned_workloads
+            return reassigned_workloads
 
         except Exception as ex:
             LOG.exception(ex)

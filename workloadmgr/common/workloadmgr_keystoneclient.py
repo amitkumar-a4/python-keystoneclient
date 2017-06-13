@@ -128,7 +128,17 @@ class KeystoneClientBase(object):
            else:
                 domain_id=CONF.get('domain_name')
 
-           auth = passMod.Password(auth_url=auth_url,
+           cloud_admin_project = CONF.get('neutron_admin_tenant_name',None)
+           if nova_client is True:
+              auth = passMod.Password(auth_url=auth_url,
+                                    username=username,
+                                    password=password,
+                                    user_domain_id=domain_id,
+                                    project_name=cloud_admin_project,
+                                    project_domain_id=domain_id,
+                                    )
+           else: 
+                 auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
                                     user_domain_id=domain_id,
