@@ -716,8 +716,13 @@ class API(base.Base):
            if workload['jobschedule']['enabled'] == True and \
               workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
               unpause_workload = True
-           options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
 
+           if workload['jobschedule']['enabled'] == True and \
+              workloadobj['jobschedule']['enabled'] == workload['jobschedule']['enabled'] and \
+              workloadobj['jobschedule']['interval'] != workload['jobschedule']['interval']:
+              pause_workload = True
+              unpause_workload = True
+           options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
         if  'instances' in workload and workload['instances']:
 
             compute_service = nova.API(production=True)
