@@ -740,7 +740,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
                         
     @autolog.log_method(logger=Logger)
-    def workload_reset(self, context, workload_id):
+    def workload_reset(self, context, workload_id, status_update=True):
         """
         Reset an existing workload
         """
@@ -758,7 +758,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _("Failed to  reset: %(exception)s") %{'exception': ex}
             LOG.error(msg)
         finally:
-            self.db.workload_update(context, workload_id, {'status': 'available'})
+            status_update is True and self.db.workload_update(context, workload_id, {'status': 'available'})
         return
 
 
@@ -772,27 +772,27 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         if len(snapshots) > 0:
             msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
             raise wlm_exceptions.InvalidState(reason=msg)
-    
-        LOG.info(_('Deleting the data of workload %s %s %s') %
-                 (workload.display_name, workload.id,
-                  workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))
-    
+            
+        LOG.info(_('Deleting the data of workload %s %s %s') % 
+                   (workload.display_name, workload.id,
+                    workload.created_at.strftime("%d-%m-%Y %H:%M:%S")))                 
+
         backup_endpoint = self.db.get_metadata_value(workload.metadata,
                                                      'backup_media_target')
-    
+
         if backup_endpoint is not None:
             backup_target = vault.get_backup_target(backup_endpoint)
             if backup_target is not None:
                 backup_target.workload_delete(context,
-                                              {'workload_id': workload.id,
-                                               'workload_name': workload.display_name,})
+                    {'workload_id': workload.id,
+                     'workload_name': workload.display_name,})
         self.workload_reset(context, workload_id)
-    
-        compute_service = nova.API(production=True)
+
+        compute_service = nova.API(production=True)                
         workload_vms = self.db.workload_vms_get(context, workload.id)
         for vm in workload_vms:
             compute_service.delete_meta(context, vm.vm_id,
-                                        ["workload_id", 'workload_name'])
+                                   ["workload_id", 'workload_name'])
             self.db.workload_vms_delete(context, vm.vm_id, workload.id)
         self.db.workload_delete(context, workload.id)
 
@@ -824,6 +824,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         flavors = compute_service.get_flavors(context)
         for inst in options['openstack']['instances']:
+
+            if inst['include'] is False:
+                continue
+
             vm_id = inst.get('id', None)
             if not vm_id:
                 msg = _("'instances' contain an element that does "
@@ -1058,7 +1062,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif rtype == 'inplace':
                 workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
                 self._validate_restore_options(context, restore, options)
-                self.workload_reset(context, snapshot.workload_id)
+                self.workload_reset(context, snapshot.workload_id, status_update=False)
             elif rtype == 'selective':
                 self._validate_restore_options(context, restore, options)
 
@@ -1270,21 +1274,20 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         """
         Delete an existing snapshot
         """
-
         def execute(context, snapshot_id, task_id):
             workload_utils.snapshot_delete(context, snapshot_id)
-
-            # unlock the workload
+                    
+            #unlock the workload
             snapshot = self.db.snapshot_get(context, snapshot_id, read_deleted='yes')
-            self.db.workload_update(context, snapshot.workload_id, {'status': 'available'})
+            self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
             self.db.snapshot_update(context, snapshot_id, {'status': 'available'})
 
             status_messages = {'message': 'Snapshot delete operation completed'}
-            self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
-                                                   'status_messages': status_messages})
+            self.db.task_update(context,task_id,{'status': 'done','finished_at': timeutils.utcnow(),
+                                'status_messages': status_messages})
 
         self.pool.submit(execute, context, snapshot_id, task_id)
-
+                    
     @autolog.log_method(logger=Logger)
     def snapshot_mount(self, context, snapshot_id, mount_vm_id):
         """
