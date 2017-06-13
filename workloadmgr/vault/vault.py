@@ -413,6 +413,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
            base64encode = base64.b64encode(backupendpoint)
            mountpath = os.path.join(CONF.vault_data_directory,
                                  base64encode)
+           self.umount_backup_target_swift()
            fileutils.ensure_tree(mountpath)
            self.__mountpath = mountpath
            super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
@@ -588,6 +589,19 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                       for line in f.readlines() if line.split()[1] == mountpath]
 
         return len(mounts) and mounts[0].get(mountpath, None) == nfsshare
+
+    def umount_backup_target_swift(self):
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+        try:
+            command = ['sudo', 'umount', '-f', CONF.vault_data_directory]
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass
 
     @autolog.log_method(logger=Logger) 
     def umount_backup_target(self):
