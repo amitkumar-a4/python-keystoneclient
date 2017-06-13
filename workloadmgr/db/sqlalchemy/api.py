@@ -1089,6 +1089,7 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
 def snapshot_get_all(context, **kwargs):
     qs = model_query(context, models.Snapshots, **kwargs).\
                     options(sa_orm.joinedload(models.Snapshots.metadata))
+    #qs = qs.join(models.SnapshotVMs, models.Snapshots.id == models.SnapshotVMs.snapshot_id)
     if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':  
        qs = qs.filter_by(workload_id=kwargs['workload_id'])
     if 'host' in kwargs and kwargs['host'] is not None and kwargs['host'] != '':
@@ -1107,13 +1108,28 @@ def snapshot_get_all(context, **kwargs):
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
     if 'status' in kwargs and kwargs['status'] is not None:
-       qs = qs.filter_by(status=kwargs['status'])
+       if kwargs['status'] == 'available':
+          qs = qs.filter(or_(models.Snapshots.status == 'available', models.Snapshots.status == 'mounted'))
+       else:
+            qs = qs.filter_by(status=kwargs['status'])
 
     qs = qs.order_by(models.Snapshots.created_at.desc())
     if 'end' in kwargs and kwargs['end'] != 0:
        qs = qs.limit(kwargs['end'])
     if 'start' in kwargs and kwargs['start'] != 0:
        qs = qs.offset(kwargs['start'])
+
+    if 'get_instances' in kwargs and kwargs['get_instances'] is True:
+       snapshots = qs.all()
+       i = 0
+       for snapshot in snapshots:
+           instances = []
+           snapshot_vms = snapshot_vms_get(context, snapshot.id)
+           for snapshot_vm in snapshot_vms:
+               instances.append(snapshot_vm)
+           snapshots[i].instances = instances
+           i = i + 1
+       return snapshots
     return qs.all() 
 
 @require_context                            
@@ -1128,7 +1144,7 @@ def snapshot_get_all_by_workload(context, workload_id, **kwargs):
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
+       kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\

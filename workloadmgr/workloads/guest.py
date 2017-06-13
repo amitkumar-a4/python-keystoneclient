@@ -32,6 +32,7 @@ def f(data):
                continue
         val = g.glob_expand(filepath)
         disk = {}
+        root = root.replace('s', 'v')
         disk[root] = val
         if len(val) > 0:
            for path in val:
@@ -39,6 +40,8 @@ def f(data):
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   
+    if len(drives) == 0:
+       dt[snapshot_id] = 'Snapshot VM deleted'
     g.close()
     return dt
 
