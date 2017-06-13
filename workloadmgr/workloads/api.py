@@ -1,4 +1,5 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
+# vim: tabstop=4 shiftwidth=4 softtabstop=
+
 
 # Copyright (c) 2014 TrilioData, Inc.
 # All Rights Reserved.
@@ -430,6 +431,16 @@ class API(base.Base):
                 break
 
         return workload_dict
+
+    def convert_date_time_zone(self, jobschedule):
+        if 'timezone' in jobschedule:
+               date_time = utils.get_local_time(jobschedule['start_date']+" "+jobschedule['start_time'], 
+                           "%m/%d/%Y %I:%M %p", "%m/%d/%Y %I:%M %p", jobschedule['timezone']).split(" ")
+               jobschedule['start_date'] = date_time[0]
+               jobschedule['start_time'] = date_time[1]+" "+date_time[2]
+               jobschedule['appliance_timezone'] = time.tzname[1]
+               return jobschedule
+        return jobschedule
     
     @autolog.log_method(logger=Logger)
     def workload_show(self, context, workload_id):
@@ -504,7 +515,6 @@ class API(base.Base):
                 timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
                 workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
                 break
-                
         return workload_dict
     
     @autolog.log_method(logger=Logger)
@@ -570,6 +580,8 @@ class API(base.Base):
             if workload_type_id_valid == False:
                 msg = _('Invalid workload type')
                 raise wlm_exceptions.Invalid(reason=msg)                
+
+            jobschedule = self.convert_date_time_zone(jobschedule)
 
             if not 'hostnames' in metadata:
                 metadata['hostnames'] = json.dumps([])
@@ -722,6 +734,8 @@ class API(base.Base):
               workloadobj['jobschedule']['interval'] != workload['jobschedule']['interval']:
               pause_workload = True
               unpause_workload = True
+
+           workload['jobschedule'] = self.convert_date_time_zone(workload['jobschedule'])
            options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
         if  'instances' in workload and workload['instances']:
 
