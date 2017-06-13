@@ -1182,8 +1182,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'snapshot_id': snapshot_to_commit.id
                                      }
 
-                                LOG.info('-------------------------------------------------------------------------')
-                                LOG.info("commit_image_list: %s" % str(commit_image_list))
                                 status = {'result': 'retry'}
 
                                 #After one click restore snapshot_vm_resource['vm_id'] would be addressing to
@@ -1205,17 +1203,11 @@ class LibvirtDriver(driver.ComputeDriver):
                                          LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
                                          time.sleep(60)
 
-                                backup_target = vault.get_backup_target(backup_endpoint)
-                                file_path = backup_target.get_progress_tracker_path(metadata)
-                                LOG.info("-----------------------------------------------------------------------------------------")
-                                LOG.info("Progress tracking fille path : %s " %str(file_path))
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
                                                                    backup_endpoint)
                                 for snapshot_del in snap_to_del:
-                                    LOG.info("-------------------------------------------------------------------------------")
-                                    LOG.info('snap_to_del: %s' % str(snap_to_del))
                                     db.vm_disk_resource_snap_delete(cntx, snapshot_del)
 
                                 if vm_disk_resource_snap_to_commit_backing:
@@ -1224,8 +1216,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                           os.sep))
                                     vault_path = os.path.join(backup_target.mount_path,
                                                               vm_disk_resource_snap.vault_url.lstrip(os.sep))
-                                    LOG.info("---------------------------------------------------------------------------")
-                                    LOG.info("shutil.move: backing_vault_path : %s, vault_path: %s" % (str(backing_vault_path), str(vault_path)) )
                                     shutil.move(backing_vault_path, vault_path)
                                     affected_snapshots = workload_utils.common_apply_retention_db_backing_update(cntx,
                                                                                                   snapshot_vm_resource,
