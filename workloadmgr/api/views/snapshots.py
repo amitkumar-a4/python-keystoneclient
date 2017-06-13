@@ -104,6 +104,8 @@ class ViewBuilder(common.ViewBuilder):
         d['pinned'] = snapshot['pinned']
         d['metadata'] = snapshot['metadata']
         d['restores_info'] = ''
+        if hasattr(snapshot, 'instances'):
+           d['instances'] = snapshot.instances
         return {'snapshot': d}      
 
     def _list_view(self, func, request, snapshots):

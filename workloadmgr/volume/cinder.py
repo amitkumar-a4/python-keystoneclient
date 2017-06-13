@@ -186,11 +186,12 @@ def _untranslate_volume_summary_view(context, vol):
     if hasattr(vol, 'display_name'):
         d['display_name'] = vol.display_name
     else:
-        d['display_name'] = ''
+        d['display_name'] = vol.name
+
     if hasattr(vol, 'display_description'):
         d['display_description'] = vol.display_description
     else:
-        d['display_description'] = '' 
+        d['display_description'] = vol.description
 
     # TODO(jdg): Information may be lost in this translation
     d['volume_type_id'] = vol.volume_type
@@ -218,8 +219,17 @@ def _untranslate_snapshot_summary_view(context, snapshot):
     d['progress'] = snapshot.progress
     d['size'] = snapshot.size
     d['created_at'] = snapshot.created_at
-    d['display_name'] = snapshot.display_name
-    d['display_description'] = snapshot.display_description
+
+    if hasattr(snapshot, 'display_name'):
+        d['display_name'] = snapshot.display_name
+    else:
+        d['display_name'] = snapshot.name
+
+    if hasattr(snapshot, 'display_description'):
+        d['display_description'] = snapshot.display_description
+    else:
+        d['display_description'] = snapshot.description
+
     d['volume_id'] = snapshot.volume_id
     d['project_id'] = snapshot.project_id
     d['volume_size'] = snapshot.size

@@ -69,7 +69,7 @@ logging_cli_opts = [
     cfg.StrOpt('log-config-append',
                metavar='PATH',
                help='(Optional) Log Append'),
-     cfg.StrOpt('watch-log-file',
+    cfg.StrOpt('watch-log-file',
                metavar='PATH',
                help='(Optional) Watch log'),
     cfg.StrOpt('log-format',
@@ -105,7 +105,10 @@ logging_cli_opts = [
 generic_log_opts = [
     cfg.BoolOpt('use_stderr',
                 default=True,
-                help='Log output to standard error')
+                help='Log output to standard error'),
+    cfg.IntOpt('rate_limit_burst',
+                default=1,
+                help='Burst limit')
 ]
 
 log_opts = [
@@ -209,6 +212,10 @@ contego_vault_opts = [
     cfg.IntOpt('vault_cache_size',
                default=5,
                help='Number of segments of an object that need to be cached'),
+    cfg.StrOpt('rootwrap_conf',
+               default='/etc/nova/rootwrap.conf',
+               metavar='PATH',
+               help='rootwrap config file'),
 ]
 
 CONF = cfg.CONF
@@ -537,7 +544,7 @@ class SwiftRepository(ObjectRepository):
         full_path = self._full_path(object_name)
 
         self.manifest[object_name] = {}
-        self.manifest[object_name]['mode'] = flags
+        self.manifest[object_name]['readonly'] = flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16))
  
         if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
            flags == int('8401', 16) or \
@@ -549,6 +556,7 @@ class SwiftRepository(ObjectRepository):
             for seg in manifest:
                 offstr = seg['name'].split('-segments/')[1].split('.')[0]
                 offset = int(offstr, 16)
+                seg['modified'] = False
                 self.manifest[object_name][offset] = seg
 
             metadata = self._get_object_metadata(object_name)
@@ -575,6 +583,7 @@ class SwiftRepository(ObjectRepository):
             if flags & os.O_WRONLY:
                 with open(full_path, "w") as f:
                     pass
+
             try:
                 segment_dir = self._full_path(object_name + "-segments")
                 os.makedirs(segment_dir)
@@ -591,37 +600,42 @@ class SwiftRepository(ObjectRepository):
             container, prefix = self.split_head_tail(segments_dir)
             object_manifest = []
             segments_list = {}
+ 
+            if not self.manifest[object_name]['readonly']:
+                offset = 0
+                while True:
+                    if offset not in self.manifest[object_name]:
+                        break
+                    if self.manifest[object_name][offset]['modified']:
 
-            offset = 0
-            while True:
-                segments_list[offset] = objects = self.segment_list(container, prefix, offset)
-                if len(objects) == 0:
-                    break
+                        st = self.object_getattr(self.manifest[object_name][offset]['name'], fh)
+                        stat = bunchify(st)
+                        object_manifest.append({"path": self.manifest[object_name][offset]['name'],
+                                                "etag": stat.etag,
+                                                "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
+                    else:
+                        object_manifest.append({"path": self.manifest[object_name][offset]['name'],
+                                                "etag": self.manifest[object_name][offset]['hash'],
+                                                "size_bytes": self.manifest[object_name][offset]['bytes']})
 
-                objects = sorted(objects)
-                st = self.object_getattr(os.path.join(container, objects[-1]), fh)
-                stat = bunchify(st)
-                object_manifest.append({"path": os.path.join(container, objects[-1]),
-                                        "etag": stat.etag,
-                                        "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
-                offset += CONF.vault_segment_size 
+                    offset += CONF.vault_segment_size 
 
-            object_manifest = json.dumps(object_manifest)
-            self._write_object_manifest(object_name, object_manifest,
-                                        metadata={'segments-dir': segments_dir})
+                object_manifest = json.dumps(object_manifest)
+                self._write_object_manifest(object_name, object_manifest,
+                                            metadata={'segments-dir': segments_dir})
 
-            offset = 0
-            while True:
-                objects = segments_list[offset]
-                if len(objects) == 0:
-                    break
+                offset = 0
+                while True:
+                    objects = self.segment_list(container, prefix, offset)
+                    if len(objects) == 0:
+                        break
 
-                objects = sorted(objects)
-                for obj in list(set(objects) - set([objects[-1]])):
-                    self.object_delete(os.path.join(container, obj))
+                    objects = sorted(objects)
+                    c, p = self.split_head_tail(self.manifest[object_name][offset]['name'])
+                    for obj in list(set(objects) - set([p])):
+                        self.object_delete(os.path.join(container, obj))
 
-                offset += CONF.vault_segment_size 
-
+                    offset += CONF.vault_segment_size 
             try:
                 os.close(fh)
             except:
@@ -642,14 +656,18 @@ class SwiftRepository(ObjectRepository):
             LOG.exception(ex)
             pass
 
-    def object_upload(self, object_name, off, buf):
-        segname = self.next_segname_from_offset(object_name, off)
-        segments_dir = self.manifest[object_name].get('segments-dir',
-                                         object_name + "-segments")
+    def object_upload(self, object_name, offset, buf):
+        if offset in self.manifest[object_name] and \
+                self.manifest[object_name][offset]['modified'] is True:
+            seg_fullname = self.manifest[object_name][offset]['name']
+        else:
+            segname = self.next_segname_from_offset(object_name, offset)
+            segments_dir = self.manifest[object_name].get('segments-dir',
+                                             object_name + "-segments")
 
-        seg_fullname = os.path.join(segments_dir, segname)
+            seg_fullname = os.path.join(segments_dir, segname)
+
         container, obj = self.split_head_tail(seg_fullname)
-
         cache_path = self._get_cache(seg_fullname)
 
         with tmpfsfile() as tempfs:
@@ -666,13 +684,18 @@ class SwiftRepository(ObjectRepository):
             except Exception as ex:
                 LOG.exception(ex)
                 raise
+        if offset not in self.manifest[object_name]:
+            self.manifest[object_name][offset] = {}
 
+        self.manifest[object_name][offset]['name'] = seg_fullname
+        self.manifest[object_name][offset]['modified'] = True
+
+    @disable_logging
     def object_download(self, object_name, offset):
-        container, obj = self.split_head_tail(object_name)
-        segname = self.curr_segname_from_offset(object_name, offset)
-        segments_dir = self.manifest[object_name].get('segments-dir',
-                                         object_name + "-segments")
-        seg_fullname = os.path.join(segments_dir, segname)
+        if offset not in self.manifest[object_name]:
+            raise Exception('object %s not found' % object_name + SEGMENT_FORMAT % (int(offset), int(0)))
+ 
+        seg_fullname = self.manifest[object_name][offset]['name']
 
         container, obj = self.split_head_tail(seg_fullname.rstrip('/'))
         # make sure that tmpfs is mounted
@@ -736,8 +759,12 @@ class SwiftRepository(ObjectRepository):
 
     def next_segname_from_offset(self, path, offset):
         container, prefix = self.split_head_tail(path)
-        segments_dir = self.manifest[path].get('segments-dir',
-                                               prefix + "-segments")
+        segments_dir = self.manifest[path].get('segments-dir', None)
+        if segments_dir:
+            c, p = self.split_head_tail(segments_dir)
+            segments_dir = p
+        else:
+            segments_dir = prefix + "-segments"
         files = self.segment_list(container, segments_dir, offset)
         if len(files) == 0:
             return SEGMENT_FORMAT % (int(offset), int(0))
@@ -749,12 +776,18 @@ class SwiftRepository(ObjectRepository):
     def curr_segname_from_offset(self, path, offset):
         container, prefix = self.split_head_tail(path)
 
-        if self.manifest.get(path, None):
+        if self.manifest.get(path, None) and \
+            offset in self.manifest[path]:
             seg = self.manifest[path][offset]['name']
             return seg.split('-segments/')[1]
 
-        segments_dir = self.manifest[path].get('segments-dir',
-                                               prefix + "-segments")
+        segments_dir = self.manifest[path].get('segments-dir', None)
+        if segments_dir:
+            c, p = self.split_head_tail(segments_dir)
+            segments_dir = p
+        else:
+            segments_dir = prefix + "-segments"
+
         files = self.segment_list(container, segments_dir, offset)
         if len(files) == 0:
             return SEGMENT_FORMAT % (int(offset), int(0))
@@ -1282,11 +1315,11 @@ class FuseCache(object):
                             self.repository.object_upload(object_name, off, item['data'])
   
                     segdata = self.repository.object_download(object_name, segoffset)
+                    self.lrucache[fh]['lrucache'][segoffset] = {'modified': False, 'data': segdata }
                 except:
                     # end of file
                     return 0
 
-            self.lrucache[fh]['lrucache'][segoffset] = {'modified': False, 'data': segdata }
             output_buf += segdata[base:base+seg_len]
 
         return str(output_buf)
@@ -1323,6 +1356,8 @@ class FuseCache(object):
             else:
                 segdata = cache[segoffset]['data']
 
+            if len(segdata) < base:
+                segdata.extend('\0' * (base+seg_len - len(segdata)))
             segdata[base:base+seg_len] = buf[bufptr:bufptr+seg_len]
 
             cache[segoffset]['modified'] = True
@@ -1364,6 +1399,7 @@ class TrilioVault(Operations):
     def chown(self, path, uid, gid):
         return self.repository.chown(path, uid, gid)
 
+    @disable_logging
     def getattr(self, path, fh=None):
         return self.repository.object_getattr(path, fh)
 
@@ -1418,7 +1454,8 @@ class TrilioVault(Operations):
         return self.open(path, os.O_CREAT)
 
     def read(self, path, length, offset, fh):
-        return self.cache.object_read(path, length, offset, fh)
+        buf = self.cache.object_read(path, length, offset, fh)
+        return buf
 
     def write(self, path, buf, offset, fh):
         return self.cache.object_write(path, buf, offset, fh)
@@ -1477,7 +1514,8 @@ def main(mountpoint, cacheroot):
                       repository=SwiftRepository(cacheroot))
     FUSE(tvaultplugin, mountpoint,
          nothreads=True, foreground=True, nonempty=True,
-         big_writes=True, direct_io=True)
+         big_writes=True, direct_io=True, allow_other=True)
 
 if __name__ == '__main__':
+    fuse_conf()
     main(CONF.vault_data_directory, CONF.vault_data_directory_old )

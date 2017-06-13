@@ -157,7 +157,28 @@ def import_settings(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
-def get_workload_url(context, workload_ids, failed_workloads, upgrade):
+def update_backup_media_target(file_path, backup_endpoint):
+    try:
+        with open(file_path, 'r') as file_db:
+            file_data = file_db.read()
+        json_obj = json.loads(file_data)
+
+        metadata = json_obj.get('metadata', None)
+        if metadata:
+            for meta in metadata:
+                if meta['key'] == 'backup_media_target':
+                    if backup_endpoint != meta['value']:
+                        meta['value'] = backup_endpoint
+                        break
+
+            json_obj['metadata'] = metadata
+            with open(file_path, 'w') as outfile:
+                json.dump(json_obj, outfile)
+
+    except Exception as ex:
+        LOG.exception(ex)
+
+def get_workload_url(context, workload_ids, upgrade):
     '''
     Iterate over all NFS backups mounted for list of workloads available.
     '''
@@ -169,6 +190,13 @@ def get_workload_url(context, workload_ids, failed_workloads, upgrade):
            failed_workloads.append(workload_id)
            LOG.error("Workload %s doesn't contains required database files," %workload_id)
            return
+
+        #Update backup media target
+        update_backup_media_target(os.path.join(workload, "workload_db"), backup_endpoint)
+        for item in os.listdir(workload):
+             snapshot_db = os.path.join(workload, item, "snapshot_db")
+             if os.path.exists(snapshot_db):
+                 update_backup_media_target(snapshot_db, backup_endpoint)
 
         # Check whether workload tenant exist in current cloud or not
         if check_tenant(context, workload, upgrade):
@@ -184,6 +212,7 @@ def get_workload_url(context, workload_ids, failed_workloads, upgrade):
 
             for workload in workload_url:
                 workload_id = os.path.split(workload)[1].replace('workload_', '')
+
                 if len(workload_ids) > 0:
                     #If workload found in given workload id's then add to iterate list
                     if workload_id in workload_ids_to_import:
