@@ -1558,7 +1558,7 @@ def get_local_time(record_time, input_format, output_format, tz):
         Convert and return the date and time - from differnt timezone to local
         """
         try:
-            if not record_time or record_time is None or record_time == '':
+            if record_time in (0, None, ''):
                 return ''
             else:
                 if not input_format \
