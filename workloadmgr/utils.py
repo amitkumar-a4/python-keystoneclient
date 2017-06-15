@@ -21,6 +21,7 @@ import signal
 import sys
 import tempfile
 import time
+import pytz
 import paramiko
 import ConfigParser
 from xml.dom import minidom
@@ -1551,3 +1552,35 @@ def sizeof_fmt(num, suffix='B'):
     except Exception as ex:
         LOG.exception(ex)
         return num
+
+def get_local_time(record_time, input_format, output_format, tz):
+        """
+        Convert and return the date and time - from differnt timezone to local
+        """
+        try:
+            if record_time in (0, None, ''):
+                return ''
+            else:
+                if not input_format \
+                        or input_format == None \
+                        or input_format == '':
+                    input_format = '%Y-%m-%dT%H:%M:%S.%f';
+                if not  output_format  \
+                        or output_format == None \
+                        or output_format == '':
+                    output_format = "%m/%d/%Y %I:%M:%S %p";
+
+                local_time = datetime.datetime.strptime(
+                                record_time, input_format)
+                local_tz = pytz.timezone(tz)
+                from_zone = pytz.timezone(time.tzname[1])
+                local_time = local_tz.localize(local_time)
+                #local_time = local_time.replace(tzinfo=local_tz)
+                local_time = local_time.astimezone(from_zone)
+                local_time = datetime.datetime.strftime(
+                                local_time, output_format)
+                return local_time
+        except Exception as ex:
+            LOG.exception(ex)
+            return record_time
+
