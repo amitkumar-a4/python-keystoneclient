@@ -1308,12 +1308,15 @@ def restore_vm_security_groups(cntx, db, restore):
                 break
             else:
                  if security_group_inside_check(vm_security_group_rule_snaps, secgrp) is True:
-                    return secgrp['id']
+                    return secgrp['name']
 
         if existinggroup == None:
-            return False
+            return existinggroup
 
-        return security_group_inside_check(vm_security_group_rule_snaps, existinggroup)
+        if security_group_inside_check(vm_security_group_rule_snaps, existinggroup) is True:
+           return snapshot_vm_resource.resource_name
+
+        return None
           
    
     # refresh token
@@ -1335,14 +1338,9 @@ def restore_vm_security_groups(cntx, db, restore):
             if vm_id not in restored_security_groups:
                 restored_security_groups[vm_id] = {}
             val = security_group_exists(snapshot_vm_resource)
-            sec_id = None
-            if type(val) == 'bool' and val is True:
-               sec_id = snapshot_vm_resource.resource_name
-            else type(val) == 'str':
-                 sec_id = val
-            if sec_id is not None:   
+            if val is not None:   
                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
-                    {'sec_id': sec_id,
+                    {'sec_id': val,
                      'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                      'res_id': snapshot_vm_resource.id}
                 continue
