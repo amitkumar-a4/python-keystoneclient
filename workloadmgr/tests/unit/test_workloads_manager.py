@@ -1157,8 +1157,8 @@ class BaseWorkloadTestCase(test.TestCase):
                         options = tests_utils.get_restore_options()
                         restore = tests_utils.create_restore(self.context,
                                                               snapshot['id'],
-                                                              display_name='test_snapshot',
-                                                              display_description='this is a test snapshot',
+                                                              display_name='test_restore',
+                                                              display_description='this is a test restore',
                                                               options=options)
                         restore_id = restore['id']
                         self.workload.snapshot_restore(self.context, restore_id)

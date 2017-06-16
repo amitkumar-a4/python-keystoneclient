@@ -608,7 +608,7 @@ class BaseLibvirtDriverTestCase(test.TestCase):
                                 "_"+args[2]['metadata']['snapshot_vm_resource_name'],
                                 args[2]['metadata']['vm_disk_resource_snap_id'])
             tests_utils.create_qcow2_image(path)
-            return {'result': 'Completed'}
+            return {'result': ['Completed']}
 
         vast_data_transfer_mock.side_effect = vast_data_transfer_mock_side
         self.workload_params = {
@@ -638,6 +638,7 @@ class BaseLibvirtDriverTestCase(test.TestCase):
 
                         def _get_tenant_context(context):
                             return context
+
                         mock_method4.side_effect = _get_tenant_context
                         workload_type = tests_utils.create_workload_type(self.context,
                                                          display_name='Serial',
