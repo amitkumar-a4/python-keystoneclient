@@ -1272,23 +1272,8 @@ def delete_vm_networks(cntx, restored_net_resources):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')
 def restore_vm_security_groups(cntx, db, restore):
-
-    def security_group_exists(snapshot_vm_resource):
-        existing_secgroups = network_service.security_group_list(cntx)
-        existinggroup = None
-        for secgrp in existing_secgroups['security_groups']:
-            if snapshot_vm_resource.resource_name == secgrp['id']:
-                existinggroup = secgrp
-                break
-        if existinggroup == None:
-            return False
-
-        vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-            cntx, snapshot_vm_resource.id)
-
-        # looks like some bug in the security_group_list where individual
-        # sec grp rules are not correct. Use the get function to get the
-        # sec grp definition correctly
+ 
+    def security_group_inside_check(vm_security_group_rule_snaps, existinggroup):
         existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
            len(existinggroup['security_group_rules']):
@@ -1302,12 +1287,35 @@ def restore_vm_security_groups(cntx, db, restore):
                 if vm_security_group_rule_values['id'] == rule['id']:
                     found = True
                     break
-
+                else:
+                     #check each & every rule value one by one
+                     pass
             if not found:
                 return False
 
         return True
 
+
+    def security_group_exists(snapshot_vm_resource):
+        existing_secgroups = network_service.security_group_list(cntx)
+        existinggroup = None
+        vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
+            cntx, snapshot_vm_resource.id)
+
+        for secgrp in existing_secgroups['security_groups']:
+            if snapshot_vm_resource.resource_name == secgrp['id']:
+                existinggroup = secgrp
+                break
+            else:
+                 if security_group_inside_check(vm_security_group_rule_snaps, secgrp) is True:
+                    return secgrp['id']
+
+        if existinggroup == None:
+            return False
+
+        return security_group_inside_check(vm_security_group_rule_snaps, existinggroup)
+          
+   
     # refresh token
     cntx = nova._get_tenant_context(cntx)
 
@@ -1326,9 +1334,15 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id')
             if vm_id not in restored_security_groups:
                 restored_security_groups[vm_id] = {}
-            if  security_group_exists(snapshot_vm_resource):
-                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
-                    {'sec_id': snapshot_vm_resource.resource_name,
+            val = security_group_exists(snapshot_vm_resource)
+            sec_id = None
+            if type(val) == 'bool' and val is True:
+               sec_id = snapshot_vm_resource.resource_name
+            else type(val) == 'str':
+                 sec_id = val
+            if sec_id is not None:   
+               restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
+                    {'sec_id': sec_id,
                      'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                      'res_id': snapshot_vm_resource.id}
                 continue
