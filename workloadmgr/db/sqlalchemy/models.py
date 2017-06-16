@@ -171,6 +171,8 @@ class FileSearch(BASE, WorkloadsBase):
     json_resp = Column(Text)
     start = Column(Integer)
     end = Column(Integer)
+    date_from = Column(String(50))
+    date_to = Column(String(50))
     host = Column(String(100))
     error_msg = Column(String(255)) 
     status = Column(String(10))
