@@ -747,10 +747,10 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         try:
             for name in os.listdir(parent_path):
                 if os.path.isdir(os.path.join(parent_path, name)) and name.startswith('workload_'):
-                     workload_urls.append(os.path.join(parent_path, name))
+                    workload_urls.append(os.path.join(parent_path, name))
         except Exception as ex:
             LOG.exception(ex)
-        return workload_urls
+        return workload_urls  
 
     @autolog.log_method(logger=Logger) 
     def workload_delete(self, context, workload_metadata):
@@ -1093,7 +1093,7 @@ def get_workloads_for_tenant(context, tenant_ids):
             backup_target = get_backup_target(backup_endpoint)
             for workload_url in backup_target.get_workloads(context):
                 workload_values = json.loads(backup_target.get_object(\
-                       os.path.join(workload_url, 'workload_db')))
+                        os.path.join(workload_url, 'workload_db')))
                 project_id = workload_values.get('project_id')
                 workload_id = workload_values.get('id')
                 if project_id in tenant_ids:
