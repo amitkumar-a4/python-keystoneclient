@@ -1343,7 +1343,7 @@ def restore_vm_security_groups(cntx, db, restore):
                     {'sec_id': val,
                      'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                      'res_id': snapshot_vm_resource.id}
-                continue
+               continue
 
             name = 'snap_of_' + db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'name')
