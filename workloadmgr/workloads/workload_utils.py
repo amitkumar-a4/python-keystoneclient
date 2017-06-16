@@ -171,11 +171,11 @@ def _remove_data(context, snapshot_id):
         LOG.exception(ex)
 
 
-@autolog.log_method(logger=Logger)    
-def _snapshot_delete(context, snapshot_id):
-    snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')    
+@autolog.log_method(logger=Logger)
+def _snapshot_delete(context, snapshot_id, database_only=False):
+    snapshot = db.snapshot_get(context, snapshot_id, read_deleted='yes')
     db.snapshot_delete(context, snapshot.id)
-        
+
     child_snapshots = db.get_snapshot_children(context, snapshot_id)
     all_child_snapshots_deleted = True
     for child_snapshot_id in child_snapshots:
@@ -187,26 +187,26 @@ def _snapshot_delete(context, snapshot_id):
             break
         except Exception as ex:
             LOG.exception(ex)
-    
-    if all_child_snapshots_deleted:
+    if all_child_snapshots_deleted and database_only is False:
         _remove_data(context, snapshot_id)
-    upload_snapshot_db_entry(context, snapshot_id) 
-        
+    if database_only is False:
+        upload_snapshot_db_entry(context, snapshot_id)
+
 
 @autolog.log_method(logger=Logger)
-def snapshot_delete(context, snapshot_id):
+def snapshot_delete(context, snapshot_id, database_only=False):
     """
     Delete an existing snapshot
     """
-    _snapshot_delete(context, snapshot_id)
-    
-    child_snapshots = db.get_snapshot_children(context, snapshot_id)            
+    _snapshot_delete(context, snapshot_id, database_only)
+
+    child_snapshots = db.get_snapshot_children(context, snapshot_id)
     for child_snapshot_id in child_snapshots:
         try:
             child_snapshot = db.snapshot_get(context, child_snapshot_id, read_deleted='yes')
             if child_snapshot.status == 'deleted' and child_snapshot.data_deleted == False:
                 # now see if the data can be deleted
-                _snapshot_delete(context, child_snapshot_id)
+                _snapshot_delete(context, child_snapshot_id, database_only)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -216,7 +216,7 @@ def snapshot_delete(context, snapshot_id):
             parent_snapshot = db.snapshot_get(context, parent_snapshot_id, read_deleted='yes')
             if parent_snapshot.status == 'deleted' and parent_snapshot.data_deleted == False:
                 # now see if the data can be deleted
-                _snapshot_delete(context, parent_snapshot_id)
+                _snapshot_delete(context, parent_snapshot_id, database_only)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -531,6 +531,10 @@ def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_o
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
+                if snapshot_vm_resource.snapshot_type == 'full' and \
+                   snapshot_vm_resource.status != 'deleted' and all_disks_deleted == True:
+                   db.snapshot_vm_resource_delete(cntx, snapshot_vm_resource.id) 
+                   continue 
                 if snapshot_vm_resource.status != 'deleted':
                     all_disks_deleted = False
                 else:

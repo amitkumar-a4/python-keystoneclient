@@ -393,7 +393,6 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
         for instance in instances:
             server_security_group_ids = network_service.server_security_groups(
                 cntx, instance['vm_id'])
-
             unique_security_group_ids = list(set(server_security_group_ids))
             for security_group_id in unique_security_group_ids:
                 security_group = network_service.security_group_get(
@@ -409,7 +408,9 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     'metadata': {'name': security_group['name'],
                                  'security_group_type': 'neutron',
                                  'description': security_group['description'],
-                                 'vm_id': instance['vm_id']},
+                                 'vm_id': instance['vm_id'],
+                                 'vm_attached': security_group_id in server_security_group_ids,
+                                },
                     'status': 'available'}
             
                 vm_security_group_snap = db.snapshot_vm_resource_create(
@@ -585,27 +586,27 @@ def pre_snapshot_vm(cntx, db, instance, snapshot):
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.freeze_vm')
-def freeze_vm(cntx, db, instance, snapshot):
+def freeze_vm(cntx, db, instance):
     # freeze instance
     if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+        return virtdriver.freeze_vm(cntx, db, instance)
     else:
         virtdriver = driver.load_compute_driver(
             None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.freeze_vm(cntx, db, instance, snapshot)
+        return virtdriver.freeze_vm(cntx, db, instance)
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.thaw_vm')
-def thaw_vm(cntx, db, instance, snapshot):
+def thaw_vm(cntx, db, instance):
     # thaw instance
     if instance['hypervisor_type'] == 'QEMU':
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+        return virtdriver.thaw_vm(cntx, db, instance)
     else:
         virtdriver = driver.load_compute_driver(
             None, 'vmwareapi.VMwareVCDriver')
-        return virtdriver.thaw_vm(cntx, db, instance, snapshot)
+        return virtdriver.thaw_vm(cntx, db, instance)
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.snapshot_vm')
@@ -1328,6 +1329,7 @@ def restore_vm_security_groups(cntx, db, restore):
             if  security_group_exists(snapshot_vm_resource):
                 restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
                     {'sec_id': snapshot_vm_resource.resource_name,
+                     'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                      'res_id': snapshot_vm_resource.id}
                 continue
 
@@ -1340,6 +1342,7 @@ def restore_vm_security_groups(cntx, db, restore):
             security_group = security_group_obj.get('security_group')
             restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
                 {'sec_id': security_group['id'],
+                 'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                  'res_id': snapshot_vm_resource.id}
             restored_vm_resource_values = \
                 {'id': str(uuid.uuid4()),
@@ -1393,7 +1396,8 @@ def restore_vm_security_groups(cntx, db, restore):
     for vm_id, res_sec_grps in restored_security_groups.iteritems():
         return_values[vm_id] = {}
         for pit_id, res_map in res_sec_grps.iteritems():
-            return_values[vm_id][pit_id] = res_map['sec_id']
+            if res_map['vm_attached'] is True:
+                return_values[vm_id][pit_id] = res_map['sec_id']
 
     return return_values
 
@@ -1434,9 +1438,83 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                   instance_options)
 
 
+@autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_data')
+def restore_vm_data(cntx, db, instance, restore):
+
+    restore_obj = db.restore_get(cntx, restore['id'])
+    restore_options = pickle.loads(str(restore_obj.pickle))
+    instance_options = utils.get_instance_restore_options(restore_options,
+                                                          instance['vm_id'],
+                                                          'openstack')
+
+    if instance_options.get('availability_zone', None) is None:
+        instance_options['availability_zone'] = restore_options.get('zone', None)
+    virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+
+    # call with new context
+    cntx = nova._get_tenant_context(cntx)
+    return virtdriver.restore_vm_data(cntx, db, instance, restore,
+                                      instance_options)
+
+
+@autolog.log_method(Logger, 'vmtasks_openstack.poweroff_vm')
+def poweroff_vm(cntx, instance, restore, restored_instance):
+    restored_instance_id = restored_instance['vm_id']
+    compute_service = nova.API(production=True)
+
+    try:
+        compute_service.stop(cntx, restored_instance_id)
+    except:
+        pass
+
+    inst =  compute_service.get_server_by_id(cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'SHUTOFF':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to shutoff' )
+        time.sleep(10)
+        inst = compute_service.get_server_by_id(cntx,
+                                                inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot')
+
+
 @autolog.log_method(Logger, 'vmtasks_openstack.poweron_vm')
 def poweron_vm(cntx, instance, restore, restored_instance):
-    pass
+    restored_instance_id = restored_instance['vm_id']
+    compute_service = nova.API(production=True)
+
+    try:
+        compute_service.start(cntx, restored_instance_id)
+    except:
+        pass
+
+    inst =  compute_service.get_server_by_id(cntx,
+                                             restored_instance_id)
+    start_time = timeutils.utcnow()
+    while hasattr(inst,'status') == False or \
+        inst.status != 'ACTIVE':
+        LOG.debug('Waiting for the instance ' + inst.id +\
+                  ' to boot' )
+        time.sleep(10)
+        inst =  compute_service.get_server_by_id(cntx,
+                                                 inst.id)
+        if hasattr(inst,'status'):
+            if inst.status == 'ERROR':
+                raise Exception(_("Error creating instance " + \
+                                   inst.id))
+        now = timeutils.utcnow()
+        if (now - start_time) > datetime.timedelta(minutes=10):
+            raise exception.ErrorOccurred(reason='Timeout waiting for '\
+                                          'the instance to boot')
 
 
 @autolog.log_method(Logger, 'vmtasks_openstack.set_vm_metadata')

@@ -458,7 +458,10 @@ class RestoredVMResourceWithNameNotFound(NotFound):
 class RestoredVMResourceWithIdNotFound(NotFound):
     message = _("RestoredVMResource %(id)s is not be found.")
 
-    
+class InvalidRestoreOptions(Invalid):
+    message = _("Invalid restore options.")
+
+
 class SwiftConnectionFailed(WorkloadMgrException):
     message = _("Connection to swift failed") + ": %(reason)s"
 
