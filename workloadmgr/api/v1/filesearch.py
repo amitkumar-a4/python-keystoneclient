@@ -17,6 +17,7 @@ from workloadmgr.openstack.common import strutils
 from workloadmgr import utils
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import search as search_views
+from datetime import datetime
 
 LOG = logging.getLogger(__name__)
 
@@ -66,6 +67,20 @@ class FileSearchController(wsgi.Controller):
                file_search['date_from'] = ''
             if file_search.get('date_to', None) is None:
                file_search['date_to'] = ''
+            if file_search['date_from'] != '':
+               try:
+                   datetime.strptime(file_search['date_from'], '%Y-%m-%dT%H:%M:%S')
+               except:
+                      raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
+                          "valid date_from in Format YYYY-MM-DDTHH:MM:SS"))
+
+            if file_search['date_to'] != '':
+               try:
+                   datetime.strptime(file_search['date_to'], '%Y-%m-%dT%H:%M:%S')
+               except:
+                      raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
+                          "valid date_to in Format YYYY-MM-DDTHH:MM:SS"))
+
             file_search['start'] = int(file_search['start'])
             file_search['end'] = int(file_search['end'])
             search = self.workload_api.search(context, file_search)
