@@ -268,6 +268,21 @@ class API(base.Base):
         if len(search_list) > 0:
            msg = _('Search with this vm_id already in exceution')
            raise wlm_exceptions.Invalid(reason=msg)
+        if data['date_from'] != '':
+           try:
+                datetime.strptime(data['date_from'], '%Y-%m-%dT%H:%M:%S')
+           except:
+                  msg = _("Please provide "\
+                          "valid date_from in Format YYYY-MM-DDTHH:MM:SS")
+                  raise wlm_exceptions.Invalid(reason=msg)
+
+           if data['date_to'] != '':
+              try:
+                   datetime.strptime(data['date_to'], '%Y-%m-%dT%H:%M:%S')
+              except:
+                      msg = _("Please provide "\
+                          "valid date_to in Format YYYY-MM-DDTHH:MM:SS")
+                      raise wlm_exceptions.Invalid(reason=msg)
         if type(data['snapshot_ids']) is list:
            data['snapshot_ids'] = ",".join(data['snapshot_ids'])
         options = {'vm_id': data['vm_id'],
