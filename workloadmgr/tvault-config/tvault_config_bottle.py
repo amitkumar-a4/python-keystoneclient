@@ -1496,7 +1496,7 @@ def service_action(service_display_name, action):
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception
         
-    bottle.redirect("/services_vmware")
+    bottle.redirect("/services_openstack")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
            
