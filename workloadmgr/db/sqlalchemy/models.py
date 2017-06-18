@@ -24,7 +24,8 @@ from workloadmgr.vault import vault
 FLAGS = flags.FLAGS
 BASE = declarative_base()
 
-DB_VERSION = '2.4.8'
+
+DB_VERSION = '2.4.18'
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
@@ -170,6 +171,8 @@ class FileSearch(BASE, WorkloadsBase):
     json_resp = Column(Text)
     start = Column(Integer)
     end = Column(Integer)
+    date_from = Column(String(50))
+    date_to = Column(String(50))
     host = Column(String(100))
     error_msg = Column(String(255)) 
     status = Column(String(10))

@@ -467,7 +467,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.file_search_update(context,search_id,{'host': self.host,
                                        'status': 'searching'})
             search = self.db.file_search_get(context, search_id)
-            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id)
+            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id, read_deleted='yes')
             workload_id = vm_found[0].workload_id
             workload_obj = self.db.workload_get(context, workload_id)
             backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
@@ -485,6 +485,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif search.end != 0 or search.start != 0:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'start': search.start, 'end': search.end, 'status':'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
+            elif search.date_from != '':
+                 kwargs = {'workload_id':workload_id, 'get_all': False, 'date_from': search.date_from, 'date_to': search.date_to, 'status':'available'}
+                 search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
             else:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'status': 'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
@@ -497,7 +500,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if not isinstance(search_list_snapshot, (str, unicode)):
                    search_list_snapshot_id = search_list_snapshot.id
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, search.vm_id, search_list_snapshot_id)
-                guestfs_input_str = search.filepath+',,'+search_list_snapshot_id
+                if len(snapshot_vm_resources) == 0:
+                   continue
+                guestfs_input_str = search.filepath+','+search_list_snapshot_id
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type != 'disk':
                        continue
@@ -740,7 +745,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
                         
     @autolog.log_method(logger=Logger)
-    def workload_reset(self, context, workload_id):
+    def workload_reset(self, context, workload_id, status_update=True):
         """
         Reset an existing workload
         """
@@ -758,7 +763,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg = _("Failed to  reset: %(exception)s") %{'exception': ex}
             LOG.error(msg)
         finally:
-            self.db.workload_update(context, workload_id, {'status': 'available'})
+            status_update is True and self.db.workload_update(context, workload_id, {'status': 'available'})
         return
 
 
@@ -824,6 +829,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         flavors = compute_service.get_flavors(context)
         for inst in options['openstack']['instances']:
+
+            if inst['include'] is False:
+                continue
+
             vm_id = inst.get('id', None)
             if not vm_id:
                 msg = _("'instances' contain an element that does "
@@ -1058,7 +1067,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif rtype == 'inplace':
                 workflow_class_name = 'workloadmgr.workflows.inplacerestoreworkflow.InplaceRestoreWorkflow'
                 self._validate_restore_options(context, restore, options)
-                self.workload_reset(context, snapshot.workload_id)
+                self.workload_reset(context, snapshot.workload_id, status_update=False)
             elif rtype == 'selective':
                 self._validate_restore_options(context, restore, options)
 

@@ -38,6 +38,7 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.workloads import workload_utils
+from workloadmgr.workflows import vmtasks_openstack
 
 from workloadmgr.vault import vault
 
@@ -45,6 +46,7 @@ from workloadmgr import utils
 from workloadmgr import flags
 from workloadmgr import autolog
 from workloadmgr import exception
+from workloadmgr.workflows.vmtasks import FreezeVM, ThawVM
 
 
 restore_vm_opts = [
@@ -55,7 +57,10 @@ restore_vm_opts = [
     cfg.StrOpt('nfs_volume_type_substr',
                default='nfs,netapp',
                help='Dir where the nfs volume is mounted for restore'),                   
-
+    cfg.IntOpt('progress_tracking_update_interval',
+               default=600,
+               help='Number of seconds to wait for progress tracking file '
+                    'updated before we call contego crash'),
     ]
 
 LOG = logging.getLogger(__name__)
@@ -971,10 +976,10 @@ class CopyBackupImageToVolume(task.Task):
                     if progstat.st_mtime > basestat.st_mtime:
                         basestat = progstat
                         basetime = time.time()
-                    elif time.time() - basetime > 600:
-                        raise Exception("No update to %s modified time for last 10 minutes. "
+                    elif time.time() - basetime > CONF.progress_tracking_update_interval:
+                        raise Exception("No update to %s modified time for last %d minutes. "
                                         "Contego may have errored. Aborting Operation" % 
-                                        progress_tracking_file_path)
+                                        (progress_tracking_file_path, CONF.progress_tracking_update_interval/60))
                 else:
                     # For swift based backup media
                     async_task_status = compute_service.vast_async_task_status(cntx, 
@@ -1098,7 +1103,7 @@ class PowerOnInstance(task.Task):
                     raise Exception(_("Error creating instance " + \
                                         restored_instance_id))
             now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=4):
+            if (now - start_time) > datetime.timedelta(minutes=5):
                 raise exception.ErrorOccurred(reason='Timeout waiting for '\
                                            'the instance to boot from volume')                   
 
@@ -1346,6 +1351,16 @@ def AssignFloatingIPFlow(context):
 
     return flow
 
+def FreezeNThawFlow(context):
+
+    flow = lf.Flow("freezenthawlf")
+    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+
+    return flow
+
 def restore_vm(cntx, db, instance, restore, restored_net_resources,
                restored_security_groups, restored_compute_flavor,
                restored_nics, instance_options):
@@ -1481,6 +1496,10 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # Assign floating IP address
     childflow = AssignFloatingIPFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    childflow = FreezeNThawFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 

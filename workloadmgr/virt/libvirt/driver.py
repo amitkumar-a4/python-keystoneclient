@@ -54,7 +54,6 @@ from workloadmgr.network import neutron
 from workloadmgr.vault import vault
 from workloadmgr import autolog
 
-from workloadmgr.workflows import vmtasks_openstack
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.workloads import workload_utils
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -539,14 +538,14 @@ class LibvirtDriver(driver.ComputeDriver):
         compute_service.vast_prepare(cntx, instance['vm_id'], vast_params)
 
     @autolog.log_method(Logger, 'libvirt.driver.freeze_vm')
-    def freeze_vm(self, cntx, db, instance, snapshot):
+    def freeze_vm(self, cntx, db, instance):
 
         compute_service = nova.API(production=True)
         vast_params = {'test1': 'test1','test2': 'test2'}
         compute_service.vast_freeze(cntx, instance['vm_id'], vast_params)
 
     @autolog.log_method(Logger, 'libvirt.driver.thaw_vm')
-    def thaw_vm(self, cntx, db, instance, snapshot):
+    def thaw_vm(self, cntx, db, instance):
 
         compute_service = nova.API(production=True)
         vast_params = {'test1': 'test1','test2': 'test2'}
@@ -996,6 +995,9 @@ class LibvirtDriver(driver.ComputeDriver):
                         os.listdir(os.path.split(resource_snap_path)[0])
                     except Exception as ex:
                            pass
+
+                    workload_url = os.path.join(backup_target.mount_path,'workload_'+snapshot_obj.workload_id)
+                    resource_snap_backing_path = resource_snap_backing_path.replace(workload_url, "../../..")
                     qemuimages.rebase_qcow2(resource_snap_backing_path,
                                             resource_snap_path)
 
