@@ -255,7 +255,7 @@ class API(base.Base):
         if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
            msg = _('Provide valid linux filepath to search')
            raise wlm_exceptions.Invalid(reason=msg)
-        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'], read_deleted='yes')
         if len(vm_found) == 0:
            msg = _('vm_id not existing with this tenant')
            raise wlm_exceptions.Invalid(reason=msg)
