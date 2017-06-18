@@ -1193,7 +1193,7 @@ class BaseWorkloadTestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.delete_meta')
     @patch('workloadmgr.compute.nova.API.set_meta_item')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def xxxtest_workload_with_multiple_vms_restore_workflow_execute_restore_vm_flow(
+    def test_workload_with_multiple_vms_restore_workflow_execute_restore_vm_flow(
         self, mock_get_servers,
         set_meta_item_mock,
         delete_meta_mock,
@@ -1351,4 +1351,3 @@ class BaseWorkloadTestCase(test.TestCase):
 
                         self.assertEqual(pre_restore_vm_mock.call_count, 5)
                         self.assertEqual(restore_keypairs_mock.call_count, 1)
-                        self.assertEqual(restore_vm_mock.call_count, 5)
