@@ -36,14 +36,6 @@ class BaseWorkloadAPITestCase(test.TestCase):
         super(BaseWorkloadAPITestCase, self).setUp()
         self.context = context.get_admin_context()
 
-
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
-
-        patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
-        patch('sys.stderr').start()
-        patch('workloadmgr.autolog.log_method').start()
-
         self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
 
@@ -51,6 +43,13 @@ class BaseWorkloadAPITestCase(test.TestCase):
         self.SubProcessMockMethod = self.subprocess_patch.start()
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
+
+        CONF.set_default('vault_storage_nfs_export',
+                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+
+        patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
+        patch('sys.stderr').start()
+        patch('workloadmgr.autolog.log_method').start()
 
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import *
@@ -78,6 +77,21 @@ class BaseWorkloadAPITestCase(test.TestCase):
         self.subprocess_patch.stop()
 
         import workloadmgr.vault.vault
+
+        self.context.project_id = '000d038df75743a88cefaacd9b704b94'
+        self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
+
+        for snapshot in self.workloadAPI.snapshot_get_all(self.context):
+            self.db.snapshot_update(self.context, snapshot.id, 
+                                    { 'status': 'available' })
+            self.db.snapshot_delete(self.context, snapshot.id)
+        for workload in self.workloadAPI.workload_get_all(self.context):
+            self.db.workload_update(self.context, workload.id, 
+                                    { 'status': 'available' })
+            for vm in self.db.workload_vms_get(self.context, workload.id):
+                self.db.workload_vms_delete(self.context, vm.vm_id, workload.id)
+            self.db.workload_delete(self.context, workload.id)
+
         for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
             backup_target = workloadmgr.vault.vault.get_backup_target(share)
             shutil.rmtree(backup_target.mount_path)

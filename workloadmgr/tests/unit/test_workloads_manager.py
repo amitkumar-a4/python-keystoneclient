@@ -39,17 +39,17 @@ class BaseWorkloadTestCase(test.TestCase):
         CONF.set_default('vault_storage_nfs_export',
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
+        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
+        self.MockMethod = self.is_online_patch.start()
+        self.MockMethod.return_value = True
+
+        self.subprocess_patch = patch('subprocess.check_call')
+        self.SubProcessMockMethod = self.subprocess_patch.start()
+        self.SubProcessMockMethod.return_value = True
+
         patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
         patch('sys.stderr').start()
         patch('workloadmgr.autolog.log_method').start()
-
-        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
-        self.subprocess_patch = patch('subprocess.check_call')
-
-        self.MockMethod = self.is_online_patch.start()
-        self.SubProcessMockMethod = self.subprocess_patch.start()
-        self.MockMethod.return_value = True
-        self.SubProcessMockMethod.return_value = True
 
         self.workload = importutils.import_object(CONF.workloads_manager)
         from workloadmgr.workloads.api import *
@@ -380,6 +380,7 @@ class BaseWorkloadTestCase(test.TestCase):
                     for meta in workload.metadata:
                         if meta.key == 'backup_media_target':
                             self.assertEqual(meta.value, 'server1:nfsshare1')
+                            break
                      
                     self.assertEqual(workload.status, 'available')
                     expected = {
@@ -507,6 +508,7 @@ class BaseWorkloadTestCase(test.TestCase):
                             'retention_policy_type': 'Number of Snapshots to Keep',
                             'retention_policy_value': '30'}),
             'host': CONF.host,}
+
         with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
                           'is_mounted', return_value=True) as mock_method1:
             with patch.object(workloadmgr.vault.vault.NfsTrilioVaultBackupTarget,
@@ -574,6 +576,7 @@ class BaseWorkloadTestCase(test.TestCase):
                                       db.workload_get,
                                       self.context,
                                       workload_id)
+
     def test_create_workload_with_invalid_workload_type(self):
         """Test workload can be created and deleted."""
         pass
@@ -1154,8 +1157,8 @@ class BaseWorkloadTestCase(test.TestCase):
                         options = tests_utils.get_restore_options()
                         restore = tests_utils.create_restore(self.context,
                                                               snapshot['id'],
-                                                              display_name='test_snapshot',
-                                                              display_description='this is a test snapshot',
+                                                              display_name='test_restore',
+                                                              display_description='this is a test restore',
                                                               options=options)
                         restore_id = restore['id']
                         self.workload.snapshot_restore(self.context, restore_id)
@@ -1190,7 +1193,7 @@ class BaseWorkloadTestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.delete_meta')
     @patch('workloadmgr.compute.nova.API.set_meta_item')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def xxxtest_workload_with_multiple_vms_restore_workflow_execute_restore_vm_flow(
+    def test_workload_with_multiple_vms_restore_workflow_execute_restore_vm_flow(
         self, mock_get_servers,
         set_meta_item_mock,
         delete_meta_mock,
@@ -1348,4 +1351,3 @@ class BaseWorkloadTestCase(test.TestCase):
 
                         self.assertEqual(pre_restore_vm_mock.call_count, 5)
                         self.assertEqual(restore_keypairs_mock.call_count, 1)
-                        self.assertEqual(restore_vm_mock.call_count, 5)
