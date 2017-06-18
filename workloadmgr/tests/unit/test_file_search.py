@@ -1,4 +1,4 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
+## vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 Trilio Data, Inc
 # All Rights Reserved.
@@ -20,6 +20,7 @@ from workloadmgr.openstack.common import importutils
 from workloadmgr.tests.unit import utils as tests_utils
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr.vault import vault
+from datetime import date, timedelta
 
 CONF = cfg.CONF
 
@@ -133,7 +134,8 @@ class BaseFileSearchTestCase(test.TestCase):
     def test_file_search_api_and_manager(self):
         workload, backup_target = self.create_workload()
         snapshot = self.create_snapshot(workload)
-        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 0, 'end': 0}
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 0, 'end': 0
+                 ,'date_from': '', 'date_to': ''}
         search = self.workloadAPI.search(self.context, data)
         self.assertEqual(search.status, 'executing')
         self.assertEqual(search.vm_id, self.context.vm_id)
@@ -169,7 +171,8 @@ class BaseFileSearchTestCase(test.TestCase):
             snapshot = self.create_snapshot(workload)
             snapshot_ids.append(snapshot['id'])
         del snapshot_ids[0]
-        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': snapshot_ids, 'start': 0, 'end': 0}
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': snapshot_ids, 'start': 0, 'end': 0
+                ,'date_from': '', 'date_to': ''}
         search = self.workloadAPI.search(self.context, data)
         self.assertEqual(search.status, 'executing')
         self.assertEqual(search.vm_id, self.context.vm_id)
@@ -206,7 +209,8 @@ class BaseFileSearchTestCase(test.TestCase):
         for i in range(5):
             snapshot = self.create_snapshot(workload)
             snapshot_ids.append(snapshot['id'])
-        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 1, 'end': 2}
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 1, 'end': 2
+                ,'date_from': '', 'date_to': ''}
         search = self.workloadAPI.search(self.context, data)
         self.assertEqual(search.status, 'executing')
         self.assertEqual(search.vm_id, self.context.vm_id)
@@ -238,3 +242,74 @@ class BaseFileSearchTestCase(test.TestCase):
         search = self.workloadAPI.search_show(self.context, search.id)
         self.assertEqual(search.status, 'completed')
         self.assertEqual(search.vm_id, self.context.vm_id)
+
+    def test_file_search_api_and_manager_with_date_filter(self):
+        workload, backup_target = self.create_workload()
+        snapshot_ids = []
+        for i in range(5):
+            snapshot = self.create_snapshot(workload)
+            snapshot_ids.append(snapshot['id'])
+        date_from = date.today() - timedelta(1)
+        date_from = date_from.strftime('%Y-%m-%dT%H:%M:%S')
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 0, 'end': 0
+                ,'date_from': date_from, 'date_to': ''}
+        search = self.workloadAPI.search(self.context, data)
+        self.assertEqual(search.status, 'executing')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        search = self.workloadAPI.search_show(self.context, search.id)
+        self.assertEqual(search.status, 'executing')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+        self.assertEqual(search.date_from, date_from)
+        self.assertEqual(search.date_to, '')
+        try:
+            search = self.workloadAPI.search(self.context, data)
+        except Exception as ex:
+               self.assertEqual(1, 1)
+        # mismatch between mysql and sqlite queries, cant check dates in tests
+        kwargs = {'workload_id':workload['id'], 'get_all': False, 'status':'available'}
+        search_list_snapshots = self.workloadManager.db.snapshot_get_all(self.context, **kwargs)
+        disks = mock.Mock()
+        disks.vault_url = str(uuid.uuid4())
+        self.workloadManager.db.vm_disk_resource_snap_get_top = mock.MagicMock()
+        self.workloadManager.db.vm_disk_resource_snap_get_top.return_value = disks
+        vault.get_backup_target = mock.MagicMock()
+        vault.get_backup_target.return_value = backup_target
+        vm_resource_obj = mock.Mock()
+        vm_resource_obj.resource_type = 'disk'
+        vm_resource_obj.id = str(uuid.uuid4())
+        vm_resource_obj_list = []
+        vm_resource_obj_list.append(vm_resource_obj)
+        self.workloadManager.db.snapshot_vm_resources_get = mock.MagicMock()
+        self.workloadManager.db.snapshot_vm_resources_get.return_value = vm_resource_obj_list
+        with patch.object(self.workloadManager.db, 'snapshot_get_all', return_value=search_list_snapshots):
+             self.workloadManager.file_search(self.context, search.id)
+        args = self.SubProcessOutputMockMethod.call_args[0]
+        self.assertEqual(len(args[0][2].split('|-|')), 5)
+        search = self.workloadAPI.search_show(self.context, search.id)
+        self.assertEqual(search.status, 'completed')
+        self.assertEqual(search.vm_id, self.context.vm_id)
+
+    def test_file_search_api_date_validations(self):
+        workload, backup_target = self.create_workload()
+        date1 = date.today() - timedelta(1)
+        date_from = date1.strftime('%Y-%m-%d')
+        data = {'vm_id': self.context.vm_id, 'filepath': '/', 'snapshot_ids': '', 'start': 0, 'end': 0
+                ,'date_from': date_from, 'date_to': ''}
+        try:
+            search = self.workloadAPI.search(self.context, data)
+            self.assertEqual(1,2)            
+        except Exception as ex:
+               self.assertEqual(ex.kwargs['reason'], 
+                    "Please provide valid date_from in Format YYYY-MM-DDTHH:MM:SS")
+
+        date_to = date1.strftime('%Y-%m-%d')
+        date_from = date1.strftime('%Y-%m-%dT%H:%M:%S')
+        data['date_to'] = date_to
+        data['date_from'] = date_from 
+
+        try:
+            search = self.workloadAPI.search(self.context, data)
+            self.assertEqual(1,2)
+        except Exception as ex:
+               self.assertEqual(ex.kwargs['reason'],
+                    "Please provide valid date_to in Format YYYY-MM-DDTHH:MM:SS") 
