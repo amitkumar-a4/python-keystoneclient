@@ -39,6 +39,8 @@ def upgrade(migrate_engine):
         Column('json_resp', Text),
         Column('start', Integer),
         Column('end', Integer),
+        Column('date_from', String),
+        Column('date_to', String),
         Column('host', String),
         Column('error_msg', String),
         Column('status', String(10)),

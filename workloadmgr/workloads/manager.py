@@ -485,6 +485,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif search.end != 0 or search.start != 0:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'start': search.start, 'end': search.end, 'status':'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
+            elif search.date_from != '':
+                 kwargs = {'workload_id':workload_id, 'get_all': False, 'date_from': search.date_from, 'date_to': search.date_to, 'status':'available'}
+                 search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
             else:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'status': 'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)

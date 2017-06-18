@@ -277,6 +277,8 @@ class API(base.Base):
                    'snapshot_ids': data['snapshot_ids'],
                    'start': data['start'],
                    'end': data['end'],
+                   'date_from': data['date_from'],
+                   'date_to': data['date_to'],
                    'status': 'executing',}
         search = self.db.file_search_create(context, options)
         self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
