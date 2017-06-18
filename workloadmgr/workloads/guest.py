@@ -11,7 +11,7 @@ os.setuid(uid)
 
 def f(data):
     g = guestfs.GuestFS(python_return_dict=True)
-    drives = data.split(',')
+    drives = data.split(',,')
     filepath = drives[0]
     drives.pop(0)
     snapshot_id = drives[0]

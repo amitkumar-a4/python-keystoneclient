@@ -509,7 +509,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
                     resource_snap_path = os.path.join(backup_target.mount_path,
                                           vm_disk_resource_snap.vault_url.strip(os.sep)) 
-                    guestfs_input_str = guestfs_input_str+','+resource_snap_path                                
+                    guestfs_input_str = guestfs_input_str+',,'+resource_snap_path                                
                 guestfs_input.append(guestfs_input_str)
             guestfs_input_str = "|-|".join(guestfs_input)
             out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])
