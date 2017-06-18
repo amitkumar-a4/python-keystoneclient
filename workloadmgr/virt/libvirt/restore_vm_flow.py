@@ -1392,8 +1392,9 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     restored_security_group_ids = {}
     vm_id = instance['vm_id']
-    for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
-        restored_security_group_ids[pit_id] = restored_security_group_id
+    if restored_security_groups:
+        for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
+            restored_security_group_ids[pit_id] = restored_security_group_id
 
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
