@@ -584,7 +584,7 @@ class BaseLibvirtDriverTestCase(test.TestCase):
         from workloadmgr.workloads import workload_utils
         from workloadmgr.virt import driver
 
-        vast_async_task_status_mock.return_value = {'status': 'Completed'}
+        vast_async_task_status_mock.return_value = {'status': ['Completed']}
         get_routers_mock.side_effect = tests_utils._routers_data
         get_interfaces_mock.side_effect = tests_utils._get_interfaces
         get_port_mock.side_effect = tests_utils._port_data
@@ -608,7 +608,7 @@ class BaseLibvirtDriverTestCase(test.TestCase):
                                 "_"+args[2]['metadata']['snapshot_vm_resource_name'],
                                 args[2]['metadata']['vm_disk_resource_snap_id'])
             tests_utils.create_qcow2_image(path)
-            return {'result': 'Completed'}
+            return {'result': ['Completed']}
 
         vast_data_transfer_mock.side_effect = vast_data_transfer_mock_side
         self.workload_params = {
