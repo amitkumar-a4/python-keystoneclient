@@ -467,7 +467,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.file_search_update(context,search_id,{'host': self.host,
                                        'status': 'searching'})
             search = self.db.file_search_get(context, search_id)
-            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id)
+            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id, read_deleted='yes')
             workload_id = vm_found[0].workload_id
             workload_obj = self.db.workload_get(context, workload_id)
             backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
@@ -485,6 +485,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             elif search.end != 0 or search.start != 0:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'start': search.start, 'end': search.end, 'status':'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
+            elif search.date_from != '':
+                 kwargs = {'workload_id':workload_id, 'get_all': False, 'date_from': search.date_from, 'date_to': search.date_to, 'status':'available'}
+                 search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
             else:
                  kwargs = {'workload_id':workload_id, 'get_all': False, 'status': 'available'}
                  search_list_snapshots = self.db.snapshot_get_all(context, **kwargs)
@@ -497,6 +500,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if not isinstance(search_list_snapshot, (str, unicode)):
                    search_list_snapshot_id = search_list_snapshot.id
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, search.vm_id, search_list_snapshot_id)
+                if len(snapshot_vm_resources) == 0:
+                   continue
                 guestfs_input_str = search.filepath+','+search_list_snapshot_id
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type != 'disk':
@@ -504,7 +509,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
                     resource_snap_path = os.path.join(backup_target.mount_path,
                                           vm_disk_resource_snap.vault_url.strip(os.sep)) 
-                    guestfs_input_str = guestfs_input_str+','+resource_snap_path                                
+                    guestfs_input_str = guestfs_input_str+',,'+resource_snap_path                                
                 guestfs_input.append(guestfs_input_str)
             guestfs_input_str = "|-|".join(guestfs_input)
             out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])

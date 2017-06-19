@@ -845,9 +845,12 @@ def workload_vms_get(context, workload_id, **kwargs):
 @require_context
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     session = kwargs.get('session') or get_session()
+    read_deleted = 'no'
+    if 'read_deleted' in kwargs:
+       read_deleted = kwargs['read_deleted'] 
     try:
         query = model_query(context, models.WorkloadVMs,
-                            session=session, read_deleted="no")\
+                            session=session, read_deleted=read_deleted)\
                      .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
                      .join(models.Workloads)\
                      .filter(models.WorkloadVMs.status != None)\
