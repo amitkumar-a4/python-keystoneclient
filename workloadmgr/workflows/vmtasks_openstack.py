@@ -1272,23 +1272,21 @@ def delete_vm_networks(cntx, restored_net_resources):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')
 def restore_vm_security_groups(cntx, db, restore):
+ 
+    def security_group_inside_check(vm_security_group_rule_snaps, existinggroup):
 
-    def security_group_exists(snapshot_vm_resource):
-        existing_secgroups = network_service.security_group_list(cntx)
-        existinggroup = None
-        for secgrp in existing_secgroups['security_groups']:
-            if snapshot_vm_resource.resource_name == secgrp['id']:
-                existinggroup = secgrp
-                break
-        if existinggroup == None:
-            return False
+        def match_rule_values(rule1, rule2):
+            #Removing id and security_group_id from rules
+            #as values for this will not match
+            for  key in ['id', 'security_group_id']:
+                 rule1.pop(key,None)
+                 rule2.pop(key,None)
+            matched_items = set(rule1.items()) & set(rule2.items())
+            if len(matched_items) == len(rule1):
+	        return True
+            else:
+                return False
 
-        vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-            cntx, snapshot_vm_resource.id)
-
-        # looks like some bug in the security_group_list where individual
-        # sec grp rules are not correct. Use the get function to get the
-        # sec grp definition correctly
         existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
            len(existinggroup['security_group_rules']):
@@ -1298,15 +1296,39 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_security_group_rule_values = pickle.loads(
                 str(vm_security_group_rule.pickle))
             found = False
+            rule_values_found = False
             for rule in existinggroup['security_group_rules']:
                 if vm_security_group_rule_values['id'] == rule['id']:
                     found = True
                     break
-
-            if not found:
+                elif match_rule_values(dict(vm_security_group_rule_values),dict(rule)) is True:
+                     rule_values_found = True
+                     break
+            if not found and not rule_values_found:
                 return False
 
         return True
+
+    def security_group_exists(snapshot_vm_resource):
+        existing_secgroups = network_service.security_group_list(cntx)
+        existinggroup = None
+
+        vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
+            cntx, snapshot_vm_resource.id)
+
+        for secgrp in existing_secgroups['security_groups']:
+            if snapshot_vm_resource.resource_name == secgrp['id']:
+                existinggroup = secgrp
+                break
+            else:
+                if security_group_inside_check(vm_security_group_rule_snaps, secgrp) is True:
+                    return (True, secgrp['id'])
+
+        if existinggroup is not None and \
+           security_group_inside_check(vm_security_group_rule_snaps, existinggroup) is True:
+            return (True, existinggroup['id'])
+        else:
+            return (False, None)
 
     # refresh token
     cntx = nova._get_tenant_context(cntx)
@@ -1326,12 +1348,13 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id')
             if vm_id not in restored_security_groups:
                 restored_security_groups[vm_id] = {}
-            if  security_group_exists(snapshot_vm_resource):
-                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
-                    {'sec_id': snapshot_vm_resource.resource_name,
+            result, sg_id = security_group_exists(snapshot_vm_resource)
+            if result is True:
+               restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
+                    {'sec_id': sg_id,
                      'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                      'res_id': snapshot_vm_resource.id}
-                continue
+               continue
 
             name = 'snap_of_' + db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'name')
@@ -1363,27 +1386,20 @@ def restore_vm_security_groups(cntx, db, restore):
                 network_service.security_group_rule_delete(
                     cntx, security_group_rule['id'])
 
-    for vm_id, restored_security_groups_per_vm in restored_security_groups.iteritems():
-        for pit_id, res_map in restored_security_groups_per_vm.iteritems():
-            if  pit_id == res_map['sec_id']:
-                continue
-
-            security_group_id = res_map['sec_id']
-            security_group = network_service.security_group_get(cntx, security_group_id)
             vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-                cntx, res_map['res_id'])
+                        cntx, snapshot_vm_resource.id)
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(
                     str(vm_security_group_rule.pickle))
                 if vm_security_group_rule_values.get('remote_group_id', None):
-                    remote_group_id = restored_security_groups_per_vm[
+                    remote_group_id = restored_security_groups[vm_id][
                         vm_security_group_rule_values['remote_group_id']]['sec_id']
                 else:
                     remote_group_id = None
 
                 network_service.security_group_rule_create(
                     cntx,
-                    security_group_id,
+                    security_group['id'],
                     vm_security_group_rule_values['direction'],
                     vm_security_group_rule_values['ethertype'],
                     vm_security_group_rule_values['protocol'],
