@@ -502,7 +502,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, search.vm_id, search_list_snapshot_id)
                 if len(snapshot_vm_resources) == 0:
                    continue
-                guestfs_input_str = search.filepath+','+search_list_snapshot_id
+                guestfs_input_str = search.filepath+',,'+search_list_snapshot_id
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type != 'disk':
                        continue
