@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
+e vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (c) 2014 TrilioData, Inc.
 # All Rights Reserved.
@@ -188,7 +188,7 @@ contego_vault_opts = [
     cfg.StrOpt('vault_swift_password',
                default='password',
                help='Swift password'),
-    cfg.StrOpt('vault_swift_region_name',
+    cfg.StrOpt('region_name_for_services',
                 default='RegionOne',
                 help='Swift Region Name'),
     cfg.StrOpt('vault_swift_domain_id',
