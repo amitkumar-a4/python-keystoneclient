@@ -204,6 +204,8 @@ def get_workload_url(context, workload_ids, upgrade):
             # update workload_backend_endpoint map
             workload_backup_endpoint[workload_id] = backup_endpoint
             workload_url_iterate.append(workload)
+        else:
+            failed_workloads.append(workload_id)
 
     for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
         backup_target = None
@@ -231,7 +233,7 @@ def get_workload_url(context, workload_ids, upgrade):
     if len(workload_ids_to_import) > 0:
         failed_workloads.extend(workload_ids_to_import)
 
-    return {'workload_url_iterate': workload_url_iterate, 'failed_workloads': failed_workloads}
+    return (workload_url_iterate, failed_workloads)
 
 def update_workload_metadata(workload_values):
     '''
@@ -286,9 +288,9 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
     }
 
     try:
-        urls = get_workload_url(context, workload_ids, upgrade)
-        workload_url_iterate = urls['workload_url_iterate']
-        failed_workloads = urls['failed_workloads']
+        workload_url_iterate, failed_workloads = get_workload_url(context, workload_ids, upgrade)
+        if len(failed_workloads) == len(workload_url_iterate):
+           return failed_workloads
 
         # Create list of all files related to a common resource
         #TODO:Find alternate for os.walk
