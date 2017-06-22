@@ -1322,13 +1322,13 @@ def restore_vm_security_groups(cntx, db, restore):
                 break
             else:
                 if security_group_inside_check(vm_security_group_rule_snaps, secgrp) is True:
-                    return (True, secgrp['id'])
+                    return secgrp['id']
 
         if existinggroup is not None and \
            security_group_inside_check(vm_security_group_rule_snaps, existinggroup) is True:
-            return (True, existinggroup['id'])
+            return existinggroup['id']
         else:
-            return (False, None)
+            return None
 
     # refresh token
     cntx = nova._get_tenant_context(cntx)
@@ -1348,8 +1348,8 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id')
             if vm_id not in restored_security_groups:
                 restored_security_groups[vm_id] = {}
-            result, sg_id = security_group_exists(snapshot_vm_resource)
-            if result is True:
+            sg_id = security_group_exists(snapshot_vm_resource)
+            if sg_id is not None:
                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
                     {'sec_id': sg_id,
                      'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
