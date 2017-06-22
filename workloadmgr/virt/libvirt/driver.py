@@ -1139,11 +1139,6 @@ class LibvirtDriver(driver.ComputeDriver):
             commit_image_list.append((vault_path, backing_vault_path))
 
         try:
-            db.snapshot_update(cntx,
-                               snapshot['id'],
-                               {'progress_msg': 'Applying retention policy.',
-                                'status': 'Applying retention'
-                               })
             compute_service = nova.API(production=True)
             (snapshot_to_commit, snapshots_to_delete, affected_snapshots, workload_obj, snapshot_obj, swift) = \
                 workload_utils.common_apply_retention_policy(cntx, instances, snapshot)
@@ -1222,10 +1217,9 @@ class LibvirtDriver(driver.ComputeDriver):
                                          LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
                                          db.snapshot_update(cntx,
                                                             snapshot['id'],
-                                                            {'progress_msg': 'Applying retention policy.',
+                                                            {'progress_msg': 'Applying retention policy on vm:%s.' %server_id,
                                                             'status': 'wait_to_apply_retention'
                                                             })
-
                                          time.sleep(60)
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
