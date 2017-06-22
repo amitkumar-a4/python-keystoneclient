@@ -953,6 +953,7 @@ class API(base.Base):
                                                upgrade)
         except Exception as ex:
             LOG.exception(ex)
+            raise ex
 
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads

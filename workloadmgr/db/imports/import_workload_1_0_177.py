@@ -289,6 +289,10 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
 
     try:
         workload_url_iterate, failed_workloads = get_workload_url(context, workload_ids, upgrade)
+
+        if len(failed_workloads) == len(workload_url_iterate) == 0:
+           raise exception.WorkloadsNotFound()
+ 
         if len(failed_workloads) == len(workload_url_iterate):
            return failed_workloads
 
@@ -342,7 +346,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         return failed_workloads
     except Exception as ex:
         LOG.exception(ex)
-
+        raise ex
 
 def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
     '''
@@ -462,12 +466,13 @@ def import_workload(cntx, workload_ids, new_version, upgrade=True):
         for resource_map in import_map:
             import_resources(cntx, resource_map, new_version, db_dir, upgrade)
         DBSession.autocommit = True
+        return {'workloads':{'imported_workloads': workloads, 'failed_workloads': failed_workloads}}
     except Exception as ex:
         LOG.exception(ex)
+        raise ex
     finally:
         #Remove temporary folder
         if os.path.exists(db_dir):
            shutil.rmtree(db_dir, ignore_errors=True)
-    return {'workloads':{'imported_workloads': workloads, 'failed_workloads': failed_workloads}}
 
 
