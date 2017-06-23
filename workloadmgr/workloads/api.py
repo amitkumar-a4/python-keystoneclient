@@ -2448,7 +2448,7 @@ class API(base.Base):
                    u'type': "license_key",}
         created_license = []
         try:
-            settings =  self.db.setting_get_all(context)
+            settings =  self.db.setting_get_all(context, get_hidden=True)
             created_license.append(self.db.setting_create(context, setting))
 
             for setting in settings:
@@ -2468,7 +2468,7 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
-        settings =  self.db.setting_get_all(context)
+        settings =  self.db.setting_get_all(context, get_hidden=True)
 
         license = [t for t in settings if t.type == "license_key"]
 
