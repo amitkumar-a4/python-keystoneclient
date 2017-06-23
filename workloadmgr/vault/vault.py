@@ -997,6 +997,13 @@ def get_workloads(context):
 
     return workloads
 
+def validate_workload(workload_url):
+    if os.path.isdir(workload_url) and os.path.exists(os.path.join(workload_url, "workload_db")):
+        return True
+    else:
+        return False
+
+
 def get_all_workload_transfers(context):
     transfers = []
 
