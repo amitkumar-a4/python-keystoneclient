@@ -1221,6 +1221,11 @@ class LibvirtDriver(driver.ComputeDriver):
                                                             'status': 'wait_to_apply_retention'
                                                             })
                                          time.sleep(60)
+                                db.snapshot_update(cntx,
+                                                   snapshot['id'],
+                                                   {'progress_msg': 'Applying retention policy on vm:%s.' %server_id,
+                                                   'status': 'applying_retention'
+                                                   })
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],
