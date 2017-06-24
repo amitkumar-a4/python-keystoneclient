@@ -183,21 +183,29 @@ def get_workload_url(context, workload_ids, upgrade):
     Iterate over all NFS backups mounted for list of workloads available.
     '''
     workload_url_iterate = []
+    workload_ids_to_import = list(workload_ids)
+    failed_workloads = []
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
+        #Before adding the workload check whether workload is valid or not
+        if vault.validate_workload(workload) is False:
+           failed_workloads.append(workload_id)
+           LOG.error("Workload %s doesn't contains required database files," %workload_id)
+           return
 
         #Update backup media target
-        if os.path.isdir(workload):
-            update_backup_media_target(os.path.join(workload, "workload_db"), backup_endpoint)
-            for item in os.listdir(workload):
-                 snapshot_db = os.path.join(workload, item, "snapshot_db")
-                 if os.path.exists(snapshot_db):
-                     update_backup_media_target(snapshot_db, backup_endpoint)
+        update_backup_media_target(os.path.join(workload, "workload_db"), backup_endpoint)
+        for item in os.listdir(workload):
+             snapshot_db = os.path.join(workload, item, "snapshot_db")
+             if os.path.exists(snapshot_db):
+                 update_backup_media_target(snapshot_db, backup_endpoint)
 
         # Check whether workload tenant exist in current cloud or not
         if check_tenant(context, workload, upgrade):
             # update workload_backend_endpoint map
             workload_backup_endpoint[workload_id] = backup_endpoint
             workload_url_iterate.append(workload)
+        else:
+            failed_workloads.append(workload_id)
 
     for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
         backup_target = None
@@ -210,7 +218,8 @@ def get_workload_url(context, workload_ids, upgrade):
 
                 if len(workload_ids) > 0:
                     #If workload found in given workload id's then add to iterate list
-                    if workload_id in workload_ids:
+                    if workload_id in workload_ids_to_import:
+                        workload_ids_to_import.remove(workload_id)
                         add_workload(context, workload_id, workload, backup_endpoint, upgrade)
                 else:
                     add_workload(context, workload_id, workload, backup_endpoint, upgrade)
@@ -220,7 +229,11 @@ def get_workload_url(context, workload_ids, upgrade):
 
         finally:
             pass
-    return workload_url_iterate
+
+    if len(workload_ids_to_import) > 0:
+        failed_workloads.extend(workload_ids_to_import)
+
+    return (workload_url_iterate, failed_workloads)
 
 def update_workload_metadata(workload_values):
     '''
@@ -275,7 +288,13 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
     }
 
     try:
-        workload_url_iterate = get_workload_url(context, workload_ids, upgrade)
+        workload_url_iterate, failed_workloads = get_workload_url(context, workload_ids, upgrade)
+
+        if len(failed_workloads) == len(workload_url_iterate) == 0:
+           raise exception.WorkloadsNotFound()
+ 
+        if len(failed_workloads) == len(workload_url_iterate):
+           return failed_workloads
 
         # Create list of all files related to a common resource
         #TODO:Find alternate for os.walk
@@ -324,9 +343,10 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                 db_json.append(json_obj)
 
             pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
+        return failed_workloads
     except Exception as ex:
         LOG.exception(ex)
-
+        raise ex
 
 def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
     '''
@@ -442,16 +462,17 @@ def import_workload(cntx, workload_ids, new_version, upgrade=True):
 
         del workloads[:]
         DBSession.autocommit = False
-        get_json_files(cntx, workload_ids, db_dir, upgrade)
+        failed_workloads = get_json_files(cntx, workload_ids, db_dir, upgrade)
         for resource_map in import_map:
             import_resources(cntx, resource_map, new_version, db_dir, upgrade)
         DBSession.autocommit = True
+        return {'workloads':{'imported_workloads': workloads, 'failed_workloads': failed_workloads}}
     except Exception as ex:
         LOG.exception(ex)
+        raise ex
     finally:
         #Remove temporary folder
         if os.path.exists(db_dir):
            shutil.rmtree(db_dir, ignore_errors=True)
-    return workloads
 
 

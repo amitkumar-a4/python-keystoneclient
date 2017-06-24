@@ -1197,8 +1197,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                     'snapshot_id': snapshot_to_commit.id
                                      }
 
-                                status = {'result': 'retry'}
-
                                 #After one click restore snapshot_vm_resource['vm_id'] would be addressing to
                                 #old vm_id which doesn't exist in Nova DB. So it will give ServerNotFound error
                                 #To overcome this issue creating a check for vm_id. if it's not existing then
@@ -1207,6 +1205,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                 if server_id not in instance_ids:
                                     server_id = instance_ids[0]
 
+                                status = {'result': 'retry'}
                                 while status['result'] == 'retry':
                                       status = self._vast_methods_call_by_function(compute_service.vast_commit_image,
                                                                              cntx,
@@ -1216,7 +1215,17 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                               })
                                       if status['result'] == 'retry':
                                          LOG.debug(_('tvault-contego returned "retry". Waiting for 60 seconds before retry.'))
+                                         db.snapshot_update(cntx,
+                                                            snapshot['id'],
+                                                            {'progress_msg': 'Applying retention policy on vm:%s.' %server_id,
+                                                            'status': 'wait_to_apply_retention'
+                                                            })
                                          time.sleep(60)
+                                db.snapshot_update(cntx,
+                                                   snapshot['id'],
+                                                   {'progress_msg': 'Applying retention policy on vm:%s.' %server_id,
+                                                   'status': 'applying_retention'
+                                                   })
                                 self._wait_for_remote_nova_process(cntx, compute_service,
                                                                    metadata,
                                                                    snapshot_vm_resource['vm_id'],

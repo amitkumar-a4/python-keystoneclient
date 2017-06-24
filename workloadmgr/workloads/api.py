@@ -989,6 +989,7 @@ class API(base.Base):
                                                upgrade)
         except Exception as ex:
             LOG.exception(ex)
+            raise ex
 
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
@@ -2615,6 +2616,7 @@ class API(base.Base):
             keystone_client = KeystoneClient(context)
 
             reassigned_workloads = []
+            failed_workloads = []
             projects = keystone_client.client.get_project_list_for_import(context)
             tenant_list = [project.id for project in projects]
             for tenant_map in tenant_maps:
@@ -2694,7 +2696,8 @@ class API(base.Base):
                     if workload_to_import:
                         vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
                         imported_workloads = self.import_workloads(context, workload_to_import, True)
-                        reassigned_workloads.extend(imported_workloads)
+                        reassigned_workloads.extend(imported_workloads['workloads']['imported_workloads'])
+                        failed_workloads.extend(imported_workloads['workloads']['failed_workloads'])
 
                     if workload_to_update:
                         jobscheduler_map = vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
@@ -2702,7 +2705,7 @@ class API(base.Base):
                                                   jobscheduler_map, new_tenant_id, user_id)
                         reassigned_workloads.extend(updated_workloads)
 
-            return reassigned_workloads
+            return {'workloads':{'reassigned_workloads': reassigned_workloads, 'failed_workloads': failed_workloads}}
 
         except Exception as ex:
             LOG.exception(ex)
