@@ -1296,15 +1296,14 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_security_group_rule_values = pickle.loads(
                 str(vm_security_group_rule.pickle))
             found = False
-            rule_values_found = False
             for rule in existinggroup['security_group_rules']:
                 if vm_security_group_rule_values['id'] == rule['id']:
                     found = True
                     break
                 elif match_rule_values(dict(vm_security_group_rule_values),dict(rule)) is True:
-                     rule_values_found = True
+                     found = True
                      break
-            if not found and not rule_values_found:
+            if found is False:
                 return False
 
         return True
