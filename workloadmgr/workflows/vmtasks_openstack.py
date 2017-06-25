@@ -1272,20 +1272,20 @@ def delete_vm_networks(cntx, restored_net_resources):
 
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')
 def restore_vm_security_groups(cntx, db, restore):
- 
-    def security_group_inside_check(vm_security_group_rule_snaps, existinggroup):
 
-        def match_rule_values(rule1, rule2):
-            #Removing id and security_group_id from rules
-            #as values for this will not match
-            for  key in ['id', 'security_group_id']:
-                 rule1.pop(key,None)
-                 rule2.pop(key,None)
-            matched_items = set(rule1.items()) & set(rule2.items())
-            if len(matched_items) == len(rule1):
-	        return True
-            else:
-                return False
+    def match_rule_values(rule1, rule2):
+        #Removing id, security_group_id and remote_group_id
+        #from rules as values for this will not match
+        for  key in ['id', 'security_group_id','remote_group_id']:
+             rule1.pop(key,None)
+             rule2.pop(key,None)
+        matched_items = set(rule1.items()) & set(rule2.items())
+        if len(matched_items) == len(rule1):
+            return True
+        else:
+            return False
+
+    def security_group_inside_check(vm_security_group_rule_snaps, existinggroup):
 
         existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
@@ -1301,8 +1301,8 @@ def restore_vm_security_groups(cntx, db, restore):
                     found = True
                     break
                 elif match_rule_values(dict(vm_security_group_rule_values),dict(rule)) is True:
-                     found = True
-                     break
+                    found = True
+                    break
             if found is False:
                 return False
 
@@ -1390,12 +1390,10 @@ def restore_vm_security_groups(cntx, db, restore):
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(
                     str(vm_security_group_rule.pickle))
-                if vm_security_group_rule_values.get('remote_group_id', None):
-                    remote_group_id = restored_security_groups[vm_id][
-                        vm_security_group_rule_values['remote_group_id']]['sec_id']
-                else:
-                    remote_group_id = None
-
+                #creting each security group with remote security group id
+                #as None because till this point we are not aware of
+                #new remote security group id if it's deleted.
+                remote_group_id = None
                 network_service.security_group_rule_create(
                     cntx,
                     security_group['id'],
@@ -1406,6 +1404,40 @@ def restore_vm_security_groups(cntx, db, restore):
                     vm_security_group_rule_values['port_range_max'],
                     vm_security_group_rule_values['remote_ip_prefix'],
                     remote_group_id)
+
+    for vm_id, restored_security_groups_per_vm in restored_security_groups.iteritems():
+        for pit_id, res_map in restored_security_groups_per_vm.iteritems():
+            if  pit_id == res_map['sec_id']:
+                continue
+
+            security_group_id = res_map['sec_id']
+            security_group = network_service.security_group_get(cntx, security_group_id)
+            vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
+                cntx, res_map['res_id'])
+            for vm_security_group_rule in vm_security_group_rule_snaps:
+                vm_security_group_rule_values = pickle.loads(
+                    str(vm_security_group_rule.pickle))
+
+                #If found a rule with remote_security group then delete matching rule
+                #from security group and create a new rule with remote _security group.
+                if vm_security_group_rule_values.get('remote_group_id', None):
+                    for sec_group_rule in security_group['security_group_rules']:
+                        if match_rule_values(dict(vm_security_group_rule_values), dict(sec_group_rule)) is True:
+                            network_service.security_group_rule_delete(cntx, sec_group_rule['id'])
+                            break;
+                    remote_group_id = restored_security_groups_per_vm[
+                        vm_security_group_rule_values['remote_group_id']]['sec_id']
+
+                    network_service.security_group_rule_create(
+                        cntx,
+                        security_group_id,
+                        vm_security_group_rule_values['direction'],
+                        vm_security_group_rule_values['ethertype'],
+                        vm_security_group_rule_values['protocol'],
+                        vm_security_group_rule_values['port_range_min'],
+                        vm_security_group_rule_values['port_range_max'],
+                        vm_security_group_rule_values['remote_ip_prefix'],
+                        remote_group_id)
 
     return_values = {}
     for vm_id, res_sec_grps in restored_security_groups.iteritems():
