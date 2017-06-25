@@ -1837,6 +1837,8 @@ class API(base.Base):
                 workload_lock.release()
                
             if snapshot['status'] != 'available':
+                #Unlocking the workload before raising the exception.
+                self.db.workload_update(context, workload['id'], {'status': 'available'})
                 msg = _('Snapshot status must be available')
                 raise wlm_exceptions.InvalidState(reason=msg)
        
@@ -1875,8 +1877,8 @@ class API(base.Base):
             return restore
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
-    
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+
     @autolog.log_method(logger=Logger)
     def snapshot_cancel(self, context, snapshot_id):
         """
