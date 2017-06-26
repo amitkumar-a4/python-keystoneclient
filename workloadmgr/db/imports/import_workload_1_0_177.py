@@ -293,7 +293,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         if len(failed_workloads) == len(workload_url_iterate) == 0:
            raise exception.WorkloadsNotFound()
  
-        if len(failed_workloads) == len(workload_url_iterate):
+        if len(failed_workloads) == len(workload_ids):
            return failed_workloads
 
         # Create list of all files related to a common resource
