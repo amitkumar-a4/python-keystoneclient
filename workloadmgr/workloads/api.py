@@ -1828,6 +1828,10 @@ class API(base.Base):
                          snapshot_display_name + '\' Restore \'' + \
                          restore_display_name + '\' Create Requested', snapshot)
 
+            if snapshot['status'] != 'available':
+                msg = _('Snapshot status must be available')
+                raise wlm_exceptions.InvalidState(reason=msg)
+
             try:
                 workload_lock.acquire()
                 if workload['status'].lower() != 'available':
@@ -1837,10 +1841,6 @@ class API(base.Base):
             finally:
                 workload_lock.release()
                
-            if snapshot['status'] != 'available':
-                msg = _('Snapshot status must be available')
-                raise wlm_exceptions.InvalidState(reason=msg)
-       
             self.db.snapshot_update(context, snapshot_id, {'status': 'restoring'})
  
             restore_type = "restore"
@@ -1876,8 +1876,8 @@ class API(base.Base):
             return restore
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
-    
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+
     @autolog.log_method(logger=Logger)
     def snapshot_cancel(self, context, snapshot_id):
         """
@@ -2485,7 +2485,7 @@ class API(base.Base):
                    u'type': "license_key",}
         created_license = []
         try:
-            settings =  self.db.setting_get_all(context)
+            settings =  self.db.setting_get_all(context, get_hidden=True)
             created_license.append(self.db.setting_create(context, setting))
 
             for setting in settings:
@@ -2505,7 +2505,7 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
-        settings =  self.db.setting_get_all(context)
+        settings =  self.db.setting_get_all(context, get_hidden=True)
 
         license = [t for t in settings if t.type == "license_key"]
 
