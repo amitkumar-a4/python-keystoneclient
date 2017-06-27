@@ -1420,7 +1420,7 @@ def restore_vm_security_groups(cntx, db, restore):
 
                 #If found a rule with remote_security group then delete matching rule
                 #from security group and create a new rule with remote _security group.
-                if vm_security_group_rule_values.get('remote_group_id', None) is None:
+                if vm_security_group_rule_values.get('remote_group_id', None) is not None:
                     for sec_group_rule in security_group['security_group_rules']:
                         if match_rule_values(dict(vm_security_group_rule_values), dict(sec_group_rule)) is True:
                             network_service.security_group_rule_delete(cntx, sec_group_rule['id'])
