@@ -21,6 +21,7 @@ function validate_swift_credentials(inputelement) {
     username = $('[name="admin-username"]')[0].value
     password = $('[name="admin-password"]')[0].value
     domain_id = $('[name="domain-name"]')[0].value
+    region_name = $('[name="region-name"]')[0].value
     swift_auth_url = $('[name="swift-auth-url"]')[0].value
     swift_username = $('[name="swift-username"]')[0].value
     swift_password = $('[name="swift-password"]')[0].value
@@ -31,7 +32,8 @@ function validate_swift_credentials(inputelement) {
     swift_auth_version = obj.val()
     $.ajax({
         url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
-              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+             "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&region_name="+region_name+
+             "&swift_auth_version="+swift_auth_version,
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
