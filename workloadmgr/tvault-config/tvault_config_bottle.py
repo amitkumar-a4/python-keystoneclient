@@ -2895,6 +2895,7 @@ def validate_swift_credentials():
        data['swift_password'] =  bottle.request.query['password']
        data['swift_tenantname'] =  bottle.request.query['project_name']
        data['swift_domain_id'] = bottle.request.query['domain_id']
+       data['region_name'] = bottle.request.query['region_name']
     elif swift_auth_version == 'TEMPAUTH':
          data['swift_auth_url'] = bottle.request.query['swift_auth_url']
          data['swift_username'] = bottle.request.query['swift_username']
