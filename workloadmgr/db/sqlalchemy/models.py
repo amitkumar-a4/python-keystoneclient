@@ -25,11 +25,7 @@ FLAGS = flags.FLAGS
 BASE = declarative_base()
 
 
-<<<<<<< HEAD
 DB_VERSION = '2.4.28'
-=======
-DB_VERSION = '2.4.28'
->>>>>>> upstream/master
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
