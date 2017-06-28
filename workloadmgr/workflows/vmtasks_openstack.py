@@ -1286,7 +1286,6 @@ def restore_vm_security_groups(cntx, db, restore):
             return False
 
     def security_group_inside_check(vm_security_group_rule_snaps, existinggroup):
-
         existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
            len(existinggroup['security_group_rules']):
@@ -1311,7 +1310,6 @@ def restore_vm_security_groups(cntx, db, restore):
     def security_group_exists(snapshot_vm_resource):
         existing_secgroups = network_service.security_group_list(cntx)
         existinggroup = None
-
         vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
             cntx, snapshot_vm_resource.id)
 
@@ -1320,6 +1318,7 @@ def restore_vm_security_groups(cntx, db, restore):
                 existinggroup = secgrp
                 break
             else:
+
                 if security_group_inside_check(vm_security_group_rule_snaps, secgrp) is True:
                     return secgrp['id']
 
@@ -1347,6 +1346,7 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id')
             if vm_id not in restored_security_groups:
                 restored_security_groups[vm_id] = {}
+
             sg_id = security_group_exists(snapshot_vm_resource)
             if sg_id is not None:
                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
