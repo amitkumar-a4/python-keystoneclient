@@ -851,10 +851,17 @@ class WorkloadMgrsController(wsgi.Controller):
                         raise exception.ErrorOccurred(msg)
             except Exception as error:
                    msg = error
-                   if error.message[0] == -5:
-                      msg = 'smtp_server_name is not valid'
-                   if error.message.__class__.__name__ == 'timeout':
-                      msg = 'smtp server unreachable with this smtp_server_name and smtp_port values' 
+                   try:
+                       if error.message != '' and error.message[0] == -5:
+                          msg = 'smtp_server_name is not valid'
+                       if error.message != '' and error.message.__class__.__name__ == 'timeout':
+                          msg = 'smtp server unreachable with this smtp_server_name and smtp_port values'
+                       if hasattr(error, 'strerror') and error.strerror != '':
+                          msg = error.strerror
+                       if '%(reason)' in error.message:
+                          msg = error.args[0]
+                   except Exception as ex:
+                          msg = "Error validation email settings"
                    raise exception.ErrorOccurred(msg)
         except exception.InvalidState as error:
             LOG.exception(error)

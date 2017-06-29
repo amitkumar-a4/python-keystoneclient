@@ -772,7 +772,7 @@ def _register_service():
                 if keystone.version == 'v3':
                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
                                                     password=config_data['workloadmgr_user_password'],
-                                                    email='workloadmgr@triliodata.com',
+                                                    email='workloadmgr@trilio.io',
                                                     domain=config_data['triliovault_user_domain_id'],
                                                     default_project=config_data['service_tenant_id'],
                                                     enabled=True)
@@ -781,7 +781,7 @@ def _register_service():
                 else:
                      wlm_user = keystone.users.create(config_data['workloadmgr_user'],
                                                  config_data['workloadmgr_user_password'],
-                                                 'workloadmgr@triliodata.com',
+                                                 'workloadmgr@trilio.io',
                                                  tenant_id=config_data['service_tenant_id'],
                                                  enabled=True)
                      keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
@@ -2895,6 +2895,7 @@ def validate_swift_credentials():
        data['swift_password'] =  bottle.request.query['password']
        data['swift_tenantname'] =  bottle.request.query['project_name']
        data['swift_domain_id'] = bottle.request.query['domain_id']
+       data['region_name'] = bottle.request.query['region_name']
     elif swift_auth_version == 'TEMPAUTH':
          data['swift_auth_url'] = bottle.request.query['swift_auth_url']
          data['swift_username'] = bottle.request.query['swift_username']

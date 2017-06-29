@@ -477,6 +477,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                filtered_snapshots = search.snapshot_ids.split(',')
                search_list_snapshots = []
                for filtered_snapshot in filtered_snapshots:
+                   if filtered_snapshot in search_list_snapshots:
+                      continue
                    filter_snapshot = self.db.snapshot_get(context, filtered_snapshot)
                    if filter_snapshot.workload_id != workload_id:
                       msg = _('Invalid snapshot_ids provided')
@@ -512,7 +514,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     guestfs_input_str = guestfs_input_str+',,'+resource_snap_path                                
                 guestfs_input.append(guestfs_input_str)
             guestfs_input_str = "|-|".join(guestfs_input)
-            out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])
+            try:
+                out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])
+            except Exception as err:
+                   msg = _('Error in serching files, Contact your administrator')
+                   raise wlm_exceptions.InvalidState(reason=msg)     
             self.db.file_search_update(context,search_id,{'status': 'completed', 'json_resp': out})
         except Exception as err:
                self.db.file_search_update(context,search_id,{'status': 'error', 'error_msg': str(err)})
