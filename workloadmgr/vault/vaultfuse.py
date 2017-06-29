@@ -188,6 +188,9 @@ contego_vault_opts = [
     cfg.StrOpt('vault_swift_password',
                default='password',
                help='Swift password'),
+    cfg.StrOpt('region_name_for_services',
+                default='RegionOne',
+                help='Swift Region Name'),
     cfg.StrOpt('vault_swift_domain_id',
                default='default',
                help='Swift domain id'),
@@ -234,7 +237,7 @@ except:
 
 options = {'sync_to': None,'verbose': 1,'header': [],'auth_version': u'1.0',
            'os_options': {u'project_name': None,
-                          u'region_name': 'RegionOne',
+                          u'region_name': None,
                           u'user_domain_name': None,
                           u'endpoint_type': None,
                           u'object_storage_url': None,
@@ -291,6 +294,7 @@ else:
     options['os_user_domain_id'] = CONF.vault_swift_domain_id
     options['os_tenant_name'] = CONF.vault_swift_tenant
     options['os_project_name'] = CONF.vault_swift_tenant
+    options['os_region_name'] = CONF.region_name_for_services
 
     # needed to create Connection object
     options['authurl'] = CONF.vault_swift_auth_url

@@ -6,6 +6,8 @@
 
 from oslo.config import cfg
 
+# makes ure vault_storage_type and other configuration parameters are defined
+import workloadmgr.vault.vault
 
 CONF = cfg.CONF
 

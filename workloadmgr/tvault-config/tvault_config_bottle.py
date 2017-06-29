@@ -429,8 +429,9 @@ def _authenticate_with_swift(config_data):
                          'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': None, 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
-                         'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
-                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 'user_domain_name': None, 
+                         'os_region_name': config_data['region_name'], 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
+                         'os_options': {'project_name': None, 'region_name': config_data['region_name'], 'tenant_name': config_data['swift_tenantname'], 
+                                        'user_domain_name': None, 
                                         'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None, 
                                         'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],'tenant_id': None,
                                         'service_type': None, 'project_id': None, 
@@ -445,8 +446,9 @@ def _authenticate_with_swift(config_data):
                          'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': config_data['swift_domain_id'], 
                          'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'], 
                          'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'], 
-                         'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
-                         'os_options': {'project_name': config_data['swift_tenantname'], 'region_name': None, 'tenant_name': config_data['swift_tenantname'], 
+                         'os_region_name': config_data['region_name'], 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None, 
+                         'os_options': {'project_name': config_data['swift_tenantname'], 'region_name': config_data['region_name'], 
+                                        'tenant_name': config_data['swift_tenantname'], 
                                         'user_domain_name': None, 
                                         'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': config_data['swift_domain_id'], 'user_id': None, 
                                         'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],
@@ -770,7 +772,7 @@ def _register_service():
                 if keystone.version == 'v3':
                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
                                                     password=config_data['workloadmgr_user_password'],
-                                                    email='workloadmgr@triliodata.com',
+                                                    email='workloadmgr@trilio.io',
                                                     domain=config_data['triliovault_user_domain_id'],
                                                     default_project=config_data['service_tenant_id'],
                                                     enabled=True)
@@ -779,7 +781,7 @@ def _register_service():
                 else:
                      wlm_user = keystone.users.create(config_data['workloadmgr_user'],
                                                  config_data['workloadmgr_user_password'],
-                                                 'workloadmgr@triliodata.com',
+                                                 'workloadmgr@trilio.io',
                                                  tenant_id=config_data['service_tenant_id'],
                                                  enabled=True)
                      keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
@@ -1496,7 +1498,7 @@ def service_action(service_display_name, action):
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         raise exception
         
-    bottle.redirect("/services_vmware")
+    bottle.redirect("/services_openstack")
     bottle.request.environ['beaker.session']['error_message'] = ''    
     return dict(error_message = bottle.request.environ['beaker.session']['error_message'])
            
@@ -2893,6 +2895,7 @@ def validate_swift_credentials():
        data['swift_password'] =  bottle.request.query['password']
        data['swift_tenantname'] =  bottle.request.query['project_name']
        data['swift_domain_id'] = bottle.request.query['domain_id']
+       data['region_name'] = bottle.request.query['region_name']
     elif swift_auth_version == 'TEMPAUTH':
          data['swift_auth_url'] = bottle.request.query['swift_auth_url']
          data['swift_username'] = bottle.request.query['swift_username']

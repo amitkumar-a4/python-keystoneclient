@@ -255,7 +255,7 @@ class API(base.Base):
         if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
            msg = _('Provide valid linux filepath to search')
            raise wlm_exceptions.Invalid(reason=msg)
-        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'], read_deleted='yes')
         if len(vm_found) == 0:
            msg = _('vm_id not existing with this tenant')
            raise wlm_exceptions.Invalid(reason=msg)
@@ -268,6 +268,21 @@ class API(base.Base):
         if len(search_list) > 0:
            msg = _('Search with this vm_id already in exceution')
            raise wlm_exceptions.Invalid(reason=msg)
+        if data['date_from'] != '':
+           try:
+                datetime.strptime(data['date_from'], '%Y-%m-%dT%H:%M:%S')
+           except:
+                  msg = _("Please provide "\
+                          "valid date_from in Format YYYY-MM-DDTHH:MM:SS")
+                  raise wlm_exceptions.Invalid(reason=msg)
+
+           if data['date_to'] != '':
+              try:
+                   datetime.strptime(data['date_to'], '%Y-%m-%dT%H:%M:%S')
+              except:
+                      msg = _("Please provide "\
+                          "valid date_to in Format YYYY-MM-DDTHH:MM:SS")
+                      raise wlm_exceptions.Invalid(reason=msg)
         if type(data['snapshot_ids']) is list:
            data['snapshot_ids'] = ",".join(data['snapshot_ids'])
         options = {'vm_id': data['vm_id'],
@@ -277,6 +292,8 @@ class API(base.Base):
                    'snapshot_ids': data['snapshot_ids'],
                    'start': data['start'],
                    'end': data['end'],
+                   'date_from': data['date_from'],
+                   'date_to': data['date_to'],
                    'status': 'executing',}
         search = self.db.file_search_create(context, options)
         self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
@@ -972,6 +989,7 @@ class API(base.Base):
                                                upgrade)
         except Exception as ex:
             LOG.exception(ex)
+            raise ex
 
         AUDITLOG.log(context,'Import Workloads Completed', None)
         return workloads
@@ -1810,6 +1828,10 @@ class API(base.Base):
                          snapshot_display_name + '\' Restore \'' + \
                          restore_display_name + '\' Create Requested', snapshot)
 
+            if snapshot['status'] != 'available':
+                msg = _('Snapshot status must be available')
+                raise wlm_exceptions.InvalidState(reason=msg)
+
             try:
                 workload_lock.acquire()
                 if workload['status'].lower() != 'available':
@@ -1819,10 +1841,6 @@ class API(base.Base):
             finally:
                 workload_lock.release()
                
-            if snapshot['status'] != 'available':
-                msg = _('Snapshot status must be available')
-                raise wlm_exceptions.InvalidState(reason=msg)
-       
             self.db.snapshot_update(context, snapshot_id, {'status': 'restoring'})
  
             restore_type = "restore"
@@ -1858,8 +1876,8 @@ class API(base.Base):
             return restore
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {})) 
-    
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+
     @autolog.log_method(logger=Logger)
     def snapshot_cancel(self, context, snapshot_id):
         """
@@ -2467,7 +2485,7 @@ class API(base.Base):
                    u'type': "license_key",}
         created_license = []
         try:
-            settings =  self.db.setting_get_all(context)
+            settings =  self.db.setting_get_all(context, get_hidden=True)
             created_license.append(self.db.setting_create(context, setting))
 
             for setting in settings:
@@ -2487,7 +2505,7 @@ class API(base.Base):
         if context.is_admin is False:
             raise wlm_exceptions.AdminRequired()
 
-        settings =  self.db.setting_get_all(context)
+        settings =  self.db.setting_get_all(context, get_hidden=True)
 
         license = [t for t in settings if t.type == "license_key"]
 
@@ -2598,6 +2616,7 @@ class API(base.Base):
             keystone_client = KeystoneClient(context)
 
             reassigned_workloads = []
+            failed_workloads = []
             projects = keystone_client.client.get_project_list_for_import(context)
             tenant_list = [project.id for project in projects]
             for tenant_map in tenant_maps:
@@ -2677,7 +2696,8 @@ class API(base.Base):
                     if workload_to_import:
                         vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
                         imported_workloads = self.import_workloads(context, workload_to_import, True)
-                        reassigned_workloads.extend(imported_workloads)
+                        reassigned_workloads.extend(imported_workloads['workloads']['imported_workloads'])
+                        failed_workloads.extend(imported_workloads['workloads']['failed_workloads'])
 
                     if workload_to_update:
                         jobscheduler_map = vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
@@ -2685,7 +2705,7 @@ class API(base.Base):
                                                   jobscheduler_map, new_tenant_id, user_id)
                         reassigned_workloads.extend(updated_workloads)
 
-            return reassigned_workloads
+            return {'workloads':{'reassigned_workloads': reassigned_workloads, 'failed_workloads': failed_workloads}}
 
         except Exception as ex:
             LOG.exception(ex)
