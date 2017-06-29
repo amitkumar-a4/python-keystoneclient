@@ -855,8 +855,11 @@ def workload_vm_get_by_id(context, vm_id, **kwargs):
                      .join(models.Workloads)\
                      .filter(models.WorkloadVMs.status != None)\
                      .filter(models.WorkloadVMs.vm_id==vm_id)\
-                     .filter(models.Workloads.project_id == context.project_id)\
+                     .filter(models.Workloads.project_id == context.project_id)
 
+        if 'workloads_filter' in kwargs:
+           query = query.filter(and_(models.Workloads.status != kwargs['workloads_filter'], models.Workloads.status != None))
+             
         vm_found = query.all()
 
     except sa_orm.exc.NoResultFound:
