@@ -467,7 +467,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             self.db.file_search_update(context,search_id,{'host': self.host,
                                        'status': 'searching'})
             search = self.db.file_search_get(context, search_id)
-            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id, read_deleted='yes')
+            vm_found = self.db.workload_vm_get_by_id(context, search.vm_id, read_deleted='yes', workloads_filter='deleted')
             workload_id = vm_found[0].workload_id
             workload_obj = self.db.workload_get(context, workload_id)
             backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
