@@ -478,7 +478,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                workload_id = snapshot.workload_id
             else:
                  workload_id = vm_found[0].workload_id
-
+                
             workload_obj = self.db.workload_get(context, workload_id)
             backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
                                                 'backup_media_target')
