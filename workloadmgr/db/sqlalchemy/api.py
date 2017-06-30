@@ -1501,7 +1501,7 @@ def _snapshot_vm_get(context, vm_id, snapshot_id, session):
                        .filter_by(vm_id=vm_id)
 
         if snapshot_id is not None:
-           query = filter_by(snapshot_id=snapshot_id)
+           query = query.filter_by(snapshot_id=snapshot_id)
 
         #TODO(gbasava): filter out deleted snapshot_vm if context disallows it
         snapshot_vm = query.first()
