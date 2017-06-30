@@ -671,7 +671,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             values = stdout.split('\n')[1].split()
 
             total_capacity = int(values[1]) * 1024
-            total_utilization = int(values[2]) * 1024
+            # Used entry in df command is not reliable indicator. Hence we use
+            # size - available as total utilization
+            total_utilization = total_capacity - int(values[3]) * 1024
 
             try:
                 stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=True)
@@ -996,6 +998,13 @@ def get_workloads(context):
         workloads += backup_target.get_workloads(context)
 
     return workloads
+
+def validate_workload(workload_url):
+    if os.path.isdir(workload_url) and os.path.exists(os.path.join(workload_url, "workload_db")):
+        return True
+    else:
+        return False
+
 
 def get_all_workload_transfers(context):
     transfers = []

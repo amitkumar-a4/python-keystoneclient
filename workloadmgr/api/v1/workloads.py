@@ -551,7 +551,10 @@ class WorkloadMgrsController(wsgi.Controller):
 
             try:
                 workloads = self.workload_api.import_workloads(context, workload_ids, upgrade)
-                return self._view_builder.detail_list(req, workloads)
+                    
+                imported_workloads = self._view_builder.detail_list(req,  workloads['workloads']['imported_workloads'])
+                workloads['workloads']['imported_workloads'] = imported_workloads['workloads']
+                return workloads
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -954,7 +957,9 @@ class WorkloadMgrsController(wsgi.Controller):
                           "required parameters: user_id."))
             try:
                 workloads = self.workload_api.workloads_reassign(context, tenant_maps)
-                return self._view_builder.detail_list(req, workloads)
+                reassigned_workloads = self._view_builder.detail_list(req,  workloads['workloads']['reassigned_workloads'])
+                workloads['workloads']['reassigned_workloads'] = reassigned_workloads['workloads']
+                return workloads
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
                 raise exc.HTTPNotFound(explanation=unicode(error))
