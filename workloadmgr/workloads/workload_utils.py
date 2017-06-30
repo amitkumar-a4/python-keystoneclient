@@ -34,7 +34,7 @@ def upload_settings_db_entry(cntx):
     #TODO: implement settings persistance per user/tenant
     (backup_target, path) = vault.get_settings_backup_target()
 
-    settings_db = db.setting_get_all(None, read_deleted = 'no', get_hidden=True)
+    settings_db = db.setting_get_all(None, read_deleted = 'no', backup_settings=True)
     for setting in settings_db:
         if 'password' in setting.name.lower():
             setting.value = '******'

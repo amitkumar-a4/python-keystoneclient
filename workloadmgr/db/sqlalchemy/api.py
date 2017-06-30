@@ -1498,8 +1498,10 @@ def _snapshot_vm_get(context, vm_id, snapshot_id, session):
     try:
         query = session.query(models.SnapshotVMs)\
                        .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)
+                       .filter_by(vm_id=vm_id)
+
+        if snapshot_id is not None:
+           query = filter_by(snapshot_id=snapshot_id)
 
         #TODO(gbasava): filter out deleted snapshot_vm if context disallows it
         snapshot_vm = query.first()
@@ -3085,11 +3087,16 @@ def setting_get_all(context, **kwargs):
         return setting_get_all_by_project(context, context.project_id, **kwargs)
     
     get_hidden = kwargs.get('get_hidden', False)
- 
-    return model_query(context, models.Settings, **kwargs).\
-                        options(sa_orm.joinedload(models.Settings.metadata)).\
-                        filter_by(hidden=get_hidden).\
-                        order_by(models.Settings.created_at.desc()).all()        
+
+    qs = model_query(context, models.Settings, **kwargs).\
+                        options(sa_orm.joinedload(models.Settings.metadata))
+
+    if 'backup_settings' in kwargs:
+       qs = qs.filter(and_(or_(models.Settings.type != 'trust_id', models.Settings.type == None), models.Settings.project_id != 'Configurator'))
+    else:
+          qs = qs.filter_by(hidden=get_hidden)
+
+    return qs.order_by(models.Settings.created_at.desc()).all()
 
 @require_context
 def setting_get_all_by_project(context, project_id, **kwargs):
