@@ -1495,8 +1495,10 @@ def _snapshot_vm_get(context, vm_id, snapshot_id, session):
     try:
         query = session.query(models.SnapshotVMs)\
                        .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)
+                       .filter_by(vm_id=vm_id)
+
+        if snapshot_id is not None:
+           query = filter_by(snapshot_id=snapshot_id)
 
         #TODO(gbasava): filter out deleted snapshot_vm if context disallows it
         snapshot_vm = query.first()

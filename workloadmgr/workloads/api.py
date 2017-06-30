@@ -257,9 +257,16 @@ class API(base.Base):
            raise wlm_exceptions.Invalid(reason=msg)
         vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'], read_deleted='yes')
         if len(vm_found) == 0:
-           msg = _('vm_id not existing with this tenant')
-           raise wlm_exceptions.Invalid(reason=msg)
-        workload = self.db.workload_get(context, vm_found[0].workload_id)
+           #Check in snapshot vms
+           vm_found = self.db.snapshot_vm_get(context, data['vm_id'], None)
+           if vm_found is None:
+              msg = _('vm_id not existing with this tenant')
+              raise wlm_exceptions.Invalid(reason=msg)
+           snapshot = self.db.snapshot_get(context, vm_found.snapshot_id)
+           workload_id = snapshot.workload_id
+        else:
+             workload_id = vm_found[0].workload_id
+        workload = self.db.workload_get(context, workload_id)
         if workload['status'] != 'available':
            msg = _('Vm workload is not in available state to perform search')
            raise wlm_exceptions.Invalid(reason=msg)

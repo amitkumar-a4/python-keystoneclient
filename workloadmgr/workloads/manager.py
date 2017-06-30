@@ -468,6 +468,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                        'status': 'searching'})
             search = self.db.file_search_get(context, search_id)
             vm_found = self.db.workload_vm_get_by_id(context, search.vm_id, read_deleted='yes')
+            if len(vm_found) == 0:
+               #Check in snapshot vms
+               vm_found = self.db.snapshot_vm_get(context, search.vm_id, None)
+               if vm_found is None:
+                  msg = _('vm_id not existing with this tenant')
+                  raise wlm_exceptions.InvalidState(reason=msg)
+               snapshot = self.db.snapshot_get(context, vm_found.snapshot_id)
+               workload_id = snapshot.workload_id
+            else:
+                 workload_id = vm_found[0].workload_id
             workload_id = vm_found[0].workload_id
             workload_obj = self.db.workload_get(context, workload_id)
             backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
