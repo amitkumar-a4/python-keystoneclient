@@ -3085,11 +3085,16 @@ def setting_get_all(context, **kwargs):
         return setting_get_all_by_project(context, context.project_id, **kwargs)
     
     get_hidden = kwargs.get('get_hidden', False)
- 
-    return model_query(context, models.Settings, **kwargs).\
-                        options(sa_orm.joinedload(models.Settings.metadata)).\
-                        filter_by(hidden=get_hidden).\
-                        order_by(models.Settings.created_at.desc()).all()        
+
+    qs = model_query(context, models.Settings, **kwargs).\
+                        options(sa_orm.joinedload(models.Settings.metadata))
+
+    if 'backup_settings' in kwargs:
+       qs = qs.filter(and_(or_(models.Settings.type != 'trust_id', models.Settings.type == None), models.Settings.project_id != 'Configurator'))
+    else:
+          qs = qs.filter_by(hidden=get_hidden)
+
+    return qs.order_by(models.Settings.created_at.desc()).all()
 
 @require_context
 def setting_get_all_by_project(context, project_id, **kwargs):
