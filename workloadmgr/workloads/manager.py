@@ -527,13 +527,17 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             try:
                 out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])
             except Exception as err:
-                   msg = _('Error in serching files, Contact your administrator')
-                   raise wlm_exceptions.InvalidState(reason=msg)     
+                   try:
+                       command = ['sudo', 'service', 'libvirt-bin', 'restart'];
+                       subprocess.call(command, shell=False)
+                       out = subprocess.check_output([sys.executable, os.path.dirname(__file__)+os.path.sep+"guest.py", guestfs_input_str])
+                   except Exception as err:
+                           msg = _('Error in searching files, Contact your administrator')
+                           raise wlm_exceptions.InvalidState(reason=msg)     
             self.db.file_search_update(context,search_id,{'status': 'completed', 'json_resp': out})
         except Exception as err:
                self.db.file_search_update(context,search_id,{'status': 'error', 'error_msg': str(err)})
-               LOG.exception(err)
-                
+               LOG.exception(err)                
 
     #@synchronized(workloadlock)
     @autolog.log_method(logger=Logger)
