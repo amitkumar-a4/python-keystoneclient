@@ -117,14 +117,13 @@ class WorkloadMgrsController(wsgi.Controller):
         """Delete a workload."""
         try:
             context = req.environ['workloadmgr.context']
+            database_only = False
             if ('QUERY_STRING' in req.environ) :
                 qs = parse_qs(req.environ['QUERY_STRING'])
                 database_only = qs.get('database_only',[''])[0]
                 database_only = escape(database_only)
                 if database_only.lower() == 'true':
                     database_only = True
-                else:
-                    database_only = False
 
             self.workload_api.workload_delete(context, id, database_only)
             return webob.Response(status_int=202)
