@@ -70,6 +70,66 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
 
+#This map includes resource name with their primary key and foreiegn 
+#key name in metadata table.
+resource_map = {
+    'RestoredVMResources':
+        {
+            'resource_id_name': 'restore_id',
+            'resource_metadata_id_name': 'restored_vm_resource_id',
+        },
+    'RestoredVMs':
+        {
+            'resource_id_name': 'restore_id',
+            'resource_metadata_id_name': 'restored_vm_id',
+        },
+    'Restores':
+        {
+            'resource_id_name': 'snapshot_id',
+            'resource_metadata_id_name': 'restore_id',
+        },
+    'VMSecurityGroupRuleSnaps':
+        {
+            'resource_id_name': 'vm_security_group_snap_id',
+            'resource_metadata_id_name': 'vm_security_group_rule_snap_id',
+        },
+    'VMNetworkResourceSnaps':
+        {
+            'resource_id_name': 'vm_network_resource_snap_id',
+            'resource_metadata_id_name': 'vm_network_resource_snap_id',
+        },
+    'VMDiskResourceSnaps':
+        {
+            'resource_id_name': 'snapshot_vm_resource_id',
+            'resource_metadata_id_name': 'vm_disk_resource_snap_id',
+        },
+    'SnapshotVMResources':
+        {
+            'resource_id_name': 'snapshot_id',
+            'resource_metadata_id_name': 'snapshot_vm_resource_id',
+        },
+    'SnapshotVMs':
+        {
+            'resource_id_name': 'snapshot_id ',
+            'resource_metadata_id_name': 'snapshot_vm_id ',
+        },
+    'Snapshots':
+        {
+            'resource_id_name': 'id',
+            'resource_metadata_id_name': 'snapshot_id ',
+        },
+    'WorkloadVMs':
+        {
+            'resource_id_name': 'workload_id ',
+            'resource_metadata_id_name': 'workload_vm_id  ',
+        },
+    'Workloads':
+        {
+            'resource_id_name': 'id',
+            'resource_metadata_id_name': 'workload_id ',
+        },
+}
+
 
 #do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
@@ -842,6 +902,80 @@ class API(base.Base):
         """
         Delete a workload. No RPC call is made
         """
+        def _delete_restores(self, context, snapshot_id, **kwargs):
+            # Get list of all(deleted/non-deleted) restores.
+            restores = self.db.restore_get_all_by_snapshot(self, context, snapshot_id, **kwargs)
+            for restore in restores:
+                restored_vms = self.db.restored_vms_get(context, restore.id)
+                for restored_vm in restored_vms:
+                    restored_vm_resources = self.db.restored_vm_resources_get(context, restored_vm.id, restore_id)
+                    if len(restored_vm_resources) > 0:
+                        # delete all restored_vm_resources and their metadata
+                        self.db.delete_resource(context, 'RestoredVMResources', restore_vm_resources)
+                if len(restored_vms) > 0:
+                    # delete all restored_vms and their metadata
+                    self.db.delete_resource(context, 'RestoredVMs', restore_vms)
+            if len(restores) > 0:
+                # delete all restores and their metadata
+                self.db.delete_resource(context, 'Restores', restores)
+    
+        def _delete_snapshots(self, context, workload_id, **kwargs):
+            #Get list of all(deleted/non-deleted) snapshots.
+            snapshots = self.db.snapshot_get_all_by_workload(context, workload_id, **kwargs)
+    
+            for snapshot in snapshots:
+                # delete all restores associated to that snapshot
+                _delete_restores(context, snapshot.id, **kwargs)
+    
+                snapshot_vms = self.db.get_all_snapshot_vms(snapshot.id)
+                for snapshot_vm in snapshot_vms:
+                    snapshot_vm_resources = self.db.get_all_snapshot_vm_resources(context, snapshot_vm.id)
+                    for snapshot_vm_resource in snapshot_vm_resources:
+    
+                        # Delete disk resources
+                        if snapshot_vm_resource.resource_type == "disk":
+                            vm_disk_resources = self.db.vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+                            self.db.delete_resource(context, 'VMDiskResourceSnaps', vm_disk_resources)
+    
+                        # Delete security group resources
+                        elif snapshot_vm_resource.resource_type == "security_group":
+                            vm_sg_rules = self.db.vm_security_group_rule_snaps_get(context, snapshot_vm_resource.id)
+                            self.db.delete_resource(context, 'VMSecurityGroupRuleSnaps', vm_sg_rules)
+    
+                        # Delete network resources
+                        elif snapshot_vm_resource.resource_type in ['network', 'subnet', 'router', 'nic']:
+                            vm_network_resources = self.db.vm_network_resource_snaps_get(context, snapshot_vm_resource.id)
+                            self.db.delete_resource(context, 'VMNetworkResourceSnaps', vm_network_resources)
+    
+                    # Delete snaphot vm resources
+                    self.db.delete_resource(context, 'SnapshotVMResources', snapshot_vm_resources)
+    
+                # Delete snapshot vm's
+                self.db.delete_resource(context, 'SnapshotVMs', snapshot_vms)
+    
+                # Delete VMRecentSnapshot's
+                self.db.delete_resource(context, 'VMRecentSnapshot', snapshots, metadata=False)
+    
+            # Delete snapshot's
+            self.db.delete_resource(context, 'Snapshots', snapshots)
+    
+        def _delete_workload(self, context, workload_id):
+            kwargs = {'read_deleted': 'yes'}
+            workload = self.db.workload_get(context, workload_id, **kwargs)
+            # Delete all snapshots associated to that workload
+            _delete_snapshots(context, workload_id, **kwargs)
+    
+            # Delete workload vm's
+            workload_vms = self.db.workload_vms_get(context, workload_id)
+            self.db.delete_resource(context, 'WorkloadVMs', workload_vms)
+    
+            # Delete scheduled jobd
+            self.db.delete_resource(context, 'ScheduledJobs', [workload], metadata=False)
+    
+            # Delete workload
+            self.db.delete_resource(context, 'Workloads', [workload], metadata=False)
+
+
         try:
             if context.is_admin is False and database_only is True:
                 raise wlm_exceptions.AdminRequired()
@@ -880,22 +1014,14 @@ class API(base.Base):
             
             if database_only is True:
                 self.db.workload_update(context, workload_id, {'status': 'deleting'})
-
-                #Remove workload entry from workload_vm's
+            
+                # Remove workload entry from workload_vm's
                 compute_service = nova.API(production=True)
                 workload_vms = self.db.workload_vms_get(context, workload_id)
                 for vm in workload_vms:
                     compute_service.delete_meta(context, vm.vm_id,
                                                 ["workload_id", 'workload_name'])
-                    self.db.workload_vms_delete(context, vm.vm_id, workload_id)
-
-                #Remove all snapshots from workload
-                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id)
-                for snapshot in snapshots:
-                    workload_utils.snapshot_delete(context, snapshot.id, database_only)
-                    self.db.snapshot_update(context, snapshot.id, {'status': 'deleted'})
-                self.db.workload_delete(context, workload_id)
-
+                _delete_workload(context, workload_id)
             else:
                 snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
                 if len(snapshots) > 0:

@@ -3365,3 +3365,22 @@ def purge_workload(context, id):
 
     except Exception as ex:
         LOG.exception(ex)
+
+def delete_resource(context, resource_name, resources, metadata=True):
+    try:
+        session = get_session()
+        for resource in resources:
+            if metadata is True:
+                #First remove all entries from resource metadata table
+                session.query(eval('models.%s' % (resource_name[:-1] + "Metadata"))).\
+                    filter_by(map[resource_name]['resource_metadata_id_name'] = resource.id).delete()
+
+                #Remove entry from resource table
+                session.query(models.resource_name).filter_by(map[resource_name]\
+                                                        ['resource_id_name'] = resource.id).delete()
+            else:
+                session.query(models.resource_name).filter_by(map[resource_name]\
+                                                        ['resource_id_name'] = resource.id).delete()
+    except Exception as ex:
+        LOG.exception(ex)
+
