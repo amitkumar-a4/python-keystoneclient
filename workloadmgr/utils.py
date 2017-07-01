@@ -47,6 +47,8 @@ from workloadmgr.openstack.common import lockutils
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.openstack.common import timeutils
 
+from tzlocal import get_localzone
+
 
 LOG = logging.getLogger(__name__)
 ISO_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -1573,7 +1575,7 @@ def get_local_time(record_time, input_format, output_format, tz):
                 local_time = datetime.datetime.strptime(
                                 record_time, input_format)
                 local_tz = pytz.timezone(tz)
-                from_zone = pytz.timezone(time.tzname[1])
+                from_zone = pytz.timezone(get_localzone().zone)
                 local_time = local_tz.localize(local_time)
                 #local_time = local_time.replace(tzinfo=local_tz)
                 local_time = local_time.astimezone(from_zone)

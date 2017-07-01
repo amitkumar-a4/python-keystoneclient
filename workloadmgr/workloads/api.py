@@ -62,6 +62,7 @@ from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
 from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
+from tzlocal import get_localzone
 workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
@@ -466,7 +467,7 @@ class API(base.Base):
                            "%m/%d/%Y %I:%M %p", "%m/%d/%Y %I:%M %p", jobschedule['timezone']).split(" ")
                jobschedule['start_date'] = date_time[0]
                jobschedule['start_time'] = date_time[1]+" "+date_time[2]
-               jobschedule['appliance_timezone'] = time.tzname[1]
+               jobschedule['appliance_timezone'] = get_localzone().zone
                return jobschedule
         return jobschedule
     
