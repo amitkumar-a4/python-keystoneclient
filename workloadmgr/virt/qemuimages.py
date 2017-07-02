@@ -41,6 +41,8 @@ class QemuImgInfo(object):
         details = self._parse(cmd_output)
         self.image = details.get('image')
         self.backing_file = details.get('backing_file')
+        if self.backing_file:
+            self.backing_file = os.path.normpath(self.backing_file)
         self.file_format = details.get('file_format')
         self.virtual_size = details.get('virtual_size')
         self.cluster_size = details.get('cluster_size')
