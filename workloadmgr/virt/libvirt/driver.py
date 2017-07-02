@@ -995,9 +995,6 @@ class LibvirtDriver(driver.ComputeDriver):
                         os.listdir(os.path.split(resource_snap_path)[0])
                     except Exception as ex:
                            pass
-
-                    workload_url = os.path.join(backup_target.mount_path,'workload_'+snapshot_obj.workload_id)
-                    resource_snap_backing_path = resource_snap_backing_path.replace(workload_url, "../../..")
                     qemuimages.rebase_qcow2(resource_snap_backing_path,
                                             resource_snap_path)
 
