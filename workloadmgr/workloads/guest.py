@@ -36,7 +36,10 @@ def f(data):
         disk[root] = val
         if len(val) > 0:
            for path in val:
-               disk[path] = g.stat(path)
+               try:
+                   disk[path] = g.stat(path)
+               except Exception as ex:
+                      disk[path] = ex.message
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   
