@@ -915,6 +915,7 @@ class CopyBackupImageToVolume(task.Task):
                 restored_file_path,
                 progress_tracking_file_path,
                 image_overlay_file_path,
+                vm_resource_id,
                 volume_id = None, volume_type = None,
                 image_id = None, image_type = None):
         return self.execute_with_log(context, restored_instance_id, 
@@ -923,7 +924,8 @@ class CopyBackupImageToVolume(task.Task):
                                      restore_id, restore_type,
                                      restored_file_path,
                                      image_overlay_file_path,
-                                     progress_tracking_file_path)
+                                     progress_tracking_file_path,
+                                     vm_resource_id)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -935,7 +937,8 @@ class CopyBackupImageToVolume(task.Task):
                          restore_id, restore_type,
                          restored_file_path, 
                          image_overlay_file_path,
-                         progress_tracking_file_path):
+                         progress_tracking_file_path,
+                         vm_resource_id):
  
         # Call into contego to copy the data from backend to volume
         compute_service = nova.API(production=True)
@@ -956,6 +959,7 @@ class CopyBackupImageToVolume(task.Task):
 
         basestat = os.stat(progress_tracking_file_path)
         basetime = time.time()
+        snapshot_vm_resource = db.snapshot_vm_resource_get(cntx, vm_resource_id)
         while True:
             try:
                 time.sleep(10)
@@ -1000,7 +1004,7 @@ class CopyBackupImageToVolume(task.Task):
                             break;
 
                 copied_size_incremental = int(float(percentage) * \
-                                                   image_info.virtual_size/100)
+                                              snapshot_vm_resource.restore_size/100)
                 restore_obj = db.restore_update(cntx, restore_id,
                                            {'uploaded_size_incremental': copied_size_incremental - \
                                                                    prev_copied_size_incremental})
@@ -1319,6 +1323,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                              vm_resource_id=snapshot_vm_resource.id, 
                                               )))
         elif db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
@@ -1327,6 +1332,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                              vm_resource_id=snapshot_vm_resource.id, 
                                               )))            
     return flow
 
