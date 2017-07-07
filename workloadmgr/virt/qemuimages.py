@@ -10,6 +10,7 @@ Handling of VM disk images.
 import os
 import re
 import time
+import subprocess
 
 from oslo.config import cfg
 
@@ -263,3 +264,17 @@ def get_disk_backing_file(path, basename=True):
 
     return backing_file    
 
+def get_effective_size(path, run_as_root=False):
+    """rebase the backing_file_top to backing_file_base
+     :param backing_file_top: top file to commit from to its base
+    """
+    qemuinfo = qemu_img_info(path)
+    if qemuinfo.file_format != 'qcow2':
+        return qemuinfo.virtual_size
+
+    restore_size = 0
+    for line in subprocess.check_output(["qemu-img", "map", path]).split('\n')[1:]:
+        if line.split():
+            restore_size += int(line.split()[1], 16)
+
+    return  restore_size
