@@ -230,7 +230,7 @@ function setSwiftRequired(checked, val) {
                                                 Backend Storage
                                             </a>
                                         </li>
-                                        <li>
+                                        <li id='import-tab'>
                                             <a href="#import" data-toggle="tab">
                                                 <div class="icon-circle">
                                                     <i class="ti-download"></i>
@@ -248,8 +248,13 @@ function setSwiftRequired(checked, val) {
                                             </div>
                                             <div class="col-sm-12">
                                                 <div class="form-group">
-		                                    <input name = "nodetype" type="radio"  value="controller" onclick='$("#panel4")[0].hidden=false'>  Controller Node
-		                                    <input name = "nodetype" type="radio"  value="additional" checked onclick='$("#panel4")[0].hidden=true'>   Additional Node <br><br>
+	                                        %if 'nodetype' in locals() and nodetype == 'additional':
+		                                    <input name = "nodetype" type="radio"  value="controller" onclick='$("#import-tab")[0].style.display=""'>  Controller Node
+		                                    <input name = "nodetype" type="radio"  value="additional" checked onclick='$("#import-tab")[0].style.display="none"'>   Additional Node <br><br>
+	                                        %else:
+		                                    <input name = "nodetype" type="radio"  value="controller" checked onclick='$("#import-tab")[0].style.display=""'>  Controller Node
+		                                    <input name = "nodetype" type="radio"  value="additional" onclick='$("#import-tab")[0].style.display="none"'>   Additional Node <br><br>
+	                                        %end  
                                                 </div>
                                             </div>
                                             <div class="col-sm-5">
@@ -285,14 +290,14 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:20px"></i></label>
-    	                                                <input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
+    	                                                <input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="text" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
                                                         <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Keystone Url (Public/Internal)<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
-    	                                                <input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
+    	                                                <input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="text" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
                                                         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
