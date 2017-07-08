@@ -175,7 +175,7 @@ function setSwiftRequired(checked, val) {
  		</div>
   % end
   <div style="margin-left:auto; margin-right:auto; padding:20px">
-  <form role="form"  id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">
+  <div ><!--role="form"  id="configure_openstack" class="form-configure" action="/configure_openstack" method="post"-->  <!-- form-->
     <div class="image-container set-full-height" style="background-image: url('images/triliobackground.png')">
 
         <!--   Big container   -->
@@ -186,7 +186,7 @@ function setSwiftRequired(checked, val) {
                     <!--      Wizard container        -->
                     <div class="wizard-container">
                         <div class="card wizard-card" data-color="green" id="wizard">
-                        <form action="" method="">
+                        <form role="form"  id="configure_openstack" class="form-configure" action="/configure_openstack" method="post">  <!-- form-->
                         <!--        You can switch " data-color="green" "  with one of the next bright colors: "blue", "azure", "orange", "red"       -->
 
                                 <div class="wizard-header">
@@ -513,7 +513,7 @@ function setSwiftRequired(checked, val) {
                                 <div class="wizard-footer">
                                     <div class="pull-right">
                                         <input type='button' class='btn btn-next btn-fill btn-success btn-wd' name='next' value='Next' />
-                                        <input type='button' class='btn btn-finish btn-fill btn-success btn-wd' name='finish' value='Finish' />
+                                        <input type='submit' class='btn btn-finish btn-fill btn-success btn-wd' name='finish' value='Finish' />
                                     </div>
 
                                     <div class="pull-left">
@@ -522,7 +522,7 @@ function setSwiftRequired(checked, val) {
                                     <div class="clearfix"></div>
                                 </div>
                              </div>
-                            </form>
+                            </div>  <!--form-->
                         </div>
                     </div> <!-- wizard container -->
                 </div>
