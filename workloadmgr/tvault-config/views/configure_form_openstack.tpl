@@ -174,7 +174,7 @@ function setSwiftRequired(checked, val) {
 		  <strong>{{error_message}}</strong>
  		</div>
   % end
-  <div style="margin-left:auto; margin-right:auto; padding:20px">
+  <div style="margin-left:auto; margin-right:auto;">
   <div ><!--role="form"  id="configure_openstack" class="form-configure" action="/configure_openstack" method="post"-->  <!-- form-->
     <div class="image-container set-full-height" style="background-image: url('images/triliobackground.png')">
 
@@ -236,6 +236,22 @@ function setSwiftRequired(checked, val) {
                                                     <i class="ti-download"></i>
                                                 </div>
                                                 Import Workloads
+                                            </a>
+                                        </li>
+                                        <li id='license-tab'>
+                                            <a href="#license" data-toggle="tab">
+                                                <div class="icon-circle">
+                                                    <i class="ti-receipt"></i>
+                                                </div>
+                                                License
+                                            </a>
+                                        </li>
+                                        <li id='certificate-tab'>
+                                            <a href="#certificate" data-toggle="tab">
+                                                <div class="icon-circle">
+                                                    <i class="ti-key"></i>
+                                                </div>
+                                                Certificate
                                             </a>
                                         </li>
                                     </ul>
