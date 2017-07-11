@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
 # Copyright (c) 2014 TrilioData, Inc.
@@ -482,39 +482,47 @@ def _authenticate_with_swift(config_data):
                 except SwiftError as e:
                     raise
 
-def _get_session(admin_url=True):
-    auth_url = config_data['keystone_admin_url']
-    if admin_url == False:
-       auth_url = config_data['keystone_public_url']
+def _validate_keystone_client_and_version(admin_url=True, retry=0):
+    try:
+        is_admin_url = admin_url
+        auth_url = config_data['keystone_admin_url']
+        if admin_url == False:
+           auth_url = config_data['keystone_public_url']
 
-    if config_data['keystone_auth_version'] == 3:
-       auth = password.Password(auth_url=auth_url,
+        if retry == 0:
+           auth = password.Password(auth_url=auth_url,
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
                                     #project_name=config_data['admin_tenant_name'],
                                     user_domain_id=config_data['domain_name'],
                                     domain_id=config_data['domain_name'],
                                     )
-    else:
-         auth = password.Password(auth_url=auth_url,
+        else:
+              auth = password.Password(auth_url=auth_url,
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
                                     project_name=config_data['admin_tenant_name'],
                                     )
-    sess = session.Session(auth=auth, verify=SSL_VERIFY)
-    return sess
+        sess = session.Session(auth=auth, verify=SSL_VERIFY)
+        keystone = client.Client(session=sess, auth_url=auth_url, insecure=SSL_INSECURE)
+        if keystone.version == 'v3':
+            tenants = keystone.projects.list()
+            config_data['keystone_auth_version'] = 3
+        elif keystone.version == 'v2.0':
+            tenants = keystone.tenants.list()
+            config_data['keystone_auth_version'] = 2
+        return (keystone, tenants)
+    except Exception as ex:
+           if retry == 1:
+              raise ex
+           _validate_keystone_client_and_version(is_admin_url, retry=1)
+
 
 def _authenticate_with_keystone():
     # Authenticate with Keystone
     #test admin url
     try:
-        sess = _get_session() 
-        keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
-        if keystone.version == 'v3':
-            tenants = keystone.projects.list()
-        else:
-            tenants = keystone.tenants.list()
-
+        keystone, tenants = _validate_keystone_client_and_version() 
     except Exception as e:
            raise Exception( "KeystoneError:Unable to connect to keystone Admin URL "+e.message  )
 
@@ -568,17 +576,11 @@ def _authenticate_with_keystone():
     
     #test public url
     try:
-        sess = _get_session(admin_url=False)
-        keystone = client.Client(session=sess, auth_url=config_data['keystone_public_url'], insecure=SSL_INSECURE)
-        if keystone.version == 'v3':
-            tenants = keystone.projects.list()
-        else:
-             tenants = keystone.tenants.list()
+        keystone, tenants = _validate_keystone_client_and_version(admin_url=False)
     except Exception as e:      
             raise Exception("KeystoneError:Unable to connect to keystone Public URL "+e.message  )
-         
-    sess = _get_session()
-    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
+        
+    keystone, tenants = _validate_keystone_client_and_version() 
 
     configure_mysql()
     configure_rabbitmq()
@@ -695,8 +697,7 @@ def _register_service():
     if config_data['configuration_type'] == 'vmware':
         authenticate_with_keystone()
     
-    sess = _get_session()
-    keystone = client.Client(session=sess, auth_url=config_data['keystone_admin_url'], insecure=SSL_INSECURE)
+    keystone, tenants = _validate_keystone_client_and_version()
  
     def _get_users_list():
         users = keystone.users.list()
@@ -2696,19 +2697,16 @@ def configure_openstack():
         config_data['keystone_admin_url'] = config_inputs['keystone-admin-url'].strip()
         config_data['keystone_public_url'] = config_inputs['keystone-public-url'].strip()
         
-        config_data['keystone_auth_version'] = 2
-        if 'v3' in config_data['keystone_admin_url']:
-           config_data['keystone_auth_version'] = 3
-
         config_data['admin_username'] = config_inputs['admin-username'].strip()
         config_data['admin_password'] = config_inputs['admin-password']
         config_data['admin_tenant_name'] = config_inputs['admin-tenant-name'].strip()
         config_data['region_name'] = config_inputs['region-name'].strip()
-        if 'domain-name' in config_inputs:
+
+        if 'domain-name' in config_inputs and config_inputs['domain-name'].strip() != '':
            config_data['domain_name'] = config_inputs['domain-name'].strip()
         else:
              config_data['domain_name'] = 'default'
-
+           
         if 'trustee-role' in config_inputs:
             config_data['trustee_role'] = config_inputs['trustee-role'].strip()
         else:
@@ -2767,9 +2765,7 @@ def configure_openstack():
                 config_data['swift_username'] = config_data['admin_username']
                 config_data['swift_password'] = config_data['admin_password']
                 config_data['swift_tenantname'] = config_data['admin_tenant_name']
-                config_data['swift_domain_id'] = ''
-                if config_data['keystone_auth_version'] == 3:
-                    config_data['swift_domain_id'] = config_data['domain_name']
+                config_data['swift_domain_id'] = config_data['domain_name']
 
         config_data['workloads_import'] = config_inputs.get('workloads-import', "off").strip().rstrip() == 'on'
         
@@ -2886,8 +2882,9 @@ def validate_swift_credentials():
     swift_auth_version = bottle.request.query['swift_auth_version']
     data['configuration_type'] = 'openstack'
     data['swift_auth_version'] = swift_auth_version
+    data['keystone_auth_version'] = bottle.request.query['keystone_auth_version']
     data['keystone_auth_version'] = 2
-    if 'v3' in public_url:
+    if data['keystone_auth_version'] == 'true':
        data['keystone_auth_version'] = 3
     if swift_auth_version == 'KEYSTONE':
        data['swift_auth_url'] = public_url
@@ -2916,36 +2913,19 @@ def validate_swift_credentials():
 @bottle.route('/validate_keystone_credentials')
 @authorize()
 def validate_keystone_credentials():
-
-    def _get_keystone_session(auth_url):
-        if 'v3' in auth_url:
-            auth = password.Password(auth_url=auth_url,
-                                    username=admin_username,
-                                    password=admin_password,
-                                    #project_name=project_name,
-                                    user_domain_id=domain_id,
-                                    domain_id=domain_id
-                                    )
-        else:
-            auth = password.Password(auth_url=auth_url,
-                                    username=admin_username,
-                                    password=admin_password,
-                                    project_name=project_name
-                                    )
-        sess = session.Session(auth=auth, verify=SSL_VERIFY)
-        return sess
-
-    admin_username = bottle.request.query['username']
-    admin_password = bottle.request.query['password']
-    project_name = bottle.request.query['project_name']
-    admin_url = bottle.request.query['admin_url']
-    public_url = bottle.request.query['public_url']
-    domain_id = bottle.request.query['domain_id']
+    data = {}
+    data['admin_username'] = bottle.request.query['username']
+    data['admin_password'] = bottle.request.query['password']
+    data['admin_tenant_name'] = bottle.request.query['project_name']
+    data['keystone_admin_url'] = bottle.request.query['admin_url']
+    data['keystone_public_url'] = bottle.request.query['public_url']
+    data['domain_name'] = bottle.request.query['domain_id']
 
     #test public url
     try:
-        sess = _get_keystone_session(public_url)
-        keystone = client.Client(session=sess, auth_url=public_url, insecure=SSL_INSECURE)
+        global config_data
+        config_data = data
+        keystone, tenants =  _validate_keystone_client_and_version(admin_url=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2954,8 +2934,7 @@ def validate_keystone_credentials():
            return bottle.HTTPResponse(status=500, body=str(exception))
 
     try:
-        sess = _get_keystone_session(admin_url)
-        keystone = client.Client(session=sess, auth_url=admin_url, insecure=SSL_INSECURE)
+        keystone, tenants =  _validate_keystone_client_and_version()
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -2973,7 +2952,7 @@ def validate_keystone_credentials():
         else:
            return bottle.HTTPResponse(status=500, body=str(exception))
 
-    return {'status':'Success', 'roles': roles}
+    return {'status':'Success', 'roles': roles, 'keystone_version': keystone.version}
 
 
 @bottle.route('/validate_nfs_share')
