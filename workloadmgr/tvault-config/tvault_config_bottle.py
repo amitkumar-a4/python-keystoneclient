@@ -420,7 +420,7 @@ def _authenticate_with_swift(config_data):
             from swiftclient.exceptions import ClientException
             
             _opts = {}
-            if config_data['swift_auth_version'] == 'KEYSTONE_V2' or (config_data['keystone_auth_version'] == 2 and config_data['swift_auth_version'] == 'KEYSTONE'):
+            if config_data['swift_auth_version'] == 'KEYSTONE_V2' or (config_data['keystone_auth_version'] == 2.0 and config_data['swift_auth_version'] == 'KEYSTONE'):
                 _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None, 
                          'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'], 
                          'os_domain_id': config_data['swift_domain_id'], 'prefix': None, 'auth_version': '2.0', 
@@ -510,7 +510,7 @@ def _validate_keystone_client_and_version(admin_url=True, retry=0):
             config_data['keystone_auth_version'] = 3
         elif keystone.version == 'v2.0':
             tenants = keystone.tenants.list()
-            config_data['keystone_auth_version'] = 2
+            config_data['keystone_auth_version'] = 2.0
         return (keystone, tenants)
     except Exception as ex:
            if retry == 1:
@@ -2267,6 +2267,10 @@ def configure_service():
                      'endpoint_type = ' + config_data['endpoint_type'],
                      starts_with=True)
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'keystone_auth_version = ',
+                     'keystone_auth_version = ' + str(config_data['keystone_auth_version']),
+                     starts_with=True)
+
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
@@ -2883,7 +2887,7 @@ def validate_swift_credentials():
     data['configuration_type'] = 'openstack'
     data['swift_auth_version'] = swift_auth_version
     data['keystone_auth_version'] = bottle.request.query['keystone_auth_version']
-    data['keystone_auth_version'] = 2
+    data['keystone_auth_version'] = 2.0
     if data['keystone_auth_version'] == 'true':
        data['keystone_auth_version'] = 3
     if swift_auth_version == 'KEYSTONE':
