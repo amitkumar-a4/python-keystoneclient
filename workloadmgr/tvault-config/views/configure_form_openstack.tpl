@@ -67,8 +67,6 @@ function setRequired() {
     }
 }
 function findForm() {
-  //setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
-  //setRequired($("#configure_openstack input[name='keystone-public-url']").val())
   hideshowstorages()
 }
 
@@ -415,20 +413,6 @@ else
 $('#ntp-servers').removeAttr('required');
 }
 });
-
-/*function validate_url_versions() {
-   if ($( "input[name='keystone-admin-url']" )[0].value.split('v')[1] !=
-       $( "input[name='keystone-public-url']" )[0].value.split('v')[1]) {
-       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).removeClass("hidden")
-       $($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0].innerHTML = "Keystone URL versions don't match"
-       $($($("input[name='keystone-public-url']")[0]).parent()).addClass("has-error")
-       return false
-   } else {
-       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).addClass("hidden")
-       $($($("input[name='keystone-public-url']")[0]).parent()).removeClass("has-error")
-   }
-   return true
-}*/
 
 function validate_keystone_url(url, inputelement) {
     $.ajax({url: url,
