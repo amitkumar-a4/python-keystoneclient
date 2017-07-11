@@ -482,9 +482,8 @@ def _authenticate_with_swift(config_data):
                 except SwiftError as e:
                     raise
 
-def _validate_keystone_client_and_version(admin_url=True, retry=0):
+def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
     try:
-        is_admin_url = admin_url
         auth_url = config_data['keystone_admin_url']
         if admin_url == False:
            auth_url = config_data['keystone_public_url']
@@ -576,7 +575,7 @@ def _authenticate_with_keystone():
     
     #test public url
     try:
-        keystone, tenants = _validate_keystone_client_and_version(admin_url=False)
+        keystone, tenants = _validate_keystone_client_and_version(is_admin_url=False)
     except Exception as e:      
             raise Exception("KeystoneError:Unable to connect to keystone Public URL "+e.message  )
         
@@ -2929,7 +2928,7 @@ def validate_keystone_credentials():
     try:
         global config_data
         config_data = data
-        keystone, tenants =  _validate_keystone_client_and_version(admin_url=False)
+        keystone, tenants =  _validate_keystone_client_and_version(is_admin_url=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
         if str(exception.__class__) == "<class 'bottle.HTTPResponse'>":
