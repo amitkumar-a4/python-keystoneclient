@@ -2886,9 +2886,10 @@ def validate_swift_credentials():
     data['configuration_type'] = 'openstack'
     data['swift_auth_version'] = swift_auth_version
     data['keystone_auth_version'] = bottle.request.query['keystone_auth_version']
-    data['keystone_auth_version'] = 2.0
     if data['keystone_auth_version'] == 'true':
        data['keystone_auth_version'] = 3
+    else:
+         data['keystone_auth_version'] = 2.0
     if swift_auth_version == 'KEYSTONE':
        data['swift_auth_url'] = public_url
        data['swift_username'] =  bottle.request.query['username']
