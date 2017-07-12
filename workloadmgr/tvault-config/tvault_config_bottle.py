@@ -810,7 +810,9 @@ def _register_service():
          wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads',
                                            'Trilio Vault Workload Manager Service')
 
-    wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+    appliance_name = socket.gethostname()
+    #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+    wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
     if keystone.version == 'v3':
        keystone.endpoints.create(region=config_data['region_name'],
                                  service=wlm_service.id,
