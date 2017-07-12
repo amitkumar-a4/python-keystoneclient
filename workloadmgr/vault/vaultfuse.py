@@ -219,6 +219,9 @@ contego_vault_opts = [
                default='/etc/nova/rootwrap.conf',
                metavar='PATH',
                help='rootwrap config file'),
+    cfg.StrOpt('keystone_auth_version',
+               default='2.0',
+               help='keystone auth version'),
 ]
 
 CONF = cfg.CONF
@@ -276,9 +279,8 @@ if CONF.vault_swift_auth_version == 'TEMPAUTH':
     options['user'] = CONF.vault_swift_username
     options['key'] = CONF.vault_swift_password
 else:
-    options['auth_version'] = '2.0'
-    if 'v3' in CONF.vault_swift_auth_url:
-       options['auth_version'] = '3'
+    options['auth_version'] = CONF.keystone_auth_version
+    if options['auth_version'] == '3':
        if CONF.vault_swift_domain_id != "":
           options['os_options']['user_domain_id'] = CONF.vault_swift_domain_id
           options['os_options']['domain_id'] = CONF.vault_swift_domain_id

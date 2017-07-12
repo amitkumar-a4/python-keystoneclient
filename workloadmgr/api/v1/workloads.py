@@ -292,7 +292,7 @@ class WorkloadMgrsController(wsgi.Controller):
                            'start_time': '09:00 PM',
                            'interval': u'24hr',
                            'enabled': u'true',
-                           'start_date': time.strftime("%x"),
+                           'start_date': time.strftime("%m/%d/%Y"),
                            'end_date': "No End",
                            'retention_policy_type': 'Number of Snapshots to Keep',
                            'retention_policy_value': '30'}

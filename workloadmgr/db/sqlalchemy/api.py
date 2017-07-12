@@ -34,6 +34,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.apscheduler import job
 from workloadmgr.vault import vault
+from workloadmgr.virt import qemuimages
 from workloadmgr.openstack.common.gettextutils import _
 
 FLAGS = flags.FLAGS
@@ -1240,12 +1241,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
                     vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
                                                                                 disk_format, disk_type)
                 else:
-                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                    while vm_disk_resource_snap_backing_id:
-                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                    vm_disk_resource_snap_restore_size = qemuimages.get_effective_size(resource_snap_path)
 
                 #For vmdk   
                 if vm_disk_resource_snap_restore_size == 0:
