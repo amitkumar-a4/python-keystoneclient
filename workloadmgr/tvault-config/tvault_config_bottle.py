@@ -485,7 +485,7 @@ def _authenticate_with_swift(config_data):
 def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
     try:
         auth_url = config_data['keystone_admin_url']
-        if admin_url == False:
+        if is_admin_url == False:
            auth_url = config_data['keystone_public_url']
 
         if retry == 0:
