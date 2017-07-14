@@ -2924,6 +2924,9 @@ def validate_keystone_credentials():
     data['keystone_admin_url'] = bottle.request.query['admin_url']
     data['keystone_public_url'] = bottle.request.query['public_url']
     data['domain_name'] = bottle.request.query['domain_id']
+    if data['domain_name'] == '':
+       data['domain_name'] = 'default'
+
 
     #test public url
     try:
