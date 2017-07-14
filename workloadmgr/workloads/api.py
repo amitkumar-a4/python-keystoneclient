@@ -1714,6 +1714,8 @@ class API(base.Base):
                            vdisk['volume_size'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_size')
                            vdisk['volume_type'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_type')
                            vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_mountpoint')
+                           if self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+                              vdisk['availability_zone'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
 
                         snapshot_vm['vdisks'].append(vdisk)
                 snapshot_vms.append(snapshot_vm)
