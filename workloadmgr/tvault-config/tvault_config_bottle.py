@@ -514,7 +514,7 @@ def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
     except Exception as ex:
            if retry == 1:
               raise ex
-           _validate_keystone_client_and_version(is_admin_url, retry=1)
+           return _validate_keystone_client_and_version(is_admin_url, retry=1)
 
 
 def _authenticate_with_keystone():
@@ -2928,10 +2928,10 @@ def validate_keystone_credentials():
        data['domain_name'] = 'default'
 
 
+    global config_data
+    config_data = data
     #test public url
     try:
-        global config_data
-        config_data = data
         keystone, tenants =  _validate_keystone_client_and_version(is_admin_url=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" %{'exception': exception,}
