@@ -86,9 +86,18 @@ def is_supported_backend(volume_type):
     return True
 
 
-def get_availability_zone(instance_options):
-    if instance_options and 'availability_zone' in instance_options:
-        availability_zone = instance_options['availability_zone']
+def get_availability_zone(instance_options, volume_id=None, az=None):
+    if volume_id is not None:
+       for vdisk in instance_options['vdisks']:
+           if vdisk['id'] == volume_id:
+              if az != '' and vdisk['availability_zone'] == '':
+                 return az
+              elif az == '' and vdisk['availability_zone'] == '':
+                   return None
+              return vdisk['availability_zone']
+
+    if instance_options and 'availability_zone' in instance_options and instance_options['availability_zone'] != '':
+        availability_zone = instance_options['availability_zone'] 
     else:   
         if CONF.default_production_availability_zone == 'None':
             availability_zone = None
@@ -387,13 +396,18 @@ class RestoreVolumeFromImage(task.Task):
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        az = ''
+        if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+           az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+        
+        availability_zone = get_availability_zone(instance_options, volume_id=volume_id)
 
-        availability_zone = get_availability_zone(instance_options)
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
                                                 volume_description,
-                                                image_id=image_id, volume_type=volume_type)
-                                                #availability_zone=availability_zone)
+                                                image_id=image_id, volume_type=volume_type,
+                                                availability_zone=availability_zone)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -462,18 +476,23 @@ class RestoreNFSVolume(task.Task):
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        az = ''
+        if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+           az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+        
+        availability_zone = get_availability_zone(instance_options, volume_id=volume_id)
 
         progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
-        availability_zone = get_availability_zone(instance_options)
         
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type)
-                                                     #availability_zone=availability_zone)
+                                                     volume_type = volume_type,
+                                                     availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -597,18 +616,23 @@ class RestoreSANVolume(task.Task):
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        az = ''
+        if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+           az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+        
+        availability_zone = get_availability_zone(instance_options, volume_id=volume_id)
 
         progressmsg = _('Restoring SAN Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
 
-        availability_zone = get_availability_zone(instance_options)
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type)
-                                                     #availability_zone=availability_zone)
+                                                     volume_type = volume_type,
+                                                     availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
