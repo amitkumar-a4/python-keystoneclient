@@ -839,6 +839,7 @@ class LibvirtDriver(driver.ComputeDriver):
                             snapshot_vm_resource_metadata['volume_size'] = cinder_volume['size']
                             snapshot_vm_resource_metadata['volume_type'] = cinder_volume['volume_type']
                             snapshot_vm_resource_metadata['volume_mountpoint'] = attachment['device']
+                            snapshot_vm_resource_metadata['availability_zone'] = cinder_volume['availability_zone']
                             break
                 if 'volume_id' in snapshot_vm_resource_metadata:
                     break

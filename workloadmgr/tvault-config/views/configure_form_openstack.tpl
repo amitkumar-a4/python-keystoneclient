@@ -49,7 +49,7 @@ function validate_swift_credentials(inputelement) {
     $.ajax({
         url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&region_name="+region_name+
-             "&swift_auth_version="+swift_auth_version,
+             "&swift_auth_version="+swift_auth_version+"&keystone_auth_version="+IsV3,
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
@@ -74,9 +74,8 @@ function validate_swift_credentials(inputelement) {
 }
 
 
-function setRequired(val) {
-    if(val.includes('v3')) {
-       IsV3 = true
+function setRequired() {
+    if(IsV3) {
        $('[name="domain-name"]').attr("required", "true");
     }
     else {
@@ -84,8 +83,6 @@ function setRequired(val) {
     }
 }
 function findForm() {
-  setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
-  setRequired($("#configure_openstack input[name='keystone-public-url']").val())
   hideshowstorages()
 }
 
@@ -560,20 +557,6 @@ $('#ntp-servers').removeAttr('required');
 }
 });
 
-function validate_url_versions() {
-   if ($( "input[name='keystone-admin-url']" )[0].value.split('v')[1] !=
-       $( "input[name='keystone-public-url']" )[0].value.split('v')[1]) {
-       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).removeClass("hidden")
-       $($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0].innerHTML = "Keystone URL versions don't match"
-       $($($("input[name='keystone-public-url']")[0]).parent()).addClass("has-error")
-       return false
-   } else {
-       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).addClass("hidden")
-       $($($("input[name='keystone-public-url']")[0]).parent()).removeClass("has-error")
-   }
-   return true
-}
-
 function validate_keystone_url(url, inputelement) {
     $.ajax({url: url,
             beforeSend: function() {
@@ -625,6 +608,11 @@ function validate_keystone_credentials(inputelement) {
         success: function(result) {
            $($(inputelement).parent()[0]).addClass("has-success")
            options = ""
+           IsV3 = false
+           if(result.keystone_version == 'v3') {
+              IsV3 = true
+           }
+           setRequired()
            $.each(result.roles, function( index, value ) {
                options += "<option value="+ value +" selected>"+ value + "</option>"
            });
