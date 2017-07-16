@@ -148,7 +148,6 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             backup_target.put_object(path, security_group_json)
 
 def upload_openstack_workload_db_entry(cntx, openstack_workload_id):
-    #TODO Ask Murali why we are using these settings
     #upload_settings_db_entry(cntx)
     try:
         openstack_workload_db = db.openstack_workload_get(cntx, openstack_workload_id)
