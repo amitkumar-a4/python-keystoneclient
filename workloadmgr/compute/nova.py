@@ -251,7 +251,6 @@ def _get_tenant_context(context):
             context = wlm_context.RequestContext(
                 user_id=user_id, project_id=tenant_id,
                 is_admin=True, auth_token=httpclient.auth_token)
-            import pdb;pdb.set_trace()
             if user != 'NA' and getattr(context, 'user', None) == None:
                context.user = user
             if tenant != 'NA' and getattr(context, 'tenant', None) == None:

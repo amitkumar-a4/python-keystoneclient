@@ -85,7 +85,6 @@ class FilterScheduler(driver.Scheduler):
         self.workloads_rpcapi.snapshot_restore(context, host, restore_id)
 
     def schedule_openstack_config_snapshot(self, context, request_spec, filter_properties):
-        #import pdb;pdb.set_trace()
         weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
     
         if not weighed_host:
