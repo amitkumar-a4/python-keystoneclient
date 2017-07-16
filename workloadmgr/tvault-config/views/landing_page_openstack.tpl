@@ -66,11 +66,11 @@
 }
 </style>
 
-<div class="navbar navbar-fixed-top">
+<div class="navbar navbar-default navbar-fixed-top">
     <div class="container-fluid">
         <div class="navbar-header">
             <a class="navbar-brand" href="http://www.trilio.io">
-                <img height="45" width="200" src="images/triliovault-logo2.png">
+                <img height="35" width="150" src="images/triliovault-logo2.png">
             </a>
         </div>
     </div>
@@ -82,7 +82,7 @@
             <!--Nav Bar -->
             <nav class="col-xs-3 bs-docs-sidebar">
                 <ul id="sidebar" class="nav nav-stacked fixed">
-                    <li>
+                    <li class='active'>
                         <a href="#GroupA">Deployment</a>
                     </li>
                     <li>

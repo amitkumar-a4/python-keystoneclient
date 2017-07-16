@@ -378,7 +378,11 @@ function setSwiftRequired(checked, val) {
                                             <div class="col-sm-5">
 		                                <div class="form-group" >
 			                            <label class="control-label">NTP servers</label>
-			                            <input name="ntp-servers" {{'value=' + ntp_servers if defined('ntp_servers') else ''}} id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
+			                            %if 'ntp_servers' in locals():
+			                               <input name="ntp-servers" value="{{locals()['ntp_servers']}}" id="ntp-servers" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
+                                                    %else:
+			                               <input name="ntp-servers" id="ntp-servers" value="" type="text" placeholder="0.pool.ntp.org,1.pool.ntp.org" class="form-control" />
+                                                    %end
 		                                </div>
 		                            </div>
                                             <div class="col-sm-5">
@@ -521,6 +525,22 @@ function setSwiftRequired(checked, val) {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                    <div class="tab-pane" id="license">
+                                        <div class="form-group"><br>
+                                            <label for="licensekey">License Key:</label>
+                                            <textarea class="form-control" rows="12" id="licensekey"></textarea>
+                                          </div>
+                                    </div>
+                                    <div class="tab-pane" id="certificate">
+                                        <div class="form-group"><br>
+                                            <label for="cert">Certificate:</label>
+                                            <textarea class="form-control" rows="5" id="cert"></textarea>
+                                          </div>
+                                        <div class="form-group">
+                                            <label for="privatekey">Private Key:</label>
+                                            <textarea class="form-control" rows="5" id="privatekey"></textarea>
+                                          </div>
                                     </div>
                                 </div>
                                 <div class="wizard-footer">
