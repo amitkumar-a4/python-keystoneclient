@@ -229,9 +229,9 @@ def _get_tenant_context(context):
         kclient = client_plugin.client("keystone")
         context.auth_token = kclient.auth_token
         context.user_id = user_id
-        if user != 'NA' and not hasattr(context, 'user'):
+        if user != 'NA' and getattr(context, 'user', None) == None:
            context.user = user
-        if tenant != 'NA' and not hasattr(context, 'tenant'):
+        if tenant != 'NA' and getattr(context, 'tenant', None) == None:
            context.tenant = tenant
     else:
          try:
@@ -251,9 +251,10 @@ def _get_tenant_context(context):
             context = wlm_context.RequestContext(
                 user_id=user_id, project_id=tenant_id,
                 is_admin=True, auth_token=httpclient.auth_token)
-            if user != 'NA' and not hasattr(context, 'user'):
+            import pdb;pdb.set_trace()
+            if user != 'NA' and getattr(context, 'user', None) == None:
                context.user = user
-            if tenant != 'NA' and not hasattr(context, 'tenant'):
+            if tenant != 'NA' and getattr(context, 'tenant', None) == None:
                context.tenant = tenant
          except Exception:
             with excutils.save_and_reraise_exception():

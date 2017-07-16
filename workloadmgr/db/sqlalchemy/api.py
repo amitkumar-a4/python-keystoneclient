@@ -3267,9 +3267,9 @@ def purge_workload(context, id):
         LOG.exception(ex)
 
 @require_context
-def openstack_workload_update(context, values,  openstack_workload_id):
+def openstack_workload_update(context, openstack_workload_id, values):
     session = get_session()
-    return _openstack_workload_update(context, values, openstack_workload_id, session)
+    return _openstack_workload_update(context, openstack_workload_id, values, session)
 
 @require_context
 def openstack_workload_get(context, openstack_workload_id, **kwargs):
@@ -3277,7 +3277,7 @@ def openstack_workload_get(context, openstack_workload_id, **kwargs):
     return _openstack_workload_get(context, openstack_workload_id, session, **kwargs)
 
 @require_context
-def _openstack_workload_update(context, values, id, session):
+def _openstack_workload_update(context, id, values, session):
     try:
         openstack_workload_ref = _openstack_workload_get(context, id, session)
     except Exception as ex:
@@ -3308,15 +3308,15 @@ def _openstack_workload_get(context, id, session, **kwargs):
 @require_context
 def openstack_config_snapshot_create(context, values):
     session = get_session()
-    return _openstack_config_snapshot_update(context, values, None, session)
+    return _openstack_config_snapshot_update(context, None, values, session)
 
 @require_context
-def openstack_config_snapshot_update(context, values, snapshot_id ):
+def openstack_config_snapshot_update(context, snapshot_id, values ):
     session = get_session()
-    return _openstack_config_snapshot_update(context, values, snapshot_id, session)
+    return _openstack_config_snapshot_update(context, snapshot_id, values, session)
 
 
-def _openstack_config_snapshot_update(context, values, snapshot_id, session):
+def _openstack_config_snapshot_update(context, snapshot_id, values, session):
     try:
         lock.acquire()
         metadata = values.pop('metadata', {})
@@ -3345,7 +3345,7 @@ def _openstack_config_snapshot_update(context, values, snapshot_id, session):
 def _openstack_config_snapshot_get(context, snapshot_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    result = model_query(   context, models.OpenstackSnapshot, **kwargs).\
+    result = model_query(context, models.OpenstackSnapshot, **kwargs).\
                             filter_by(id=snapshot_id).\
                             first()
 

@@ -10,6 +10,7 @@ import time
 import pickle
 import os
 import yaml
+import webob
 from workloadmgr.api import wsgi
 from workloadmgr import exception as wlm_exceptions
 from workloadmgr import flags
@@ -63,13 +64,17 @@ class OpenStackConfigBackupController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
 
             jobschedule = body['jobschedule']
-            
-            existing_openstack_workload = self.workload_api.openstack_config_workload_show(context)
+           
+            try: 
+                existing_openstack_workload = self.workload_api.get_openstack_config_workload(context)
+            except wlm_exceptions.OpenStackWorkload:
+                existing_openstack_workload = None
+
             existing_jobschedule = None
 
             #If OpenStack workload is never enabled, Then user should first enable it 
             #before any update.
-            if not existing_openstack_workload and jobschedule.get('enabled', '').lower() != 'true':
+            if existing_openstack_workload is None and str(jobschedule.get('enabled', '')).lower() != 'true':
                 message = "OpenStack configuration backup is not enabled. First enable it."
                 raise wlm_exceptions.OpenStackWorkload(message=message)
 
@@ -86,7 +91,7 @@ class OpenStackConfigBackupController(wsgi.Controller):
             else:
                 jobdefaults = {'start_time': '09:00 PM',
                                'interval': u'24hr',
-                               'start_date': time.strftime("%x"),
+                               'start_date': time.strftime("%m/%d/%Y"),
                                'end_date': 'No End',
                                'enabled': 'true',
                                'retention_policy_type': 'Number of Snapshots to Keep',
@@ -134,7 +139,7 @@ class OpenStackConfigBackupController(wsgi.Controller):
         """Show OpenStack workload object"""
         try:
             context = req.environ['workloadmgr.context']
-            openstack_workload = self.workload_api.openstack_config_workload_show(context)
+            openstack_workload = self.workload_api.get_openstack_config_workload(context)
             if openstack_workload:
                 return openstack_workload
             else:
@@ -153,9 +158,9 @@ class OpenStackConfigBackupController(wsgi.Controller):
         """snapshot a openstack workload."""
         try:
             context = req.environ['workloadmgr.context']
-            openstack_workload = self.workload_api.openstack_config_workload_show(context)
-
-            if not openstack_workload:
+            try:
+                openstack_workload = self.workload_api.get_openstack_config_workload(context)
+            except wlm_exceptions.OpenStackWorkload:
                #Create OpenStack workload 
                workload_body = {"jobschedule":{"enabled":"true"}}
                self.openstack_config_workload(req, workload_body)
@@ -171,18 +176,20 @@ class OpenStackConfigBackupController(wsgi.Controller):
                     if len(service_list):
                         services_to_snap = service_list
                     else:
+                        #If default file is empty then will snapshot 
+                        #default services
                         services_to_snap = services_to_snapshot
             else:
                 services_to_snap = services_to_snapshot
             if (body and 'snapshot' in body):
-                name = body['snapshot'].get('name', "") or 'Snapshot'
+                name = body['snapshot'].get('name', "")
                 name = name.strip() or 'Snapshot'
-                description = body['snapshot'].get('description', "") or 'no-description'
+                description = body['snapshot'].get('description', "")
                 description = description.strip() or 'no-description'
-   
+
             snapshot = self.workload_api.openstack_config_snapshot(context, services_to_snap, name, description)
             return self.snapshot_view_builder.summary(req, dict(snapshot.iteritems()))
-        except wlm_exceptions.WorkloadNotFound as error:
+        except wlm_exceptions.OpenStackWorkloadNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
         except wlm_exceptions.InvalidState as error:
@@ -238,11 +245,10 @@ class OpenStackConfigBackupController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                snapshot = self.workload_api.openstack_config_snapshot_delete(context, id)
-                return self.snapshot_view_builder.detail(req, snapshot)
+                self.workload_api.openstack_config_snapshot_delete(context, id)
+                return webob.Response(status_int=202)
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
-            return webob.Response(status_int=202)
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

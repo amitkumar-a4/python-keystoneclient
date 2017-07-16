@@ -1617,13 +1617,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     @autolog.log_method(Logger, 'WorkloadMgrManager.openstack_config_workload')
     def openstack_config_workload(self, context, openstack_workload_id):
         """
-        Create a scheduled OpenStack workload in the scheduler.
+        Create a scheduled OpenStack workload.
         """
         try:
-            self.db.openstack_workload_update(context,
+            #TODO add logic for capacity check on NFS
+            self.db.openstack_workload_update(context, openstack_workload_id,
                                     {
                                      'status': 'available',
-                                    },openstack_workload_id)
+                                    })
             workload_utils.upload_openstack_workload_db_entry(context, openstack_workload_id)
     
         except Exception as err:
@@ -1634,23 +1635,21 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     def openstack_config_snapshot(self, context, services_to_snapshot, openstack_snapshot_id):
         try:
-            #import pdb;pdb.set_trace()
-            snapshot = self.db.openstack_config_snapshot_update(context,
+            snapshot = self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
                                                {'host': self.host,
                                                 'progress_msg': 'Snapshot of workload is starting',
-                                                'status': 'starting'},openstack_snapshot_id)
+                                                'status': 'starting'})
 
             openstack_workload = self.db.openstack_workload_get(context, snapshot.openstack_workload_id)
             vault_storage_path = openstack_workload.get('vault_storage_path')
-            if os.path.exists(vault_storage_path):
-               snapshot_vault_storage_path = os.path.join(vault_storage_path, "snapshot_" + str(snapshot.get('id')))
-   
-            self.db.openstack_config_snapshot_update(context,
+            snapshot_vault_storage_path = os.path.join(vault_storage_path, "snapshot_" + str(snapshot.get('id')))
+
+            self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
                                     {
                                      'progress_msg': 'Initializing Snapshot Workflow',
                                      'status': 'executing',
                                      'vault_storage_path': snapshot_vault_storage_path
-                                     }, openstack_snapshot_id)
+                                     })
  
             #Create folder structure on backend
             self._create_snapshot_directory(context, services_to_snapshot, snapshot_vault_storage_path)
@@ -1680,25 +1679,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow_class = get_workflow_class(context, None, config_backup=True)
             workflow = workflow_class( "config_backup" , store)
 
-            self.db.openstack_config_snapshot_update(context,
+            self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
                                     {
                                      'progress_msg': 'Initializing Snapshot Workflow',
                                      'status': 'uploading',
                                      'vault_storage_path': snapshot_vault_storage_path
-                                     }, openstack_snapshot_id)
+                                     })
             workflow.initflow()
             workflow.execute()
 
             time_taken = 0
             if snapshot:
                 time_taken = int((timeutils.utcnow() - snapshot.created_at).total_seconds())
-            snapshot = self.db.openstack_config_snapshot_update(context, 
+            snapshot = self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
                                     {
                                      'progress_msg': 'Snapshot of workload is complete',
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'available',
                                      'time_taken': time_taken,
-                                     }, openstack_snapshot_id)
+                                     })
             workload_utils.upload_config_snapshot_db_entry(context, openstack_snapshot_id)
         except Exception as ex:
             LOG.exception(ex)
@@ -1706,7 +1705,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             time_taken = 0
             if snapshot:
                 time_taken = int((timeutils.utcnow() - snapshot.created_at).total_seconds())
-            snapshot = self.db.openstack_config_snapshot_update(context,
+            snapshot = self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
                                     {
                                      'progress_msg': '',
                                      'error_msg': msg,
@@ -1714,7 +1713,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'error',
                                      'time_taken': time_taken,
                                      'upload_summary' : pickle.dumps(upload_status),
-                                     }, openstack_snapshot_id)
+                                     })
             workload_utils.upload_config_snapshot_db_entry(context, openstack_snapshot_id) 
 
     @autolog.log_method(logger=Logger)

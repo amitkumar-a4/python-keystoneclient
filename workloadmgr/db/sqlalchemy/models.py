@@ -604,6 +604,8 @@ class OpenstackWorkload(BASE, WorkloadsBase):
     __tablename__ = 'openstack_workload'
 
     id = Column(String(36), primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
     status = Column(String(255))
     jobschedule = Column(String(4096))
     storage_backend = Column(String(36))
@@ -616,6 +618,8 @@ class OpenstackSnapshot(BASE, WorkloadsBase):
     """Represents a OpenStack configuration snapshot object."""
     __tablename__ = 'openstack_snapshot'
     id = Column(String(36), primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
     finished_at = Column(DateTime)
     openstack_workload_id = Column(String(36), ForeignKey('openstack_workload.id'), nullable=False)
     display_name = Column(String(255))
