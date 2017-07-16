@@ -61,6 +61,29 @@ class SchedulerManager(manager.Manager):
                                                 host,
                                                 capabilities)
 
+    def file_search(self, context, topic, search_id,
+                          request_spec=None, filter_properties=None):
+        try:
+            if request_spec is None:
+                request_spec = {}
+                snapshot_ref = db.file_search_get(context, search_id)
+
+                request_spec.update( {'search_id': search_id, 'file_search_properties':{}})
+
+            self.driver.schedule_file_search(context, request_spec,
+                                                   filter_properties)
+        except exception.NoValidHost as ex:
+            file_search_state = {'status': {'status': 'error'}}
+            self._set_file_search_state_and_notify('file_search',
+                                              file_search_state,
+                                              context, ex, request_spec)
+        except Exception as ex:
+            with excutils.save_and_reraise_exception():
+                file_search_state = {'status': {'status': 'error'}}
+                self._set_file_search_state_and_notify('file_search',
+                                                  file_search_state,
+                                                  context, ex, request_spec)
+
     def workload_snapshot(self, context, topic, snapshot_id,
                           request_spec=None, filter_properties=None):
         try:
@@ -106,6 +129,29 @@ class SchedulerManager(manager.Manager):
                 self._set_restore_state_and_notify('snapshot_restore',
                                                   restore_state,
                                                   context, ex, request_spec)
+
+    def _set_file_search_state_and_notify(self, method, updates, context, ex,
+                                     request_spec):
+        LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
+
+        file_search_status = updates['status']
+        properties = request_spec.get('snapshot_properties', {})
+
+        search_id = request_spec.get('search_id', None)
+
+        if search_id:
+            db.file_search_update(context, search_id, file_search_status)
+
+        payload = dict(request_spec=request_spec,
+                       snapshot_properties=properties,
+                       search_id=search_id,
+                       state=file_search_status,
+                       method=method,
+                       reason=ex)
+
+        notifier.notify(context, notifier.publisher_id("scheduler"),
+                        'scheduler.' + method, notifier.ERROR, payload)
+
 
     def _set_snapshot_state_and_notify(self, method, updates, context, ex,
                                      request_spec):

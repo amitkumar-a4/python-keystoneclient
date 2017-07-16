@@ -112,13 +112,20 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-            
 
     def delete(self, req, id):
         """Delete a workload."""
         try:
             context = req.environ['workloadmgr.context']
-            self.workload_api.workload_delete(context, id)
+            database_only = False
+            if ('QUERY_STRING' in req.environ) :
+                qs = parse_qs(req.environ['QUERY_STRING'])
+                database_only = qs.get('database_only',[''])[0]
+                database_only = escape(database_only)
+                if database_only.lower() == 'true':
+                    database_only = True
+
+            self.workload_api.workload_delete(context, id, database_only)
             return webob.Response(status_int=202)
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
@@ -285,7 +292,7 @@ class WorkloadMgrsController(wsgi.Controller):
                            'start_time': '09:00 PM',
                            'interval': u'24hr',
                            'enabled': u'true',
-                           'start_date': time.strftime("%x"),
+                           'start_date': time.strftime("%m/%d/%Y"),
                            'end_date': "No End",
                            'retention_policy_type': 'Number of Snapshots to Keep',
                            'retention_policy_value': '30'}
@@ -543,7 +550,10 @@ class WorkloadMgrsController(wsgi.Controller):
 
             try:
                 workloads = self.workload_api.import_workloads(context, workload_ids, upgrade)
-                return self._view_builder.detail_list(req, workloads)
+                    
+                imported_workloads = self._view_builder.detail_list(req,  workloads['workloads']['imported_workloads'])
+                workloads['workloads']['imported_workloads'] = imported_workloads['workloads']
+                return workloads
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -840,10 +850,17 @@ class WorkloadMgrsController(wsgi.Controller):
                         raise exception.ErrorOccurred(msg)
             except Exception as error:
                    msg = error
-                   if error.message[0] == -5:
-                      msg = 'smtp_server_name is not valid'
-                   if error.message.__class__.__name__ == 'timeout':
-                      msg = 'smtp server unreachable with this smtp_server_name and smtp_port values' 
+                   try:
+                       if error.message != '' and error.message[0] == -5:
+                          msg = 'smtp_server_name is not valid'
+                       if error.message != '' and error.message.__class__.__name__ == 'timeout':
+                          msg = 'smtp server unreachable with this smtp_server_name and smtp_port values'
+                       if hasattr(error, 'strerror') and error.strerror != '':
+                          msg = error.strerror
+                       if '%(reason)' in error.message:
+                          msg = error.args[0]
+                   except Exception as ex:
+                          msg = "Error validation email settings"
                    raise exception.ErrorOccurred(msg)
         except exception.InvalidState as error:
             LOG.exception(error)
@@ -939,7 +956,9 @@ class WorkloadMgrsController(wsgi.Controller):
                           "required parameters: user_id."))
             try:
                 workloads = self.workload_api.workloads_reassign(context, tenant_maps)
-                return self._view_builder.detail_list(req, workloads)
+                reassigned_workloads = self._view_builder.detail_list(req,  workloads['workloads']['reassigned_workloads'])
+                workloads['workloads']['reassigned_workloads'] = reassigned_workloads['workloads']
+                return workloads
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
                 raise exc.HTTPNotFound(explanation=unicode(error))

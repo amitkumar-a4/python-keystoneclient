@@ -21,6 +21,7 @@ function validate_swift_credentials(inputelement) {
     username = $('[name="admin-username"]')[0].value
     password = $('[name="admin-password"]')[0].value
     domain_id = $('[name="domain-name"]')[0].value
+    region_name = $('[name="region-name"]')[0].value
     swift_auth_url = $('[name="swift-auth-url"]')[0].value
     swift_username = $('[name="swift-username"]')[0].value
     swift_password = $('[name="swift-password"]')[0].value
@@ -31,7 +32,8 @@ function validate_swift_credentials(inputelement) {
     swift_auth_version = obj.val()
     $.ajax({
         url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
-              "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&swift_auth_version="+swift_auth_version,
+             "&swift_auth_url="+swift_auth_url+"&swift_username="+swift_username+"&swift_password="+swift_password+"&region_name="+region_name+
+             "&swift_auth_version="+swift_auth_version+"&keystone_auth_version="+IsV3,
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
@@ -56,9 +58,8 @@ function validate_swift_credentials(inputelement) {
 }
 
 
-function setRequired(val) {
-    if(val.includes('v3')) {
-       IsV3 = true
+function setRequired() {
+    if(IsV3) {
        $('[name="domain-name"]').attr("required", "true");
     }
     else {
@@ -66,8 +67,6 @@ function setRequired(val) {
     }
 }
 function findForm() {
-  setRequired($("#configure_openstack input[name='keystone-admin-url']").val())
-  setRequired($("#configure_openstack input[name='keystone-public-url']").val())
   hideshowstorages()
 }
 
@@ -139,7 +138,7 @@ function setSwiftRequired(checked, val) {
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
-      <a class="navbar-brand" href="#"><img src="images/triliodata-144x36.png" alt="Trilio Data, Inc" height="36" width="144"></a>
+      <a class="navbar-brand" href="#"><img src="images/triliodata-144x36.png" alt="Trilio Data, Inc" height="32" width="134"></a>
     </div>
     <div id="bs-example-navbar-collapse-3" class="collapse navbar-collapse navbar-right">
        <button class="btn btn-default navbar-btn" type="button" onClick="parent.location='/logout'">Sign Out</button>
@@ -173,12 +172,12 @@ function setSwiftRequired(checked, val) {
     </div>
     <div class="form-group">
     	<label class="control-label">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:20px"></i></label>
-    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
+    	<input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
         <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
     	<label class="control-label">Keystone Url (Public/Internal)<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
-    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
+    	<input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="url" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
     </div>
     <div class="form-group">
@@ -415,20 +414,6 @@ $('#ntp-servers').removeAttr('required');
 }
 });
 
-function validate_url_versions() {
-   if ($( "input[name='keystone-admin-url']" )[0].value.split('v')[1] !=
-       $( "input[name='keystone-public-url']" )[0].value.split('v')[1]) {
-       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).removeClass("hidden")
-       $($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0].innerHTML = "Keystone URL versions don't match"
-       $($($("input[name='keystone-public-url']")[0]).parent()).addClass("has-error")
-       return false
-   } else {
-       $($($("input[name='keystone-public-url']")[0]).parent().find(".help-block")[0]).addClass("hidden")
-       $($($("input[name='keystone-public-url']")[0]).parent()).removeClass("has-error")
-   }
-   return true
-}
-
 function validate_keystone_url(url, inputelement) {
     $.ajax({url: url,
             beforeSend: function() {
@@ -480,6 +465,11 @@ function validate_keystone_credentials(inputelement) {
         success: function(result) {
            $($(inputelement).parent()[0]).addClass("has-success")
            options = ""
+           IsV3 = false
+           if(result.keystone_version == 'v3') {
+              IsV3 = true
+           }
+           setRequired()
            $.each(result.roles, function( index, value ) {
                options += "<option value="+ value +" selected>"+ value + "</option>"
            });

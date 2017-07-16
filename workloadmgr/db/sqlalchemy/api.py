@@ -34,6 +34,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.apscheduler import job
 from workloadmgr.vault import vault
+from workloadmgr.virt import qemuimages
 from workloadmgr.openstack.common.gettextutils import _
 
 FLAGS = flags.FLAGS
@@ -318,6 +319,70 @@ def service_update(context, service_id, values):
         service_ref.update(values)
         service_ref.save(session=session)
 
+
+######### File search ###############
+
+@require_context
+def file_search_get_all(context, **kwargs):
+    status = kwargs.get('status',None)
+    time_in_minutes = kwargs.get('time_in_minutes',None)
+    host = kwargs.get('host', None)
+    vm_id = kwargs.get('vm_id', None)
+    query =  model_query(context, models.FileSearch, **kwargs)
+    query = query.filter_by(project_id=context.project_id)
+    if time_in_minutes is not None:
+       now = timeutils.utcnow()
+       minutes_ago = now - timedelta(minutes=int(time_in_minutes))
+       query = query.filter(models.FileSearch.created_at < minutes_ago)
+    if vm_id is not None:
+       query = query.filter_by(vm_id=vm_id)
+    if host is not None:
+       query = query.filter(or_(models.FileSearch.host == host, models.FileSearch.host == None))
+    if status is not None:
+       query = query.filter(and_(models.FileSearch.status != status, models.FileSearch.status != 'error'))
+    return query.all()   
+
+@require_context
+def file_search_delete(context, search_id):
+    session = get_session()
+    with session.begin():
+        ref = _file_search_get(context, search_id, session=session)
+        session.delete(ref)
+
+@require_context
+def file_search_get(context, search_id):
+    session = get_session()
+    return _file_search_get(context, search_id, session)
+
+@require_context
+def _file_search_get(context, search_id, session):
+    result = model_query(
+        context,
+        models.FileSearch,
+        session=session).\
+        filter_by(project_id=context.project_id).\
+        filter_by(id=search_id).\
+        first()
+    if not result:
+        raise exception.FileSearchNotFound(search_id=search_id)
+
+    return result
+
+@require_context
+def file_search_create(context, values):
+    session = get_session()
+    ref = models.FileSearch()
+    ref.update(values)
+    ref.save()
+    return ref
+
+@require_context
+def file_search_update(context, search_id, values):
+    session = get_session()
+    with session.begin():
+        ref = _file_search_get(context, search_id, session=session)
+        ref.update(values)
+        ref.save(session=session)
 
 #### Work load Types #################
 """ workload_type functions """
@@ -781,15 +846,21 @@ def workload_vms_get(context, workload_id, **kwargs):
 @require_context
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     session = kwargs.get('session') or get_session()
+    read_deleted = 'no'
+    if 'read_deleted' in kwargs:
+       read_deleted = kwargs['read_deleted'] 
     try:
         query = model_query(context, models.WorkloadVMs,
-                            session=session, read_deleted="no")\
+                            session=session, read_deleted=read_deleted)\
                      .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
                      .join(models.Workloads)\
                      .filter(models.WorkloadVMs.status != None)\
                      .filter(models.WorkloadVMs.vm_id==vm_id)\
-                     .filter(models.Workloads.project_id == context.project_id)\
+                     .filter(models.Workloads.project_id == context.project_id)
 
+        if 'workloads_filter' in kwargs:
+           query = query.filter(and_(models.Workloads.status != kwargs['workloads_filter'], models.Workloads.status != None))
+             
         vm_found = query.all()
 
     except sa_orm.exc.NoResultFound:
@@ -1025,6 +1096,7 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
 def snapshot_get_all(context, **kwargs):
     qs = model_query(context, models.Snapshots, **kwargs).\
                     options(sa_orm.joinedload(models.Snapshots.metadata))
+    #qs = qs.join(models.SnapshotVMs, models.Snapshots.id == models.SnapshotVMs.snapshot_id)
     if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':  
        qs = qs.filter_by(workload_id=kwargs['workload_id'])
     if 'host' in kwargs and kwargs['host'] is not None and kwargs['host'] != '':
@@ -1042,7 +1114,30 @@ def snapshot_get_all(context, **kwargs):
     else:
          if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
-    return qs.order_by(models.Snapshots.created_at.desc()).all() 
+    if 'status' in kwargs and kwargs['status'] is not None:
+       if kwargs['status'] == 'available':
+          qs = qs.filter(or_(models.Snapshots.status == 'available', models.Snapshots.status == 'mounted'))
+       else:
+            qs = qs.filter_by(status=kwargs['status'])
+
+    qs = qs.order_by(models.Snapshots.created_at.desc())
+    if 'end' in kwargs and kwargs['end'] != 0:
+       qs = qs.limit(kwargs['end'])
+    if 'start' in kwargs and kwargs['start'] != 0:
+       qs = qs.offset(kwargs['start'])
+
+    if 'get_instances' in kwargs and kwargs['get_instances'] is True:
+       snapshots = qs.all()
+       i = 0
+       for snapshot in snapshots:
+           instances = []
+           snapshot_vms = snapshot_vms_get(context, snapshot.id)
+           for snapshot_vm in snapshot_vms:
+               instances.append(snapshot_vm)
+           snapshots[i].instances = instances
+           i = i + 1
+       return snapshots
+    return qs.all() 
 
 @require_context                            
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
@@ -1056,7 +1151,7 @@ def snapshot_get_all_by_workload(context, workload_id, **kwargs):
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
     if kwargs.get('session') == None:
-        kwargs['session'] = get_session()
+       kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, **kwargs).\
                             options(sa_orm.joinedload(models.Snapshots.metadata)).\
@@ -1146,12 +1241,7 @@ def snapshot_type_time_size_update(context, snapshot_id):
                     vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
                                                                                 disk_format, disk_type)
                 else:
-                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                    while vm_disk_resource_snap_backing_id:
-                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
+                    vm_disk_resource_snap_restore_size = qemuimages.get_effective_size(resource_snap_path)
 
                 #For vmdk   
                 if vm_disk_resource_snap_restore_size == 0:
@@ -1404,8 +1494,10 @@ def _snapshot_vm_get(context, vm_id, snapshot_id, session):
     try:
         query = session.query(models.SnapshotVMs)\
                        .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)
+                       .filter_by(vm_id=vm_id)
+
+        if snapshot_id is not None:
+           query = query.filter_by(snapshot_id=snapshot_id)
 
         #TODO(gbasava): filter out deleted snapshot_vm if context disallows it
         snapshot_vm = query.first()
@@ -2826,7 +2918,6 @@ def task_get_all_by_project(context, project_id, **kwargs):
     return model_query(context, models.Tasks, **kwargs).\
                             options(sa_orm.joinedload(models.Tasks.status_messages)).\
                             filter_by(project_id=project_id).all()
-        
 
 @require_context
 def task_show(context, task_id):
@@ -2992,11 +3083,16 @@ def setting_get_all(context, **kwargs):
         return setting_get_all_by_project(context, context.project_id, **kwargs)
     
     get_hidden = kwargs.get('get_hidden', False)
- 
-    return model_query(context, models.Settings, **kwargs).\
-                        options(sa_orm.joinedload(models.Settings.metadata)).\
-                        filter_by(hidden=get_hidden).\
-                        order_by(models.Settings.created_at.desc()).all()        
+
+    qs = model_query(context, models.Settings, **kwargs).\
+                        options(sa_orm.joinedload(models.Settings.metadata))
+
+    if 'backup_settings' in kwargs:
+       qs = qs.filter(and_(or_(models.Settings.type != 'trust_id', models.Settings.type == None), models.Settings.project_id != 'Configurator'))
+    else:
+          qs = qs.filter_by(hidden=get_hidden)
+
+    return qs.order_by(models.Settings.created_at.desc()).all()
 
 @require_context
 def setting_get_all_by_project(context, project_id, **kwargs):
