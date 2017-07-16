@@ -154,10 +154,6 @@ class SchedulerManager(manager.Manager):
     def openstack_config_snapshot(self, context, topic, openstack_snapshot_id,
                                     request_spec=None, filter_properties=None):
         try:
-            #import pdb;pdb.set_trace()
-            #if request_spec is None:
-            #    request_spec = {}
-    
             request_spec.update({'openstack_snapshot_id': openstack_snapshot_id, 'snapshot_properties': {}})
     
             self.driver.schedule_openstack_config_snapshot(context, request_spec,

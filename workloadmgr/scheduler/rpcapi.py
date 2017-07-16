@@ -54,7 +54,6 @@ class SchedulerAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
 
     def openstack_config_snapshot(self, ctxt, topic, snapshot_id,
                              request_spec=None, filter_properties=None):
-        #import pdb;pdb.set_trace()
         request_spec_p = jsonutils.to_primitive(request_spec)
         return self.cast(ctxt, self.make_msg(
             'openstack_config_snapshot', topic=topic,
