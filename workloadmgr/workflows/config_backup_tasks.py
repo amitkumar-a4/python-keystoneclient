@@ -107,9 +107,9 @@ class CopyConfigFiles(task.Task):
         compute_service = nova.API(production=True)
         result = compute_service.vast_config_snapshot(cntx, openstack_snapshot_id, params)
         upload_status = wait_for_nova_process(openstack_snapshot_id, params, result)
-        db.openstack_config_snapshot_update(cntx,{
+        db.openstack_config_snapshot_update(cntx, openstack_snapshot_id, {
                                     'upload_summary' : pickle.dumps(upload_status),
-                                    }, openstack_snapshot_id)
+                                    })
 
     @autolog.log_method(Logger, 'CopyConfigFiles.revert')
     def revert_with_log(self, *args, **kwargs):
