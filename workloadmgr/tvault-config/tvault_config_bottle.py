@@ -126,14 +126,19 @@ def logout():
     aaa.logout(success_redirect='/login')
 
 
-@bottle.post('/reset_password')
+@bottle.route('/reset_password')
+@authorize()
 def send_password_reset_email():
     """Send out password reset email"""
+    """
     aaa.send_password_reset_email(
         username=post_get('username'),
         email_addr=post_get('email_address')
     )
     return 'Please check your mailbox.'
+    """
+    aaa.current_user.update(email_addr="admin@localhost.local")
+    bottle.redirect("/change_password")
 
 
 @bottle.route('/change_password/:reset_code')

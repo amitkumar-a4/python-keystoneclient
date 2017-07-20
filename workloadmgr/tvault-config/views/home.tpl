@@ -16,6 +16,9 @@
 	function warnReinitialize() {
 	   return confirm("Reinitializing will erase the backup metadata from the the appliance. \nThis operation can't be undone. Proceed to reinitialize?");
 	}
+	function warnResetPassword() {
+	   return confirm("Do you want to reset password?");
+	}
 	</script>
 	
 </head>
@@ -65,6 +68,8 @@
                 <a href="/configure">Configuration</a>
             	<br><br>
             	<a href="/reinitialize" onclick='return warnReinitialize(this)';>Reinitialize</a>                       
+                <br><br>
+            	<a href="/reset_password" onclick='return warnResetPassword(this)';>Reset Password</a>                       
                 <br><br>
                 <a href="/services">Services</a>
             	<br><br>
