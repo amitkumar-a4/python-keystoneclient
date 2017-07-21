@@ -67,10 +67,10 @@ function validatepasswords()
 <div class="container" style="width:370px">
  <img width="350" height="50" src="images/triliovault.png" alt="trilio-splash" id="tdmini">
  <form role="form" class="form-signin" action="/update_service_account_password" onsubmit="return validatepasswords()" method="post">
-  <h2 class="form-signin-heading">Update Service Account Credentials</h2><br><br>
+  <h5 class="form-signin-heading">Update Service Account Credentials</h5><br><br>
       <div>
-        <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="New Password" class="form-control"><br>
-        <input id="confirmpassword" name="confirmpassword" type="password" required="" placeholder="Confirm Password" class="form-control" onkeyup="validatepasswords(); return false;"><br>
+        <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="triliovault New Password" class="form-control"><br>
+        <input id="confirmpassword" name="confirmpassword" type="password" required="" placeholder="Confirm New Password" class="form-control" onkeyup="validatepasswords(); return false;"><br>
         <span id="confirmMessage" class="confirmMessage"></span>
         <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
       </div>
