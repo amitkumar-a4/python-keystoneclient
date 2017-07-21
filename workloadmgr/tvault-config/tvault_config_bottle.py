@@ -198,6 +198,15 @@ def change_password():
     with open('/etc/workloadmgr/workloadmgr.conf', 'wb') as configfile:
         Config.write(configfile)
 
+    command = ['sudo', 'service', 'wlm-api', 'restart'];
+    subprocess.call(command, shell=False)
+
+    command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
+    subprocess.call(command, shell=False)
+
+    command = ['sudo', 'service', 'wlm-workloads', 'restart'];
+    subprocess.call(command, shell=False)
+
     bottle.redirect("/home")
 
 
