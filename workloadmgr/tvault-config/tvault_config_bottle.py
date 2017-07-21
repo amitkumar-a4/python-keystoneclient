@@ -2267,6 +2267,11 @@ def configure_service():
             replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
                          'ssl_key_file = ', starts_with=True)
         else:
+            try:
+                os.mkdir('/opt/stack/data/cert')
+            except:
+                pass
+
             with open('/opt/stack/data/cert/workloadmgr.cert', 'w') as f:
                 f.write(config_data['cert'])
 
