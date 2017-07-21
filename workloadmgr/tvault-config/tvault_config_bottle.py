@@ -817,7 +817,11 @@ def _register_service():
 
     appliance_name = socket.gethostname()
     #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
-    wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
+    if config_data['enable_tls'] == 'on':
+        wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
+    else:
+        wlm_url = 'http://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
+
     if keystone.version == 'v3':
        keystone.endpoints.create(region=config_data['region_name'],
                                  service=wlm_service.id,
@@ -847,10 +851,10 @@ def _register_workloadtypes():
                    workload_types = wlm.workload_types.list()
                    break
                except Exception as ex:
-                      time.sleep(10)
-                      now = timeutils.utcnow()
-                      if (now - start_time) > datetime.timedelta(minutes=8):
-                         raise ex
+                   time.sleep(10)
+                   now = timeutils.utcnow()
+                   if (now - start_time) > datetime.timedelta(minutes=1):
+                       raise ex
         
         workload_type_names = {'Hadoop':False,
                                'MongoDB':False,
@@ -2253,6 +2257,29 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' + config_data.get('trustee_role', '_member_'),
                      starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'enable_tls = ',
+                     'enable_tls = ' + config_data.get('enable_tls', 'off'),
+                     starts_with=True)
+
+        if config_data.get('enable_tls', 'off') == 'off':
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_cert_file = ',
+                         'ssl_cert_file = ', starts_with=True)
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
+                         'ssl_key_file = ', starts_with=True)
+        else:
+            with open('/opt/stack/data/cert/workloadmgr.cert', 'w') as f:
+                f.write(config_data['cert'])
+
+            with open('/opt/stack/data/cert/workloadmgr.key', 'w') as f:
+                f.write(config_data['privatekey'])
+
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_cert_file = ',
+                         'ssl_cert_file = /opt/stack/data/cert/workloadmgr.cert',
+                         starts_with=True)
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
+                         'ssl_key_file = /opt/stack/data/cert/workloadmgr.key',
+                         starts_with=True)
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
                      'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
                      starts_with=True)        
@@ -2271,10 +2298,6 @@ def configure_service():
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'endpoint_type = ',
                      'endpoint_type = ' + config_data['endpoint_type'],
-                     starts_with=True)
-
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'keystone_auth_version = ',
-                     'keystone_auth_version = ' + str(config_data['keystone_auth_version']),
                      starts_with=True)
 
         #configure api-paste
@@ -2721,6 +2744,12 @@ def configure_openstack():
             config_data['trustee_role'] = config_inputs['trustee-role'].strip()
         else:
              config_data['trustee_role'] = None
+
+        config_data['enable_tls'] = config_inputs.get('enable_tls', 'off')
+        if config_data['enable_tls'] == 'on':
+            config_data['cert'] = config_inputs.get('cert', '')
+            config_data['privatekey'] = config_inputs.get('privatekey', '')
+
         config_data['guest_name'] = config_inputs['guest-name'].strip()
         
         parse_result = urlparse(config_data['keystone_admin_url'])

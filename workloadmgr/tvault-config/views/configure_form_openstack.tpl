@@ -13,7 +13,6 @@
 <link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
 
 <!-- Fonts and Icons -->
-<link href='https://fonts.googleapis.com/css?family=Muli:400,300' rel='stylesheet' type='text/css'>
 <link href="css/themify-icons.css" rel="stylesheet">
 
 <!--   Core JS Files   -->
@@ -233,14 +232,6 @@ function setSwiftRequired(checked, val) {
                                                     <i class="ti-download"></i>
                                                 </div>
                                                 Import Workloads
-                                            </a>
-                                        </li>
-                                        <li id='license-tab'>
-                                            <a href="#license" data-toggle="tab">
-                                                <div class="icon-circle">
-                                                    <i class="ti-receipt"></i>
-                                                </div>
-                                                License
                                             </a>
                                         </li>
                                         <li id='certificate-tab'>
@@ -526,21 +517,39 @@ function setSwiftRequired(checked, val) {
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="tab-pane" id="license">
-                                        <div class="form-group"><br>
-                                            <label for="licensekey">License Key:</label>
-                                            <textarea class="form-control" rows="12" id="licensekey"></textarea>
-                                          </div>
-                                    </div>
                                     <div class="tab-pane" id="certificate">
-                                        <div class="form-group"><br>
-                                            <label for="cert">Certificate:</label>
-                                            <textarea class="form-control" rows="5" id="cert"></textarea>
-                                          </div>
-                                        <div class="form-group">
-                                            <label for="privatekey">Private Key:</label>
-                                            <textarea class="form-control" rows="5" id="privatekey"></textarea>
-                                          </div>
+                                        <div class="row">
+                                            <div class="col-sm-12">
+                                                <div id="collapseFour" class="panel-collapse collapse in">
+                                                  <div class="panel-body">
+                                                      <div class="form-group">
+                                                        %if 'enable_ssl' in locals() and enable_tls == 'on':
+                                                             <input name="enable_tls" checked id="enable_tls" checked type="checkbox"> Enable TLS. <span style="font-size:11px;">Choose this option if you are enabling TLS endpoint.</span>
+                                                             <div class="form-group" id='cert-group'><br>
+                                                                 <label for="cert">Certificate:</label>
+                                                                 <textarea name='cert' class="form-control" required rows="5" id="cert"></textarea>
+                                                               </div>
+                                                             <div class="form-group" id='privatekey-group'>
+                                                                 <label for="privatekey">Private Key:</label>
+                                                                 <textarea name='privatekey' class="form-control" required rows="5" id="privatekey"></textarea>
+                                                             </div>
+                                                        %else:
+                                                             <input name="enable_tls" id="enable_tls" type="checkbox"> Enable TLS. <span style="font-size:11px;">Choose this option if you are enabling TLS endpoint.</span>
+                                                             <div class="form-group disabled" id='cert-group'><br>
+                                                                 <label for="cert">Certificate:</label>
+                                                                 <textarea name='cert' class="form-control" required rows="5" id="cert"></textarea>
+                                                               </div>
+                                                             <div class="form-group disabled" id='privatekey-group'>
+                                                                 <label for="privatekey">Private Key:</label>
+                                                                 <textarea name='privatekey' class="form-control" required rows="5" id="privatekey"></textarea>
+                                                             </div>
+                                                        %end
+                                                      </div>
+                                                      <br />
+                                                  </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="wizard-footer">
@@ -569,10 +578,23 @@ function setSwiftRequired(checked, val) {
 $('#ntp-enabled').click(function(){
 if($(this).is(':checked'))
 {
-$('#ntp-servers').attr('required','required')
+    $('#ntp-servers').attr('required','required')
 }
 else
 {
+    $('#ntp-servers').removeAttr('required');
+}
+});
+
+$('#enable_tls').click(function(){
+if($(this).is(':checked'))
+{
+    $('#cert-group').removeClass('disabled')
+    $('#privatekey-group').removeClass('disabled')
+}
+else
+{
+    $('#cert-group').addClass('disabled')
 $('#ntp-servers').removeAttr('required');
 }
 });
