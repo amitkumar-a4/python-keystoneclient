@@ -165,6 +165,45 @@ def change_password():
     aaa.current_user.update(pwd=post_get('newpassword'), email_addr="info@triliodata.com")
     bottle.redirect("/home")
 
+#####
+###   Service account credentials
+#####
+@bottle.route('/update_service_account_password')
+@bottle.view('service_password_change_form')
+@authorize()
+def update_service_account_password():
+    """Show password change form"""
+    return {}
+
+
+@bottle.post('/update_service_account_password')
+@authorize()
+def change_password():
+    config_inputs = bottle.request.POST
+
+    """Change service account password"""
+    Config = ConfigParser.RawConfigParser()
+    Config.read('/etc/workloadmgr/api-paste.ini')
+    Config.set('filter:authtoken','admin_password',
+               config_inputs['newpassword'])
+    with open('/etc/workloadmgr/api-paste.ini', 'wb') as configfile:
+        Config.write(configfile)
+
+    Config = ConfigParser.RawConfigParser()
+    Config.read('/etc/workloadmgr/workloadmgr.conf')
+    Config.set('keystone_authtoken','admin_password',
+               config_inputs['newpassword'])
+    Config.set('keystone_authtoken','password',
+               config_inputs['newpassword'])
+    with open('/etc/workloadmgr/workloadmgr.conf', 'wb') as configfile:
+        Config.write(configfile)
+
+    bottle.redirect("/home")
+
+
+####
+### Landing page
+####
 @bottle.route('/landing_page_openstack')
 @bottle.view('landing_page_openstack')
 def landing_page_openstack():
@@ -1373,7 +1412,7 @@ def configure_glance():
         Config.set('keystone_authtoken','admin_user', config_data['vcenter_username'])
         Config.set('keystone_authtoken','admin_password', config_data['vcenter_password'])
         with open('/etc/glance/glance-api.conf', 'wb') as configfile:
-            Config.write(configfile) 
+            Config.write(configfile)
             
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/glance/glance-cache.conf')
@@ -2223,8 +2262,6 @@ def configure_service():
                  replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['service_tenant_name'])
                  replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_domain_id = ', 'vault_swift_domain_id = ' + config_data['triliovault_user_domain_id'])
 
-
-                        
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])

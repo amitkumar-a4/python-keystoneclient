@@ -19,6 +19,9 @@
 	function warnResetPassword() {
 	   return confirm("Do you want to reset password?");
 	}
+	function warnUpdateServiceAccount() {
+	   return confirm("Do you want to update TrilioVault service account password?");
+	}
 	</script>
 	
 </head>
@@ -70,6 +73,8 @@
             	<a href="/reinitialize" onclick='return warnReinitialize(this)';>Reinitialize</a>                       
                 <br><br>
             	<a href="/reset_password" onclick='return warnResetPassword(this)';>Reset Password</a>                       
+                <br><br>
+            	<a href="/update_service_account_password" onclick='return warnUpdateServiceAccount(this)';>Update Service Password</a>
                 <br><br>
                 <a href="/services">Services</a>
             	<br><br>
