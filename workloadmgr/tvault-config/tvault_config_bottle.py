@@ -2305,6 +2305,10 @@ def configure_service():
                      'endpoint_type = ' + config_data['endpoint_type'],
                      starts_with=True)
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'keystone_auth_version = ',
+                     'keystone_auth_version = ' + str(config_data['keystone_auth_version']),
+                     starts_with=True)
+
         #configure api-paste
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_host = ', 'auth_host = ' + config_data['keystone_host'])
         replace_line('/etc/workloadmgr/api-paste.ini', 'auth_port = ', 'auth_port = ' + str(config_data['keystone_admin_port']))
