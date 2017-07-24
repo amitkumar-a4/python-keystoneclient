@@ -26,6 +26,14 @@ scheduler_driver_opts = [
 FLAGS = flags.FLAGS
 FLAGS.register_opts(scheduler_driver_opts)
 
+def file_search_update_db(context, search_id, host):
+    '''Set the host and set the scheduled_at field of the snapshot.
+
+    :returns: A File search with the updated fields set properly.
+    '''
+    now = timeutils.utcnow()
+    values = {'host': host, 'scheduled_at': now}
+    return db.file_search_update(context, search_id, values)
 
 def snapshot_update_db(context, snapshot_id, host):
     '''Set the host and set the scheduled_at field of the snapshot.
@@ -85,6 +93,10 @@ class Scheduler(object):
     def schedule(self, context, topic, method, *_args, **_kwargs):
         """Must override schedule method for scheduler to work."""
         raise NotImplementedError(_("Must implement a fallback schedule"))
+
+    def schedule_file_search(self, context, request_spec, filter_properties):
+        """Must override search method for scheduler to work."""
+        raise NotImplementedError(_("Must implement schedule_file_search"))
 
     def schedule_snapshot(self, context, request_spec, filter_properties):
         """Must override schedule method for scheduler to work."""

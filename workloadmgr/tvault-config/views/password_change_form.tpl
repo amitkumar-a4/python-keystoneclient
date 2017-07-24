@@ -54,7 +54,7 @@ function validatepasswords()
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
-      <a class="navbar-brand" href="#"><img src="images/triliodata-144x36.png" alt="Trilio Data, Inc" height="36" width="144"></a>
+      <a class="navbar-brand" href="#"><img src="images/triliodata-144x36.png" alt="Trilio Data, Inc" height="32" width="134"></a>
     </div>
   </div><!-- /.container-fluid -->
 </nav>
@@ -62,7 +62,7 @@ function validatepasswords()
 <div class="panel panel-default" style="width:400px;text-align:center;margin-left:auto; margin-right:auto;margin-top:100px">
 <div class="panel-body">
 <div class="container" style="width:370px">
- <img width="200" height="100" src="images/triliovault.png" alt="trilio-splash" id="tdmini">
+ <img width="350" height="50" src="images/triliovault.png" alt="trilio-splash" id="tdmini">
  <form role="form" class="form-signin" action="/change_password" onsubmit="return validatepasswords()" method="post">
   <h2 class="form-signin-heading">Change Password</h2><br><br>
       <div>

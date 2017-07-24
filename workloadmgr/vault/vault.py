@@ -117,6 +117,9 @@ wlm_vault_opts = [
     cfg.StrOpt('triliovault_user_domain_id',
                default='default',
                help='triliovault user domain name'),
+    cfg.StrOpt('keystone_auth_version',
+               default='2.0',
+               help='Keystone authentication version'),
     cfg.IntOpt('workload_full_backup_factor',
                default=50,
                help='The size of full backup compared to actual resource size in percentage'),
@@ -413,6 +416,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
            base64encode = base64.b64encode(backupendpoint)
            mountpath = os.path.join(CONF.vault_data_directory,
                                  base64encode)
+           self.umount_backup_target_swift()
            fileutils.ensure_tree(mountpath)
            self.__mountpath = mountpath
            super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
@@ -607,6 +611,19 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
         return len(mounts) and mounts[0].get(mountpath, None) == nfsshare
 
+    def umount_backup_target_swift(self):
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+        try:
+            command = ['sudo', 'umount', '-f', CONF.vault_data_directory]
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass
+
     @autolog.log_method(logger=Logger) 
     def umount_backup_target(self):
         nfsshare = self.backup_endpoint
@@ -675,7 +692,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             values = stdout.split('\n')[1].split()
 
             total_capacity = int(values[1]) * 1024
-            total_utilization = int(values[2]) * 1024
+            # Used entry in df command is not reliable indicator. Hence we use
+            # size - available as total utilization
+            total_utilization = total_capacity - int(values[3]) * 1024
 
             try:
                 stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=True)
@@ -1025,6 +1044,13 @@ def get_workloads(context):
         workloads += backup_target.get_workloads(context)
 
     return workloads
+
+def validate_workload(workload_url):
+    if os.path.isdir(workload_url) and os.path.exists(os.path.join(workload_url, "workload_db")):
+        return True
+    else:
+        return False
+
 
 def get_all_workload_transfers(context):
     transfers = []

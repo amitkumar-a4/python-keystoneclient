@@ -46,6 +46,26 @@ class FilterScheduler(driver.Scheduler):
         """
         pass
 
+
+    def schedule_file_search(self, context, request_spec, filter_properties):
+        weighed_host = self._host_for_file_search(context, request_spec, filter_properties)
+
+        if not weighed_host:
+            raise exception.NoValidHost(reason="")
+
+        host = weighed_host.obj.host
+        search_id = request_spec['search_id']
+
+        updated_snapshot = driver.file_search_update_db(context, search_id, host)
+        self._post_select_populate_filter_properties(filter_properties,
+                                                     weighed_host.obj)
+
+        # context is not serializable
+        if filter_properties:
+            filter_properties.pop('context', None)
+
+        self.workloads_rpcapi.file_search(context, host, search_id)
+
     def schedule_workload_snapshot(self, context, request_spec, filter_properties):
         weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
 
@@ -178,6 +198,45 @@ class FilterScheduler(driver.Scheduler):
             msg = _("Exceeded max scheduling attempts %(max_attempts)d for "
                     "snapshot %(snapshot_id)s") % locals()
             raise exception.NoValidHost(reason=msg)
+
+    def _host_for_file_search(self, context, request_spec, filter_properties=None):
+        """Returns a list of hosts that meet the required specs,
+        ordered by their fitness.
+        """
+        elevated = context.elevated()
+
+        search_properties = request_spec['file_search_properties']
+        resource_properties = search_properties.copy()
+        request_spec.update({'resource_properties': resource_properties})
+
+        config_options = self._get_configuration_options()
+
+        if filter_properties is None:
+            filter_properties = {}
+        self._populate_retry(filter_properties, resource_properties)
+
+        filter_properties.update({'context': context,
+                                  'request_spec': request_spec,
+                                  'config_options': config_options})
+
+        self.populate_filter_properties(request_spec,
+                                        filter_properties)
+
+        hosts = self.host_manager.get_all_host_states(elevated)
+        hosts = self.host_manager.get_filtered_hosts(hosts,
+                                                     filter_properties)
+        if not hosts:
+            return None
+
+        LOG.info(_("Filtered %(hosts)s") % locals())
+        # weighted_host = WeightedHost() ... the best
+        # host for the job.
+        weighed_hosts = self.host_manager.get_weighed_hosts(hosts,
+                                                            filter_properties)
+        best_host = weighed_hosts[0]
+        LOG.info(_("Choosing %(best_host)s") % locals())
+        best_host.obj.consume_from_file_search(search_properties)
+        return best_host
 
     def _host_for_snapshot(self, context, request_spec, filter_properties=None):
         """Returns a list of hosts that meet the required specs,

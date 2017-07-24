@@ -130,7 +130,7 @@ class RestoreWorkflow(object):
         self._flow.add(vmtasks.RestoreKeypairs("RestoreKeypairs"))
         
         #linear restore VMs
-        self._flow.add(vmtasks.LinearRestoreVMs(self._store['instances']))
+        self._flow.add(vmtasks.UnorderedRestoreVMs(self._store['instances']))
         
         if pre_poweron:
             self._flow.add(pre_poweron)

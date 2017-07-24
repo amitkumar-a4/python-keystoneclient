@@ -30,16 +30,16 @@
             <div>
                 <h2>Deployment</h2>
                 <ol>
-                    <img src="images/triliovault-overview-openstack-thumb.png" width=auto height=auto style="padding-top:23px;" onmouseover="showtrail('auto','auto','images/triliovault-overview-openstack.png');" onmouseout="hidetrail();" />
+                    <img src="images/triliovault-overview-openstack-thumb.png" width=70%  height=45% style="padding-top:23px;" onmouseover="showtrail('auto','auto','images/triliovault-overview-openstack.png');" onmouseout="hidetrail();" />
                     <br>
                 </ol>
                 <h2>Configuration</h2>
                 <ol>
-                    <li>Configure tVault Appliance( Controller or Additional Node)
+                    <li>Configure TrilioVault Appliance (Controller or Additional Node)
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/home" target="_blank">http://floating-ipaddress-of-tvault-vm/home</a>
+                            <a href="/home" target="_blank">http://floating-ipaddress-of-triliovault-vm/home</a>
                         </div>
                     </li>
                     
