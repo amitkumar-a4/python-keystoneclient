@@ -484,23 +484,23 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             'workload_%s' % (workload_metadata['workload_id']))
         return workload_path
 
-    @ensure_mounted()
-    def get_openstack_workload_path(self, workload_metadata):
-        workload_path = os.path.join(self.mount_path,
-                        'workload_%s' % (workload_metadata['workload_id']))
-        return workload_path
+    #@ensure_mounted()
+    #def get_openstack_workload_path(self, workload_metadata):
+    #    workload_path = os.path.join(self.mount_path,
+    #                    'workload_%s' % (workload_metadata['workload_id']))
+    #    return workload_path
    
     @ensure_mounted()
-    def get_openstack_config_workload_path(self, workload_metadata):
-        workload_path = os.path.join(self.mount_path,
-                                     'openstack_workload_%s' % (workload_metadata['openstack_workload_id']))
-        return workload_path
+    def get_config_workload_path(self, config_workload_metadata):
+        config_workload_path = os.path.join(self.mount_path,
+                                     'config_workload_%s' % (config_workload_metadata['config_workload_id']))
+        return config_workload_path
     
-    def get_openstack_config_snapshot_path(self, snapshot_metadata):
-        workload_path = self.get_openstack_config_workload_path(snapshot_metadata)
-        snapshot_path = os.path.join(workload_path,
-                                     'snapshot_%s' % (snapshot_metadata['snapshot_id']))
-        return snapshot_path
+    def get_config_backup_path(self, backup_metadata):
+        workload_path = self.get_config_workload_path(backup_metadata)
+        backup_path = os.path.join(workload_path,
+                                     'backup_%s' % (backup_metadata['backup_id']))
+        return backup_path
  
     def get_snapshot_path(self, snapshot_metadata):                 
         workload_path = self.get_workload_path(snapshot_metadata)
@@ -789,11 +789,11 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             LOG.exception(ex)
 
     @autolog.log_method(logger=Logger)
-    def openstack_config_snapshot_delete(self, context, snapshot_metadata):
+    def config_backup_delete(self, context, backup_metadata):
         try:
-            snapshot_path = self.get_openstack_config_snapshot_path(snapshot_metadata)
-            if os.path.isdir(snapshot_path):
-                shutil.rmtree(snapshot_path)
+            backup_path = self.get_config_backup_path(backup_metadata)
+            if os.path.isdir(backup_path):
+                shutil.rmtree(backup_path)
         except Exception as ex:
             LOG.exception(ex)
 

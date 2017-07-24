@@ -84,16 +84,15 @@ class FilterScheduler(driver.Scheduler):
 
         self.workloads_rpcapi.snapshot_restore(context, host, restore_id)
 
-    def schedule_openstack_config_snapshot(self, context, request_spec, filter_properties):
+    def schedule_config_backup(self, context, request_spec, filter_properties):
         weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
     
         if not weighed_host:
             raise exception.NoValidHost(reason="")
-    
         host = weighed_host.obj.host
-        openstack_snapshot_id = request_spec['openstack_snapshot_id']
+        backup_id = request_spec['backup_id']
     
-        updated_snapshot = driver.openstack_snapshot_update_db(context, openstack_snapshot_id, host)
+        updated_backup = driver.config_backup_update_db(context, backup_id, host)
         self._post_select_populate_filter_properties(filter_properties,
                                                      weighed_host.obj)
     
@@ -101,7 +100,7 @@ class FilterScheduler(driver.Scheduler):
         if filter_properties:
             filter_properties.pop('context', None)
     
-        self.workloads_rpcapi.openstack_config_snapshot(context, host, openstack_snapshot_id, request_spec['services_to_snapshot'])
+        self.workloads_rpcapi.config_backup(context, host, backup_id)
 
     def _post_select_populate_filter_properties(self, filter_properties,
                                                 host_state):

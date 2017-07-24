@@ -461,33 +461,33 @@ def task_get(context, task_id, **kwargs):
 def task_get_all(context, **kwargs):
     return IMPL.task_get_all(context, **kwargs)
 
-def openstack_workload_update(context, values, openstack_workload_id):
+def config_workload_update(context, values, config_workload_id):
     """
-    Create a openstack_workload from the values dictionary or
-    Set the given properties on a openstack_workload  and update it.
+    Create a config_workload from the values dictionary or
+    Set the given properties on a config_workload  and update it.
     """
-    return IMPL.openstack_workload_update(context, values, openstack_workload_id)
+    return IMPL.config_workload_update(context, values, config_workload_id)
 
-def openstack_workload_get(context, openstack_workload_id, **kwargs):
+def config_workload_get(context, config_workload_id, **kwargs):
     """Get a workload or raise if it does not exist."""
-    return IMPL.openstack_workload_get(context, openstack_workload_id, **kwargs)
+    return IMPL.config_workload_get(context, config_workload_id, **kwargs)
 
-def openstack_config_snapshot_create(context, values, **kwargs):
-    """Create a snappshot for OpenStack config."""
-    return IMPL.openstack_config_snapshot_create(context, values, **kwargs)
+def config_backup_create(context, values, **kwargs):
+    """Create a backup for OpenStack config."""
+    return IMPL.config_backup_create(context, values, **kwargs)
 
-def openstack_config_snapshot_update(context, values, snapshot_id, **kwargs):
-    """update a snappshot for OpenStack config"""
-    return IMPL.openstack_config_snapshot_update(context, values, snapshot_id, **kwargs)
+def config_backup_update(context, backup_id, values, **kwargs):
+    """update a backup for OpenStack config"""
+    return IMPL.config_backup_update(context, backup_id, values, **kwargs)
 
-def openstack_config_snapshot_get(context, snapshot_id, **kwargs):
-    """get a snappshot for OpenStack config"""
-    return IMPL.openstack_config_snapshot_get(context, snapshot_id, **kwargs)
+def config_backup_get(context, backup_id, **kwargs):
+    """get a backup for OpenStack config"""
+    return IMPL.config_backup_get(context, backup_id, **kwargs)
 
-def openstack_config_snapshot_get_all(context, **kwargs):
-    """get all snappshots for OpenStack config"""
-    return IMPL.openstack_config_snapshot_get_all(context, **kwargs)
+def config_backup_get_all(context, **kwargs):
+    """get all backups for OpenStack config"""
+    return IMPL.config_backup_get_all(context, **kwargs)
 
-def openstack_config_snapshot_delete(context, snapshot_id, **kwargs):
-    """get all snappshots for OpenStack config"""
-    return IMPL.openstack_config_snapshot_delete(context, snapshot_id, **kwargs)
+def config_backup_delete(context, backup_id, **kwargs):
+    """get all backups for OpenStack config"""
+    return IMPL.config_backup_delete(context, backup_id, **kwargs)

@@ -599,9 +599,9 @@ class SettingMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
 
-class OpenstackWorkload(BASE, WorkloadsBase):
-    """Represents a OpenStack configuration backup object."""
-    __tablename__ = 'openstack_workload'
+class ConfigWorkloads(BASE, WorkloadsBase):
+    """Represents a config workload object."""
+    __tablename__ = 'config_workloads'
 
     id = Column(String(36), primary_key=True)
     user_id = Column(String(255), nullable=False)
@@ -614,14 +614,25 @@ class OpenstackWorkload(BASE, WorkloadsBase):
     backup_media_target = Column(String(2046))
     error_msg = Column(String(4096))
 
-class OpenstackSnapshot(BASE, WorkloadsBase):
-    """Represents a OpenStack configuration snapshot object."""
-    __tablename__ = 'openstack_snapshot'
+class ConfigWorkloadMetadata(BASE, WorkloadsBase):
+    """Represents metadata for the config workload"""
+    __tablename__ = 'config_workload_metadata'
+    __table_args__ = (UniqueConstraint('config_workload_id', 'key'), {})
+
+    id = Column(String(255), primary_key=True)
+    config_workload_id = Column(String(36), ForeignKey('config_workloads.id'), nullable=False)
+    config_workload = relationship(ConfigWorkloads, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)
+
+class ConfigBackups(BASE, WorkloadsBase):
+    """Represents a configuration backup object."""
+    __tablename__ = 'config_backups'
     id = Column(String(36), primary_key=True)
     user_id = Column(String(255), nullable=False)
     project_id = Column(String(255), nullable=False)
     finished_at = Column(DateTime)
-    openstack_workload_id = Column(String(36), ForeignKey('openstack_workload.id'), nullable=False)
+    config_workload_id = Column(String(36), ForeignKey('config_workloads.id'), nullable=False)
     display_name = Column(String(255))
     display_description = Column(String(255))
     size = Column(BigInteger)
@@ -634,8 +645,18 @@ class OpenstackSnapshot(BASE, WorkloadsBase):
     scheduled_at = Column(DateTime)
     status = Column(String(255), nullable=False)
     data_deleted = Column(Boolean, default=False)
-    services_to_backup = Column(String(4096))
     upload_summary = Column(String(4096))
+
+class ConfigBackupMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the config backup"""
+    __tablename__ = 'config_backup_metadata'
+    __table_args__ = (UniqueConstraint('config_backup_id', 'key'), {})
+
+    id = Column(String(255), primary_key=True)
+    config_backup_id = Column(String(36), ForeignKey('config_backups.id'), nullable=False)
+    config_backup = relationship(ConfigBackups, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)
  
 def register_models():
     """Register Models and create metadata.
@@ -676,8 +697,10 @@ def register_models():
               TaskStatusMessages,
               Settings,
               SettingMetadata,
-              OpenstackWorkload,
-              OpenstackSnapshot
+              ConfigWorkloads,
+              ConfigWorkloadMetadata,
+              ConfigBackups,
+              ConfigBackupMetadata,
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:

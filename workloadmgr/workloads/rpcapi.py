@@ -174,26 +174,26 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   timeout=300)        
 
     @autolog.log_method(logger=Logger)
-    def openstack_config_workload(self, ctxt, host, openstack_workload_id):
-        LOG.debug("openstack_config_workload in rpcapi openstack_workload_id %s", openstack_workload_id)
+    def config_workload(self, ctxt, host, config_workload_id):
+        LOG.debug("config_workload in rpcapi workload_id %s", config_workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
         self.cast(ctxt,
-                  self.make_msg('openstack_config_workload', openstack_workload_id=openstack_workload_id),
+                  self.make_msg('config_workload', config_workload_id=config_workload_id),
                   topic=topic)
 
     @autolog.log_method(logger=Logger)
-    def openstack_config_snapshot(self, ctxt, host, openstack_snapshot_id, services_to_snapshot):
-        LOG.debug("openstack_config_snapshot in rpcapi openstack_snapshot_id:%s", openstack_snapshot_id)
+    def config_backup(self, ctxt, host, backup_id):
+        LOG.debug("config_backup in rpcapi backup_id:%s", backup_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
         self.cast(ctxt,
-                  self.make_msg('openstack_config_snapshot',  openstack_snapshot_id=openstack_snapshot_id, services_to_snapshot=services_to_snapshot), topic=topic)
+                  self.make_msg('config_backup', backup_id=backup_id), topic=topic)
 
     @autolog.log_method(logger=Logger)
-    def openstack_config_snapshot_delete(self, ctxt, host, snapshot_id, task_id):
-        LOG.debug("openstack_config_snapshot rpcapi openstack_snapshot_id:%s", snapshot_id)
+    def config_backup_delete(self, ctxt, host, backup_id, task_id):
+        LOG.debug("config_backup rpcapi backup_id:%s", backup_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         self.cast(ctxt,
-                  self.make_msg('openstack_config_snapshot_delete', snapshot_id=snapshot_id,
+                  self.make_msg('config_backup_delete', backup_id=backup_id,
                                 task_id=task_id), topic=topic)

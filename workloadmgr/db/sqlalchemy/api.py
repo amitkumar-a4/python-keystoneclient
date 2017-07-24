@@ -3267,122 +3267,176 @@ def purge_workload(context, id):
         LOG.exception(ex)
 
 @require_context
-def openstack_workload_update(context, openstack_workload_id, values):
+def config_workload_update(context, config_workload_id, values):
     session = get_session()
-    return _openstack_workload_update(context, openstack_workload_id, values, session)
+    return _config_workload_update(context, config_workload_id, values, session)
 
 @require_context
-def openstack_workload_get(context, openstack_workload_id, **kwargs):
+def config_workload_get(context, config_workload_id, **kwargs):
     session = get_session()
-    return _openstack_workload_get(context, openstack_workload_id, session, **kwargs)
+    return _config_workload_get(context, config_workload_id, session, **kwargs)
 
 @require_context
-def _openstack_workload_update(context, id, values, session):
+def _config_workload_update(context, id, values, session):
+    metadata = values.pop('metadata', {})
     try:
-        openstack_workload_ref = _openstack_workload_get(context, id, session)
+        config_workload_ref = _config_workload_get(context, id, session)
     except Exception as ex:
-        openstack_workload_ref = models.OpenstackWorkload()
+        config_workload_ref = models.ConfigWorkloads()
         if not values.get('id'):
             values['id'] = id
 
-    openstack_workload_ref.update(values)
-    openstack_workload_ref.save(session)
+    config_workload_ref.update(values)
+    config_workload_ref.save(session)
 
-    return openstack_workload_ref
+    if metadata:
+        _set_metadata_for_config_workload(context, config_workload_ref, metadata, session=session)
+
+    return config_workload_ref
 
 @require_context
-def _openstack_workload_get(context, id, session, **kwargs):
+def _config_workload_get(context, id, session, **kwargs):
     try:
-        openstack_workload = model_query(
-            context, models.OpenstackWorkload, session=session, **kwargs).\
+        config_workload = model_query(
+            context, models.ConfigWorkloads, session=session, **kwargs).\
+            options(sa_orm.joinedload(models.ConfigWorkloads.metadata)).\
             filter_by(id=id).first()
 
-        if openstack_workload is None:
-            raise exception.OpenStackWorkloadNotFound(id=id)
+        if config_workload is None:
+            raise exception.ConfigWorkloadNotFound(id=id)
 
     except sa_orm.exc.NoResultFound:
-        raise exception.OpenStackWorkloadNotFound(id=id)
+        raise exception.ConfigWorkloadNotFound(id=id)
 
-    return openstack_workload
+    return config_workload
+
+def _set_metadata_for_config_workload(context, config_workload_ref, metadata, session):
+    """
+    Create or update a set of config_workload_metadata for a given config_workload
+    """
+    orig_metadata = {}
+    for metadata_ref in config_workload_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'config_workload_id': config_workload_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _config_workload_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _config_workload_metadata_create(context, metadata_values, session)
 
 @require_context
-def openstack_config_snapshot_create(context, values):
-    session = get_session()
-    return _openstack_config_snapshot_update(context, None, values, session)
+def _config_workload_metadata_create(context, values, session):
+    """Create an ConfigWorkloadMetadata object"""
+    metadata_ref = models.ConfigWorkloadMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    return _config_workload_metadata_update(context, metadata_ref, values, session)
 
 @require_context
-def openstack_config_snapshot_update(context, snapshot_id, values ):
+def config_workload_metadata_create(context, values, session):
+    """Create an ConfigWorkloadMetadata object"""
     session = get_session()
-    return _openstack_config_snapshot_update(context, snapshot_id, values, session)
+    return _config_workload_metadata_create(context, values, session)
+
+@require_context
+def _config_workload_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by config_workload_metadata_create and config_workload_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _config_workload_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by config_workload_metadata_create and config_workload_metadata_create
+    """
+    metadata_ref.delete(session=session)
+
+@require_context
+def config_backup_create(context, values):
+    session = get_session()
+    return _config_backup_update(context, None, values, session)
+
+@require_context
+def config_backup_update(context, backup_id, values ):
+    session = get_session()
+    return _config_backup_update(context, backup_id, values, session)
 
 
-def _openstack_config_snapshot_update(context, snapshot_id, values, session):
+def _config_backup_update(context, backup_id, values, session):
     try:
         lock.acquire()
         metadata = values.pop('metadata', {})
 
-        if snapshot_id:
-            snapshot_ref = model_query(context, models.OpenstackSnapshot, session=session, read_deleted="yes"). \
-                filter_by(id=snapshot_id).first()
-            if not snapshot_ref:
+        if backup_id:
+            backup_ref = model_query(context, models.ConfigBackups, session=session, read_deleted="yes"). \
+                filter_by(id=backup_id).first()
+            if not backup_ref:
                 lock.release()
-                raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
+                raise exception.ConfigBackupNotFound(backup_id=backup_id)
         else:
-            snapshot_ref = models.OpenstackSnapshot()
+            backup_ref = models.ConfigBackups()
             if not values.get('id'):
                 values['id'] = str(uuid.uuid4())
             if not values.get('size'):
                 values['size'] = 0
-        snapshot_ref.update(values)
-        snapshot_ref.save(session)
+        backup_ref.update(values)
+        backup_ref.save(session)
 
-        return snapshot_ref
+        return backup_ref
     finally:
         lock.release()
-    return snapshot_ref
+    return backup_ref
 
 @require_context
-def _openstack_config_snapshot_get(context, snapshot_id, **kwargs):
+def _config_backup_get(context, backup_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    result = model_query(context, models.OpenstackSnapshot, **kwargs).\
-                            filter_by(id=snapshot_id).\
+    result = model_query(context, models.ConfigBackups, **kwargs).\
+                            filter_by(id=backup_id).\
                             first()
 
     if not result:
-        raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
+        raise exception.ConfigBackupNotFound(backup_id=backup_id)
 
     return result
 
 @require_context
-def openstack_config_snapshot_get(context, snapshot_id, **kwargs):
+def config_backup_get(context, backup_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
-    return _openstack_config_snapshot_get(context, snapshot_id, **kwargs)
+    return _config_backup_get(context, backup_id, **kwargs)
 
 
 @require_context
-def openstack_config_snapshot_get_all(context, **kwargs):
-    qs = model_query(context, models.OpenstackSnapshot, **kwargs)
-    if 'openstack_workload_id' in kwargs and kwargs['openstack_workload_id'] is not None and kwargs['openstack_workload_id'] != '':
-       qs = qs.filter_by(openstack_workload_id=kwargs['openstack_workload_id'])
+def config_backup_get_all(context, **kwargs):
+    qs = model_query(context, models.ConfigBackups, **kwargs)
+    if 'config_workload_id' in kwargs and kwargs['config_workload_id'] is not None and kwargs['config_workload_id'] != '':
+       qs = qs.filter_by(config_workload_id=kwargs['config_workload_id'])
     if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
        if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
            date_to = kwargs['date_to']
        else:
             date_to = datetime.now()
-       qs = qs.filter(and_(models.OpenstackSnapshot.created_at >= func.date_format(kwargs['date_from'],'%y-%m-%dT%H:%i:%s'),\
-                      models.OpenstackSnapshot.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
+       qs = qs.filter(and_(models.ConfigBackups.created_at >= func.date_format(kwargs['date_from'],'%y-%m-%dT%H:%i:%s'),\
+                      models.ConfigBackups.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
 
-    return qs.order_by(models.OpenstackSnapshot.created_at.desc()).all()
+    return qs.order_by(models.ConfigBackups.created_at.desc()).all()
 
 
 @require_context
-def openstack_config_snapshot_delete(context, snapshot_id):
+def config_backup_delete(context, backup_id):
     session = get_session()
     with session.begin():
-        session.query(models.OpenstackSnapshot).\
-            filter_by(id=snapshot_id).\
+        session.query(models.ConfigBackups).\
+            filter_by(id=backup_id).\
             update({'status': 'deleted',
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),

@@ -28,13 +28,13 @@ vmtasks_opts = []
 CONF = cfg.CONF
 CONF.register_opts(vmtasks_opts)
 
-def wait_for_nova_process( openstack_snapshot_id, params, result):
+def wait_for_nova_process( backup_id, params, result):
     try:
-        tracker_metadata = {'snapshot_id': params['snapshot_id']}
+        tracker_metadata = {'backup_id': params['backup_id']}
         backup_target = vault.get_backup_target(params['backend_endpoint'])
         progress_tracking_directory = backup_target.get_progress_tracker_directory(tracker_metadata)
         hosts = result['hosts']
-        snapshot_status = {}
+        backup_status = {}
         start_time = time.time()
         base_stat_map = {}
 
@@ -62,7 +62,7 @@ def wait_for_nova_process( openstack_snapshot_id, params, result):
                             base_stat_map[host]['base_stat'] = progstat
                             base_stat_map[host]['base_time'] = time.time()
                         elif time.time() - base_stat_map[host]['base_time'] > 600:
-                            snapshot_status[host] = ("No update to %s modified time for last 10 minutes. "
+                            backup_status[host] = ("No update to %s modified time for last 10 minutes. "
                                                      "Contego may have errored. Aborting Operation")
                             hosts.remove(host)
                             continue
@@ -85,8 +85,8 @@ def wait_for_nova_process( openstack_snapshot_id, params, result):
                     diff = time.time() - start_time
                     if diff >= 600:
                         hosts.remove(host)
-                        snapshot_status[host] = "Contego service Unreachable."
-        return snapshot_status
+                        backup_status[host] = "Contego service Unreachable."
+        return backup_status
 
     except Exception as ex:
         LOG.exception(ex)
@@ -94,20 +94,20 @@ def wait_for_nova_process( openstack_snapshot_id, params, result):
 
 class CopyConfigFiles(task.Task):
 
-    def execute(self, context, openstack_snapshot_id, params):
-        return self.execute_with_log(context, openstack_snapshot_id, params)
+    def execute(self, context, backup_id, params):
+        return self.execute_with_log(context, backup_id, params)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'CopyConfigFiles.execute')
-    def execute_with_log(self, context, openstack_snapshot_id, params):
+    def execute_with_log(self, context, backup_id, params):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
-        result = compute_service.vast_config_snapshot(cntx, openstack_snapshot_id, params)
-        upload_status = wait_for_nova_process(openstack_snapshot_id, params, result)
-        db.openstack_config_snapshot_update(cntx, openstack_snapshot_id, {
+        result = compute_service.vast_config_snapshot(cntx, backup_id, params)
+        upload_status = wait_for_nova_process(backup_id, params, result)
+        db.config_backup_update(cntx, backup_id, {
                                     'upload_summary' : pickle.dumps(upload_status),
                                     })
 
@@ -117,27 +117,27 @@ class CopyConfigFiles(task.Task):
 
 class ApplyRetentionPolicy(task.Task):
 
-    def execute(self, context, openstack_workload_id):
-        return self.execute_with_log(context, openstack_workload_id)
+    def execute(self, context, config_workload_id):
+        return self.execute_with_log(context, config_workload_id)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.execute')
-    def execute_with_log(self, context, openstack_workload_id):
+    def execute_with_log(self, context, config_workload_id):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        openstack_workload = db.openstack_workload_get(cntx, openstack_workload_id)
-        jobschedule = pickle.loads(str(openstack_workload['jobschedule']))
+        config_workload = db.config_workload_get(cntx, config_workload_id)
+        jobschedule = pickle.loads(str(config_workload['jobschedule']))
 
-        snapshots_to_keep = int(jobschedule['retention_policy_value'])
+        backups_to_keep = int(jobschedule['retention_policy_value'])
 
-        snapshots = db.openstack_config_snapshot_get_all(cntx)
+        backups = db.config_backup_get_all(cntx)
 
-        if len(snapshots) > snapshots_to_keep:
-            for snapshot in snapshots[snapshots_to_keep:]:
-                workload_utils.openstack_config_snapshot_delete(cntx, snapshot.id)
+        if len(backups) > backups_to_keep:
+            for backup in backups[backups_to_keep:]:
+                workload_utils.config_backup_delete(cntx, backup.id)
 
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.revert')
     def revert_with_log(self, *args, **kwargs):

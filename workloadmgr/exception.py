@@ -529,8 +529,11 @@ class RoleNotFound(NotFound):
     message = _("User %(user_id)s does not have role '%(role_name)s' on "
                 "project %(project_id)s")
 
-class OpenStackWorkload(WorkloadMgrException):
+class ConfigWorkload(WorkloadMgrException):
     message = _("%(message)")
 
-class OpenStackWorkloadNotFound(NotFound):
-    message = _("OpenStack Workload %(id)s could not be found.")
+class ConfigWorkloadNotFound(NotFound):
+    message = _("Config Workload %(id)s could not be found.")
+
+class ConfigBackupNotFound(NotFound):
+    message = _("Config backup %(backup_id)s could not be found.")

@@ -45,13 +45,13 @@ def restore_update_db(context, restore_id, host):
     values = {'host': host, 'scheduled_at': now}
     return db.restore_update(context, restore_id, values)
 
-def openstack_snapshot_update_db(context, openstack_snapshot_id, host):
-    '''Set the host and set the scheduled_at field of the snapshot.
-    :returns: A OpenstackSnapshot with the updated fields set properly.
+def config_backup_update_db(context, backup_id, host):
+    '''Set the host and set the scheduled_at field of the backup.
+    :returns: A ConfigBackup with the updated fields set properly.
     '''
     now = timeutils.utcnow()
     values = {'host': host, 'scheduled_at': now}
-    return db.openstack_config_snapshot_update(context, values, openstack_snapshot_id)
+    return db.config_backup_update(context, backup_id, values)
 
 class Scheduler(object):
     """The base class that all Scheduler classes should inherit from."""

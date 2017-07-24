@@ -1534,88 +1534,99 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             LOG.error("Error while creating folder structer for snapshot :%s" %ex.message)
             LOG.exception(ex)
 
-    @autolog.log_method(Logger, 'WorkloadMgrManager.openstack_config_workload')
-    def openstack_config_workload(self, context, openstack_workload_id):
+    @autolog.log_method(Logger, 'WorkloadMgrManager.config_workload')
+    def config_workload(self, context, config_workload_id):
         """
-        Create a scheduled OpenStack workload.
+        Create a scheduled config workload.
         """
         try:
-            self.db.openstack_workload_update(context, openstack_workload_id,
+            self.db.config_workload_update(context, config_workload_id,
                                     {
                                      'status': 'available',
                                     })
-            workload_utils.upload_openstack_workload_db_entry(context, openstack_workload_id)
+            workload_utils.upload_config_workload_db_entry(context, config_workload_id)
     
         except Exception as err:
             with excutils.save_and_reraise_exception():
-                self.db.openstack_workload_update(context, openstack_workload_id,
+                self.db.config_workload_update(context, config_workload_id,
                                         {'status': 'error',
                                          'error_msg': str(err)})
 
-    def openstack_config_snapshot(self, context, services_to_snapshot, openstack_snapshot_id):
+    def config_backup(self, context, config_backup_id):
         try:
-            snapshot = self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
+            services_to_backup = None
+            backup = self.db.config_backup_update(context, config_backup_id,
                                                {'host': self.host,
-                                                'progress_msg': 'Snapshot of workload is starting',
+                                                'progress_msg': 'Config backup is starting',
                                                 'status': 'starting'})
 
-            openstack_workload = self.db.openstack_workload_get(context, snapshot.openstack_workload_id)
-            vault_storage_path = openstack_workload.get('vault_storage_path')
-            snapshot_vault_storage_path = os.path.join(vault_storage_path, "snapshot_" + str(snapshot.get('id')))
+            config_workload = self.db.config_workload_get(context, backup.config_workload_id)
+            config_workload_metadata = config_workload.get('metadata')
+            for metadata in config_workload_metadata:
+                if metadata['key'] == 'services_to_backup':
+                    services_to_backup = metadata['services_to_backup']
 
-            self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
+            #TODO throw right exception here
+            if services_to_backup is None:
+                message = "Config workload doesn't contain services to backup."
+                raise wlm_exceptions.NotFound(message) 
+
+            vault_storage_path = config_workload.get('vault_storage_path')
+            backup_vault_storage_path = os.path.join(vault_storage_path, "backup_" + str(backup.get('id')))
+
+            self.db.config_backup_update(context, config_backup_id,
                                     {
-                                     'progress_msg': 'Initializing Snapshot Workflow',
+                                     'progress_msg': 'Initializing backup Workflow',
                                      'status': 'executing',
-                                     'vault_storage_path': snapshot_vault_storage_path
+                                     'vault_storage_path': backup_vault_storage_path
                                      })
- 
+
             #Create folder structure on backend
-            self._create_snapshot_directory(context, services_to_snapshot, snapshot_vault_storage_path)
-    
-            params = {'services_to_snapshot': services_to_snapshot, 'snapshot_directory': snapshot_vault_storage_path,
-                      'backend_endpoint': openstack_workload['backup_media_target'], 'snapshot_id': snapshot.get('id')}
+            self._create_backup_directory(context, services_to_backup, backup_vault_storage_path)
+
+            params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
+                      'backend_endpoint': config_workload['backup_media_target'], 'backup_id': config_backup_id}
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])
             context_dict['conf'] =  None # RpcContext object looks for this during init
             store = {
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
-                'openstack_snapshot_id': openstack_snapshot_id, # snapshot id
-                'openstack_workload_id': snapshot.openstack_workload_id,
+                'backup_id': config_backup_id, # backup id
+                'config_workload_id': backup.config_workload_id,
                 'params': params,    
             }
 
             workflow_class = get_workflow_class(context, None, config_backup=True)
             workflow = workflow_class( "config_backup" , store)
 
-            self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
+            self.db.config_backup_update(context, config_backup_id,
                                     {
-                                     'progress_msg': 'Initializing Snapshot Workflow',
+                                     'progress_msg': 'Initializing backup Workflow',
                                      'status': 'uploading',
-                                     'vault_storage_path': snapshot_vault_storage_path
+                                     'vault_storage_path': backup_vault_storage_path
                                      })
             workflow.initflow()
             workflow.execute()
 
             time_taken = 0
-            if snapshot:
-                time_taken = int((timeutils.utcnow() - snapshot.created_at).total_seconds())
-            snapshot = self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
+            if backup:
+                time_taken = int((timeutils.utcnow() - backup.created_at).total_seconds())
+            backup = self.db.config_backup_update(context, config_backup_id,
                                     {
-                                     'progress_msg': 'Snapshot of workload is complete',
+                                     'progress_msg': 'Configuration backup is complete',
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'available',
                                      'time_taken': time_taken,
                                      })
-            workload_utils.upload_config_snapshot_db_entry(context, openstack_snapshot_id)
+            workload_utils.upload_config_backup_db_entry(context, config_backup_id)
         except Exception as ex:
             LOG.exception(ex)
             msg = _("Failed creating config backup: %(exception)s") %{'exception': ex}
             time_taken = 0
-            if snapshot:
-                time_taken = int((timeutils.utcnow() - snapshot.created_at).total_seconds())
-            snapshot = self.db.openstack_config_snapshot_update(context, openstack_snapshot_id,
+            if backup:
+                time_taken = int((timeutils.utcnow() - backup.created_at).total_seconds())
+            backup = self.db.config_backup_update(context, config_backup_id,
                                     {
                                      'progress_msg': '',
                                      'error_msg': msg,
@@ -1623,19 +1634,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': 'error',
                                      'time_taken': time_taken,
                                      })
-            workload_utils.upload_config_snapshot_db_entry(context, openstack_snapshot_id) 
+            workload_utils.upload_config_backup_db_entry(context, config_backup_id) 
 
     @autolog.log_method(logger=Logger)
-    def openstack_config_snapshot_delete(self, context, snapshot_id, task_id):
+    def config_backup_delete(self, context, backup_id, task_id):
         """
-        Delete an existing openstack config snapshot
+        Delete an existing config snapshot
         """
-        def execute(context, snapshot_id, task_id):
-            workload_utils.openstack_config_snapshot_delete(context, snapshot_id)
-            self.db.openstack_config_snapshot_update(context, snapshot_id, {'status': 'deleted'})
-            status_messages = {'message': 'Snapshot delete operation completed'}
+        def execute(context, backup_id, task_id):
+            workload_utils.config_backup_delete(context, backup_id)
+            self.db.config_backup_update(context, backup_id, {'status': 'deleted'})
+            status_messages = {'message': 'Config backup delete operation completed'}
             self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
                                                    'status_messages': status_messages})
 
-        self.pool.submit(execute, context, snapshot_id, task_id)
+        self.pool.submit(execute, context, backup_id, task_id)
         

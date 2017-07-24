@@ -654,40 +654,39 @@ class APIRouter(workloadmgr.api.APIRouter):
         #Openstack configuration backup
         self.resources['openstack_config_backup'] = openstack_config_backup.create_resource(ext_mgr)
         
-        # reassign workloads
-        mapper.connect("openstack_config_workload_update",
-                       "/{project_id}/openstack_config",
+        mapper.connect("config_workload_update",
+                       "/{project_id}/config_workload",
                        controller=self.resources['openstack_config_backup'],
-                       action='openstack_config_workload',
+                       action='config_workload',
                        conditions={"method": ['PUT']})
 
-        mapper.connect("openstack_config_workload_show",
-                       "/{project_id}/openstack_config_show",
+        mapper.connect("get_config_workload",
+                       "/{project_id}/config_workload",
                        controller=self.resources['openstack_config_backup'],
-                       action='openstack_config_workload_show',
+                       action='get_config_workload',
                        conditions={"method": ['GET']})
 
-        mapper.connect("openstack_config_snapshot",
-                       "/{project_id}/openstack_config_snapshot",
+        mapper.connect("config_backup",
+                       "/{project_id}/config_backup",
                        controller=self.resources['openstack_config_backup'],
-                       action='openstack_config_snapshot',
+                       action='config_backup',
                        conditions={"method": ['POST']})
 
-        mapper.connect("openstack_config_snapshot_show",
-                       "/{project_id}/openstack_config_snapshot/{id}",
+        mapper.connect("get_config_backup",
+                       "/{project_id}/config_backup/{id}",
                        controller=self.resources['openstack_config_backup'],
-                       action='openstack_config_snapshot_show',
+                       action='get_config_backup',
                        conditions={"method": ['GET']})
 
-        mapper.connect("openstack_config_snapshot_list",
-                       "/{project_id}/openstack_config_snapshots",
+        mapper.connect("config_backup_list",
+                       "/{project_id}/config_backups",
                        controller=self.resources['openstack_config_backup'],
-                       action='openstack_config_snapshot_list',
+                       action='config_backup_list',
                        conditions={"method": ['GET']})
 
-        mapper.connect("openstack_config_snapshot_delete",
-                       "/{project_id}/openstack_config_snapshot/{id}",
+        mapper.connect("config_snapshot_delete",
+                       "/{project_id}/config_backup/{id}",
                        controller=self.resources['openstack_config_backup'],
-                       action='openstack_config_snapshot_delete',
+                       action='config_backup_delete',
                        conditions={"method": ['DELETE']})
 
