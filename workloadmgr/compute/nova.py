@@ -214,26 +214,34 @@ def _get_tenant_context(context):
 
     trust = _get_trusts(user_id, tenant_id)
     if len(trust):
-        trust_id = trust[0].value
-        context = wlm_context.RequestContext(
-            username=CONF.keystone_authtoken.admin_user,
-            password=CONF.keystone_authtoken.admin_password,
-            trust_id=trust_id,
-            tenant_id=tenant_id,
-            trustor_user_id=user_id,
-            user_domain_id=CONF.triliovault_user_domain_id,
-            is_admin=False)
+        try:
+            trust_id = trust[0].value
+            context = wlm_context.RequestContext(
+                username=CONF.keystone_authtoken.admin_user,
+                password=CONF.keystone_authtoken.admin_password,
+                trust_id=trust_id,
+                tenant_id=tenant_id,
+                trustor_user_id=user_id,
+                user_domain_id=CONF.triliovault_user_domain_id,
+                is_admin=False)
 
-        clients.initialise()
-        client_plugin = clients.Clients(context)
-        kclient = client_plugin.client("keystone")
-        context.auth_token = kclient.auth_token
-        context.user_id = user_id
-        if user != 'NA' and not hasattr(context, 'user'):
-           context.user = user
-        if tenant != 'NA' and not hasattr(context, 'tenant'):
-           context.tenant = tenant
+            clients.initialise()
+            client_plugin = clients.Clients(context)
+            kclient = client_plugin.client("keystone")
+            context.auth_token = kclient.auth_token
+            context.user_id = user_id
+            if user != 'NA' and not hasattr(context, 'user'):
+               context.user = user
+            if tenant != 'NA' and not hasattr(context, 'tenant'):
+               context.tenant = tenant
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_("token cannot be created using saved "
+                                "trust id for user %s, tenant %s") %
+                                (user_id, tenant_id))
     else:
+         LOG.info(_("Could not find any saved trust ids. Trying "
+                    "admin credentials to generate token"))
          try:
             httpclient = client.HTTPClient(
                 user=CONF.nova_admin_username,
@@ -257,7 +265,8 @@ def _get_tenant_context(context):
                context.tenant = tenant
          except Exception:
             with excutils.save_and_reraise_exception():
-                LOG.exception(_("_get_auth_token() failed"))
+                LOG.exception(_("_get_auth_token() with admin credentials failed. "
+                                "Perhaps admin is not member of tenant %s") % tenant_id)
 
     return context
 
