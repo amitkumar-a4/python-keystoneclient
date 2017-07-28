@@ -409,6 +409,12 @@ def to_abs():
         return new_function
     return wrap
 
+def get_directory_size(path):
+    cmd = ['du', '-sh', path]
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    out, err = p.communicate()
+    return out.split('\t')[0]
+
 
 class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def __init__(self, backupendpoint):

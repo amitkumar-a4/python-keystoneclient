@@ -25,15 +25,30 @@ class ConfigBackupWorkflow(object):
 
     def initflow(self):
         self._flow = lf.Flow('ConfigBackuplf')
-        
-        self._flow.add(config_backup_tasks.CopyConfigFiles(name="ConfigBackup" +
-                                          self._store['openstack_snapshot_id'],
-                       rebind={'openstack_snapshot_id':'openstack_snapshot_id',
-                                'params':'params'}))
 
-        self._flow.add(config_backup_tasks.ApplyRetentionPolicy(name="RetentionPolicy" + 
-                                                 self._store['openstack_snapshot_id'],
-                               rebind={'openstack_workload_id':'openstack_workload_id'}))
+        self._store['params']['target'] = 'compute'
+        self._flow.add(config_backup_tasks.UnorderedCopyConfigFiles(self._store['backup_id'],
+                                 self._store['params']['compute_hosts'],
+                                 self._store['params']))
+
+        if len(self._store['params']['controller_hosts'])>0:
+            params['target'] = 'controller'
+            self._flow.add(config_backup_tasks.UnorderedCopyConfigFilesFromRemoteHost(self._store['backup_id'],
+                                 self._store['params']['controller_hosts'],
+                                 self._store['params']))
+
+        self._store['params']['target'] = 'database'
+        db_host = self._store['params']['compute_hosts'][0]
+        self._flow.add(config_backup_tasks.CopyConfigFiles(name="BackupDatabase_" + db_host,
+                                 rebind={'backup_id':'backup_id',
+                                         'host': db_host,
+                                         'params':'params'
+                                        } ))
+
+
+        self._flow.add(config_backup_tasks.ApplyRetentionPolicy(name="RetentionPolicy_" + 
+                                                 self._store['backup_id'],
+                               rebind={'config_workload_id':'config_workload_id'}))
 
 
     def execute(self):

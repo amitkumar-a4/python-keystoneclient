@@ -1140,11 +1140,11 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
-    def vast_config_snapshot(self, context, snapshot_id, params, **kwargs):
+    def vast_config_backup(self, context, backup_id, params, **kwargs):
         """
-        Snapshot OpenStack config files.
+        Backup OpenStack config files.
         :param services: services for which configuration and database need to backup.
         """
         client = kwargs['client']
-        return client.contego.vast_config_snapshot(snapshot_id, params)
+        return client.contego.vast_config_backup(backup_id, params)
 

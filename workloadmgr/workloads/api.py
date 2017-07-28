@@ -2908,8 +2908,22 @@ class API(base.Base):
             else:
                 description = 'No description'
 
+            try:
+                config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
+            except wlm_exceptions.ConfigWorkloadNotFound as ex:
+                message = 'OpenStack config backup is not configured. First configure it.'
+                raise wlm_exceptions.ConfigWorkload(message)
+
+            if config_workload['status'].lower() != 'available':
+                message = "Config workload is not available. " \
+                          "Please wait for other backup to complete."
+                raise wlm_exceptions.InvalidState(reason=message)
+            self.db.config_workload_update(context, config_workload['id'],
+                                           {'status': 'locked'})
+
             AUDITLOG.log(context, 'OpenStack configuration backup ' + backup_display_name + ' Create Requested', None)
 
+            
             options = {'config_workload_id': CONF.cloud_unique_id,
                        'user_id': context.user_id,
                        'project_id': context.project_id,
