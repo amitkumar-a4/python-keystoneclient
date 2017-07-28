@@ -8,10 +8,6 @@
 	<link rel="stylesheet" href="css/bootstrap-theme.min.css">
         <link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
 	
-	<script src="js/jquery-1.11.0.min.js"></script>
-	<!-- Latest compiled and minified JavaScript -->
-	<script src="js/bootstrap.min.js"></script>
-	
 	<script>
 	function warnReinitialize() {
 	   return confirm("Reinitializing will erase the backup metadata from the the appliance. \nThis operation can't be undone. Proceed to reinitialize?");
@@ -86,4 +82,9 @@
         </div>
     </div>
 </body>
+
+<script src="js/jquery-1.11.0.min.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="js/bootstrap.min.js"></script>
+
 </html>

@@ -7,9 +7,6 @@
 	<link rel="stylesheet" href="css/bootstrap-theme.min.css">
         <link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
 	
-	<script src="js/jquery-1.11.0.min.js"></script>
-	<!-- Latest compiled and minified JavaScript -->
-	<script src="js/bootstrap.min.js"></script>
 </head>
 
 <body>
@@ -226,6 +223,10 @@
     <hr>
     <!-- /container -->
 </body>
+
+<script src="js/jquery-1.11.0.min.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="js/bootstrap.min.js"></script>
 
 <script>
 $('body').scrollspy({

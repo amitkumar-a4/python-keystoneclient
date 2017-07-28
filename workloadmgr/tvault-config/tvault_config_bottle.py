@@ -2804,6 +2804,8 @@ def configure_openstack():
         if config_data['enable_tls'] == 'on':
             config_data['cert'] = config_inputs.get('cert', '')
             config_data['privatekey'] = config_inputs.get('privatekey', '')
+            if config_data['cert'] == '' or config_data['privatekey'] == '':
+                raise Exception("cert or private key is empty. Please enter valid values")
 
         config_data['guest_name'] = config_inputs['guest-name'].strip()
         
