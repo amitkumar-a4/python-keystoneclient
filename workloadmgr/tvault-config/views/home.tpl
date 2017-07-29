@@ -6,14 +6,14 @@
 	
 	<!-- Optional theme -->
 	<link rel="stylesheet" href="css/bootstrap-theme.min.css">
-	
-	<script src="js/jquery-1.11.0.min.js"></script>
-	<!-- Latest compiled and minified JavaScript -->
-	<script src="js/bootstrap.min.js"></script>
+        <link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
 	
 	<script>
 	function warnReinitialize() {
 	   return confirm("Reinitializing will erase the backup metadata from the the appliance. \nThis operation can't be undone. Proceed to reinitialize?");
+	}
+	function warnResetPassword() {
+	   return confirm("Do you want to reset password?");
 	}
 	</script>
 	
@@ -65,6 +65,8 @@
             	<br><br>
             	<a href="/reinitialize" onclick='return warnReinitialize(this)';>Reinitialize</a>                       
                 <br><br>
+            	<a href="/reset_password" onclick='return warnResetPassword(this)';>Reset Password</a>                       
+                <br><br>
                 <a href="/services">Services</a>
             	<br><br>
                 <a href="/logs">Logs</a>
@@ -75,4 +77,9 @@
         </div>
     </div>
 </body>
+
+<script src="js/jquery-1.11.0.min.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="js/bootstrap.min.js"></script>
+
 </html>
