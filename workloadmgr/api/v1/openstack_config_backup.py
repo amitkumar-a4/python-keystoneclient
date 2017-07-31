@@ -166,7 +166,7 @@ class ConfigBackupController(wsgi.Controller):
                 description = description.strip() or 'no-description'
 
             backup = self.workload_api.config_backup(context, name, description)
-            return self.config_view_builder.summary(req, dict(backup.iteritems()))
+            return self.backup_view_builder.summary(req, dict(backup.iteritems()))
         except wlm_exceptions.InvalidState as error:
             LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
