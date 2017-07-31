@@ -35,20 +35,21 @@ CONF.register_opts(vmtasks_opts)
 
 class CopyConfigFiles(task.Task):
 
-    def execute(self, context, backup_id, host, params):
-        return self.execute_with_log(context, backup_id, host, params)
+    def execute(self, context, backup_id, host, target, params):
+        return self.execute_with_log(context, backup_id, host, target, params)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'CopyConfigFiles.execute')
-    def execute_with_log(self, context, backup_id, host, params):
+    def execute_with_log(self, context, backup_id, host, target, params):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
         config_workload = db.config_workload_get(cntx, CONF.cloud_unique_id)
         backend_endpoint = config_workload.backup_media_target
         params['host'] = host
+        params['target'] = target
 
         metadata = {
             'resource_id': host + '_' + str( int(time.time()) ),
@@ -72,21 +73,21 @@ class CopyConfigFiles(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass
 
-def UnorderedCopyConfigFiles(backup_id, hosts, params):
+def UnorderedCopyConfigFiles(backup_id, hosts, target, params):
     flow = uf.Flow("copyconfigfilesuf")
     for host in hosts:
         flow.add(CopyConfigFiles(name="CopyConfigFile_" + host,
                                  rebind={'backup_id':'backup_id',
                                          'host':host,
+                                         'target': target,
                                          'params':'params'
                                         } ))
     return flow
 
-def UnorderedCopyConfigFilesFromRemoteHost(backup_id, hosts, params):
-        
+def UnorderedCopyConfigFilesFromRemoteHost(backup_id, hosts, target, params):
     flow = uf.Flow("copyconfigfilesremotehostuf")
     compute_hosts = params['compute_hosts']
-    params['target'] = 'controller'
+    target = 'controller'
     #If list of controller nodes is more than contego
     #nodes then targetting all requests to one node only
     if len(hosts) > len(compute_hosts):
@@ -95,7 +96,8 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, hosts, params):
             flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_hosts[0],
                                  rebind={'backup_id':'backup_id',
                                          'host':compute_hosts[0],
-                                         'params': params
+                                         'target':target,
+                                         'params':params
                                         } ))
     else:
         #If If list of controller nodes is less than or 
@@ -106,7 +108,8 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, hosts, params):
             flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_host,
                                  rebind={'backup_id':'backup_id',
                                          'host':compute_host,
-                                         'params': params
+                                         'target':target,
+                                         'params':params
                                         } ))
     return flow
 

@@ -15,7 +15,7 @@ LOG = logging.getLogger(__name__)
 
 class ConfigBackupWorkflow(object):
     '''
-    Config Backup Restore
+    Config Backup Workflow.
     '''
 
     def __init__(self, name, store):
@@ -26,22 +26,25 @@ class ConfigBackupWorkflow(object):
     def initflow(self):
         self._flow = lf.Flow('ConfigBackuplf')
 
-        self._store['params']['target'] = 'compute'
+        self._store['compute'] = 'compute'
+        self._store['controller'] = 'controller'
+        self._store['database'] = 'database'
+       
+        ''' 
         self._flow.add(config_backup_tasks.UnorderedCopyConfigFiles(self._store['backup_id'],
-                                 self._store['params']['compute_hosts'],
+                                 self._store['params']['compute_hosts'], 'compute',
                                  self._store['params']))
 
         if len(self._store['params']['controller_hosts'])>0:
-            params['target'] = 'controller'
             self._flow.add(config_backup_tasks.UnorderedCopyConfigFilesFromRemoteHost(self._store['backup_id'],
-                                 self._store['params']['controller_hosts'],
+                                 self._store['params']['controller_hosts'], 'controller',
                                  self._store['params']))
-
-        self._store['params']['target'] = 'database'
+        '''
         db_host = self._store['params']['compute_hosts'][0]
         self._flow.add(config_backup_tasks.CopyConfigFiles(name="BackupDatabase_" + db_host,
                                  rebind={'backup_id':'backup_id',
                                          'host': db_host,
+                                         'target': 'database',
                                          'params':'params'
                                         } ))
 
