@@ -3473,7 +3473,8 @@ def _config_backup_update(context, backup_id, values, session):
 
         if backup_id:
             backup_ref = model_query(context, models.ConfigBackups, session=session, read_deleted="yes"). \
-                filter_by(id=backup_id).first()
+                         options(sa_orm.joinedload(models.ConfigBackups.metadata)).\
+                         filter_by(id=backup_id).first()
             if not backup_ref:
                 lock.release()
                 raise exception.ConfigBackupNotFound(backup_id=backup_id)
@@ -3486,6 +3487,10 @@ def _config_backup_update(context, backup_id, values, session):
         backup_ref.update(values)
         backup_ref.save(session)
 
+        if metadata:
+            _set_metadata_for_config_backup(context, backup_ref,
+                                            metadata, session=session)
+
         return backup_ref
     finally:
         lock.release()
@@ -3496,8 +3501,9 @@ def _config_backup_get(context, backup_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
     result = model_query(context, models.ConfigBackups, **kwargs).\
-                            filter_by(id=backup_id).\
-                            first()
+                         options(sa_orm.joinedload(models.ConfigBackups.metadata)).\
+                         filter_by(id=backup_id).\
+                         first()
 
     if not result:
         raise exception.ConfigBackupNotFound(backup_id=backup_id)
@@ -3513,7 +3519,9 @@ def config_backup_get(context, backup_id, **kwargs):
 
 @require_context
 def config_backup_get_all(context, **kwargs):
-    qs = model_query(context, models.ConfigBackups, **kwargs)
+    qs = model_query(context, models.ConfigBackups, **kwargs).\
+                     options(sa_orm.joinedload(models.ConfigBackups.metadata))
+         
     if 'config_workload_id' in kwargs and kwargs['config_workload_id'] is not None and kwargs['config_workload_id'] != '':
        qs = qs.filter_by(config_workload_id=kwargs['config_workload_id'])
     if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
@@ -3537,3 +3545,49 @@ def config_backup_delete(context, backup_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+
+def _set_metadata_for_config_backup(context, backup_ref, metadata,
+                                    session):
+    """Create or update a set of config_backup_metadata for a given backup"""
+    orig_metadata = {}
+    for metadata_ref in backup_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'backup_id': backup_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _config_backup_metadata_update(context, metadata_ref, metadata_values, session)
+        else:
+            _config_backup_metadata_create(context, metadata_values, session)
+
+@require_context
+def _config_backup_metadata_create(context, values, session):
+    """Create a ConfigBackupMetadata object"""
+    metadata_ref = models.ConfigBackupMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    return _config_backup_metadata_update(context, metadata_ref, values, session)
+
+@require_context
+def config_metadata_create(context, values, session):
+    """Create an ConfigBackupMetadata object"""
+    session = get_session()
+    return _config_backup_metadata_create(context, values, session)
+
+@require_context
+def _config_backup_metadata_update(context, metadata_ref, values, session):
+    """Update ConfigBackupMetadata object"""
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+@require_context
+def _config_backup_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by config_metadata_create and _config_backup_metadata_update
+    """
+    metadata_ref.delete(session=session)

@@ -649,11 +649,11 @@ def _remove_data(context, backup_id):
         return;
 
     try:
-        LOG.info(_('Deleting the data of config backup %s ') % (config_with_data.id))
+        LOG.info(_('Deleting the data of config backup %s ') % (backup_with_data.id))
         config_workload_obj = db.config_workload_get(context, backup_with_data['config_workload_id'])
         backup_endpoint = config_workload_obj['backup_media_target']
         backup_target = vault.get_backup_target(backup_endpoint)
-        backup_target.config_workload_delete(context,
+        backup_target.config_backup_delete(context,
             {'config_workload_id': backup_with_data.config_workload_id,
              'backup_id' : backup_with_data.id})
 
