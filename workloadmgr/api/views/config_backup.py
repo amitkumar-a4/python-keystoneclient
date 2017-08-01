@@ -52,15 +52,14 @@ class ViewBuilder(common.ViewBuilder):
                 'name': config_backup.get('display_name'),
                 'description': config_backup.get('display_description'),
                 'config_workload_id': config_backup.get('config_workload_id'),
-                'services_to_backup': config_backup.get('services_to_backup'),
                 'host': config_backup.get('host'),
                 'size': config_backup.get('size'),
                 'progress_msg': config_backup.get('progress_msg'),
                 'warning_msg': config_backup.get('warning_msg'),
                 'error_msg': config_backup.get('error_msg'),
-                'upload_summary': config_backup.get('upload_summary'),
                 'time_taken': config_backup.get('time_taken'),
                 'vault_storage_path': config_backup.get('vault_storage_path'),
+                'metadata': config_backup.get('metadata')
             }}
 
     def _list_view(self, func, request, backups):

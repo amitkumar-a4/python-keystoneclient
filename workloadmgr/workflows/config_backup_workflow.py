@@ -30,7 +30,6 @@ class ConfigBackupWorkflow(object):
         self._store['controller'] = 'controller'
         self._store['database'] = 'database'
        
-        ''' 
         self._flow.add(config_backup_tasks.UnorderedCopyConfigFiles(self._store['backup_id'],
                                  self._store['params']['compute_hosts'], 'compute',
                                  self._store['params']))
@@ -39,7 +38,7 @@ class ConfigBackupWorkflow(object):
             self._flow.add(config_backup_tasks.UnorderedCopyConfigFilesFromRemoteHost(self._store['backup_id'],
                                  self._store['params']['controller_hosts'], 'controller',
                                  self._store['params']))
-        '''
+        
         db_host = self._store['params']['compute_hosts'][0]
         self._flow.add(config_backup_tasks.CopyConfigFiles(name="BackupDatabase_" + db_host,
                                  rebind={'backup_id':'backup_id',

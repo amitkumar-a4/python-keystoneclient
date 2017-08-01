@@ -3554,7 +3554,7 @@ def _set_metadata_for_config_backup(context, backup_ref, metadata,
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'backup_id': backup_ref.id,
+        metadata_values = {'config_backup_id': backup_ref.id,
                            'key': key,
                            'value': value}
         if key in orig_metadata:
@@ -3572,7 +3572,7 @@ def _config_backup_metadata_create(context, values, session):
     return _config_backup_metadata_update(context, metadata_ref, values, session)
 
 @require_context
-def config_metadata_create(context, values, session):
+def config_backup_metadata_create(context, values, session):
     """Create an ConfigBackupMetadata object"""
     session = get_session()
     return _config_backup_metadata_create(context, values, session)

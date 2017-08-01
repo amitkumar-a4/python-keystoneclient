@@ -51,23 +51,65 @@ class CopyConfigFiles(task.Task):
         params['host'] = host
         params['target'] = target
 
+        target_host = host
+        target_host_data = 'config_data'
+        if target == 'controller':
+            remote_host_creds = params.get('remote_host_creds')
+            target_host = remote_host_creds['remote_host']
+        elif target == 'database':
+             target_host_data = 'database'
+             
         metadata = {
             'resource_id': host + '_' + str( int(time.time()) ),
             'backend_endpoint': backend_endpoint,
             'snapshot_id': backup_id
         }
         params['metadata'] = metadata
+        
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        status = virtdriver._vast_methods_call_by_function(compute_service.vast_config_backup,
-                                                     cntx, backup_id,
-                                                     params)
-        virtdriver._wait_for_remote_nova_process(cntx, compute_service,
+        virtdriver._vast_methods_call_by_function(compute_service.vast_config_backup,
+                                                  cntx, backup_id,
+                                                  params)
+        try:
+            upload_status = virtdriver._wait_for_remote_nova_process(cntx, compute_service,
                                       metadata,
                                       backup_id,
                                       backend_endpoint)
-        db.config_backup_update(cntx, backup_id, {
-                                    'upload_summary' : pickle.dumps(status),
-                                    })
+            if upload_status is True:
+               upload_status = 'Completed'
+        except Exception as ex:
+            upload_status = _("%(exception)s") %{'exception': ex}
+        
+        config_backup = db.config_backup_get(cntx, backup_id)
+        config_metadata = config_backup.metadata
+        backup_summary = None
+        for metadata in config_metadata:
+            if metadata['key'] == "backup_summary":
+                backup_summary = metadata['value']
+                break
+        '''
+        backupsummary sample:
+        backup_summary = {'Host1':
+                              {
+                                  'config_files': 'status',
+                                  'database': 'status'
+                              }
+                          }
+        '''
+        if backup_summary:
+            backup_summary = pickle.loads(str(backup_summary))
+        else:
+            backup_summary = {}
+
+        if backup_summary.get(target_host, None):
+            backup_summary[target_host][target_host_data] = upload_status
+        else : 
+            backup_summary[target_host] = {target_host_data: upload_status}
+
+        backup_summary = pickle.dumps(backup_summary)
+        metadata = {'backup_summary': backup_summary}
+        values = {'metadata': metadata}
+        config_backup = db.config_backup_update(cntx, backup_id, values)
 
     @autolog.log_method(Logger, 'CopyConfigFiles.revert')
     def revert_with_log(self, *args, **kwargs):
