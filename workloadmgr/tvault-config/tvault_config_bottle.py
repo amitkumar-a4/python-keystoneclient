@@ -173,41 +173,80 @@ def change_password():
 @authorize()
 def update_service_account_password():
     """Show password change form"""
-    return {}
+    if bottle.request.GET.get('error') == 'error':
+        return {'error': 'Cannot reset service password. Try again..'}
+    else:
+        return {'error':''}
 
 
 @bottle.post('/update_service_account_password')
 @authorize()
-def change_password():
-    config_inputs = bottle.request.POST
+def change_service_password():
+    try:
+        config_inputs = bottle.request.POST
 
-    """Change service account password"""
-    Config = ConfigParser.RawConfigParser()
-    Config.read('/etc/workloadmgr/api-paste.ini')
-    Config.set('filter:authtoken','admin_password',
-               config_inputs['newpassword'])
-    with open('/etc/workloadmgr/api-paste.ini', 'wb') as configfile:
-        Config.write(configfile)
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        service_tenant_name = Config.get('keystone_authtoken','admin_tenant_name')
+        auth_uri = Config.get('keystone_authtoken','auth_uri')
+        service_tenant_domain_id = Config.get('keystone_authtoken','project_domain_id')
+        service_user_domain_id = Config.get('keystone_authtoken','user_domain_id')
+        service_password = config_inputs['oldpassword']
+        keystone_auth_version = Config.get('DEFAULT', 'keystone_auth_version')
 
-    Config = ConfigParser.RawConfigParser()
-    Config.read('/etc/workloadmgr/workloadmgr.conf')
-    Config.set('keystone_authtoken','admin_password',
-               config_inputs['newpassword'])
-    Config.set('keystone_authtoken','password',
-               config_inputs['newpassword'])
-    with open('/etc/workloadmgr/workloadmgr.conf', 'wb') as configfile:
-        Config.write(configfile)
+        # first authenticate old credentials to make sure the
+        # user is genuine
+        if keystone_auth_version == '3':
+            auth = password.Password(auth_url=auth_uri,
+                                     username='triliovault',
+                                     password=service_password,
+                                     user_domain_id=service_user_domain_id,
+                                     project_name=service_tenant_name,
+                                     domain_id=service_tenant_domain_id,
+                                    )
+        else:
+            auth = password.Password(auth_url=auth_uri,
+                                     username='triliovault',
+                                     password=service_password,
+                                     project_name=service_tenant_name,
+                                    )
+        sess = session.Session(auth=auth, verify=SSL_VERIFY)
+        keystone = client.Client(session=sess, auth_url=auth_uri, insecure=SSL_INSECURE)
 
-    command = ['sudo', 'service', 'wlm-api', 'restart'];
-    subprocess.call(command, shell=False)
+        keystone.users.update_own_password(service_password,
+                                           config_inputs['newpassword'])
 
-    command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
-    subprocess.call(command, shell=False)
+        """Change service account password"""
+        Config.read('/etc/workloadmgr/api-paste.ini')
+        Config.set('filter:authtoken','admin_password',
+                   config_inputs['newpassword'])
+        with open('/etc/workloadmgr/api-paste.ini', 'wb') as configfile:
+            Config.write(configfile)
+    
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        Config.set('keystone_authtoken','admin_password',
+                   config_inputs['newpassword'])
+        Config.set('keystone_authtoken','password',
+                   config_inputs['newpassword'])
+        with open('/etc/workloadmgr/workloadmgr.conf', 'wb') as configfile:
+            Config.write(configfile)
+    
+        command = ['sudo', 'service', 'wlm-api', 'restart'];
+        subprocess.call(command, shell=False)
+    
+        command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
+        subprocess.call(command, shell=False)
+    
+        command = ['sudo', 'service', 'wlm-workloads', 'restart'];
+        subprocess.call(command, shell=False)
+    
+        bottle.redirect("/home")
+    except Exception as ex:
+        if str(ex.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise ex
 
-    command = ['sudo', 'service', 'wlm-workloads', 'restart'];
-    subprocess.call(command, shell=False)
-
-    bottle.redirect("/home")
+        # put some error message here
+        bottle.redirect("/update_service_account_password?error=error")
 
 
 ####

@@ -32,6 +32,7 @@
  <form role="form" class="form-signin" action="/update_service_account_password" onsubmit="return validatepasswords()" method="post">
   <h5 class="form-signin-heading">Update Service Account Credentials</h5><br><br>
       <div>
+        <input id="oldpassword" name="oldpassword" type="password" autofocus="" required="" placeholder="triliovault Old Password" class="form-control"><span style="align:left;color:#ff6666">{{error}}</span><br>
         <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="triliovault New Password" class="form-control"><br>
         <input id="confirmpassword" name="confirmpassword" type="password" required="" placeholder="Confirm New Password" class="form-control" onkeyup="validatepasswords(); return false;"><br>
         <span id="confirmMessage" class="confirmMessage"></span>
