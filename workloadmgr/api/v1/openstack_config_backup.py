@@ -142,23 +142,9 @@ class ConfigBackupController(wsgi.Controller):
             try:
                 config_workload = self.workload_api.get_config_workload(context)
             except wlm_exceptions.ConfigWorkload:
-                message = "OpenStack coniguration backup is not configured. First configure it."
+                message = "Configuration backup is not configured. First configure it."
                 raise wlm_exceptions.ConfigWorkload(message=message)
 
-            '''
-            #Read list of services to snapshot from default file
-            if os.path.exists(CONFIG_FILES_PATH):
-                with open(CONFIG_FILES_PATH, 'r') as file:
-                    service_list = yaml.load(file)
-                    if len(service_list):
-                        services_to_snap = service_list
-                    else:
-                        #If default file is empty then will snapshot 
-                        #default services
-                        services_to_snap = services_to_snapshot
-            else:
-                services_to_snap = services_to_snapshot
-            '''
             if (body and 'backup' in body):
                 name = body['backup'].get('name', "")
                 name = name.strip() or 'Config backup'

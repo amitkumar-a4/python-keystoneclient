@@ -1886,6 +1886,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                           {'status': 'available'})
         except Exception as ex:
             LOG.exception(ex)
+            self.db.config_workload_update(context, config_workload['id'],
+                          {'status': 'available'})
             msg = _("Failed creating config backup: %(exception)s") %{'exception': ex}
             time_taken = 0
             if backup:
