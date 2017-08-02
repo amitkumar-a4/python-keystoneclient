@@ -410,7 +410,7 @@ def to_abs():
     return wrap
 
 def get_directory_size(path):
-    cmd = ['du', '-sh', path]
+    cmd = ['du', '-shb', path]
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     out, err = p.communicate()
     return out.split('\t')[0]

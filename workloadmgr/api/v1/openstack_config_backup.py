@@ -58,50 +58,43 @@ class ConfigBackupController(wsgi.Controller):
                 if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
                     message = "Database credentials are required to configure config backup."
                     raise wlm_exceptions.ConfigWorkload(message=message)
-                if len(jobschedule.keys()) == 0:
-                    jobschedule =  {'enabled' : False}
+            else:
+                existing_jobschedule = existing_config_workload['jobschedule']
+                #if len(jobschedule.keys()) == 0:
+                #    jobschedule =  {'enabled' : False}
 
-            # If Openstack backup scheduler is disabled then user can't update this
-            elif existing_config_workload:
-                 existing_jobschedule = existing_config_workload['jobschedule']
-                 if str(existing_jobschedule['enabled']).lower() == 'false' and \
-                     str(jobschedule.get('enabled', '')).lower() != 'true' and \
-                     len(jobschedule)>0:
-                     message = "Can not update OpenStack configuration backup in disabled state."
-                     raise wlm_exceptions.ConfigWorkload(message=message)
+            #if len(jobschedule) > 0:
+            if existing_jobschedule:
+                jobdefaults = existing_jobschedule
+            else:
+                jobdefaults = {'start_time': '09:00 PM',
+                               'interval': u'24hr',
+                               'start_date': time.strftime("%m/%d/%Y"),
+                               'end_date': 'No End',
+                               'enabled': 'False',
+                               'retention_policy_type': 'Number of Snapshots to Keep',
+                               'retention_policy_value': '30'}
 
-            if len(jobschedule) > 0:
-                if existing_jobschedule:
-                    jobdefaults = existing_jobschedule
-                else:
-                    jobdefaults = {'start_time': '09:00 PM',
-                                   'interval': u'24hr',
-                                   'start_date': time.strftime("%m/%d/%Y"),
-                                   'end_date': 'No End',
-                                   'enabled': 'False',
-                                   'retention_policy_type': 'Number of Snapshots to Keep',
-                                   'retention_policy_value': '30'}
+            if not 'start_time' in jobschedule:
+                jobschedule['start_time'] = jobdefaults['start_time']
 
-                if not 'start_time' in jobschedule:
-                    jobschedule['start_time'] = jobdefaults['start_time']
+            if not 'interval' in jobschedule:
+                jobschedule['interval'] = jobdefaults['interval']
 
-                if not 'interval' in jobschedule:
-                    jobschedule['interval'] = jobdefaults['interval']
+            if not 'enabled' in jobschedule:
+               jobschedule['enabled'] = jobdefaults['enabled']
 
-                if not 'enabled' in jobschedule:
-                    jobschedule['enabled'] = jobdefaults['enabled']
+            if not 'start_date' in jobschedule:
+                jobschedule['start_date'] = jobdefaults['start_date']
 
-                if not 'start_date' in jobschedule:
-                    jobschedule['start_date'] = jobdefaults['start_date']
+            if not 'end_date' in jobschedule:
+                jobschedule['end_date'] = jobdefaults['end_date']
 
-                if not 'end_date' in jobschedule:
-                    jobschedule['end_date'] = jobdefaults['end_date']
+            if not 'retention_policy_type' in jobschedule:
+                jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']
 
-                if not 'retention_policy_type' in jobschedule:
-                    jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']
-
-                if not 'retention_policy_value' in jobschedule:
-                    jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
+            if not 'retention_policy_value' in jobschedule:
+                jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
 
             try:
                 config_workload = self.workload_api.config_workload(context,

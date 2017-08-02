@@ -33,6 +33,7 @@ class ViewBuilder(common.ViewBuilder):
                 'created_at': config_backup.get('created_at'),
                 'status': config_backup.get('status'),
                 'name': config_backup.get('display_name'),
+                'size': config_backup.get('size'),
                 'description': config_backup.get('display_description'),
                 'config_workload_id': config_backup.get('config_workload_id'),
             }}

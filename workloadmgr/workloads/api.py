@@ -2791,8 +2791,11 @@ class API(base.Base):
             metadata = {}
             if 'databases' in services_to_backup:
                metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
+            if 'trusted_nodes' in services_to_backup:
+               metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
             if services_to_backup.keys() > 0:
                 metadata['services_to_backup'] = pickle.dumps(services_to_backup)
+
             # Create new OpenStack workload
             if existing_config_workload is None:
                 backup_endpoint = \
