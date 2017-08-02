@@ -34,6 +34,7 @@ class ViewBuilder(common.ViewBuilder):
                 'status': config_backup.get('status'),
                 'name': config_backup.get('display_name'),
                 'size': config_backup.get('size'),
+                'vault_storage_path': config_backup.get('vault_storage_path'),
                 'description': config_backup.get('display_description'),
                 'config_workload_id': config_backup.get('config_workload_id'),
             }}
