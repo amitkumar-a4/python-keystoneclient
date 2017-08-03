@@ -496,7 +496,6 @@ class RestoreNFSVolume(task.Task):
                                                   volume_id=volume_id,
                                                   az=az)
 
-
         progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
