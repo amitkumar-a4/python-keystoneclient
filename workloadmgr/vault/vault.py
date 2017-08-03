@@ -924,13 +924,13 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
             LOG.exception(ex)
 
     @autolog.log_method(logger=Logger)
-    def snapshot_delete(self, context, snapshot_metadata):
+    def config_backup_delete(self, context, backup_metadata):
         try:
-            snapshot_path = self.get_openstack_config_snapshot_path(snapshot_metadata)
+            backup_path = self.get_config_backup_path(backup_metadata)
             retry = 0
             while os.path.isdir(snapshot_path):
                 try:
-                    command = ['rm', '-rf', snapshot_path]
+                    command = ['rm', '-rf', backup_path]
                     subprocess.check_call(command, shell=False)
                 except:
                     pass
