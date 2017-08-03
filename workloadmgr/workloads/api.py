@@ -2773,7 +2773,6 @@ class API(base.Base):
             raise ex
 
     @autolog.log_method(logger=Logger)
-    @create_trust
     def config_workload(self,context, jobschedule, services_to_backup):
         """
         Make the RPC call to create/update a config workload.
@@ -2802,8 +2801,6 @@ class API(base.Base):
                     vault.get_nfs_share_for_workload_by_free_overcommit\
                     (context, jobschedule)
                 mount_path = vault.get_backup_target(backup_endpoint).mount_path
-                vault_storage_path = os.path.join(mount_path, "config_workload_"\
-                    + str(CONF.cloud_unique_id))
                 options = {
                     'id': CONF.cloud_unique_id,
                     'user_id': context.user_id,
@@ -2812,7 +2809,6 @@ class API(base.Base):
                     'status': 'creating',
                     'metadata': metadata,
                     'jobschedule': pickle.dumps(jobschedule),
-                    'vault_storage_path': vault_storage_path,
                     'backup_media_target': backup_endpoint,
                     'storage_backend': CONF.vault_storage_type
                 }

@@ -152,11 +152,12 @@ def upload_config_workload_db_entry(cntx, config_workload_id):
         config_workload_db = db.config_workload_get(cntx, config_workload_id)
         backup_endpoint = config_workload_db['backup_media_target']
 
-        backup_target = vault.get_backup_target(backup_endpoint)
-        parent = config_workload_db['vault_storage_path']
+        backup_target = vault.get_backup_target(backup_endpoint).mount_path
+        config_workload_storage_path = os.path.join(backup_target.mount_path,\
+                                   "config_workload_" + str(CONF.cloud_unique_id))
 
         config_workload_json = jsonutils.dumps(config_workload_db)
-        path = os.path.join(parent, "config_workload_db")
+        path = os.path.join(config_workload_storage_path, "config_workload_db")
         backup_target.put_object(path, config_workload_json)
     except Exception as ex:
         LOG.exception(ex)
@@ -640,7 +641,7 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
     return affected_snapshots
 
 @autolog.log_method(logger=Logger)
-def _remove_data(context, backup_id):
+def _remove_config_backup_data(context, backup_id):
     backup_with_data = db.config_backup_get(context, backup_id, read_deleted='yes')
     if backup_with_data.status != 'deleted':
         return;
@@ -668,7 +669,7 @@ def config_backup_delete(context, backup_id):
     """
     try:
         db.config_backup_delete(context, backup_id)
-        _remove_data(context, backup_id)
+        _remove_config_backup_data(context, backup_id)
     except Exception as ex:
         LOG.exception(ex)
 

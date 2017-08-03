@@ -26,6 +26,7 @@ class ConfigBackupWorkflow(object):
     def initflow(self):
         self._flow = lf.Flow('ConfigBackuplf')
 
+        #Populate _store with target values
         self._store['compute'] = 'compute'
         self._store['controller'] = 'controller'
         self._store['database'] = 'database'

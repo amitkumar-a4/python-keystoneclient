@@ -1784,6 +1784,21 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(Logger, 'WorkloadMgrManager.config_backup')
     def config_backup(self, context, backup_id):
+        def get_backup_summary(backup_summary):
+            status = 'error'
+            warning_msg = None
+            for host, host_status in backup_summary.iteritems():
+                for backup_task, status in host_status.iteritems():
+                    if status.lower() == "completed":
+                        status = "available"
+                    else:
+                        warning_msg = "All backup jobs are not completed successfully. Please see backup summary"
+
+                    if status == "available" and warning_msg is not None:
+                        return (status, warning_msg)
+
+            return (status, warning_msg)
+
         try:
             services_to_backup = None
             databases = None
@@ -1808,9 +1823,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #Look for contego and compute nodes
             nova_client = nova.novaclient(context, production=True)
     
-            #contego_binary_name = "nova-contego_" + DB_VERSION
-            contego_binary_name = "nova-contego_2.3.48"
+            #Before Mitaka release contego binary name would be statrting with contego only 
+            #and after Mitaka we have nova-contego. So will look for bot binaries.
+            contego_binary_name = "contego_" + DB_VERSION
+            #nova_contego_binary_name = "nova-contego_" + DB_VERSION
+            nova_contego_binary_name = "nova-contego_2.3.48"
             contego_nodes = nova_client.services.list(binary=contego_binary_name)
+            nova_contego_nodes = nova_client.services.list(binary=nova_contego_binary_name)
+            contego_nodes.extend(nova_contego_nodes)
             contego_nodes = [node.host for node in contego_nodes]
     
             controller_nodes = nova_client.services.list(binary='nova-scheduler')
@@ -1825,9 +1845,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if services_to_backup is None:
                 message = "Config workload doesn't contain services to backup."
                 raise wlm_exceptions.NotFound(message)
-    
-            vault_storage_path = config_workload.get('vault_storage_path')
-            backup_vault_storage_path = os.path.join(vault_storage_path, "backup_" + str(backup.get('id')))
+
+            backup_endpoint = config_workload['backup_media_target']
+
+            mount_path = vault.get_backup_target(backup_endpoint).mount_path
+            config_workload_storage_path = os.path.join(mount_path, "config_workload_"\
+                                                          + str(CONF.cloud_unique_id))
+
+            backup_vault_storage_path = os.path.join(config_workload_storage_path, "backup_" + str(backup.get('id')))
     
             self.db.config_backup_update(context, backup_id,
                                     {
@@ -1873,14 +1898,30 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if backup:
                 time_taken = int((timeutils.utcnow() - backup.created_at).total_seconds())
             size = vault.get_directory_size(backup_vault_storage_path)
+            error_msg = None
+            backup = self.db.config_backup_get(context, backup_id)
+            backup_metadata = backup.metadata
+            backup_summary = {}
+            for metadata in backup_metadata:
+                if metadata['key'] == 'backup_summary':
+                    backup_summary = pickle.loads(str(metadata['value']))
+                    break
+
+            status, warning_msg = get_backup_summary(backup_summary)
+            if status != "available":
+                error_msg = "Please see backup summary."
+
             backup = self.db.config_backup_update(context, backup_id,
                                     {
                                      'progress_msg': 'Configuration backup is complete',
                                      'finished_at' : timeutils.utcnow(),
-                                     'status': 'available',
+                                     'status': status,
                                      'time_taken': time_taken,
                                      'size': size,
+                                     'warning_msg': warning_msg,
+                                     'error_msg': error_msg
                                      })
+
             workload_utils.upload_config_backup_db_entry(context, backup_id)
             self.db.config_workload_update(context, config_workload['id'],
                           {'status': 'available'})
@@ -1909,11 +1950,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Delete an existing config snapshot
         """
         def execute(context, backup_id, task_id):
-            workload_utils.config_backup_delete(context, backup_id)
-            self.db.config_backup_update(context, backup_id, {'status': 'deleted'})
-            status_messages = {'message': 'Config backup delete operation completed'}
-            self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
-                                                   'status_messages': status_messages})
+            try:
+                workload_utils.config_backup_delete(context, backup_id)
+                self.db.config_backup_update(context, backup_id, {'status': 'deleted'})
+                status_messages = {'message': 'Config backup delete operation completed'}
+                self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
+                                                       'status_messages': status_messages})
+            except Exception as ex:
+                LOG.exception(ex)
 
         self.pool.submit(execute, context, backup_id, task_id)
         

@@ -65,7 +65,6 @@ class ViewBuilder(common.ViewBuilder):
                 'start_time': joschedule.get('start_time'),
                 'start_date': joschedule.get('start_date'),
                 'end_date': joschedule.get('end_date'),
-                'vault_storage_path': config_workload.get('vault_storage_path'),
                 'storage_backend': config_workload.get('storage_backend'),
                 }
         }

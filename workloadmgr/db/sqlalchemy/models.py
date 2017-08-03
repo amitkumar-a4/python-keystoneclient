@@ -635,7 +635,6 @@ class ConfigWorkloads(BASE, WorkloadsBase):
     jobschedule = Column(String(4096))
     storage_backend = Column(String(36))
     host = Column(String(255))
-    vault_storage_path = Column(String(4096))
     backup_media_target = Column(String(2046))
     error_msg = Column(String(4096))
 
@@ -670,7 +669,6 @@ class ConfigBackups(BASE, WorkloadsBase):
     scheduled_at = Column(DateTime)
     status = Column(String(255), nullable=False)
     data_deleted = Column(Boolean, default=False)
-    upload_summary = Column(String(4096))
 
 class ConfigBackupMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the config backup"""
