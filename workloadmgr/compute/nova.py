@@ -1148,3 +1148,22 @@ class API(base.Base):
         client = kwargs['client']
         return client.contego.vast_config_backup(backup_id, params)
 
+    @exception_handler(ignore_exception=False, contego=True)
+    def validate_database_creds(self, context, params, **kwargs):
+        """
+        Validate database credentials.
+        :param : database credentials which need to be validate.
+        """
+        client = kwargs['client']
+        return client.contego.validate_database_creds(CONF.cloud_unique_id, params)
+
+    @exception_handler(ignore_exception=False, contego=True)
+    def validate_trusted_node_creds(self, context, params, **kwargs):
+        """
+        validate a trusted node whether it has access to controller node or not.
+        :param : trusted_node creds.
+        """
+        client = kwargs['client']
+        return client.contego.validate_trusted_node_creds(CONF.cloud_unique_id, params)
+
+

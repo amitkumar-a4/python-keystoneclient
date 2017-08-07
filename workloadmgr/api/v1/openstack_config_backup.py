@@ -19,6 +19,7 @@ from workloadmgr import workloads as workloadAPI
 from workloadmgr.api import xmlutil
 from workloadmgr.api.views import config_workload as config_workload_views
 from workloadmgr.api.views import config_backup as config_backup_views
+from workloadmgr.workloads import workload_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -46,6 +47,20 @@ class ConfigBackupController(wsgi.Controller):
             jobschedule = body['jobschedule']
             services_to_backup = body['services_to_backup']
 
+            #Validate database creds
+            if services_to_backup.get('databases', None):
+               try:
+                   workload_utils.validate_database_creds(context, services_to_backup['databases'])
+               except Exception as  ex:
+                   raise ex
+
+            #Validate trusted_host creds
+            if services_to_backup.get('trusted_nodes', None):
+               try:
+                   workload_utils.validate_trusted_node_creds(context, services_to_backup['trusted_nodes'])
+               except Exception as  ex:
+                   raise ex
+
             try:
                 existing_config_workload = self.workload_api.get_config_workload(context)
             except wlm_exceptions.ConfigWorkload:
@@ -60,10 +75,7 @@ class ConfigBackupController(wsgi.Controller):
                     raise wlm_exceptions.ConfigWorkload(message=message)
             else:
                 existing_jobschedule = existing_config_workload['jobschedule']
-                #if len(jobschedule.keys()) == 0:
-                #    jobschedule =  {'enabled' : False}
 
-            #if len(jobschedule) > 0:
             if existing_jobschedule:
                 jobdefaults = existing_jobschedule
             else:

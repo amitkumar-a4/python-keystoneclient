@@ -7,6 +7,7 @@ from workloadmgr import autolog
 from workloadmgr import flags
 from workloadmgr import settings
 from workloadmgr.vault import vault
+from workloadmgr.compute import nova
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import timeutils
@@ -672,4 +673,72 @@ def config_backup_delete(context, backup_id):
         _remove_config_backup_data(context, backup_id)
     except Exception as ex:
         LOG.exception(ex)
+
+@autolog.log_method(logger=Logger)
+def validate_database_creds(context, databases):
+    try:
+        #Look for contego node, which is up
+        nova_client = nova.novaclient(context, production=True)
+        nova_nodes = nova_client.services.list()
+        host = None
+        for node in nova_nodes:
+            if node.binary.find('contego') != -1 and node.state == 'up':
+                host = node.host
+                break
+
+        if host is None:
+            message = "No contego node is up for validating database credentials."
+            raise exception.ConfigWorkload(message=message)
+
+        compute_service = nova.API(production=True)
+        params = {'host':host, 'databases':databases}
+        status = compute_service.validate_database_creds(context, params)
+        if status['result'] != "success":
+            message = "Please verify, Given database creddentials are not correct."
+            raise exception.ConfigWorkload(message=message)
+        else:
+            return True
+    except exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def validate_trusted_node_creds(context, trusted_node):
+    try:
+        compute_service = nova.API(production=True)
+        nova_client = nova.novaclient(context, production=True)
+
+        #Change this mechanism to some other, getting list 
+        #of scheduler service is not right way
+        controller_nodes = nova_client.services.list(binary='nova-scheduler')
+        controller_nodes = [node.host for node in controller_nodes]
+        for node,node_creds in trusted_node.iteritems():
+            host = node_creds['node_hostname']
+            services_on_node = nova_client.services.list(host=host)
+            #Verify there is a compute node with this host
+            if len(services_on_node) != 0:
+               #Verify Contego module is installed on that node and up.
+               found = False
+               for service in services_on_node:
+                   if service.binary.find('contego') != -1\
+                                         and service.state == 'up':
+                       found = True
+                       break
+
+               if found is False:
+                   message = "Contego data mover is not installed on compute " \
+                   "node: %s or node is not up." %host
+                   raise exception.ConfigWorkload(message=message)
+            else:
+                message = "No compute node found with hostname: %s" %host
+                raise exception.ConfigWorkload(message=message)
+
+            params = {'controller_nodes': controller_nodes, 'node_creds': node_creds}
+            status = compute_service.validate_trusted_node_creds(context, params)
+            if status['result'] != "success":
+                message = "Please verify, Given trusted nodes doesn't have access to controller nodes."
+                raise exception.ConfigWorkload(message=message)
+            else:
+                return True
+    except exception as ex:
+        raise ex
 
