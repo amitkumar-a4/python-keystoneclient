@@ -282,11 +282,15 @@ class API(base.Base):
         if not hasattr(self, "_jobstore"):
             self._jobstore = SQLAlchemyJobStore(engine=self._engine)
 
+        if not hasattr(self, "_config_jobstore"):
+            self._config_jobstore = SQLAlchemyJobStore(engine=self._engine)
+
         super(API, self).__init__(db_driver)
 
         if not hasattr(self, "_scheduler"):
             self._scheduler = Scheduler()
             self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
+            self._scheduler.add_jobstore(self._config_jobstore, 'config_jobstore')
 
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
@@ -730,26 +734,25 @@ class API(base.Base):
                            user_domain_id = context.user_domain
                  else:
                       user_domain_id = 'default'
+                 kwargs={'workload_id':workload.id,
+                         'user_id': context.user_id,
+                         'project_id':context.project_id,
+                         'user_domain_id':user_domain_id,
+                         'user':context.user,
+                         'tenant':context.tenant}
                  if is_config_backup:
-                    self._scheduler.add_workloadmgr_job(_config_backup_create_callback,
-                                                    jobschedule,
-                                                    jobstore='jobscheduler_store',
-                                                    kwargs={'workload_id':workload.id,
-                                                            'user_id': context.user_id,
-                                                            'project_id':context.project_id,
-                                                            'user_domain_id':user_domain_id,
-                                                            'user':context.user,
-                                                            'tenant':context.tenant})
+                    hours = int(jobschedule['interval'].split('hr')[0])
+                    start_time = jobschedule['start_time']
+                    self._scheduler.add_interval_job(_config_backup_create_callback,
+                                                    hours = hours,
+                                                    start_time = start_time,
+                                                    jobstore='config_jobstore',
+                                                    kwargs=kwargs)
                  else:
                      self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
                                                     jobstore='jobscheduler_store', 
-                                                    kwargs={'workload_id':workload.id,  
-                                                            'user_id': workload.user_id, 
-                                                            'project_id':workload.project_id,
-                                                            'user_domain_id':user_domain_id,
-                                                            'user':context.user,
-                                                            'tenant':context.tenant})
+                                                    kwargs=kwargs)
 
     @autolog.log_method(logger=Logger)
     def workload_modify(self, context, workload_id, workload):
@@ -1538,6 +1541,7 @@ class API(base.Base):
 
         self._scheduler = Scheduler()
         self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
+        self._scheduler.add_jobstore(self._config_jobstore, 'config_jobstore')
         self._scheduler.start()
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
@@ -2792,15 +2796,13 @@ class API(base.Base):
                metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
             if 'trusted_nodes' in services_to_backup:
                metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
-            if services_to_backup.keys() > 0:
-                metadata['services_to_backup'] = pickle.dumps(services_to_backup)
 
+            metadata['services_to_backup'] = pickle.dumps(services_to_backup)
+
+            backup_target, path = vault.get_settings_backup_target()
             # Create new OpenStack workload
             if existing_config_workload is None:
-                backup_endpoint = \
-                    vault.get_nfs_share_for_workload_by_free_overcommit\
-                    (context, jobschedule)
-                mount_path = vault.get_backup_target(backup_endpoint).mount_path
+                backup_target, path = vault.get_settings_backup_target()
                 options = {
                     'id': CONF.cloud_unique_id,
                     'user_id': context.user_id,
@@ -2809,8 +2811,7 @@ class API(base.Base):
                     'status': 'creating',
                     'metadata': metadata,
                     'jobschedule': pickle.dumps(jobschedule),
-                    'backup_media_target': backup_endpoint,
-                    'storage_backend': CONF.vault_storage_type
+                    'backup_media_target': backup_target.backup_endpoint,
                 }
                 config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
             else:
@@ -2822,7 +2823,7 @@ class API(base.Base):
                     config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
 
                     #Check whether configuration backup job is running or not
-                    jobs = self._scheduler.get_jobs()
+                    jobs = self._scheduler.get_config_backup_jobs()
                     found = False
                     for job in jobs:
                         if job.kwargs['workload_id'] == config_workload['id']:
@@ -2847,11 +2848,13 @@ class API(base.Base):
                             LOG.warning("Config workload is already disabled.")
                 else:
                     config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
-
-            self.workloads_rpcapi.config_workload(context,
-                                                  socket.gethostname(),
-                                                  config_workload['id'])
-
+ 
+            self.db.config_workload_update(context, config_workload['id'],
+                                    {
+                                     'status': 'available',
+                                     'error_msg': None,
+                                    })
+            workload_utils.upload_config_workload_db_entry(context, config_workload['id'])
             AUDITLOG.log(context, 'Config workload update submitted.', config_workload)
             return config_workload
         except Exception as ex:
@@ -2859,6 +2862,7 @@ class API(base.Base):
             if config_workload:
                 self.db.config_workload_update(context, config_workload['id'],
                           {'status': 'error', 'error_msg': str(ex.message)})
+                workload_utils.upload_config_workload_db_entry(context, config_workload['id'])
             raise ex
 
     @autolog.log_method(logger=Logger)
@@ -2877,7 +2881,7 @@ class API(base.Base):
             config_workload_dict['jobschedule']['enabled'] = False
             config_workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
             # find the job object based on config_workload_id
-            jobs = self._scheduler.get_jobs()
+            jobs = self._scheduler.get_config_backup_jobs()
             for job in jobs:
                 if job.kwargs['workload_id'] == config_workload['id']:
                     config_workload_dict['jobschedule']['enabled'] = True

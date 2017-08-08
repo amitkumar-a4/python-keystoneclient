@@ -152,12 +152,11 @@ def upload_config_workload_db_entry(cntx, config_workload_id):
     try:
         config_workload_db = db.config_workload_get(cntx, config_workload_id)
         backup_endpoint = config_workload_db['backup_media_target']
-
-        backup_target = vault.get_backup_target(backup_endpoint).mount_path
-        config_workload_storage_path = os.path.join(backup_target.mount_path,\
-                                   "config_workload_" + str(CONF.cloud_unique_id))
+        backup_target = vault.get_backup_target(backup_endpoint)
+        config_workload_storage_path = backup_target.get_config_workload_path()
 
         config_workload_json = jsonutils.dumps(config_workload_db)
+
         path = os.path.join(config_workload_storage_path, "config_workload_db")
         backup_target.put_object(path, config_workload_json)
     except Exception as ex:

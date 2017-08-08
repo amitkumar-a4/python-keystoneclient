@@ -321,7 +321,7 @@ class Scheduler(object):
         trigger = SimpleTrigger(date)
         return self.add_job(trigger, func, args, kwargs, **options)
 
-    def add_interval_job(self, func, weeks=0, days=0, hours=0, minutes=0,
+    def add_interval_job(self, func, start_time, weeks=0, days=0, hours=0, minutes=0,
                          seconds=0, start_date=None, args=None, kwargs=None,
                          **options):
         """
@@ -347,7 +347,7 @@ class Scheduler(object):
         """
         interval = timedelta(weeks=weeks, days=days, hours=hours,
                              minutes=minutes, seconds=seconds)
-        trigger = IntervalTrigger(interval, start_date)
+        trigger = IntervalTrigger(interval, start_time, start_date)
         return self.add_job(trigger, func, args, kwargs, **options)
 
     def add_workloadmgr_job(self, func, jobschedule, args=None, 
@@ -429,6 +429,22 @@ class Scheduler(object):
             func.job = self.add_interval_job(func, **options)
             return func
         return inner
+
+    def get_config_backup_jobs(self):
+        """
+        Returns a list of config backup jobs.
+
+        :return: list of :class:`~apscheduler.job.Job` objects
+        """
+        self._jobstores_lock.acquire()
+        try:
+            jobs = []
+            if 'config_jobstore' in self._jobstores:
+                 config_jobstore = self._jobstores['config_jobstore']
+                 jobs.extend(config_jobstore.jobs)
+            return jobs
+        finally:
+            self._jobstores_lock.release()
 
     def get_jobs(self):
         """

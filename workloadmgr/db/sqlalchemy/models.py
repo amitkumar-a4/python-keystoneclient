@@ -633,7 +633,6 @@ class ConfigWorkloads(BASE, WorkloadsBase):
     project_id = Column(String(255), nullable=False)
     status = Column(String(255))
     jobschedule = Column(String(4096))
-    storage_backend = Column(String(36))
     host = Column(String(255))
     backup_media_target = Column(String(2046))
     error_msg = Column(String(4096))

@@ -42,8 +42,6 @@ class ViewBuilder(common.ViewBuilder):
                 'retention_policy': joschedule.get('retention_policy_value'),
                 'scheduler_interval': joschedule.get('interval'),
                 'start_time': joschedule.get('start_time'),
-                'start_date': joschedule.get('start_date'),
-                'end_date': joschedule.get('end_date')
 
             }
         }
@@ -63,9 +61,6 @@ class ViewBuilder(common.ViewBuilder):
                 'retention_policy': joschedule.get('retention_policy_value'),
                 'scheduler_interval': joschedule.get('interval'),
                 'start_time': joschedule.get('start_time'),
-                'start_date': joschedule.get('start_date'),
-                'end_date': joschedule.get('end_date'),
-                'storage_backend': config_workload.get('storage_backend'),
                 }
         }
 

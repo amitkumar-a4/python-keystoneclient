@@ -183,15 +183,6 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   timeout=300)        
 
     @autolog.log_method(logger=Logger)
-    def config_workload(self, ctxt, host, config_workload_id):
-        LOG.debug("config_workload in rpcapi workload_id %s", config_workload_id)
-        topic = rpc.queue_get_for(ctxt, self.topic, host)
-        LOG.debug("create queue topic=%s", topic)
-        self.cast(ctxt,
-                  self.make_msg('config_workload', config_workload_id=config_workload_id),
-                  topic=topic)
-
-    @autolog.log_method(logger=Logger)
     def config_backup(self, ctxt, host, backup_id):
         LOG.debug("config_backup in rpcapi backup_id:%s", backup_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)

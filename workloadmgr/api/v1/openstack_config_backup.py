@@ -81,10 +81,7 @@ class ConfigBackupController(wsgi.Controller):
             else:
                 jobdefaults = {'start_time': '09:00 PM',
                                'interval': u'24hr',
-                               'start_date': time.strftime("%m/%d/%Y"),
-                               'end_date': 'No End',
                                'enabled': 'False',
-                               'retention_policy_type': 'Number of Snapshots to Keep',
                                'retention_policy_value': '30'}
 
             if not 'start_time' in jobschedule:
@@ -95,15 +92,6 @@ class ConfigBackupController(wsgi.Controller):
 
             if not 'enabled' in jobschedule:
                jobschedule['enabled'] = jobdefaults['enabled']
-
-            if not 'start_date' in jobschedule:
-                jobschedule['start_date'] = jobdefaults['start_date']
-
-            if not 'end_date' in jobschedule:
-                jobschedule['end_date'] = jobdefaults['end_date']
-
-            if not 'retention_policy_type' in jobschedule:
-                jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']
 
             if not 'retention_policy_value' in jobschedule:
                 jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']

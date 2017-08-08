@@ -1764,24 +1764,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             LOG.error("Error while creating folder structer for snapshot :%s" %ex.message)
             LOG.exception(ex)
 
-    @autolog.log_method(Logger, 'WorkloadMgrManager.config_workload')
-    def config_workload(self, context, config_workload_id):
-        """
-        Create a scheduled config workload.
-        """
-        try:
-            self.db.config_workload_update(context, config_workload_id,
-                                    {
-                                     'status': 'available',
-                                    })
-            workload_utils.upload_config_workload_db_entry(context, config_workload_id)
-    
-        except Exception as err:
-            with excutils.save_and_reraise_exception():
-                self.db.config_workload_update(context, config_workload_id,
-                                        {'status': 'error',
-                                         'error_msg': str(err)})
-
     @autolog.log_method(Logger, 'WorkloadMgrManager.config_backup')
     def config_backup(self, context, backup_id):
         def get_backup_summary(backup_summary):
