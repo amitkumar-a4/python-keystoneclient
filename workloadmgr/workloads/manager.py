@@ -1754,32 +1754,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             LOG.exception(ex)
             pass
 
-    def _create_backup_directory(self, context, services, snapshot_directory_path):
-        try:
-            fileutils.ensure_tree(snapshot_directory_path)
-            for service,config_path in  services.iteritems():
-                service_name = service
-                fileutils.ensure_tree(os.path.join(snapshot_directory_path,service_name))
-        except Exception as ex:
-            LOG.error("Error while creating folder structer for snapshot :%s" %ex.message)
-            LOG.exception(ex)
-
     @autolog.log_method(Logger, 'WorkloadMgrManager.config_backup')
     def config_backup(self, context, backup_id):
-        def get_backup_summary(backup_summary):
-            status = 'error'
-            warning_msg = None
-            for host, host_status in backup_summary.iteritems():
-                for backup_task, status in host_status.iteritems():
-                    if status.lower() == "completed":
-                        status = "available"
-                    else:
-                        warning_msg = "All backup jobs are not completed successfully. Please see backup summary"
-
-                    if status == "available" and warning_msg is not None:
-                        return (status, warning_msg)
-
-            return (status, warning_msg)
 
         try:
             services_to_backup = None
@@ -1804,35 +1780,27 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     
             #Look for contego and compute nodes
             nova_client = nova.novaclient(context, production=True)
-    
-            #Before Mitaka release contego binary name would be statrting with contego only 
-            #and after Mitaka we have nova-contego. So will look for bot binaries.
-            contego_binary_name = "contego_" + DB_VERSION
-            #nova_contego_binary_name = "nova-contego_" + DB_VERSION
-            nova_contego_binary_name = "nova-contego_2.3.48"
-            contego_nodes = nova_client.services.list(binary=contego_binary_name)
-            nova_contego_nodes = nova_client.services.list(binary=nova_contego_binary_name)
-            contego_nodes.extend(nova_contego_nodes)
-            contego_nodes = [node.host for node in contego_nodes]
-    
-            controller_nodes = nova_client.services.list(binary='nova-scheduler')
-            controller_nodes = [node.host for node in controller_nodes]
-    
+            nova_services = nova_client.services.list()
+            controller_nodes = []
+            contego_nodes = []
+            for nova_service in nova_services:
+                if nova_service.binary.find('contego') != -1:
+                    host = nova_service.host
+                    if host not in contego_nodes:
+                        contego_nodes.append(host)
+                #TODO(Amit) Change the way to fing controller nodes
+                if nova_service.binary.find('scheduler') != -1:
+                    controller_nodes.append(nova_service.host)
+ 
             #If contego and controller node are same then remove from controller
             for controller_node in controller_nodes:
                 if controller_node in contego_nodes:
                     controller_nodes.remove(controller_node)
-    
-            #TODO throw right exception here
-            if services_to_backup is None:
-                message = "Config workload doesn't contain services to backup."
-                raise wlm_exceptions.NotFound(message)
 
             backup_endpoint = config_workload['backup_media_target']
 
-            mount_path = vault.get_backup_target(backup_endpoint).mount_path
-            config_workload_storage_path = os.path.join(mount_path, "config_workload_"\
-                                                          + str(CONF.cloud_unique_id))
+            backup_target = vault.get_backup_target(backup_endpoint)
+            config_workload_storage_path = backup_target.get_config_workload_path()
 
             backup_vault_storage_path = os.path.join(config_workload_storage_path, "backup_" + str(backup.get('id')))
     
@@ -1844,7 +1812,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      })
     
             #Create folder structure on backend
-            self._create_backup_directory(context, services_to_backup, backup_vault_storage_path)
+            vault.create_backup_directory(context, services_to_backup, backup_vault_storage_path)
     
             params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
                       'backend_endpoint': config_workload['backup_media_target'], 'backup_id': backup_id,
@@ -1882,16 +1850,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             size = vault.get_directory_size(backup_vault_storage_path)
             error_msg = None
             backup = self.db.config_backup_get(context, backup_id)
-            backup_metadata = backup.metadata
-            backup_summary = {}
-            for metadata in backup_metadata:
-                if metadata['key'] == 'backup_summary':
-                    backup_summary = pickle.loads(str(metadata['value']))
-                    break
+            status = backup.status
 
-            status, warning_msg = get_backup_summary(backup_summary)
             if status != "available":
-                error_msg = "Please see backup summary."
+                error_msg = "Config backup failed. Please see backup summary."
+                raise Exception(error_msg)
 
             backup = self.db.config_backup_update(context, backup_id,
                                     {
@@ -1900,8 +1863,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': status,
                                      'time_taken': time_taken,
                                      'size': size,
-                                     'warning_msg': warning_msg,
-                                     'error_msg': error_msg
                                      })
 
             workload_utils.upload_config_backup_db_entry(context, backup_id)
@@ -1917,7 +1878,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 time_taken = int((timeutils.utcnow() - backup.created_at).total_seconds())
             backup = self.db.config_backup_update(context, backup_id,
                                     {
-                                     'progress_msg': '',
+                                     'progress_msg': 'Configuration backup is complete',
                                      'error_msg': msg,
                                      'finished_at' : timeutils.utcnow(),
                                      'status': 'error',

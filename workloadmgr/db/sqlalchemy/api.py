@@ -3362,17 +3362,16 @@ def purge_workload(context, id):
     except Exception as ex:
         LOG.exception(ex)
 
-@require_context
+@require_admin_context
 def config_workload_update(context, config_workload_id, values):
     session = get_session()
     return _config_workload_update(context, config_workload_id, values, session)
 
-@require_context
+@require_admin_context
 def config_workload_get(context, config_workload_id, **kwargs):
     session = get_session()
     return _config_workload_get(context, config_workload_id, session, **kwargs)
 
-@require_context
 def _config_workload_update(context, id, values, session):
     metadata = values.pop('metadata', {})
     try:
@@ -3390,7 +3389,6 @@ def _config_workload_update(context, id, values, session):
 
     return config_workload_ref
 
-@require_context
 def _config_workload_get(context, id, session, **kwargs):
     try:
         config_workload = model_query(
@@ -3424,7 +3422,6 @@ def _set_metadata_for_config_workload(context, config_workload_ref, metadata, se
         else:
             _config_workload_metadata_create(context, metadata_values, session)
 
-@require_context
 def _config_workload_metadata_create(context, values, session):
     """Create an ConfigWorkloadMetadata object"""
     metadata_ref = models.ConfigWorkloadMetadata()
@@ -3432,13 +3429,12 @@ def _config_workload_metadata_create(context, values, session):
         values['id'] = str(uuid.uuid4())
     return _config_workload_metadata_update(context, metadata_ref, values, session)
 
-@require_context
+@require_admin_context
 def config_workload_metadata_create(context, values, session):
     """Create an ConfigWorkloadMetadata object"""
     session = get_session()
     return _config_workload_metadata_create(context, values, session)
 
-@require_context
 def _config_workload_metadata_update(context, metadata_ref, values, session):
     """
     Used internally by config_workload_metadata_create and config_workload_metadata_update
@@ -3448,19 +3444,18 @@ def _config_workload_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
-@require_context
 def _config_workload_metadata_delete(context, metadata_ref, session):
     """
     Used internally by config_workload_metadata_create and config_workload_metadata_create
     """
     metadata_ref.delete(session=session)
 
-@require_context
+@require_admin_context
 def config_backup_create(context, values):
     session = get_session()
     return _config_backup_update(context, None, values, session)
 
-@require_context
+@require_admin_context
 def config_backup_update(context, backup_id, values ):
     session = get_session()
     return _config_backup_update(context, backup_id, values, session)
@@ -3496,7 +3491,6 @@ def _config_backup_update(context, backup_id, values, session):
         lock.release()
     return backup_ref
 
-@require_context
 def _config_backup_get(context, backup_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
@@ -3510,14 +3504,14 @@ def _config_backup_get(context, backup_id, **kwargs):
 
     return result
 
-@require_context
+@require_admin_context
 def config_backup_get(context, backup_id, **kwargs):
     if kwargs.get('session') == None:
         kwargs['session'] = get_session()
     return _config_backup_get(context, backup_id, **kwargs)
 
 
-@require_context
+@require_admin_context
 def config_backup_get_all(context, **kwargs):
     qs = model_query(context, models.ConfigBackups, **kwargs).\
                      options(sa_orm.joinedload(models.ConfigBackups.metadata))
@@ -3534,8 +3528,7 @@ def config_backup_get_all(context, **kwargs):
 
     return qs.order_by(models.ConfigBackups.created_at.desc()).all()
 
-
-@require_context
+@require_admin_context
 def config_backup_delete(context, backup_id):
     session = get_session()
     with session.begin():
@@ -3563,7 +3556,6 @@ def _set_metadata_for_config_backup(context, backup_ref, metadata,
         else:
             _config_backup_metadata_create(context, metadata_values, session)
 
-@require_context
 def _config_backup_metadata_create(context, values, session):
     """Create a ConfigBackupMetadata object"""
     metadata_ref = models.ConfigBackupMetadata()
@@ -3571,13 +3563,12 @@ def _config_backup_metadata_create(context, values, session):
         values['id'] = str(uuid.uuid4())
     return _config_backup_metadata_update(context, metadata_ref, values, session)
 
-@require_context
+@require_admin_context
 def config_backup_metadata_create(context, values, session):
     """Create an ConfigBackupMetadata object"""
     session = get_session()
     return _config_backup_metadata_create(context, values, session)
 
-@require_context
 def _config_backup_metadata_update(context, metadata_ref, values, session):
     """Update ConfigBackupMetadata object"""
     values["deleted"] = False
@@ -3585,7 +3576,6 @@ def _config_backup_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
-@require_context
 def _config_backup_metadata_delete(context, metadata_ref, session):
     """
     Used internally by config_metadata_create and _config_backup_metadata_update

@@ -109,6 +109,12 @@ class CopyConfigFiles(task.Task):
         backup_summary = pickle.dumps(backup_summary)
         metadata = {'backup_summary': backup_summary}
         values = {'metadata': metadata}
+
+        if upload_status == 'Completed':
+            values['status'] = 'available'
+        else:
+            values['warning_msg'] = "All backup jobs are not completed successfully. Please see backup summary."
+
         config_backup = db.config_backup_update(cntx, backup_id, values)
 
     @autolog.log_method(Logger, 'CopyConfigFiles.revert')

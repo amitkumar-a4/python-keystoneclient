@@ -409,13 +409,6 @@ def to_abs():
         return new_function
     return wrap
 
-def get_directory_size(path):
-    cmd = ['du', '-shb', path]
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    out, err = p.communicate()
-    return out.split('\t')[0]
-
-
 class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
         if CONF.vault_storage_type == 'nfs':
@@ -1206,6 +1199,25 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
 
     except Exception as ex:
         LOG.exception(ex)
+
+def create_backup_directory(context, services, backup_directory_path):
+    try:
+        fileutils.ensure_tree(backup_directory_path)
+        for service,config_path in  services.iteritems():
+            service_name = service
+            fileutils.ensure_tree(os.path.join(backup_directory_path,service_name))
+    except Exception as ex:
+        LOG.exception(ex)
+
+def get_directory_size(path):
+    try:
+        cmd = ['du', '-shb', path]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        out, err = p.communicate()
+        return out.split('\t')[0]
+    except Exception as ex:
+        LOG.exception(ex)
+
 
 """
 if __name__ == '__main__':

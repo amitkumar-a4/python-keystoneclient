@@ -17,7 +17,6 @@ import threading
 import time
 import uuid
 import zlib
-import yaml
 import re
 
 from M2Crypto import DSA
@@ -2822,16 +2821,14 @@ class API(base.Base):
                     options['jobschedule'] = pickle.dumps(jobschedule)
                     config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
 
-                    #Check whether configuration backup job is running or not
-                    jobs = self._scheduler.get_config_backup_jobs()
-                    found = False
-                    for job in jobs:
-                        if job.kwargs['workload_id'] == config_workload['id']:
-                            found = True
-                            break
+                      
+                    existing_joschedule = pickle.loads(existing_config_workload.get('jobschedule'))
+                    existing_scheduler_status = False
+                    if existing_joschedule.get('enabled') == 'true':
+                        existing_scheduler_status = True
         
                     if str(jobschedule['enabled']).lower() == 'true':
-                        if found is True:
+                        if existing_scheduler_status is True:
                             #Case when scheduler is updated with some new values
                             #Need to update scheduler with new values so that it
                             #reflect changes instantly.
@@ -2841,7 +2838,7 @@ class API(base.Base):
                         self.workload_add_scheduler_job(jobschedule, config_workload, context, is_config_backup=True)
         
                     if str(jobschedule['enabled']).lower() == 'false':
-                        if found is True:
+                        if existing_scheduler_status is True:
                             # Remove from scheduler jobs
                             self._scheduler.unschedule_job(job)
                         else:
@@ -2901,16 +2898,6 @@ class API(base.Base):
         Make the RPC call to backup OpenStack configuration.
         """
         try:
-            if name and len(name) > 0:
-                backup_display_name = name
-            else:
-                backup_display_name = 'Config backup'
-
-            if description and len(description) > 0:
-                description = description
-            else:
-                description = 'No description'
-
             try:
                 config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
             except wlm_exceptions.ConfigWorkloadNotFound as ex:
@@ -2924,13 +2911,13 @@ class API(base.Base):
             self.db.config_workload_update(context, config_workload['id'],
                                            {'status': 'locked'})
 
-            AUDITLOG.log(context, 'OpenStack configuration backup ' + backup_display_name + ' Create Requested', None)
+            AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Requested', None)
 
             
             options = {'config_workload_id': CONF.cloud_unique_id,
                        'user_id': context.user_id,
                        'project_id': context.project_id,
-                       'display_name': backup_display_name,
+                       'display_name': name,
                        'display_description': description,
                        'start_date': time.strftime("%x"),
                        'status': 'creating',}
@@ -2942,7 +2929,7 @@ class API(base.Base):
                                      'status': 'executing'
                                      })
             self.scheduler_rpcapi.config_backup(context, FLAGS.scheduler_topic, backup['id'], request_spec={})
-            AUDITLOG.log(context, 'OpenStack configuration backup ' + backup_display_name + ' Create Submitted.', backup)
+            AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Submitted.', backup)
             return backup
         except Exception as ex:
             LOG.exception(ex)
@@ -2950,7 +2937,9 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     def get_config_backups(self, context, backup_id=None):
-        "Return list/single of backups."
+        """
+        Return list/single of backups.
+        """
         try:
             if backup_id:
                 backups = self.db.config_backup_get(context, backup_id)
@@ -2974,7 +2963,7 @@ class API(base.Base):
             AUDITLOG.log(context,
                          'Config backup ' + backup_display_name + ' Delete Requested',
                          config_backup)
-            if config_backup['status'] not in ['available', 'error', 'cancelled']:
+            if config_backup['status'] not in ['available', 'error']:
                 msg = _("Config backup status must be 'available' or 'error' or 'cancelled'")
                 #raise wlm_exceptions.InvalidState(reason=msg)
 

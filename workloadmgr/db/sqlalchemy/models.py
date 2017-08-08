@@ -628,7 +628,7 @@ class ConfigWorkloads(BASE, WorkloadsBase):
     """Represents a config workload object."""
     __tablename__ = 'config_workloads'
 
-    id = Column(String(36), primary_key=True)
+    id = Column(String(255), primary_key=True)
     user_id = Column(String(255), nullable=False)
     project_id = Column(String(255), nullable=False)
     status = Column(String(255))
@@ -643,7 +643,7 @@ class ConfigWorkloadMetadata(BASE, WorkloadsBase):
     __table_args__ = (UniqueConstraint('config_workload_id', 'key'), {})
 
     id = Column(String(255), primary_key=True)
-    config_workload_id = Column(String(36), ForeignKey('config_workloads.id'), nullable=False)
+    config_workload_id = Column(String(255), ForeignKey('config_workloads.id'), nullable=False)
     config_workload = relationship(ConfigWorkloads, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
@@ -651,11 +651,11 @@ class ConfigWorkloadMetadata(BASE, WorkloadsBase):
 class ConfigBackups(BASE, WorkloadsBase):
     """Represents a configuration backup object."""
     __tablename__ = 'config_backups'
-    id = Column(String(36), primary_key=True)
+    id = Column(String(255), primary_key=True)
     user_id = Column(String(255), nullable=False)
     project_id = Column(String(255), nullable=False)
     finished_at = Column(DateTime)
-    config_workload_id = Column(String(36), ForeignKey('config_workloads.id'), nullable=False)
+    config_workload_id = Column(String(255), ForeignKey('config_workloads.id'), nullable=False)
     display_name = Column(String(255))
     display_description = Column(String(255))
     size = Column(BigInteger)
@@ -675,7 +675,7 @@ class ConfigBackupMetadata(BASE, WorkloadsBase):
     __table_args__ = (UniqueConstraint('config_backup_id', 'key'), {})
 
     id = Column(String(255), primary_key=True)
-    config_backup_id = Column(String(36), ForeignKey('config_backups.id'), nullable=False)
+    config_backup_id = Column(String(255), ForeignKey('config_backups.id'), nullable=False)
     config_backup = relationship(ConfigBackups, backref=backref('metadata'))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
