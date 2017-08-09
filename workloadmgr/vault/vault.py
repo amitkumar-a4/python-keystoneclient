@@ -492,10 +492,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         config_workload_path = os.path.join(self.mount_path, CONF.cloud_unique_id, 'config_workload')
         return config_workload_path
  
-    def get_config_backup_path(self, backup_metadata):
+    def get_config_backup_path(self, backup_id):
         workload_path = self.get_config_workload_path()
-        backup_path = os.path.join(workload_path,
-                                     'backup_%s' % (backup_metadata['backup_id']))
+        backup_path = os.path.join(workload_path, 'backup_%s' % (backup_id))
         return backup_path
  
     def get_snapshot_path(self, snapshot_metadata):                 
@@ -800,9 +799,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             LOG.exception(ex)
 
     @autolog.log_method(logger=Logger)
-    def config_backup_delete(self, context, backup_metadata):
+    def config_backup_delete(self, context, backup_id):
         try:
-            backup_path = self.get_config_backup_path(backup_metadata)
+            backup_path = self.get_config_backup_path(backup_id)
             if os.path.isdir(backup_path):
                 shutil.rmtree(backup_path)
         except Exception as ex:
@@ -835,6 +834,18 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
         super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
+
+    def _delete_path(path):
+        retry = 0
+        while os.path.isdir(backup_path):
+            try:
+                command = ['rm', '-rf', backup_path]
+                subprocess.check_call(command, shell=False)
+            except:
+                pass
+            retry += 1
+            if retry >= 1:
+                break
 
     @autolog.log_method(logger=Logger)
     def get_progress_tracker_directory(self, tracker_metadata):
@@ -896,35 +907,18 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
-            retry = 0
-            while os.path.isdir(snapshot_path):
-               try:
-                   command = ['rm', '-rf', snapshot_path]
-                   subprocess.check_call(command, shell=False)
-               except:
-                       pass
-               retry += 1
-               if retry >= 1:
-                  break
+            _delete_path(snapshot_path)
         except Exception as ex:
             LOG.exception(ex)
 
     @autolog.log_method(logger=Logger)
-    def config_backup_delete(self, context, backup_metadata):
+    def config_backup_delete(self, context, backup_id):
         try:
-            backup_path = self.get_config_backup_path(backup_metadata)
-            retry = 0
-            while os.path.isdir(snapshot_path):
-                try:
-                    command = ['rm', '-rf', backup_path]
-                    subprocess.check_call(command, shell=False)
-                except:
-                    pass
-                retry += 1
-                if retry >= 1:
-                    break
+            backup_path = self.get_config_backup_path(backup_id)
+            _delete_path(backup_path)
         except Exception as ex:
             LOG.exception(ex)
+
     @autolog.log_method(logger=Logger)
     def get_total_capacity(self, context):
         """

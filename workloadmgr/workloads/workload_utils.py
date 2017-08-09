@@ -654,10 +654,7 @@ def _remove_config_backup_data(context, backup_id):
         config_workload_obj = db.config_workload_get(context, backup_with_data['config_workload_id'])
         backup_endpoint = config_workload_obj['backup_media_target']
         backup_target = vault.get_backup_target(backup_endpoint)
-        backup_target.config_backup_delete(context,
-            {'config_workload_id': backup_with_data.config_workload_id,
-             'backup_id' : backup_with_data.id})
-
+        backup_target.config_backup_delete(context,backup_with_data.id)
         db.config_backup_update(context, backup_with_data.id, {'data_deleted':True})
     except Exception as ex:
         LOG.exception(ex)

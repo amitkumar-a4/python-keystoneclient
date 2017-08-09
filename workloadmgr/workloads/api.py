@@ -2960,26 +2960,15 @@ class API(base.Base):
             config_workload = self.get_config_workload(context)
             backup_display_name = config_backup['display_name']
 
-            AUDITLOG.log(context,
-                         'Config backup ' + backup_display_name + ' Delete Requested',
-                         config_backup)
+            AUDITLOG.log(context, 'Config backup ' + backup_display_name + 
+                         ' Delete Requested', config_backup)
             if config_backup['status'] not in ['available', 'error']:
-                msg = _("Config backup status must be 'available' or 'error' or 'cancelled'")
-                #raise wlm_exceptions.InvalidState(reason=msg)
+                msg = _("Config backup status must be 'available' or 'error'.")
+                raise wlm_exceptions.InvalidState(reason=msg)
 
             backup = self.db.config_backup_update(context, backup_id, {'status': 'deleting'})
+            workload_utils.config_backup_delete(context, backup_id)
 
-            status_messages = {'message': 'Backup delete operation starting'}
-            options = {
-                'display_name': "Config backup Delete",
-                'display_description': "Backup delete for config backup id %s" % backup_id,
-                'status': "starting",
-                'status_messages': status_messages,
-            }
-
-            task = self.db.task_create(context, options)
-
-            self.workloads_rpcapi.config_backup_delete(context, config_workload['host'], backup_id, task.id)
             AUDITLOG.log(context,
                          'OpenStack cofig backup  ' + backup_display_name + ' Delete Submited',
                           config_backup)
