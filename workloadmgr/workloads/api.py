@@ -160,15 +160,8 @@ def _config_backup_create_callback(*args, **kwargs):
 
         from workloadmgr.workloads import API
         workloadmgrapi = API()
-
         tenantcontext = nova._get_tenant_context(kwargs)
-
         config_workload = workloadmgrapi.get_config_workload(tenantcontext)
-        # Make sure config workload is in a created state
-        if config_workload['status'] == 'error':
-            LOG.info("Config Workload is in error state. Cannot schedule backup operation")
-            LOG.info(_("_openstack_config_snapshot_create_callback Exit"))
-            return
 
         # wait for 2 minutes until the config workload changes state to available
         count = 0
@@ -189,7 +182,7 @@ def _config_backup_create_callback(*args, **kwargs):
     except Exception as ex:
         LOG.exception(ex)
 
-    LOG.info(_("_snapshot_create_callback Exit"))
+    LOG.info(_("_config_backup_create_callback Exit"))
 
 def create_trust(func):
    def trust_create_wrapper(*args, **kwargs):
@@ -2926,7 +2919,7 @@ class API(base.Base):
             self.db.config_backup_update(context, backup.id,
                                     {
                                      'progress_msg': 'Config backup operation is scheduled',
-                                     'status': 'executing'
+                                     'status': 'starting'
                                      })
             self.scheduler_rpcapi.config_backup(context, FLAGS.scheduler_topic, backup['id'], request_spec={})
             AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Submitted.', backup)
