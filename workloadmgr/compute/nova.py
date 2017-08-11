@@ -1158,12 +1158,12 @@ class API(base.Base):
         return client.contego.validate_database_creds(CONF.cloud_unique_id, params)
 
     @exception_handler(ignore_exception=False, contego=True)
-    def validate_trusted_node_creds(self, context, params, **kwargs):
+    def validate_trusted_nodes(self, context, params, **kwargs):
         """
         validate a trusted node whether it has access to controller node or not.
-        :param : trusted_node creds.
+        :param : trusted_node hostname.
         """
         client = kwargs['client']
-        return client.contego.validate_trusted_node_creds(CONF.cloud_unique_id, params)
+        return client.contego.validate_trusted_nodes(CONF.cloud_unique_id, params)
 
 

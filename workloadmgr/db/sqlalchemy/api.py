@@ -3532,12 +3532,8 @@ def config_backup_get_all(context, **kwargs):
 def config_backup_delete(context, backup_id):
     session = get_session()
     with session.begin():
-        session.query(models.ConfigBackups).\
-            filter_by(id=backup_id).\
-            update({'status': 'deleted',
-                    'deleted': True,
-                    'deleted_at': timeutils.utcnow(),
-                    'updated_at': literal_column('updated_at')})
+        session.query(models.ConfigBackupMetadata).filter_by(config_backup_id=backup_id).delete()
+        session.query(models.ConfigBackups).filter_by(id=backup_id).delete()
 
 def _set_metadata_for_config_backup(context, backup_ref, metadata,
                                     session):

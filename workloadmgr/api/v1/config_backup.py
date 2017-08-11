@@ -38,9 +38,9 @@ class ConfigBackupController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             try:
                 config_workload = self.workload_api.get_config_workload(context)
-            except wlm_exceptions.ConfigWorkload:
+            except wlm_exceptions.ConfigWorkloadNotFound:
                 message = "Configuration backup is not configured. First configure it."
-                raise wlm_exceptions.ConfigWorkload(message=message)
+                raise wlm_exceptions.ErrorOccurred(reason=message)
 
             if (body and 'backup' in body):
                 name = body['backup'].get('name', "")

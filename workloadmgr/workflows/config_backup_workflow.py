@@ -42,8 +42,10 @@ class ConfigBackupWorkflow(object):
                                 (self._store['backup_id'], self._store['params']['compute_hosts'],
                                  'compute', self._store['params']))
 
-        #Add task to backup controller nodes
-        if len(self._store['params']['controller_hosts']) > 0:
+        #Add task to backup controller nodes only
+        #if user has provided list of trusted nodes 
+        if len(self._store['params']['controller_hosts']) > 0 and \
+           len(self._store['params']['trusted_nodes'].keys()) > 0:
             self._config_backup.add(config_backup_tasks.UnorderedCopyConfigFilesFromRemoteHost
                                     (self._store['backup_id'], self._store['params']['controller_hosts'],
                                      'controller',self._store['params']))

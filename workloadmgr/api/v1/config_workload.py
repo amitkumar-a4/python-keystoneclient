@@ -53,13 +53,13 @@ class ConfigWorkloadController(wsgi.Controller):
             # Validate trusted_host creds
             if services_to_backup.get('trusted_nodes', None):
                 try:
-                    workload_utils.validate_trusted_node_creds(context, services_to_backup['trusted_nodes'])
+                    workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
                 except Exception as  ex:
                     raise ex
 
             try:
                 existing_config_workload = self.workload_api.get_config_workload(context)
-            except wlm_exceptions.ConfigWorkload:
+            except wlm_exceptions.ConfigWorkloadNotFound:
                 existing_config_workload = None
 
             existing_jobschedule = None
@@ -68,7 +68,7 @@ class ConfigWorkloadController(wsgi.Controller):
             if existing_config_workload is None:
                 if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
                     message = "Database credentials are required to configure config backup."
-                    raise wlm_exceptions.ConfigWorkload(message=message)
+                    raise wlm_exceptions.ErrorOccurred(message=message)
             else:
                 existing_jobschedule = existing_config_workload['jobschedule']
 

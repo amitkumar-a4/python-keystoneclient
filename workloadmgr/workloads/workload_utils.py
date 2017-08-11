@@ -684,21 +684,21 @@ def validate_database_creds(context, databases):
 
         if host is None:
             message = "No contego node is up for validating database credentials."
-            raise exception.ConfigWorkload(message=message)
+            raise exception.ErrorOccurred(reason=message)
 
         compute_service = nova.API(production=True)
         params = {'host':host, 'databases':databases}
         status = compute_service.validate_database_creds(context, params)
         if status['result'] != "success":
-            message = "Please verify, Given database creddentials are not correct."
-            raise exception.ConfigWorkload(message=message)
+            message = "Please verify given database credentials."
+            raise exception.ErrorOccurred(reason=message)
         else:
             return True
     except exception as ex:
         raise ex
 
 @autolog.log_method(logger=Logger)
-def validate_trusted_node_creds(context, trusted_node):
+def validate_trusted_nodes(context, trusted_node):
     try:
         compute_service = nova.API(production=True)
         nova_client = nova.novaclient(context, production=True)
@@ -708,7 +708,7 @@ def validate_trusted_node_creds(context, trusted_node):
         controller_nodes = nova_client.services.list(binary='nova-scheduler')
         controller_nodes = [node.host for node in controller_nodes]
         for node,node_creds in trusted_node.iteritems():
-            host = node_creds['node_hostname']
+            host = node_creds['hostname']
             services_on_node = nova_client.services.list(host=host)
             #Verify there is a compute node with this host
             if len(services_on_node) != 0:
@@ -723,18 +723,18 @@ def validate_trusted_node_creds(context, trusted_node):
                if found is False:
                    message = "Contego data mover is not installed on compute " \
                    "node: %s or node is not up." %host
-                   raise exception.ConfigWorkload(message=message)
+                   raise exception.ErrorOccurred(reason=message)
             else:
                 message = "No compute node found with hostname: %s" %host
-                raise exception.ConfigWorkload(message=message)
+                raise exception.ErrorOccurred(reason=message)
 
             params = {'controller_nodes': controller_nodes, 'node_creds': node_creds}
-            status = compute_service.validate_trusted_node_creds(context, params)
+            status = compute_service.validate_trusted_nodes(context, params)
             if status['result'] != "success":
                 message = "Please verify, Given trusted nodes doesn't have access to controller nodes."
-                raise exception.ConfigWorkload(message=message)
+                raise exception.ErrorOccurred(reason=message)
             else:
                 return True
-    except exception as ex:
+    except Exception as ex:
         raise ex
 

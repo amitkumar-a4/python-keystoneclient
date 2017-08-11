@@ -7,8 +7,8 @@ import os
 import time
 import cPickle as pickle
 
+from itertools import cycle
 from oslo.config import cfg
-
 from taskflow import task
 
 from workloadmgr.openstack.common.rpc import amqp
@@ -54,8 +54,8 @@ class CopyConfigFiles(task.Task):
         target_host = host
         target_host_data = 'config_data'
         if target == 'controller':
-            remote_host_creds = params.get('remote_host_creds')
-            target_host = remote_host_creds['remote_host']
+            remote_node = params['remote_host_creds']['hostname']
+            target_host_data = 'config_data for remote node: %s' %(remote_node)
         elif target == 'database':
              target_host_data = 'database'
              
@@ -108,13 +108,13 @@ class CopyConfigFiles(task.Task):
 
         backup_summary = pickle.dumps(backup_summary)
         metadata = {'backup_summary': backup_summary}
-        values = {'metadata': metadata}
 
         if upload_status == 'Completed':
-            values['status'] = 'available'
+            metadata['status'] = 'available'
         else:
-            values['warning_msg'] = "All backup jobs are not completed successfully. Please see backup summary."
+            metadata['warning_msg'] = "All backup jobs are not completed successfully. Please see backup summary."   
 
+        values = {'metadata': metadata}
         config_backup = db.config_backup_update(cntx, backup_id, values)
 
     @autolog.log_method(Logger, 'CopyConfigFiles.revert')
@@ -132,35 +132,39 @@ def UnorderedCopyConfigFiles(backup_id, hosts, target, params):
                                         } ))
     return flow
 
-def UnorderedCopyConfigFilesFromRemoteHost(backup_id, hosts, target, params):
+def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, params):
     flow = uf.Flow("copyconfigfilesremotehostuf")
-    compute_hosts = params['compute_hosts']
+    trusted_nodes = params['trusted_nodes']
     target = 'controller'
-    #If list of controller nodes is more than contego
-    #nodes then targetting all requests to one node only
-    if len(hosts) > len(compute_hosts):
-        for host in hosts:
-            params['remote_host'] = host
-            flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_hosts[0],
-                                 rebind={'backup_id':'backup_id',
-                                         'host':compute_hosts[0],
-                                         'target':target,
-                                         'params':params
-                                        } ))
-    else:
-        #If If list of controller nodes is less than or 
-        #equal that pairing each compute node with controller node.
-        nodes = zip(compute_hosts, host)
-        for compute_host,controller_host in nodes:
-            params['remote_host'] = controller_host
-            flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_host,
-                                 rebind={'backup_id':'backup_id',
-                                         'host':compute_host,
-                                         'target':target,
-                                         'params':params
-                                        } ))
-    return flow
 
+    '''
+    If list of controller nodes is more than trusted compute nodes 
+    then pairing each controller node to compute nodes in  cycle
+    For ex:
+    cont nodes = node1, node2, node3, node4
+    comp_nodes = comp1, comp2
+    In this case pairing would be 
+    (node1, comp1) (node2, comp2)(node3, comp1)(node4, comp2)
+    
+    if we have controller nodes less than or equal to trusted
+    computed nodes then there would be one to one pairing
+    '''
+
+    nodes = zip(controller_nodes, cycle(trusted_nodes.keys())) \
+        if len(controller_nodes) > len(trusted_nodes.keys()) \
+        else zip(controller_nodes, trusted_nodes)
+
+    for controller_host, trusted_node in nodes:
+        compute_host = trusted_nodes[trusted_node]['hostname']
+        params['remote_host_creds'] = trusted_nodes[trusted_node]
+        params['remote_host_creds']['hostname'] = controller_host
+        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_host,
+                             rebind={'backup_id':'backup_id',
+                                     'host':compute_host,
+                                     'target':target,
+                                     'params':'params'
+                                    } ))
+    return flow
 
 class ApplyRetentionPolicy(task.Task):
 

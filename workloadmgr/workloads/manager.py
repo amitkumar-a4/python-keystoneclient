@@ -69,7 +69,6 @@ from workloadmgr.openstack.common import timeutils
 from taskflow.exceptions import WrappedFailure
 from workloadmgr.workloads import workload_utils
 from workloadmgr.openstack.common import fileutils
-from workloadmgr.db.sqlalchemy.models import DB_VERSION
 
 from workloadmgr import autolog
 from workloadmgr import settings
@@ -105,7 +104,7 @@ def workflow_lookup_class(class_name):
 
 
 @autolog.log_method(logger=Logger)
-def get_workflow_class(context, workload_type_id, restore=False, config_backup=False ):
+def get_workflow_class(context, workload_type_id, restore=False ):
     #TODO(giri): implement a driver model for the workload types
     if workload_type_id:
         workload_type = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
@@ -142,8 +141,7 @@ def get_workflow_class(context, workload_type_id, restore=False, config_backup=F
         else:
             kwargs = {'workload_type_id': workload_type_id}
             raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
-
-    if config_backup:
+    else:
         workflow_class_name = 'workloadmgr.workflows.config_backup_workflow.ConfigBackupWorkflow'
 
     return workflow_lookup_class(workflow_class_name)
@@ -1756,17 +1754,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(Logger, 'WorkloadMgrManager.config_backup')
     def config_backup(self, context, backup_id):
-
+        '''
+        Backup OpenStack configuration
+        '''
         try:
             services_to_backup = None
             databases = None
-            controller_creds = None
-    
+            trusted_nodes = None
+   
             backup = self.db.config_backup_update(context, backup_id,
-                                               {'host': self.host,
-                                                'progress_msg': 'Config backup is starting',
-                                                'status': 'starting'})
-    
+                                               {'host': self.host})
             #Get list of services, database and remote nodes to backup
             config_workload = self.db.config_workload_get(context, backup.config_workload_id)
             config_workload_metadata = config_workload.get('metadata')
@@ -1775,23 +1772,28 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     services_to_backup = pickle.loads(str(metadata['value'])) 
                 elif metadata['key'] == 'databases':
                     databases = pickle.loads(str(metadata['value']))
-                elif metadata['key'] == 'controller_creds':
-                    controller_creds = pickle.loads(str(metadata['value']))
-    
+                elif metadata['key'] == 'trusted_nodes':
+                    trusted_nodes = pickle.loads(str(metadata['value']))
+
             #Look for contego and compute nodes
             nova_client = nova.novaclient(context, production=True)
             nova_services = nova_client.services.list()
             controller_nodes = []
             contego_nodes = []
+            down_contego_nodes = []
             for nova_service in nova_services:
                 if nova_service.binary.find('contego') != -1:
+                    #Filtering down nodes
+                    if nova_service.state != 'up':
+                       down_contego_nodes.append(nova_service.host)
+                       continue
                     host = nova_service.host
                     if host not in contego_nodes:
                         contego_nodes.append(host)
                 #TODO(Amit) Change the way to fing controller nodes
                 if nova_service.binary.find('scheduler') != -1:
                     controller_nodes.append(nova_service.host)
- 
+
             #If contego and controller node are same then remove from controller
             for controller_node in controller_nodes:
                 if controller_node in contego_nodes:
@@ -1803,20 +1805,28 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             config_workload_storage_path = backup_target.get_config_workload_path()
 
             backup_vault_storage_path = os.path.join(config_workload_storage_path, "backup_" + str(backup.get('id')))
-    
-            self.db.config_backup_update(context, backup_id,
-                                    {
-                                     'progress_msg': 'Initializing backup Workflow',
-                                     'status': 'executing',
-                                     'vault_storage_path': backup_vault_storage_path
-                                     })
+
+            values = {
+                      'progress_msg': 'Initializing backup Workflow',
+                      'status': 'executing',
+                      'vault_storage_path': backup_vault_storage_path}
+
+            #If any down node found then adding them to the summary.
+            if len(down_contego_nodes) > 0:
+                backup_summary = {}
+                for down_contego_node in down_contego_nodes:
+                    backup_summary[down_contego_node] = {'config_data': 'Node is down.'}
+                backup_summary = pickle.dumps(backup_summary)
+                metadata = {'backup_summary': backup_summary}
+                values['metadata'] = metadata
+            self.db.config_backup_update(context, backup_id, values)
     
             #Create folder structure on backend
             vault.create_backup_directory(context, services_to_backup, backup_vault_storage_path)
     
             params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
                       'backend_endpoint': config_workload['backup_media_target'], 'backup_id': backup_id,
-                      'databases': databases, 'controller_creds': controller_creds, 'compute_hosts': contego_nodes,
+                      'databases': databases, 'trusted_nodes': trusted_nodes, 'compute_hosts': contego_nodes,
                       'controller_hosts': controller_nodes
                       }
             context_dict = dict([('%s' % key, value)
@@ -1832,7 +1842,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
    
             for contego_node in contego_nodes:
                 store[contego_node] = contego_node
-            workflow_class = get_workflow_class(context, None, config_backup=True)
+            workflow_class = get_workflow_class(context, None)
             workflow = workflow_class( "config_backup" , store)
     
             self.db.config_backup_update(context, backup_id,
@@ -1850,11 +1860,18 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             size = vault.get_directory_size(backup_vault_storage_path)
             error_msg = None
             backup = self.db.config_backup_get(context, backup_id)
-            status = backup.status
+            backup_metadata = backup.metadata
+            status = None
+            warning_msg = None
+            for metadata in backup_metadata:
+                if metadata['key'] == 'status':
+                    status = metadata['value']
+                if metadata['key'] == 'warning_msg':
+                    warning_msg = metadata['value']
 
-            if status != "available":
+            if status is None:
                 error_msg = "Config backup failed. Please see backup summary."
-                raise Exception(error_msg)
+                raise wlm_exceptions.ErrorOccurred(reason=error_ms)
 
             backup = self.db.config_backup_update(context, backup_id,
                                     {
@@ -1863,6 +1880,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      'status': status,
                                      'time_taken': time_taken,
                                      'size': size,
+                                     'warning_msg': warning_msg
                                      })
 
             workload_utils.upload_config_backup_db_entry(context, backup_id)
@@ -1886,21 +1904,3 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      })
             workload_utils.upload_config_backup_db_entry(context, backup_id)
 
-
-    @autolog.log_method(logger=Logger)
-    def config_backup_delete(self, context, backup_id, task_id):
-        """
-        Delete an existing config snapshot
-        """
-        def execute(context, backup_id, task_id):
-            try:
-                workload_utils.config_backup_delete(context, backup_id)
-                self.db.config_backup_update(context, backup_id, {'status': 'deleted'})
-                status_messages = {'message': 'Config backup delete operation completed'}
-                self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
-                                                       'status_messages': status_messages})
-            except Exception as ex:
-                LOG.exception(ex)
-
-        self.pool.submit(execute, context, backup_id, task_id)
-        

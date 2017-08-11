@@ -73,26 +73,30 @@ AUDITLOG = auditlog.getAuditLogger()
 
 CONF=cfg.CONF
 
-#do not decorate this function with autolog
+# do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
     try:
         arg_str = autolog.format_args(args, kwargs)
-        LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
+        callback_obj = kwargs.get('callback_obj', 'snapshot')
+        LOG.info(_("_%s_create_callback Enter - "%(callback_obj) + arg_str))
 
         from workloadmgr.workloads import API
         workloadmgrapi = API()
- 
+
         workload_id = kwargs['workload_id']
         user_id = kwargs['user_id']
         project_id = kwargs['project_id']
         tenantcontext = nova._get_tenant_context(kwargs)
-    
-        workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
-        #TODO: Make sure workload is in a created state
+        if callback_obj == 'snapshot':
+            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+        else:
+            workload = workloadmgrapi.get_config_workload(tenantcontext)
+
         if workload['status'] == 'error':
-            LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
-            LOG.info(_("_snapshot_create_callback Exit"))
+            LOG.info(_("Workload %s is in error state. Cannot schedule %s operation")
+                     % (workload['display_name'] if callback_obj == 'snapshot' else 'config_workload', callback_obj))
+            LOG.info(_("_%s_create_callback Exit")%(callback_obj))
             return
 
         # wait for 5 minutes until the workload changes state to available
@@ -102,87 +106,64 @@ def _snapshot_create_callback(*args, **kwargs):
                 break
             time.sleep(30)
             count += 1
-            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+            if callback_obj == 'snapshot':
+                workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+            else:
+                workload = workloadmgrapi.get_config_workload(tenantcontext)
 
         # if workload hasn't changed the status to available
         if workload['status'] != 'available':
-            LOG.info(_("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
-            LOG.info(_("_snapshot_create_callback Exit"))
+            LOG.info(
+                _("Workload %s is not in available state. Cannot schedule %s operation")
+                % (workload['display_name'] if callback_obj == 'snapshot' else 'config_workload', callback_obj))
+            LOG.info(_("_%s_create_callback Exit") %(callback_obj))
             return
 
-        # determine if the workload need to be full snapshot or incremental
-        # the last full snapshot
-        # if the last full snapshot is over policy based number of days, do a full backup
-        snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
-                                                                           project_id, workload_id)
-        jobscheduler = workload['jobschedule']
+        if callback_obj == 'snapshot':
+            # determine if the workload need to be full snapshot or incremental
+            # the last full snapshot
+            # if the last full snapshot is over policy based number of days, do a full backup
+            snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
+                                                                               project_id, workload_id)
+            jobscheduler = workload['jobschedule']
 
-        # 
-        # if fullbackup_interval is -1, never take full backups
-        # if fullbackup_interval is 0, always take full backups
-        # if fullbackup_interval is +ve follow the interval
-        #
-        jobscheduler['fullbackup_interval'] = \
-                       'fullbackup_interval' in jobscheduler and \
-                       jobscheduler['fullbackup_interval'] or "-1"
+            #
+            # if fullbackup_interval is -1, never take full backups
+            # if fullbackup_interval is 0, always take full backups
+            # if fullbackup_interval is +ve follow the interval
+            #
+            jobscheduler['fullbackup_interval'] = \
+                'fullbackup_interval' in jobscheduler and \
+                jobscheduler['fullbackup_interval'] or "-1"
 
-        snapshot_type = "incremental"
-        if int(jobscheduler['fullbackup_interval']) == 0:
-            snapshot_type = "full"
-        elif int(jobscheduler['fullbackup_interval']) < 0:
             snapshot_type = "incremental"
-        elif int(jobscheduler['fullbackup_interval']) > 0:
-            # check full backup policy here
-            num_of_incr_in_current_chain = 0
-            for snap in snapshots:
-                if snap.snapshot_type == 'full':
-                    break;
-                else:
-                    num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
-                
-            if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
-               snapshot_type = "full"
+            if int(jobscheduler['fullbackup_interval']) == 0:
+                snapshot_type = "full"
+            elif int(jobscheduler['fullbackup_interval']) < 0:
+                snapshot_type = "incremental"
+            elif int(jobscheduler['fullbackup_interval']) > 0:
+                # check full backup policy here
+                num_of_incr_in_current_chain = 0
+                for snap in snapshots:
+                    if snap.snapshot_type == 'full':
+                        break;
+                    else:
+                        num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
 
-            if snapshots.__len__ == 0:
-               snapshot_type = 'full'
+                if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+                    snapshot_type = "full"
 
-        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
+                if snapshots.__len__ == 0:
+                    snapshot_type = 'full'
+
+            snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
+        else:
+            config_backup = workloadmgrapi.config_backup(tenantcontext, "jobscheduler", "No description")
     except Exception as ex:
-        LOG.exception(_("Error creating a snapshot for workload %s") % workload_id)
+        LOG.exception(_("Error creating a % for workload %s") % (callback_obj,
+                workload_id if callback_obj=='snapshot' else 'config_backup'))
 
-    LOG.info(_("_snapshot_create_callback Exit"))
-
-# do not decorate this function with autolog
-def _config_backup_create_callback(*args, **kwargs):
-    try:
-        arg_str = autolog.format_args(args, kwargs)
-        LOG.info(_("_config_backup_create_callback Enter - " + arg_str))
-
-        from workloadmgr.workloads import API
-        workloadmgrapi = API()
-        tenantcontext = nova._get_tenant_context(kwargs)
-        config_workload = workloadmgrapi.get_config_workload(tenantcontext)
-
-        # wait for 2 minutes until the config workload changes state to available
-        count = 0
-        while True:
-            if config_workload['status'] == "available" or config_workload['status'] == 'error' or count > 3:
-                break
-            time.sleep(30)
-            count += 1
-            config_workload = workloadmgrapi.get_config_workload(tenantcontext)
-
-        # if config workload hasn't changed the status to available
-        if config_workload['status'] != 'available':
-            LOG.info("Config Workload is not in available state. Cannot schedule backup operation")
-            LOG.info("_config_backup_create_callback exit")
-            return
-
-        config_backup = workloadmgrapi.config_backup(tenantcontext, "jobscheduler", "No description")
-    except Exception as ex:
-        LOG.exception(ex)
-
-    LOG.info(_("_config_backup_create_callback Exit"))
+    LOG.info(_("_%s_create_callback Exit") %(callback_obj))
 
 def create_trust(func):
    def trust_create_wrapper(*args, **kwargs):
@@ -733,14 +714,16 @@ class API(base.Base):
                          'user':context.user,
                          'tenant':context.tenant}
                  if is_config_backup:
+                    kwargs['callback_obj'] = 'config_backup'
                     hours = int(jobschedule['interval'].split('hr')[0])
                     start_time = jobschedule['start_time']
-                    self._scheduler.add_interval_job(_config_backup_create_callback,
+                    self._scheduler.add_interval_job(_snapshot_create_callback,
                                                     hours = hours,
                                                     start_time = start_time,
                                                     jobstore='config_jobstore',
                                                     kwargs=kwargs)
                  else:
+                     kwargs['callback_obj'] = 'snapshot'
                      self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
                                                     jobstore='jobscheduler_store', 
@@ -2813,9 +2796,8 @@ class API(base.Base):
                 if len(jobschedule):
                     options['jobschedule'] = pickle.dumps(jobschedule)
                     config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
-
                       
-                    existing_joschedule = pickle.loads(existing_config_workload.get('jobschedule'))
+                    existing_joschedule = pickle.loads(str(existing_config_workload.get('jobschedule')))
                     existing_scheduler_status = False
                     if existing_joschedule.get('enabled') == 'true':
                         existing_scheduler_status = True
@@ -2861,9 +2843,7 @@ class API(base.Base):
             try:
                 config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
             except wlm_exceptions.ConfigWorkloadNotFound as ex:
-                message = 'OpenStack config backup is not configured.'
-                LOG.exception(message)
-                raise wlm_exceptions.ConfigWorkload(message)
+                raise ex
 
             config_workload_dict = dict(config_workload.iteritems())
 
@@ -2885,7 +2865,6 @@ class API(base.Base):
             raise ex
 
     @autolog.log_method(logger=Logger)
-    @create_trust
     def config_backup(self, context, name, description):
         """
         Make the RPC call to backup OpenStack configuration.
@@ -2895,7 +2874,7 @@ class API(base.Base):
                 config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
             except wlm_exceptions.ConfigWorkloadNotFound as ex:
                 message = 'OpenStack config backup is not configured. First configure it.'
-                raise wlm_exceptions.ConfigWorkload(message)
+                raise wlm_exceptions.ErrorOccurred(reason=message)
 
             if config_workload['status'].lower() != 'available':
                 message = "Config workload is not available. " \
