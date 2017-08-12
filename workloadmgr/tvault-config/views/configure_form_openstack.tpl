@@ -19,6 +19,7 @@
 <script src="js/jquery-2.2.4.min.js" type="text/javascript"></script>
 <script src="js/bootstrap.min.js" type="text/javascript"></script>
 <script src="js/jquery.bootstrap.wizard.js" type="text/javascript"></script>
+<script src="js/passwordvalidation.js"></script>
 
 <!--  Plugin for the Wizard -->
 <script src="js/paper-bootstrap-wizard.js" type="text/javascript"></script>
@@ -369,15 +370,18 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Password</label>
-    	                                                <input name="triliovault-password1" type="password" required="" placeholder="" class="form-control">
+    	                                                <input id='newpassword' name="triliovault-password1" type="password" required="" placeholder="" class="form-control" onkeyup="validatestrongpassword(); return false;">
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Retype Password</label>
-    	                                                <input name="triliovault-password2" type="password" required="" placeholder="" class="form-control">
+    	                                                <input id='confirmpassword' name="triliovault-password2" type="password" required="" placeholder="" class="form-control" onkeyup="validatepasswords(); return false;">
                                                     </div>
                                                 </div>
+                                            </div>
+                                            <div class="col-sm-12">
+                                                <span id="confirmMessage" class="confirmMessage"></span>
                                             </div>
                                         </div>
                                     </div>
