@@ -33,7 +33,7 @@
   <h5 class="form-signin-heading">Update Service Account Credentials</h5><br><br>
       <div>
         <input id="oldpassword" name="oldpassword" type="password" autofocus="" required="" placeholder="triliovault Old Password" class="form-control"><span style="align:left;color:#ff6666">{{error}}</span><br>
-        <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="triliovault New Password" class="form-control"><br>
+        <input id="newpassword" name="newpassword" type="password" autofocus="" required="" placeholder="triliovault New Password" class="form-control" onkeyup="validatestrongpassword(); return false;"><br>
         <input id="confirmpassword" name="confirmpassword" type="password" required="" placeholder="Confirm New Password" class="form-control" onkeyup="validatepasswords(); return false;"><br>
         <span id="confirmMessage" class="confirmMessage"></span>
         <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
@@ -47,6 +47,37 @@
 <!-- Latest compiled and minified JavaScript -->
 <script src="js/bootstrap.min.js"></script>
 <script>
+
+function validatestrongpassword()
+{
+    //Store the password field objects into variables ...
+    var pass1 = document.getElementById('newpassword');
+
+    //Store the Confimation Message Object ...
+    var message = document.getElementById('confirmMessage');
+
+    //Set the colors we will be using ...
+    var goodColor = "#66cc66";
+    var badColor = "#ff6666";
+
+    //Compare the values in the password field 
+    //and the confirmation field
+    //The passwords match. 
+    //Set the color to the good color and inform
+    //the user that they have entered the correct password 
+    var strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})");
+    if (strongRegex.test(pass1.value)) {
+        pass1.style.backgroundColor = goodColor;
+        message.style.color = goodColor;
+        message.innerHTML = "Passwords are strongly typed!"
+    } else {
+        pass1.style.backgroundColor = badColor;
+        message.style.color = badColor;
+        message.innerHTML = "Password must have lower,upper,digit,special character and must be 8 or more characters!"
+        return false;
+    }
+}
+
 function validatepasswords()
 {
     //Store the password field objects into variables ...
@@ -68,7 +99,7 @@ function validatepasswords()
         //the user that they have entered the correct password 
         pass2.style.backgroundColor = goodColor;
         message.style.color = goodColor;
-        message.innerHTML = "Passwords Match!"
+        message.innerHTML = "Passwords Matched!"
     }else{
         //The passwords do not match.
         //Set the color to the bad color and
