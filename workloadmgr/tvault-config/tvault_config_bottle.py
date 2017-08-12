@@ -217,12 +217,14 @@ def change_service_password():
                                            config_inputs['newpassword'])
 
         """Change service account password"""
+        Config = ConfigParser.RawConfigParser()
         Config.read('/etc/workloadmgr/api-paste.ini')
         Config.set('filter:authtoken','admin_password',
                    config_inputs['newpassword'])
         with open('/etc/workloadmgr/api-paste.ini', 'wb') as configfile:
             Config.write(configfile)
     
+        Config = ConfigParser.RawConfigParser()
         Config.read('/etc/workloadmgr/workloadmgr.conf')
         Config.set('keystone_authtoken','admin_password',
                    config_inputs['newpassword'])
