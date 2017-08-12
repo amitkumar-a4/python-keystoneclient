@@ -230,16 +230,8 @@ def change_service_password():
                    config_inputs['newpassword'])
         with open('/etc/workloadmgr/workloadmgr.conf', 'wb') as configfile:
             Config.write(configfile)
-    
-        command = ['sudo', 'service', 'wlm-api', 'restart'];
-        subprocess.call(command, shell=False)
-    
-        command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
-        subprocess.call(command, shell=False)
-    
-        command = ['sudo', 'service', 'wlm-workloads', 'restart'];
-        subprocess.call(command, shell=False)
-    
+
+        _restart_wlm_services()
         bottle.redirect("/home")
     except Exception as ex:
         if str(ex.__class__) == "<class 'bottle.HTTPResponse'>":
@@ -496,6 +488,18 @@ def get_lan_ip():
                 pass
     return ip
 
+
+def _restart_wlm_services():
+        command = ['sudo', 'service', 'wlm-api', 'restart'];
+        subprocess.call(command, shell=False)
+    
+        command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
+        subprocess.call(command, shell=False)
+    
+        command = ['sudo', 'service', 'wlm-workloads', 'restart'];
+        subprocess.call(command, shell=False)
+
+
 def _authenticate_with_vcenter():
     if config_data['configuration_type'] == 'vmware':
         from workloadmgr.virt.vmwareapi import vim
@@ -505,6 +509,7 @@ def _authenticate_with_vcenter():
                                 password=config_data['vcenter_password'])
         vim_obj.Logout(vim_obj.get_service_content().sessionManager)
         
+
 def _authenticate_with_swift(config_data):
     if config_data['configuration_type'] == 'vmware' or config_data['configuration_type'] == 'openstack':
         if config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:

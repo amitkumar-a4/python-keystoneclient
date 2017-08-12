@@ -263,7 +263,7 @@ function setSwiftRequired(checked, val) {
                                             </div>
                                             <div class="col-sm-5">
                                                 <div class="form-group">
-    	                                            <label class="control-label">TrilioVault Controller IP Address<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:20px"></i></label>
+    	                                            <label class="control-label">TrilioVault Controller IP Address<i class="fa fa-spinner fa-spin hidden" id="floatingip-spinner" style="font-size:15px"></i></label>
     	                                            <input name="floating-ipaddress" {{'value=' + floating_ipaddress if defined('floating_ipaddress') else ''}} type="text" required="" placeholder="192.168.2.200" class="form-control">
                                                 </div>
                                             </div>
@@ -293,14 +293,14 @@ function setSwiftRequired(checked, val) {
                                             <div class="col-sm-12">
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
-    	                                                <label class="control-label">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:20px"></i></label>
+    	                                                <label class="control-label">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:15px"></i></label>
     	                                                <input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="text" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
                                                         <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
-    	                                                <label class="control-label">Keystone Url (Public/Internal)<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:20px"></i></label>
+    	                                                <label class="control-label">Keystone Url (Public/Internal)<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:15px"></i></label>
     	                                                <input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="text" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
                                                         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
@@ -319,7 +319,7 @@ function setSwiftRequired(checked, val) {
                                                 </div>
                                                 <div class="col-sm-5">
     	                                            <div class="form-group">
-    	                                                <label class="control-label">Admin Tenant<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:20px"></i></label>
+    	                                                <label class="control-label">Admin Tenant<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:15px"></i></label>
     	                                                <input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur='validate_keystone_credentials(this)'  aria-describedby="cred_helpblock">
                                                         <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
@@ -426,12 +426,12 @@ function setSwiftRequired(checked, val) {
 		                                        <div id="collapseThree" class="panel-collapse collapse in">
 		                                          <div class="panel-body">
 			                                      <div class="form-group" >
-		                                                  <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
+		                                                  <label class="control-label">NFS Export<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:15px"></i></label>
 			                                          <input name="storage-nfs-export" {{'value='+storage_nfs_export if (defined('storage_nfs_export') and len(storage_nfs_export)) else ''}} id="storage-nfs-export" type="text" placeholder="server:/var/nfs" class="form-control"  aria-describedby="nfs_helpblock" data-role="tagsinput">
                                                                   <span id="nfs_helpblock" class="help-block">Please enter list of NFS shares separated by commas</span>
 			                                      </div>
                                                               <div class="form-group">
-                                                                  <label class="control-label">NFS Options<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:20px"></i></label>
+                                                                  <label class="control-label">NFS Options<i class="fa fa-spinner fa-spin hidden" id="nfs-spinner" style="font-size:15px"></i></label>
                                                                   <input name="storage-nfs-options" {{'value=' + storage_nfs_options if defined('storage_nfs_options') else ''}} id="storage-nfs-options" type="text" required placeholder="" class="form-control"  aria-describedby="nfs_options_helpblock" data-role="tagsinput">
                                                                   <span id="nfs_options_helpblock" class="help-block">Please enter list of NFS options separated by commas</span>
                                                               </div>
