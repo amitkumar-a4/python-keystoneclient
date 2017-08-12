@@ -211,6 +211,14 @@ function setSwiftRequired(checked, val) {
                                             </a>
                                         </li>
                                         <li>
+                                            <a href="#triliovaultcredentials" data-toggle="tab">
+                                                <div class="icon-circle">
+                                                    <i class="ti-ticket"></i>
+                                                </div>
+                                                TrilioVault Credentials
+                                            </a>
+                                        </li>
+                                        <li>
                                             <a href="#ntpservers" data-toggle="tab">
                                                 <div class="icon-circle">
                                                     <i class="ti-timer"></i>
@@ -349,6 +357,25 @@ function setSwiftRequired(checked, val) {
                                                                 %end
                                                             %end
                                                          </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane" id="triliovaultcredentials">
+                                        <h5 class="info-text"> TrilioVault Service Credentials </h5>
+                                        <div class="row">
+                                            <div class="col-sm-12">
+                                                <div class="col-sm-5">
+                                                    <div class="form-group">
+    	                                                <label class="control-label">Password</label>
+    	                                                <input name="triliovault-password1" type="password" required="" placeholder="" class="form-control">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-5">
+                                                    <div class="form-group">
+    	                                                <label class="control-label">Retype Password</label>
+    	                                                <input name="triliovault-password2" type="password" required="" placeholder="" class="form-control">
                                                     </div>
                                                 </div>
                                             </div>

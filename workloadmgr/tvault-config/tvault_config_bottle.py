@@ -884,6 +884,9 @@ def _register_service():
                                                  tenant_id=config_data['service_tenant_id'],
                                                  enabled=True)
                      keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+            else:
+                keystone.users.update_password(wlm_user,
+                                               config_data['workloadmgr_user_password'])
 
             config_data['cloud_unique_id'] = wlm_user.id
 
@@ -2872,7 +2875,7 @@ def configure_openstack():
         config_data['keystone_public_protocol'] = parse_result.scheme
         
         config_data['workloadmgr_user'] = 'triliovault'
-        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
+        config_data['workloadmgr_user_password'] = config_inputs['triliovault-password1']
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
