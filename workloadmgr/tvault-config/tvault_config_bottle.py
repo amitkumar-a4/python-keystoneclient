@@ -19,6 +19,7 @@ from tempfile import mkstemp
 from shutil import move
 from os import remove, close
 from urlparse import urlparse
+import urllib
 from xml.dom.minidom import parseString
 import ConfigParser
 import tarfile
@@ -173,8 +174,9 @@ def change_password():
 @authorize()
 def update_service_account_password():
     """Show password change form"""
-    if bottle.request.GET.get('error') == 'error':
-        return {'error': 'Cannot reset service password. Try again..'}
+    message = bottle.request.GET.get('error', '')
+    if bottle.request.GET.get('error') != '':
+        return {'error': message}
     else:
         return {'error':''}
 
@@ -240,7 +242,8 @@ def change_service_password():
            raise ex
 
         # put some error message here
-        bottle.redirect("/update_service_account_password?error=error")
+        qstring = urllib.urlencode({'error': ex.message})
+        bottle.redirect("/update_service_account_password?%s" % qstring)
 
 
 ####
@@ -492,14 +495,13 @@ def get_lan_ip():
 
 
 def _restart_wlm_services():
-        command = ['sudo', 'service', 'wlm-api', 'restart'];
-        subprocess.call(command, shell=False)
-    
-        command = ['sudo', 'service', 'wlm-scheduler', 'restart'];
-        subprocess.call(command, shell=False)
-    
-        command = ['sudo', 'service', 'wlm-workloads', 'restart'];
-        subprocess.call(command, shell=False)
+    for service in ['wlm-api', 'wlm-scheduler', 'wlm-workloads']:
+        try:
+            command = ['sudo', 'service', service, 'restart'];
+            subprocess.call(command, shell=False)
+        except:
+            # additional nodes may not have wlm-api and wlm-scheduler
+            pass
 
 
 def _authenticate_with_vcenter():
