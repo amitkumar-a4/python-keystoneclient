@@ -535,9 +535,6 @@ class RoleNotFound(NotFound):
     message = _("User %(user_id)s does not have role '%(role_name)s' on "
                 "project %(project_id)s")
 
-class ConfigWorkload(WorkloadMgrException):
-    message = _("%(message)")
-
 class ConfigWorkloadNotFound(NotFound):
     message = _("Config Workload %(id)s could not be found.")
 

@@ -72,6 +72,12 @@ class ConfigWorkloadController(wsgi.Controller):
             else:
                 existing_jobschedule = existing_config_workload['jobschedule']
 
+            if existing_jobschedule and existing_jobschedule.get('interval', None) != None:
+                interval = int(existing_jobschedule.get('interval').split('hr')[0])
+                if interval < 1:
+                    message = "interval should be minimum 1 hr"
+                    raise wlm_exceptions.ErrorOccurred(message=message)
+
             if existing_jobschedule:
                 jobdefaults = existing_jobschedule
             else:
@@ -113,6 +119,7 @@ class ConfigWorkloadController(wsgi.Controller):
         """Get Config workload object."""
         try:
             context = req.environ['workloadmgr.context']
+
             config_workload = self.workload_api.get_config_workload(context)
             return config_workload
         except exc.HTTPNotFound as error:

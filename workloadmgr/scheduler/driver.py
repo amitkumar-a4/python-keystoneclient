@@ -55,6 +55,7 @@ def restore_update_db(context, restore_id, host):
 
 def config_backup_update_db(context, backup_id, host):
     '''Set the host and set the scheduled_at field of the backup.
+
     :returns: A ConfigBackup with the updated fields set properly.
     '''
     now = timeutils.utcnow()
