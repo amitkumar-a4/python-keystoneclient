@@ -3363,23 +3363,23 @@ def purge_workload(context, id):
         LOG.exception(ex)
 
 @require_admin_context
-def config_workload_update(context, config_workload_id, values):
+def config_workload_update(context, values):
     session = get_session()
-    return _config_workload_update(context, config_workload_id, values, session)
+    return _config_workload_update(context, values, session)
 
 @require_admin_context
-def config_workload_get(context, config_workload_id, **kwargs):
+def config_workload_get(context, **kwargs):
     session = get_session()
-    return _config_workload_get(context, config_workload_id, session, **kwargs)
+    return _config_workload_get(context, session, **kwargs)
 
-def _config_workload_update(context, id, values, session):
+def _config_workload_update(context, values, session):
     metadata = values.pop('metadata', {})
     try:
-        config_workload_ref = _config_workload_get(context, id, session)
+        config_workload_ref = _config_workload_get(context, session)
     except Exception as ex:
         config_workload_ref = models.ConfigWorkloads()
         if not values.get('id'):
-            values['id'] = id
+            values['id'] =  CONF.cloud_unique_id
 
     config_workload_ref.update(values)
     config_workload_ref.save(session)
@@ -3389,18 +3389,18 @@ def _config_workload_update(context, id, values, session):
 
     return config_workload_ref
 
-def _config_workload_get(context, id, session, **kwargs):
+def _config_workload_get(context, session, **kwargs):
     try:
         config_workload = model_query(
             context, models.ConfigWorkloads, session=session, **kwargs).\
             options(sa_orm.joinedload(models.ConfigWorkloads.metadata)).\
-            filter_by(id=id).first()
+            filter_by(id= CONF.cloud_unique_id).first()
 
         if config_workload is None:
-            raise exception.ConfigWorkloadNotFound(id=id)
+            raise exception.ConfigWorkloadNotFound(id=CONF.cloud_unique_id)
 
     except sa_orm.exc.NoResultFound:
-        raise exception.ConfigWorkloadNotFound(id=id)
+        raise exception.ConfigWorkloadNotFound(id=CONF.cloud_unique_id)
 
     return config_workload
 

@@ -2762,7 +2762,7 @@ class API(base.Base):
 
             AUDITLOG.log(context, 'Config workload update Requested', None)
             try:
-                existing_config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
+                existing_config_workload = self.db.config_workload_get(context)
             except Exception as ex:
                 existing_config_workload = None
 
@@ -2788,14 +2788,14 @@ class API(base.Base):
                     'jobschedule': pickle.dumps(jobschedule),
                     'backup_media_target': backup_target.backup_endpoint,
                 }
-                config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
+                config_workload = self.db.config_workload_update(context, options)
             else:
                 #Update existing config workload
                 options = {}
                 options['metadata'] = metadata
                 if len(jobschedule):
                     options['jobschedule'] = pickle.dumps(jobschedule)
-                    config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
+                    config_workload = self.db.config_workload_update(context, options)
                       
                     existing_joschedule = pickle.loads(str(existing_config_workload.get('jobschedule')))
                     existing_scheduler_status = False
@@ -2819,7 +2819,7 @@ class API(base.Base):
                         else:
                             LOG.warning("Config workload is already disabled.")
                 else:
-                    config_workload = self.db.config_workload_update(context, CONF.cloud_unique_id, options)
+                    config_workload = self.db.config_workload_update(context, options)
  
             self.db.config_workload_update(context, config_workload['id'],
                                     {
@@ -2841,7 +2841,7 @@ class API(base.Base):
     def get_config_workload(self, context):
         try:
             try:
-                config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
+                config_workload = self.db.config_workload_get(context)
             except wlm_exceptions.ConfigWorkloadNotFound as ex:
                 raise ex
 
@@ -2871,7 +2871,7 @@ class API(base.Base):
         """
         try:
             try:
-                config_workload = self.db.config_workload_get(context, CONF.cloud_unique_id)
+                config_workload = self.db.config_workload_get(context)
             except wlm_exceptions.ConfigWorkloadNotFound as ex:
                 message = 'OpenStack config backup is not configured. First configure it.'
                 raise wlm_exceptions.ErrorOccurred(reason=message)
