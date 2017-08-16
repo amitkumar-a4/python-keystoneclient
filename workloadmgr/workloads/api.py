@@ -2821,20 +2821,20 @@ class API(base.Base):
                 else:
                     config_workload = self.db.config_workload_update(context, options)
  
-            self.db.config_workload_update(context, config_workload['id'],
+            self.db.config_workload_update(context,
                                     {
                                      'status': 'available',
                                      'error_msg': None,
                                     })
-            workload_utils.upload_config_workload_db_entry(context, config_workload['id'])
+            workload_utils.upload_config_workload_db_entry(context)
             AUDITLOG.log(context, 'Config workload update submitted.', config_workload)
             return config_workload
         except Exception as ex:
             LOG.exception(ex)
             if config_workload:
-                self.db.config_workload_update(context, config_workload['id'],
+                self.db.config_workload_update(context,
                           {'status': 'error', 'error_msg': str(ex.message)})
-                workload_utils.upload_config_workload_db_entry(context, config_workload['id'])
+                workload_utils.upload_config_workload_db_entry(context)
             raise ex
 
     @autolog.log_method(logger=Logger)
@@ -2880,11 +2880,9 @@ class API(base.Base):
                 message = "Config workload is not available. " \
                           "Please wait for other backup to complete."
                 raise wlm_exceptions.InvalidState(reason=message)
-            self.db.config_workload_update(context, config_workload['id'],
-                                           {'status': 'locked'})
+            self.db.config_workload_update(context, {'status': 'locked'})
 
             AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Requested', None)
-
             
             options = {'config_workload_id': CONF.cloud_unique_id,
                        'user_id': context.user_id,
@@ -2916,7 +2914,7 @@ class API(base.Base):
             if backup_id:
                 backups = self.db.config_backup_get(context, backup_id)
             else:
-                backups = self.db.config_backup_get_all(context, config_workload_id = CONF.cloud_unique_id)
+                backups = self.db.config_backup_get_all(context)
             return backups
         except Exception as ex:
             LOG.exception(ex)

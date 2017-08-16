@@ -27,11 +27,7 @@ from taskflow.patterns import linear_flow as lf
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
-vmtasks_opts = []
-
 CONF = cfg.CONF
-CONF.register_opts(vmtasks_opts)
-
 
 class CopyConfigFiles(task.Task):
 
@@ -46,7 +42,7 @@ class CopyConfigFiles(task.Task):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
         compute_service = nova.API(production=True)
-        config_workload = db.config_workload_get(cntx, CONF.cloud_unique_id)
+        config_workload = db.config_workload_get(cntx)
         backend_endpoint = config_workload.backup_media_target
         params['host'] = host
         params['target'] = target
@@ -133,10 +129,6 @@ def UnorderedCopyConfigFiles(backup_id, hosts, target, params):
     return flow
 
 def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, params):
-    flow = uf.Flow("copyconfigfilesremotehostuf")
-    trusted_nodes = params['trusted_nodes']
-    target = 'controller'
-
     '''
     If list of controller nodes is more than trusted compute nodes 
     then pairing each controller node to compute nodes in  cycle
@@ -149,6 +141,9 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
     if we have controller nodes less than or equal to trusted
     computed nodes then there would be one to one pairing
     '''
+    flow = uf.Flow("copyconfigfilesremotehostuf")
+    trusted_nodes = params['trusted_nodes']
+    target = 'controller'
 
     nodes = zip(controller_nodes, cycle(trusted_nodes.keys())) \
         if len(controller_nodes) > len(trusted_nodes.keys()) \
@@ -168,18 +163,18 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
 
 class ApplyRetentionPolicy(task.Task):
 
-    def execute(self, context, config_workload_id):
-        return self.execute_with_log(context, config_workload_id)
+    def execute(self, context):
+        return self.execute_with_log(context)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.execute')
-    def execute_with_log(self, context, config_workload_id):
+    def execute_with_log(self, context):
         db = WorkloadMgrDB().db
         cntx = amqp.RpcContext.from_dict(context)
 
-        config_workload = db.config_workload_get(cntx, config_workload_id)
+        config_workload = db.config_workload_get(cntx)
         jobschedule = pickle.loads(str(config_workload['jobschedule']))
 
         backups_to_keep = int(jobschedule['retention_policy_value'])

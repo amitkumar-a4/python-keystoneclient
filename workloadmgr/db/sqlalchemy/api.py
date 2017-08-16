@@ -11,6 +11,8 @@ import uuid
 import warnings
 import threading
 
+from oslo_config import cfg
+
 import sqlalchemy
 import sqlalchemy.orm as sa_orm
 import sqlalchemy.sql as sa_sql
@@ -43,6 +45,7 @@ LOG = logging.getLogger(__name__)
 
 lock = threading.Lock()
 
+CONF=cfg.CONF
 
 def is_admin_context(context):
     """Indicates if the request context is an administrator."""
@@ -3516,8 +3519,8 @@ def config_backup_get_all(context, **kwargs):
     qs = model_query(context, models.ConfigBackups, **kwargs).\
                      options(sa_orm.joinedload(models.ConfigBackups.metadata))
          
-    if 'config_workload_id' in kwargs and kwargs['config_workload_id'] is not None and kwargs['config_workload_id'] != '':
-       qs = qs.filter_by(config_workload_id=kwargs['config_workload_id'])
+    qs = qs.filter_by(config_workload_id=CONF.cloud_unique_id)
+
     if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
        if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
            date_to = kwargs['date_to']

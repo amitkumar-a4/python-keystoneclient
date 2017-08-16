@@ -59,7 +59,7 @@ class ConfigBackupWorkflow(object):
 
         #Add task for retention policy
         self._postbackup.add(config_backup_tasks.ApplyRetentionPolicy(name="RetentionPolicy_" +
-                              self._store['backup_id'], rebind={'config_workload_id': 'config_workload_id'}))
+                                                                     self._store['backup_id']))
 
         self._flow = lf.Flow('ConfigBackuplf')
         self._flow.add(self._config_backup, self._postbackup)

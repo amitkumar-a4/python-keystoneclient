@@ -1765,7 +1765,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             backup = self.db.config_backup_update(context, backup_id,
                                                {'host': self.host})
             #Get list of services, database and remote nodes to backup
-            config_workload = self.db.config_workload_get(context, backup.config_workload_id)
+            config_workload = self.db.config_workload_get(context)
             config_workload_metadata = config_workload.get('metadata')
             for metadata in config_workload_metadata:
                 if metadata['key'] == 'services_to_backup':
@@ -1836,7 +1836,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 'connection': FLAGS.sql_connection,     # taskflow persistence connection
                 'context': context_dict,                # context dictionary
                 'backup_id': backup_id, # backup id
-                'config_workload_id': backup.config_workload_id,
                 'params': params,
             }
    
@@ -1884,12 +1883,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                      })
 
             workload_utils.upload_config_backup_db_entry(context, backup_id)
-            self.db.config_workload_update(context, config_workload['id'],
-                          {'status': 'available'})
+            self.db.config_workload_update(context, {'status': 'available'})
         except Exception as ex:
             LOG.exception(ex)
-            self.db.config_workload_update(context, config_workload['id'],
-                          {'status': 'available'})
+            self.db.config_workload_update(context, {'status': 'available'})
             msg = _("Failed creating config backup: %(exception)s") %{'exception': ex}
             time_taken = 0
             if backup:

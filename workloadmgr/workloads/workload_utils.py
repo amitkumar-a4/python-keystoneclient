@@ -148,9 +148,9 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             security_group_json = jsonutils.dumps(security_group)
             backup_target.put_object(path, security_group_json)
 
-def upload_config_workload_db_entry(cntx, config_workload_id):
+def upload_config_workload_db_entry(cntx):
     try:
-        config_workload_db = db.config_workload_get(cntx, config_workload_id)
+        config_workload_db = db.config_workload_get(cntx)
         backup_endpoint = config_workload_db['backup_media_target']
         backup_target = vault.get_backup_target(backup_endpoint)
         config_workload_storage_path = backup_target.get_config_workload_path()
@@ -165,7 +165,7 @@ def upload_config_workload_db_entry(cntx, config_workload_id):
 def upload_config_backup_db_entry(cntx, backup_id):
     try:
         config_db = db.config_backup_get(cntx, backup_id)
-        config_workload_db = db.config_workload_get(cntx, config_db['config_workload_id'])
+        config_workload_db = db.config_workload_get(cntx)
         backup_endpoint = config_workload_db['backup_media_target']
 
         backup_target = vault.get_backup_target(backup_endpoint)
@@ -651,7 +651,7 @@ def _remove_config_backup_data(context, backup_id):
 
     try:
         LOG.info(_('Deleting the data of config backup %s ') % (backup_with_data.id))
-        config_workload_obj = db.config_workload_get(context, backup_with_data['config_workload_id'])
+        config_workload_obj = db.config_workload_get(context)
         backup_endpoint = config_workload_obj['backup_media_target']
         backup_target = vault.get_backup_target(backup_endpoint)
         backup_target.config_backup_delete(context,backup_with_data.id)
