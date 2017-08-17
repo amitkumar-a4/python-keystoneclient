@@ -1252,6 +1252,13 @@ def move_file(src, dest):
     
 def copy_file(src, dest):
     execute('cp', src, dest)    
+
+def remove_directory(path):
+    try:
+        if os.path.isdir(path):
+        shutil.rmtree(path)
+    except Exception as ex:
+        raise ex
     
 def append_unique(dict, new_item, key="id"):
     for item in dict:

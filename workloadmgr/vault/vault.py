@@ -427,7 +427,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
              mountpath = CONF.vault_data_directory
              self.__mountpath = mountpath
              super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
-                                                         mountpath=mountpath)  
+                                                         mountpath=mountpath)
 
     def get_progress_tracker_directory(self, tracker_metadata):
         """
@@ -784,8 +784,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def workload_delete(self, context, workload_metadata):
         try:
             workload_path = self.get_workload_path(workload_metadata)
-            if os.path.isdir(workload_path):
-                shutil.rmtree(workload_path)
+            utils.remove_directory(workload_path)
         except Exception as ex:
             LOG.exception(ex)  
 
@@ -793,8 +792,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
-            if os.path.isdir(snapshot_path):
-                shutil.rmtree(snapshot_path)
+            utils.remove_directory(snapshot_path)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -802,8 +800,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def config_backup_delete(self, context, backup_id):
         try:
             backup_path = self.get_config_backup_path(backup_id)
-            if os.path.isdir(backup_path):
-                shutil.rmtree(backup_path)
+            utils.remove_directory(backup_path)
         except Exception as ex:
             LOG.exception(ex)
 
