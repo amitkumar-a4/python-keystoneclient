@@ -1168,4 +1168,11 @@ class API(base.Base):
         client = kwargs['client']
         return client.contego.validate_trusted_nodes(CONF.cloud_unique_id, params)
 
-
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def get_controller_nodes(self, context, **kwargs):
+        """
+        Get list of controller nodes.
+        """
+        client = kwargs['client']
+        return client.contego.get_controller_nodes(CONF.cloud_unique_id)

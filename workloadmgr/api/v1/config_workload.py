@@ -46,7 +46,7 @@ class ConfigWorkloadController(wsgi.Controller):
             # Validate database creds
             if services_to_backup.get('databases', None) is not None:
                 try:
-                    for database, database_config in databases.iteritems():
+                    for database, database_config in services_to_backup.get('databases').iteritems():
                         #Validate existance of required keys and their values
                         for required_key in ['host', 'user', 'password']:
                             if required_key not in database_config:
@@ -57,20 +57,12 @@ class ConfigWorkloadController(wsgi.Controller):
                 except Exception as  ex:
                     raise ex
 
+            existing_jobschedule = None
             try:
                 existing_config_workload = self.workload_api.get_config_workload(context)
+                existing_jobschedule = existing_config_workload['jobschedule']
             except wlm_exceptions.ConfigWorkloadNotFound:
                 existing_config_workload = None
-
-            existing_jobschedule = None
-
-            # When user configuring for the first time
-            if existing_config_workload is None:
-                if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
-                    message = "Database credentials are required to configure config backup."
-                    raise wlm_exceptions.ErrorOccurred(reason=message)
-            else:
-                existing_jobschedule = existing_config_workload['jobschedule']
 
             if jobschedule.get('interval', None) != None:
                 interval = int(jobschedule.get('interval').split('hr')[0])
@@ -85,7 +77,7 @@ class ConfigWorkloadController(wsgi.Controller):
                     message = "Time should be in 'HH:MM AM/PM' or 'HH:MM' format. For ex: '09:00 PM' or '23:45'"
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
-            if existing_jobschedule:
+            if existing_jobschedule is not None:
                 jobdefaults = existing_jobschedule
             else:
                 jobdefaults = {'start_time': '09:00 PM',

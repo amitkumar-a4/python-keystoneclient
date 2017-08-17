@@ -642,20 +642,12 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
 
 @autolog.log_method(logger=Logger)
 def _remove_config_backup_data(context, backup_id):
-    backup_with_data = db.config_backup_get(context, backup_id, read_deleted='yes')
-    if backup_with_data.status != 'deleted':
-        return;
-
-    if backup_with_data.data_deleted == True:
-        return;
-
     try:
-        LOG.info(_('Deleting the data of config backup %s ') % (backup_with_data.id))
+        LOG.info(_('Deleting the data of config backup %s ') % (backup_id))
         config_workload_obj = db.config_workload_get(context)
         backup_endpoint = config_workload_obj['backup_media_target']
         backup_target = vault.get_backup_target(backup_endpoint)
-        backup_target.config_backup_delete(context,backup_with_data.id)
-        db.config_backup_update(context, backup_with_data.id, {'data_deleted':True})
+        backup_target.config_backup_delete(context, backup_id)
     except Exception as ex:
         LOG.exception(ex)
 
@@ -738,3 +730,24 @@ def validate_trusted_nodes(context, trusted_node):
     except Exception as ex:
         raise ex
 
+@autolog.log_method(logger=Logger)
+def get_controller_nodes(context):
+    try:
+        compute_service = nova.API(production=True)
+        result = compute_service.get_controller_nodes(context)
+        return result['controller_nodes']
+    except exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def get_compute_nodes(context):
+    try:
+        contego_nodes = []
+        nova_client = nova.novaclient(context, production=True)
+        nova_services = nova_client.services.list()
+        for nova_service in nova_services:
+            if nova_service.binary.find('contego') != -1:
+                contego_nodes.append(nova_service)
+        return contego_nodes
+    except Exception as ex:
+        raise ex

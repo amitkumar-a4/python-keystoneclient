@@ -2761,10 +2761,28 @@ class API(base.Base):
                 raise wlm_exceptions.AdminRequired()
 
             AUDITLOG.log(context, 'Config workload update Requested', None)
+
             try:
                 existing_config_workload = self.db.config_workload_get(context)
             except Exception as ex:
                 existing_config_workload = None
+                #When user configuring for the first time
+                if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
+                    message = "Database credentials are required to configure config backup."
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
+
+                '''
+                #TODO(Amit) This code snippet will fail as return is not consistent among
+                #different utilities. Find a solution to get IP always.
+
+                controller_nodes = workload_utils.get_controller_nodes(context)
+                compute_nodes = workload_utils.get_compute_nodes(context)
+                #If controller node is other than compute node then we need
+                #trusted hosts which cab take backup from controller nodes. 
+                if len(list(set(controller_nodes.extend(compute_nodes)))) != len(compute_nodes):
+                    message = "To backup controller nodes, please provide list of trusted " \
+                       "compute nodes, which has password less access to controller nodes."
+                '''
 
             metadata = {}
             if 'databases' in services_to_backup:

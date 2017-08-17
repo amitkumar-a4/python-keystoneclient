@@ -1775,24 +1775,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 elif metadata['key'] == 'trusted_nodes':
                     trusted_nodes = pickle.loads(str(metadata['value']))
 
-            #Look for contego and compute nodes
-            nova_client = nova.novaclient(context, production=True)
-            nova_services = nova_client.services.list()
             controller_nodes = []
             contego_nodes = []
             down_contego_nodes = []
-            for nova_service in nova_services:
-                if nova_service.binary.find('contego') != -1:
-                    #Filtering down nodes
-                    if nova_service.state != 'up':
-                       down_contego_nodes.append(nova_service.host)
-                       continue
-                    host = nova_service.host
-                    if host not in contego_nodes:
-                        contego_nodes.append(host)
-                #TODO(Amit) Change the way to fing controller nodes
-                if nova_service.binary.find('scheduler') != -1:
-                    controller_nodes.append(nova_service.host)
+
+            #Look for contego nodes
+            compute_nodes = workload_utils.get_compute_nodes(context)
+            for compute_node in compute_nodes:
+                #Filtering down nodes
+                if compute_node.state != 'up':
+                    down_contego_nodes.append(compute_node.host)
+                    continue
+                host = compute_node.host
+                if host not in contego_nodes:
+                    contego_nodes.append(host)
+
+            controller_nodes = workload_utils.get_controller_nodes(context)
 
             #If contego and controller node are same then remove from controller
             for controller_node in controller_nodes:
