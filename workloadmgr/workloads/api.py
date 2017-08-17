@@ -2768,8 +2768,13 @@ class API(base.Base):
 
             metadata = {}
             if 'databases' in services_to_backup:
+               # Validate database creds
+               workload_utils.validate_database_creds(context, services_to_backup['databases']) 
                metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
+
             if 'trusted_nodes' in services_to_backup:
+               # Validate trusted_host creds
+               workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
                metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
 
             metadata['services_to_backup'] = pickle.dumps(services_to_backup)

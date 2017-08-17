@@ -6,6 +6,7 @@
 """The config workload api."""
 
 from webob import exc
+from dateutil.parser import parse
 import webob
 from workloadmgr.api import wsgi
 from workloadmgr import exception as wlm_exceptions
@@ -14,7 +15,6 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import config_workload as config_workload_views
 from workloadmgr.api.views import config_backup as config_backup_views
-from workloadmgr.workloads import workload_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -44,16 +44,16 @@ class ConfigWorkloadController(wsgi.Controller):
             services_to_backup = body['services_to_backup']
 
             # Validate database creds
-            if services_to_backup.get('databases', None):
+            if services_to_backup.get('databases', None) not None:
                 try:
-                    workload_utils.validate_database_creds(context, services_to_backup['databases'])
-                except Exception as  ex:
-                    raise ex
-
-            # Validate trusted_host creds
-            if services_to_backup.get('trusted_nodes', None):
-                try:
-                    workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
+                    for database, database_config in databases.iteritems():
+                        #Validate existance of required keys and their values
+                        for required_key in ['host', 'user', 'password']:
+                            if required_key not in database_config:
+                                raise wlm_exceptions.ErrorOccurred(reason="Database"
+                                      "credentials should have host, user and password.")
+                            if str(database_config[required_key]).lower() == 'none':
+                                raise wlm_exceptions.ErrorOccurred(reason=required_key + " can not be None.")
                 except Exception as  ex:
                     raise ex
 
@@ -68,15 +68,22 @@ class ConfigWorkloadController(wsgi.Controller):
             if existing_config_workload is None:
                 if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
                     message = "Database credentials are required to configure config backup."
-                    raise wlm_exceptions.ErrorOccurred(message=message)
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
             else:
                 existing_jobschedule = existing_config_workload['jobschedule']
 
-            if existing_jobschedule and existing_jobschedule.get('interval', None) != None:
-                interval = int(existing_jobschedule.get('interval').split('hr')[0])
+            if jobschedule.get('interval', None) != None:
+                interval = int(jobschedule.get('interval').split('hr')[0])
                 if interval < 1:
                     message = "interval should be minimum 1 hr"
-                    raise wlm_exceptions.ErrorOccurred(message=message)
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
+
+            if jobschedule.get('start_time', None) != None:
+                try:
+                    parse(datetime.now().strftime("%m/%d/%Y") + ' ' + jobschedule.get('start_time'))
+                except exception as ex:
+                    message = "Time should be in 'HH:MM AM/PM' or 'HH:MM' format. For ex: '09:00 PM' or '23:45'"
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
 
             if existing_jobschedule:
                 jobdefaults = existing_jobschedule
