@@ -1148,6 +1148,7 @@ class API(base.Base):
         client = kwargs['client']
         return client.contego.vast_config_backup(backup_id, params)
 
+    @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
     def validate_database_creds(self, context, params, **kwargs):
         """
@@ -1157,6 +1158,7 @@ class API(base.Base):
         client = kwargs['client']
         return client.contego.validate_database_creds(CONF.cloud_unique_id, params)
 
+    @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
     def validate_trusted_nodes(self, context, params, **kwargs):
         """

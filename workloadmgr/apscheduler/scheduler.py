@@ -6,6 +6,7 @@ and related exceptions.
 from threading import Thread, Event, Lock
 from datetime import datetime, timedelta
 from logging import getLogger
+from oslo_config import cfg
 import os
 import sys
 
@@ -18,6 +19,7 @@ from workloadmgr.apscheduler.threadpool import ThreadPool
 
 logger = getLogger(__name__)
 
+CONF=cfg.CONF
 
 class SchedulerAlreadyRunningError(Exception):
     """
@@ -430,7 +432,7 @@ class Scheduler(object):
             return func
         return inner
 
-    def get_config_backup_jobs(self):
+    def get_config_backup_job(self):
         """
         Returns a list of config backup jobs.
 
@@ -438,11 +440,14 @@ class Scheduler(object):
         """
         self._jobstores_lock.acquire()
         try:
-            jobs = []
+            config_job = None
             if 'config_jobstore' in self._jobstores:
                  config_jobstore = self._jobstores['config_jobstore']
-                 jobs.extend(config_jobstore.jobs)
-            return jobs
+                 for job in config_jobstore.jobs:
+                     if job.kwargs['workload_id'] == CONF.cloud_unique_id:
+                        config_job = job
+                        break
+            return config_job
         finally:
             self._jobstores_lock.release()
 
@@ -655,3 +660,26 @@ class Scheduler(object):
 
         logger.info('Scheduler has been shut down')
         self._notify_listeners(SchedulerEvent(EVENT_SCHEDULER_SHUTDOWN))
+
+    def unschedule_config_backup_job(self, job):
+        """
+        Removes a config backup job, preventing it from being run any more.
+        """
+        self._jobstores_lock.acquire()
+        try:
+            config_jobstore = self._jobstores['config_jobstore']
+            for job in config_jobstore.jobs:
+                self._remove_job(job, 'config_jobstore', config_jobstore)
+                return
+        except Exception as ex:
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')
+            logger.exception(ex)
+            config_jobstore = self._jobstores['config_jobstore']
+            for job in config_jobstore.jobs:
+                self._remove_job(job, 'config_jobstore', config_jobstore)
+                return
+        finally:
+            self._jobstores_lock.release()
+    
+        raise KeyError('config backup job is not scheduled.')
+

@@ -2796,10 +2796,10 @@ class API(base.Base):
                 if len(jobschedule):
                     options['jobschedule'] = pickle.dumps(jobschedule)
                     config_workload = self.db.config_workload_update(context, options)
-                      
+                    
                     existing_joschedule = pickle.loads(str(existing_config_workload.get('jobschedule')))
                     existing_scheduler_status = False
-                    if existing_joschedule.get('enabled') == 'true':
+                    if str(existing_joschedule.get('enabled')).lower() == 'true':
                         existing_scheduler_status = True
         
                     if str(jobschedule['enabled']).lower() == 'true':
@@ -2807,7 +2807,9 @@ class API(base.Base):
                             #Case when scheduler is updated with some new values
                             #Need to update scheduler with new values so that it
                             #reflect changes instantly.
-                            self._scheduler.unschedule_job(job)
+                            job = self._scheduler.get_config_backup_job()
+                            if job is not None:
+                                self._scheduler.unschedule_config_backup_job(job)
         
                         # Add to scheduler jobs
                         self.workload_add_scheduler_job(jobschedule, config_workload, context, is_config_backup=True)
@@ -2815,7 +2817,9 @@ class API(base.Base):
                     if str(jobschedule['enabled']).lower() == 'false':
                         if existing_scheduler_status is True:
                             # Remove from scheduler jobs
-                            self._scheduler.unschedule_job(job)
+                            job = self._scheduler.get_config_backup_job()
+                            if job is not None:
+                                self._scheduler.unschedule_config_backup_job(job)
                         else:
                             LOG.warning("Config workload is already disabled.")
                 else:
@@ -2851,14 +2855,11 @@ class API(base.Base):
             config_workload_dict['jobschedule']['enabled'] = False
             config_workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
             # find the job object based on config_workload_id
-            jobs = self._scheduler.get_config_backup_jobs()
-            for job in jobs:
-                if job.kwargs['workload_id'] == config_workload['id']:
-                    config_workload_dict['jobschedule']['enabled'] = True
-                    timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
-                    config_workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
-                    break
-
+            job = self._scheduler.get_config_backup_job()
+            if job is not None:
+                config_workload_dict['jobschedule']['enabled'] = True
+                timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
+                config_workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
             return config_workload_dict
         except Exception as ex:
             LOG.exception(ex)
