@@ -44,7 +44,7 @@ class ConfigWorkloadController(wsgi.Controller):
             services_to_backup = body['services_to_backup']
 
             # Validate database creds
-            if services_to_backup.get('databases', None) not None:
+            if services_to_backup.get('databases', None) is not None:
                 try:
                     for database, database_config in databases.iteritems():
                         #Validate existance of required keys and their values

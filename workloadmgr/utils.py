@@ -1256,7 +1256,7 @@ def copy_file(src, dest):
 def remove_directory(path):
     try:
         if os.path.isdir(path):
-        shutil.rmtree(path)
+            shutil.rmtree(path)
     except Exception as ex:
         raise ex
     
