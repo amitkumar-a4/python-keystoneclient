@@ -2773,9 +2773,12 @@ class API(base.Base):
 
                 controller_nodes = workload_utils.get_controller_nodes(context)
                 compute_nodes = workload_utils.get_compute_nodes(context)
+                compute_nodes = [compute_node.host for compute_node in compute_nodes]
+
                 #If controller node is other than compute node then we need
                 #trusted hosts which cab take backup from controller nodes. 
-                if len(list(set(controller_nodes.extend(compute_nodes)))) != len(compute_nodes):
+                controller_nodes.extend(compute_nodes)
+                if len(list(set(controller_nodes))) != len(set(compute_nodes)):
                     message = "To backup controller nodes, please provide list of trusted " \
                        "compute nodes, which has password less access to controller nodes."
 

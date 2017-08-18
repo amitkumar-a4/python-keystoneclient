@@ -210,6 +210,23 @@ def get_workload_url(context, workload_ids, upgrade):
     workload_url_iterate = []
     workload_ids_to_import = list(workload_ids)
     failed_workloads = []
+
+    def add_config_workload(context, config_workload_path):
+        try:
+            #If config_workload is not in the database then only import it.
+            db = WorkloadMgrDB().db
+            config_workload = db.config_workload_get(context)
+        except exception.ConfigWorkloadNotFound:
+            workload_url_iterate.append(config_workload_path)
+            #Updating backup media and adding config_workload for import
+            config_workload_db = os.path.join(config_workload_path, "config_workload_db")
+            if os.path.exists(config_workload_db):
+                update_backup_media_target(config_workload_db, backup_endpoint)
+            for item in os.listdir(config_workload_path):
+                config_backup_db = os.path.join(config_workload_path, item, "config_backup_db")
+                if os.path.exists(config_backup_db):
+                    update_backup_media_target(config_backup_db, backup_endpoint)
+
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
         #Before adding the workload check whether workload is valid or not
         if vault.validate_workload(workload) is False:
@@ -237,25 +254,16 @@ def get_workload_url(context, workload_ids, upgrade):
         try:
             backup_target = vault.get_backup_target(backup_endpoint)
 
-            #Updating backup media and adding config_workload for import
-            config_workload_path = os.path.join(backup_target.mount_path,
+            #importing config backup only when user has not specified any workload id
+            if len(workload_ids) == 0:
+                config_workload_path = os.path.join(backup_target.mount_path,
                                    vault.CONF.cloud_unique_id, 'config_workload' )
-            if os.path.exists(config_workload_path):
-                workload_url_iterate.append(config_workload_path)
-                config_workload_db = os.path.join(config_workload_path, "config_workload_db")
-                if os.path.exists(config_workload_db):
-                    update_backup_media_target(config_workload_db, backup_endpoint)
-                for item in os.listdir(config_workload_path):
-                    config_backup_db = os.path.join(config_workload_path, item, "config_backup_db")
-                    if os.path.exists(config_backup_db):
-                        update_backup_media_target(config_backup_db, backup_endpoint)
-                continue
+                if os.path.exists(config_workload_path):
+                    add_config_workload(context, config_workload_path)
+
             workload_url = backup_target.get_workloads(context)
 
             for workload in workload_url:
-                if os.path.split(workload)[1].startswith('config_workload'):
-                   workload_url_iterate.append(workload)
-                   continue
                 workload_id = os.path.split(workload)[1].replace('workload_', '')
 
                 if len(workload_ids) > 0:
@@ -483,18 +491,23 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
         DBSession.bulk_insert_mappings(eval('models.%s' % (metadata_model_class)), resources_metadata_list)
         DBSession.commit()
 
-        # if workloads then check for job schedule, if it's there then update it.
-        if file_name == 'workload_db':
+        # if workloads/config_workload then check for job schedule, if it's there then update it.
+        if file_name in ['workload_db', 'config_workload_db']:
             for resource in resources_list:
-                workload = models.Workloads()
-                workload.update(resource)
-                workloads.append(workload)
+                if file_name == 'workload_db':
+                    workload = models.Workloads()
+                    workload.update(resource)
+                    workloads.append(workload)
+                else:
+                    workload = models.ConfigWorkloads()
+                    workload.update(resource)
 
-                #Check if job schedule is enable then add scheduler.
+                # Check if job schedule is enable then add scheduler.
                 if len(resource['jobschedule']) and \
-                   pickle.loads(str(resource['jobschedule']))['enabled'] == True:
-                   workload_api = workloadAPI.API()
-                   workload_api.workload_add_scheduler_job(pickle.loads(str(resource['jobschedule'])), workload, tenantcontext)
+                                pickle.loads(str(resource['jobschedule']))['enabled'] == True:
+                    workload_api = workloadAPI.API()
+                    workload_api.workload_add_scheduler_job(pickle.loads(str(resource['jobschedule'])), workload,
+                                                            tenantcontext, is_config_backup=(file_name=='config_workload_db'))
 
     except Exception as ex:
         LOG.exception(ex)
