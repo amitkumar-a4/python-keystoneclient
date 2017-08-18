@@ -174,17 +174,31 @@ def update_backup_media_target(file_path, backup_endpoint):
             file_data = file_db.read()
         json_obj = json.loads(file_data)
 
-        metadata = json_obj.get('metadata', None)
-        if metadata:
-            for meta in metadata:
-                if meta['key'] == 'backup_media_target':
-                    if backup_endpoint != meta['value']:
-                        meta['value'] = backup_endpoint
-                        break
+        #This case is for config_workload
+        if json_obj.get('backup_media_target', None) :
+            if backup_endpoint != json_obj.get('backup_media_target'):
+                json_obj['backup_media_target'] = backup_endpoint
+        #Check for config_backup
+        elif json_obj.get('vault_storage_path', None):
+            vault_storage_path = json_obj.get('vault_storage_path')
+            mount_path = vault.get_backup_target(backup_endpoint).mount_path
+            if vault_storage_path.startswith(mount_path) is False:
+                backup_path = vault_storage_path.split(vault.CONF.cloud_unique_id + "/")[1]
+                json_obj['vault_storage_path'] = os.path.join(mount_path, vault.CONF.cloud_unique_id, backup_path)
+        else:
+            #Case for workload and snapshot
+            metadata = json_obj.get('metadata', None)
+            if metadata:
+                for meta in metadata:
+                    if meta['key'] == 'backup_media_target':
+                        if backup_endpoint != meta['value']:
+                            meta['value'] = backup_endpoint
+                            break
 
             json_obj['metadata'] = metadata
-            with open(file_path, 'w') as outfile:
-                json.dump(json_obj, outfile)
+
+        with open(file_path, 'w') as outfile:
+            json.dump(json_obj, outfile)
 
     except Exception as ex:
         LOG.exception(ex)
@@ -222,11 +236,20 @@ def get_workload_url(context, workload_ids, upgrade):
         backup_target = None
         try:
             backup_target = vault.get_backup_target(backup_endpoint)
+
+            #Updating backup media and adding config_workload for import
             config_workload_path = os.path.join(backup_target.mount_path,
-                                   'config_workload_' + str(vault.CONF.cloud_unique_id))
+                                   vault.CONF.cloud_unique_id, 'config_workload' )
             if os.path.exists(config_workload_path):
                 workload_url_iterate.append(config_workload_path)
-            continue
+                config_workload_db = os.path.join(config_workload_path, "config_workload_db")
+                if os.path.exists(config_workload_db):
+                    update_backup_media_target(config_workload_db, backup_endpoint)
+                for item in os.listdir(config_workload_path):
+                    config_backup_db = os.path.join(config_workload_path, item, "config_backup_db")
+                    if os.path.exists(config_backup_db):
+                        update_backup_media_target(config_backup_db, backup_endpoint)
+                continue
             workload_url = backup_target.get_workloads(context)
 
             for workload in workload_url:
@@ -424,11 +447,10 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
                 raise  exception.NotFound()
         except Exception:
             #If resource not found then create new entry in database
-            if 'metadata' in resource:
-                for resource_metadata in resource.pop('metadata'):
-                    resources_metadata_list.append(resource_metadata)
-        resource = _adjust_values(tenantcontext, new_version, resource, upgrade)
-        resources_list.append(resource)
+            for resource_metadata in resource.pop('metadata'):
+                resources_metadata_list.append(resource_metadata)
+            resource = _adjust_values(tenantcontext, new_version, resource, upgrade)
+            resources_list.append(resource)
 
     try:
         #Load file for resource containing all objects neeed to import
