@@ -1790,6 +1790,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 if host not in contego_nodes:
                     contego_nodes.append(host)
 
+            if len(contego_nodes) == 0:
+                error_msg = "No contego node found in up state. Can not take backup."
+                raise wlm_exceptions.ErrorOccurred(reason=error_msg) 
+
             controller_nodes = workload_utils.get_controller_nodes(context)
 
             #If contego and controller node are same then remove from controller
