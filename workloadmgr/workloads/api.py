@@ -2771,10 +2771,6 @@ class API(base.Base):
                     message = "Database credentials are required to configure config backup."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
-                '''
-                #TODO(Amit) This code snippet will fail as return is not consistent among
-                #different utilities. Find a solution to get IP always.
-
                 controller_nodes = workload_utils.get_controller_nodes(context)
                 compute_nodes = workload_utils.get_compute_nodes(context)
                 #If controller node is other than compute node then we need
@@ -2782,7 +2778,6 @@ class API(base.Base):
                 if len(list(set(controller_nodes.extend(compute_nodes)))) != len(compute_nodes):
                     message = "To backup controller nodes, please provide list of trusted " \
                        "compute nodes, which has password less access to controller nodes."
-                '''
 
             metadata = {}
             if 'databases' in services_to_backup:
