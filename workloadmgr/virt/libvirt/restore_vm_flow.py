@@ -88,7 +88,7 @@ def is_supported_backend(volume_type):
 
 def get_availability_zone(instance_options, volume_id=None, az=None):
     # find the mapping for volume
-    if volume_id is not None and 'vdisks' in instance_options:
+    if volume_id is not None and 'vdisks' in instance_options and len(instance_options['vdisks']) > 0:
        for vdisk in instance_options['vdisks']:
            if vdisk['id'] == volume_id:
               if 'availability_zone' in vdisk and vdisk['availability_zone'] != '':
