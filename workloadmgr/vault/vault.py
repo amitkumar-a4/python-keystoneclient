@@ -552,6 +552,13 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             restore_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
         return restore_vm_disk_resource_staging_path
 
+    def remove_directory(self, path):
+        try:
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+        except Exception as ex:
+            raise ex
+
     ##
     # backup target capabilities
     ##
@@ -784,7 +791,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def workload_delete(self, context, workload_metadata):
         try:
             workload_path = self.get_workload_path(workload_metadata)
-            utils.remove_directory(workload_path)
+            self.remove_directory(workload_path)
         except Exception as ex:
             LOG.exception(ex)  
 
@@ -792,7 +799,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
-            utils.remove_directory(snapshot_path)
+            self.remove_directory(snapshot_path)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -800,7 +807,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def config_backup_delete(self, context, backup_id):
         try:
             backup_path = self.get_config_backup_path(backup_id)
-            utils.remove_directory(backup_path)
+            self.remove_directory(backup_path)
         except Exception as ex:
             LOG.exception(ex)
 

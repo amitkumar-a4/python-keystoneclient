@@ -160,7 +160,7 @@ def _snapshot_create_callback(*args, **kwargs):
         else:
             config_backup = workloadmgrapi.config_backup(tenantcontext, "jobscheduler", "No description")
     except Exception as ex:
-        LOG.exception(_("Error creating a % for workload %s") % (callback_obj,
+        LOG.exception(_("Error creating a %s for workload %s") % (callback_obj,
                 workload_id if callback_obj=='snapshot' else 'config_backup'))
 
     LOG.info(_("_%s_create_callback Exit") %(callback_obj))

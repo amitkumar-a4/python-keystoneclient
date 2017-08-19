@@ -666,12 +666,11 @@ def config_backup_delete(context, backup_id):
 def validate_database_creds(context, databases):
     try:
         #Look for contego node, which is up
-        nova_client = nova.novaclient(context, production=True)
-        nova_nodes = nova_client.services.list()
         host = None
-        for node in nova_nodes:
-            if node.binary.find('contego') != -1 and node.state == 'up':
-                host = node.host
+        compute_nodes = get_compute_nodes(context)
+        for compute_node in compute_nodes:
+            if compute_node.state == 'up':
+                host = compute_node.host
                 break
 
         if host is None:
@@ -693,24 +692,19 @@ def validate_database_creds(context, databases):
 def validate_trusted_nodes(context, trusted_node):
     try:
         compute_service = nova.API(production=True)
-        nova_client = nova.novaclient(context, production=True)
 
-        #Change this mechanism to some other, getting list 
-        #of scheduler service is not right way
-        controller_nodes = nova_client.services.list(binary='nova-scheduler')
-        controller_nodes = [node.host for node in controller_nodes]
+        controller_nodes = get_controller_nodes(context)
         for node,node_creds in trusted_node.iteritems():
             host = node_creds['hostname']
-            services_on_node = nova_client.services.list(host=host)
+            compute_nodes = get_compute_nodes(context, host=host)
             #Verify there is a compute node with this host
-            if len(services_on_node) != 0:
-               #Verify Contego module is installed on that node and up.
+            if len(compute_nodes) != 0:
+               #Verify node is up.
                found = False
-               for service in services_on_node:
-                   if service.binary.find('contego') != -1\
-                                         and service.state == 'up':
-                       found = True
-                       break
+               for compute_node in compute_nodes:
+                   if compute_node.state == 'up':
+                      found = True
+                      break
 
                if found is False:
                    message = "Contego data mover is not installed on compute " \
@@ -740,11 +734,11 @@ def get_controller_nodes(context):
         raise ex
 
 @autolog.log_method(logger=Logger)
-def get_compute_nodes(context):
+def get_compute_nodes(context, host=None):
     try:
         contego_nodes = []
         nova_client = nova.novaclient(context, production=True)
-        nova_services = nova_client.services.list()
+        nova_services = nova_client.services.list(host=host)
         for nova_service in nova_services:
             if nova_service.binary.find('contego') != -1:
                 contego_nodes.append(nova_service)

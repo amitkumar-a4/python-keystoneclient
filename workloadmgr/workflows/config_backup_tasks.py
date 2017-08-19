@@ -3,7 +3,6 @@
 # Copyright (C) 2014 Trilio Data, Inc. All Rights Reserved.
 #
 
-import os
 import time
 import cPickle as pickle
 
@@ -14,7 +13,6 @@ from taskflow import task
 from workloadmgr.openstack.common.rpc import amqp
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.compute import nova
-from workloadmgr.vault import vault
 from workloadmgr.virt import driver
 from workloadmgr.openstack.common import log as logging
 
@@ -29,8 +27,8 @@ Logger = autolog.Logger(LOG)
 
 CONF = cfg.CONF
 
-class CopyConfigFiles(task.Task):
 
+class CopyConfigFiles(task.Task):
     def execute(self, context, backup_id, host, target, params):
         return self.execute_with_log(context, backup_id, host, target, params)
 
@@ -51,31 +49,33 @@ class CopyConfigFiles(task.Task):
         target_host_data = 'config_data'
         if target == 'controller':
             remote_node = params['remote_host_creds']['hostname']
-            target_host_data = 'config_data for remote node: %s' %(remote_node)
+            target_host_data = 'config_data for remote node: %s' % (remote_node)
         elif target == 'database':
-             target_host_data = 'database'
-             
+            target_host_data = 'database'
+
         metadata = {
-            'resource_id': host + '_' + str( int(time.time()) ),
+            'resource_id': host + '_' + str(int(time.time())),
             'backend_endpoint': backend_endpoint,
             'snapshot_id': backup_id
         }
         params['metadata'] = metadata
-        
+
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
+        LOG.info("vast_config_backup called for backup_id: %s" %backup_id)
         virtdriver._vast_methods_call_by_function(compute_service.vast_config_backup,
                                                   cntx, backup_id,
                                                   params)
         try:
             upload_status = virtdriver._wait_for_remote_nova_process(cntx, compute_service,
-                                      metadata,
-                                      backup_id,
-                                      backend_endpoint)
+                                                                     metadata,
+                                                                     backup_id,
+                                                                     backend_endpoint)
             if upload_status is True:
-               upload_status = 'Completed'
+                upload_status = 'Completed'
         except Exception as ex:
-            upload_status = _("%(exception)s") %{'exception': ex}
-        
+            upload_status = _("%(exception)s") % {'exception': ex}
+            LOG.exception(ex)
+
         config_backup = db.config_backup_get(cntx, backup_id)
         config_metadata = config_backup.metadata
         backup_summary = None
@@ -99,7 +99,7 @@ class CopyConfigFiles(task.Task):
 
         if backup_summary.get(target_host, None):
             backup_summary[target_host][target_host_data] = upload_status
-        else : 
+        else:
             backup_summary[target_host] = {target_host_data: upload_status}
 
         backup_summary = pickle.dumps(backup_summary)
@@ -108,28 +108,30 @@ class CopyConfigFiles(task.Task):
         if upload_status == 'Completed':
             metadata['status'] = 'available'
         else:
-            metadata['warning_msg'] = "All backup jobs are not completed successfully. Please see backup summary."   
+            metadata['warning_msg'] = "All backup jobs are not completed successfully. Please see backup summary."
 
         values = {'metadata': metadata}
-        config_backup = db.config_backup_update(cntx, backup_id, values)
+        db.config_backup_update(cntx, backup_id, values)
 
     @autolog.log_method(Logger, 'CopyConfigFiles.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
 
+
 def UnorderedCopyConfigFiles(backup_id, hosts, target, params):
     flow = uf.Flow("copyconfigfilesuf")
     for host in hosts:
         flow.add(CopyConfigFiles(name="CopyConfigFile_" + host,
-                                 rebind={'backup_id':'backup_id',
-                                         'host':host,
+                                 rebind={'backup_id': 'backup_id',
+                                         'host': host,
                                          'target': target,
-                                         'params':'params'
-                                        } ))
+                                         'params': 'params'
+                                         }))
     return flow
 
+
 def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, params):
-    '''
+    """
     If list of controller nodes is more than trusted compute nodes 
     then pairing each controller node to compute nodes in  cycle
     For ex:
@@ -137,10 +139,10 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
     comp_nodes = comp1, comp2
     In this case pairing would be 
     (node1, comp1) (node2, comp2)(node3, comp1)(node4, comp2)
-    
+
     if we have controller nodes less than or equal to trusted
     computed nodes then there would be one to one pairing
-    '''
+    """
     flow = uf.Flow("copyconfigfilesremotehostuf")
     trusted_nodes = params['trusted_nodes']
     target = 'controller'
@@ -153,16 +155,17 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
         compute_host = trusted_nodes[trusted_node]['hostname']
         params['remote_host_creds'] = trusted_nodes[trusted_node]
         params['remote_host_creds']['hostname'] = controller_host
+        LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,compute_host))
         flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_host,
-                             rebind={'backup_id':'backup_id',
-                                     'host':compute_host,
-                                     'target':target,
-                                     'params':'params'
-                                    } ))
+                                 rebind={'backup_id': 'backup_id',
+                                         'host': compute_host,
+                                         'target': target,
+                                         'params': 'params'
+                                         }))
     return flow
 
-class ApplyRetentionPolicy(task.Task):
 
+class ApplyRetentionPolicy(task.Task):
     def execute(self, context):
         return self.execute_with_log(context)
 
@@ -183,10 +186,10 @@ class ApplyRetentionPolicy(task.Task):
 
         if len(backups) > backups_to_keep:
             for backup in backups[backups_to_keep:]:
+                LOG.info("Deleting backup %s" %backup.id)
                 workload_utils.config_backup_delete(cntx, backup.id)
 
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
-
 
