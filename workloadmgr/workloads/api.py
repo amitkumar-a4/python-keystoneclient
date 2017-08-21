@@ -71,8 +71,6 @@ LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 AUDITLOG = auditlog.getAuditLogger()
 
-CONF=cfg.CONF
-
 # do not decorate this function with autolog
 def _snapshot_create_callback(*args, **kwargs):
     try:
@@ -2800,7 +2798,7 @@ class API(base.Base):
             if existing_config_workload is None:
                 backup_target, path = vault.get_settings_backup_target()
                 options = {
-                    'id': CONF.cloud_unique_id,
+                    'id': vault.CONF.cloud_unique_id,
                     'user_id': context.user_id,
                     'project_id': context.project_id,
                     'host': socket.gethostname(),
@@ -2906,7 +2904,7 @@ class API(base.Base):
 
             AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Requested', None)
             
-            options = {'config_workload_id': CONF.cloud_unique_id,
+            options = {'config_workload_id': vault.CONF.cloud_unique_id,
                        'user_id': context.user_id,
                        'project_id': context.project_id,
                        'display_name': name,
