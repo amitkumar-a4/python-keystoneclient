@@ -1,5 +1,4 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
+# vim: tabstop=4 shiftwidth=4 softtabstop=4 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
@@ -484,3 +483,34 @@ def task_get(context, task_id, **kwargs):
 
 def task_get_all(context, **kwargs):
     return IMPL.task_get_all(context, **kwargs)
+
+def config_workload_update(context, values):
+    """
+    Create a config_workload from the values dictionary or
+    Set the given properties on a config_workload  and update it.
+    """
+    return IMPL.config_workload_update(context, values)
+
+def config_workload_get(context, **kwargs):
+    """Get a workload or raise if it does not exist."""
+    return IMPL.config_workload_get(context, **kwargs)
+
+def config_backup_create(context, values, **kwargs):
+    """Create a backup for OpenStack config."""
+    return IMPL.config_backup_create(context, values, **kwargs)
+
+def config_backup_update(context, backup_id, values, **kwargs):
+    """update a backup for OpenStack config"""
+    return IMPL.config_backup_update(context, backup_id, values, **kwargs)
+
+def config_backup_get(context, backup_id, **kwargs):
+    """get a backup for OpenStack config"""
+    return IMPL.config_backup_get(context, backup_id, **kwargs)
+
+def config_backup_get_all(context, **kwargs):
+    """get all backups for OpenStack config"""
+    return IMPL.config_backup_get_all(context, **kwargs)
+
+def config_backup_delete(context, backup_id, **kwargs):
+    """get all backups for OpenStack config"""
+    return IMPL.config_backup_delete(context, backup_id, **kwargs)

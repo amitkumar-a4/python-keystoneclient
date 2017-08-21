@@ -7,6 +7,7 @@ from workloadmgr import autolog
 from workloadmgr import flags
 from workloadmgr import settings
 from workloadmgr.vault import vault
+from workloadmgr.compute import nova
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import timeutils
@@ -146,6 +147,35 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             security_group = db.vm_security_group_rule_snaps_get(cntx, res.id)
             security_group_json = jsonutils.dumps(security_group)
             backup_target.put_object(path, security_group_json)
+
+def upload_config_workload_db_entry(cntx):
+    try:
+        config_workload_db = db.config_workload_get(cntx)
+        backup_endpoint = config_workload_db['backup_media_target']
+        backup_target = vault.get_backup_target(backup_endpoint)
+        config_workload_storage_path = backup_target.get_config_workload_path()
+
+        config_workload_json = jsonutils.dumps(config_workload_db)
+
+        path = os.path.join(config_workload_storage_path, "config_workload_db")
+        backup_target.put_object(path, config_workload_json)
+    except Exception as ex:
+        LOG.exception(ex)
+
+def upload_config_backup_db_entry(cntx, backup_id):
+    try:
+        config_db = db.config_backup_get(cntx, backup_id)
+        config_workload_db = db.config_workload_get(cntx)
+        backup_endpoint = config_workload_db['backup_media_target']
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        parent = config_db['vault_storage_path']
+
+        config_json = jsonutils.dumps(config_db)
+        path = os.path.join(parent, "config_backup_db")
+        backup_target.put_object(path, config_json)
+    except Exception as ex:
+        LOG.exception(ex)
 
 
 @autolog.log_method(logger=Logger)
@@ -609,3 +639,109 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
         affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
 
     return affected_snapshots
+
+@autolog.log_method(logger=Logger)
+def _remove_config_backup_data(context, backup_id):
+    try:
+        LOG.info(_('Deleting the data of config backup %s ') % (backup_id))
+        config_workload_obj = db.config_workload_get(context)
+        backup_endpoint = config_workload_obj['backup_media_target']
+        backup_target = vault.get_backup_target(backup_endpoint)
+        backup_target.config_backup_delete(context, backup_id)
+    except Exception as ex:
+        LOG.exception(ex)
+
+@autolog.log_method(logger=Logger)
+def config_backup_delete(context, backup_id):
+    """
+    Delete an existing config backup
+    """
+    try:
+        db.config_backup_delete(context, backup_id)
+        _remove_config_backup_data(context, backup_id)
+    except Exception as ex:
+        LOG.exception(ex)
+
+@autolog.log_method(logger=Logger)
+def validate_database_creds(context, databases):
+    try:
+        #Look for contego node, which is up
+        host = None
+        compute_nodes = get_compute_nodes(context)
+        for compute_node in compute_nodes:
+            if compute_node.state == 'up':
+                host = compute_node.host
+                break
+
+        if host is None:
+            message = "No contego node is up for validating database credentials."
+            raise exception.ErrorOccurred(reason=message)
+
+        compute_service = nova.API(production=True)
+        params = {'host':host, 'databases':databases}
+        status = compute_service.validate_database_creds(context, params)
+        if status['result'] != "success":
+            message = "Please verify given database credentials."
+            raise exception.ErrorOccurred(reason=message)
+        else:
+            return True
+    except exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def validate_trusted_nodes(context, trusted_node):
+    try:
+        compute_service = nova.API(production=True)
+
+        controller_nodes = get_controller_nodes(context)
+        for node,node_creds in trusted_node.iteritems():
+            host = node_creds['hostname']
+            compute_nodes = get_compute_nodes(context, host=host)
+            #Verify there is a compute node with this host
+            if len(compute_nodes) != 0:
+               #Verify node is up.
+               found = False
+               for compute_node in compute_nodes:
+                   if compute_node.state == 'up':
+                      found = True
+                      break
+
+               if found is False:
+                   message = "Contego data mover is not installed on compute " \
+                   "node: %s or node is not up." %host
+                   raise exception.ErrorOccurred(reason=message)
+            else:
+                message = "No compute node found with hostname: %s" %host
+                raise exception.ErrorOccurred(reason=message)
+
+            params = {'controller_nodes': controller_nodes, 'node_creds': node_creds}
+            status = compute_service.validate_trusted_nodes(context, params)
+            if status['result'] != "success":
+                message = "Please verify, Given trusted nodes doesn't have access to controller nodes."
+                raise exception.ErrorOccurred(reason=message)
+            else:
+                return True
+    except Exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def get_controller_nodes(context):
+    try:
+        compute_service = nova.API(production=True)
+        result = compute_service.get_controller_nodes(context)
+        return result['controller_nodes']
+    except exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def get_compute_nodes(context, host=None):
+    try:
+        contego_nodes = []
+        nova_client = nova.novaclient(context, production=True)
+        nova_services = nova_client.services.list(host=host)
+        for nova_service in nova_services:
+            if nova_service.binary.find('contego') != -1:
+                contego_nodes.append(nova_service)
+        return contego_nodes
+    except Exception as ex:
+        raise ex

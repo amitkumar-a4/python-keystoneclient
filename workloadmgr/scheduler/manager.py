@@ -196,3 +196,45 @@ class SchedulerManager(manager.Manager):
 
         notifier.notify(context, notifier.publisher_id("scheduler"),
                         'scheduler.' + method, notifier.ERROR, payload)
+
+    def config_backup(self, context, topic, backup_id,
+                                    request_spec=None, filter_properties=None):
+        try:
+            request_spec.update({'backup_id': backup_id, 'snapshot_properties': {}})
+    
+            self.driver.schedule_config_backup(context, request_spec,
+                                                    filter_properties)
+        except exception.NoValidHost as ex:
+            backup_state = {'status': {'status': 'error'}}
+            self._set_backup_state_and_notify('config_backup',
+                                                backup_state,
+                                                context, ex, request_spec)
+        except Exception as ex:
+            with excutils.save_and_reraise_exception():
+                backup_state = {'status': {'status': 'error'}}
+                self._set_backup_state_and_notify('config_backup',
+                                                    backup_state,
+                                                    context, ex, request_spec)
+    
+    
+    def _set_backup_state_and_notify(self, method, updates, context, ex,
+                                       request_spec):
+        LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
+   
+        backup_status = updates['status']
+        properties = request_spec.get('backup_properties', {})
+    
+        backup_id = request_spec.get('backup_id', None)
+    
+        if backup_id:
+            db.config_backup_update(context, backup_id, backup_status)
+    
+        payload = dict(request_spec=request_spec,
+                       backup_properties=properties,
+                       backup_id=backup_id,
+                       state=backup_status,
+                       method=method,
+                       reason=ex)
+    
+        notifier.notify(context, notifier.publisher_id("scheduler"),
+                        'scheduler.' + method, notifier.ERROR, payload)
