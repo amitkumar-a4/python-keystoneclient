@@ -1754,9 +1754,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
     @autolog.log_method(Logger, 'WorkloadMgrManager.config_backup')
     def config_backup(self, context, backup_id):
-        '''
+        """
         Backup OpenStack configuration
-        '''
+        """
         try:
             services_to_backup = None
             databases = None
