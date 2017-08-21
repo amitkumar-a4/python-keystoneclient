@@ -7,6 +7,7 @@
 
 from webob import exc
 from dateutil.parser import parse
+from datetime import datetime
 import webob
 from workloadmgr.api import wsgi
 from workloadmgr import exception as wlm_exceptions
@@ -73,7 +74,7 @@ class ConfigWorkloadController(wsgi.Controller):
             if jobschedule.get('start_time', None) != None:
                 try:
                     parse(datetime.now().strftime("%m/%d/%Y") + ' ' + jobschedule.get('start_time'))
-                except exception as ex:
+                except Exception as ex:
                     message = "Time should be in 'HH:MM AM/PM' or 'HH:MM' format. For ex: '09:00 PM' or '23:45'"
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
@@ -118,7 +119,6 @@ class ConfigWorkloadController(wsgi.Controller):
         """Get Config workload object."""
         try:
             context = req.environ['workloadmgr.context']
-
             config_workload = self.workload_api.get_config_workload(context)
             return config_workload
         except exc.HTTPNotFound as error:
