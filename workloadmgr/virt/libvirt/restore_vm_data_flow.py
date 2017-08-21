@@ -38,6 +38,8 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.workloads import workload_utils
+from workloadmgr.workflows.vmtasks import FreezeVM, ThawVM
+from workloadmgr.virt.libvirt.restore_vm_flow import PowerOnInstance
 
 from workloadmgr.vault import vault
 
@@ -291,6 +293,7 @@ class CinderSnapshot(task.Task):
     def revert_with_log(self, *args, **kwargs):
         pass
 
+
 def LinearCinderSnapshots(context, instance, instance_options, snapshotobj, restore_id,
                           volumes_to_restore):
     flow = lf.Flow("createsnapshotslf")
@@ -336,6 +339,24 @@ def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, 
 
     return flow
 
+
+def PowerOnInstanceFlow(context):
+
+    flow = lf.Flow("poweroninstancelf")
+    flow.add(PowerOnInstance("PowerOnInstance"))
+
+    return flow
+
+def FreezeNThawFlow(context):
+
+    flow = lf.Flow("freezenthawlf")
+
+    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
+                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
+                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+
+    return flow
 
 def restore_vm_data(cntx, db, instance, restore, instance_options):
 
@@ -434,6 +455,15 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
     childflow = CopyBackupImagesToVolumes(cntx, instance, snapshot_obj,
                                           restore['id'], volumes_to_restore,
                                           restore_boot_disk)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    # power on the restored instance until all volumes are attached
+    childflow = PowerOnInstanceFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    childflow = FreezeNThawFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 

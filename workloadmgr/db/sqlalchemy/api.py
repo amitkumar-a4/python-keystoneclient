@@ -3119,9 +3119,15 @@ def setting_update(context, setting_name, values, purge_metadata=False):
 @require_context
 def setting_delete(context, setting_name):
     session = get_session()
-    setting = _setting_get(context, setting_name, session = session)
+
+    try:
+        setting = _setting_get(context, setting_name, session=session)
+    except:
+        setting = _setting_get(context, setting_name, session=session, get_hidden=True)
+
     for metadata_ref in setting.metadata:
         metadata_ref.purge(session=session)
+
     session.refresh(setting)
     setting.purge(session=session)
      

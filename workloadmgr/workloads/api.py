@@ -2425,7 +2425,7 @@ class API(base.Base):
     @upload_settings
     def trust_delete(self, context, name):
 
-        trust = self.db.setting_get(context, name)
+        trust = self.db.setting_get(context, name, get_hidden=True)
         if trust.type != "trust_id":
             msg = _("No trust record by name %s" % name)
             raise wlm_exceptions.Invalid(reason=msg)

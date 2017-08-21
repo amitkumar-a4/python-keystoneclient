@@ -2,11 +2,12 @@
 <html>
 <head>
 
-<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/bootstrap.css">
 <link rel="stylesheet" href="css/spinner.css">
 
 <!-- Optional theme -->
 <link rel="stylesheet" href="css/bootstrap-theme.min.css">
+<link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
 
 <script src="js/jquery-1.11.0.min.js"></script>
 <!-- Latest compiled and minified JavaScript -->

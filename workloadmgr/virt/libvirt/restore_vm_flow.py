@@ -87,23 +87,32 @@ def is_supported_backend(volume_type):
 
 
 def get_availability_zone(instance_options, volume_id=None, az=None):
-    if volume_id is not None:
+    # find the mapping for volume
+    if volume_id is not None and 'vdisks' in instance_options and len(instance_options['vdisks']) > 0:
        for vdisk in instance_options['vdisks']:
            if vdisk['id'] == volume_id:
-              if az != '' and vdisk['availability_zone'] == '':
-                 return az
-              elif az == '' and vdisk['availability_zone'] == '':
-                   return None
-              return vdisk['availability_zone']
-
-    if instance_options and 'availability_zone' in instance_options and instance_options['availability_zone'] != '':
-        availability_zone = instance_options['availability_zone'] 
-    else:   
-        if CONF.default_production_availability_zone == 'None':
-            availability_zone = None
+              if 'availability_zone' in vdisk and vdisk['availability_zone'] != '':
+                 availability_zone = vdisk.get('availability_zone')
+              elif az is not None:
+                   availability_zone = az
+              else:
+                   availability_zone = None
+              break
+    elif volume_id is not None and az is not None:
+         return az
+    else:
+        # else find the mapping for VM
+        if instance_options and 'availability_zone' in instance_options and \
+            instance_options['availability_zone'] != '':
+            availability_zone = instance_options['availability_zone'] 
         else:
-            availability_zone = CONF.default_production_availability_zone
+            if CONF.default_production_availability_zone == 'None':
+                availability_zone = None
+            else:
+                availability_zone = CONF.default_production_availability_zone
 
+    if availability_zone == '':
+       return None
     return availability_zone
 
 
@@ -401,7 +410,9 @@ class RestoreVolumeFromImage(task.Task):
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
         
-        availability_zone = get_availability_zone(instance_options, volume_id=volume_id)
+        availability_zone = get_availability_zone(instance_options,
+                                                  volume_id=volume_id,
+                                                  az=az)
 
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
@@ -481,7 +492,9 @@ class RestoreNFSVolume(task.Task):
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
         
-        availability_zone = get_availability_zone(instance_options, volume_id=volume_id)
+        availability_zone = get_availability_zone(instance_options,
+                                                  volume_id=volume_id,
+                                                  az=az)
 
         progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
@@ -620,8 +633,10 @@ class RestoreSANVolume(task.Task):
         az = ''
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
-        
-        availability_zone = get_availability_zone(instance_options, volume_id=volume_id)
+ 
+        availability_zone = get_availability_zone(instance_options,
+                                                  volume_id=volume_id,
+                                                  az=az)
 
         progressmsg = _('Restoring SAN Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
