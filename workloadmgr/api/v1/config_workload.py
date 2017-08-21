@@ -7,6 +7,7 @@
 
 from webob import exc
 from dateutil.parser import parse
+from datetime import datetime
 import webob
 from workloadmgr.api import wsgi
 from workloadmgr import exception as wlm_exceptions
