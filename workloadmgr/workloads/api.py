@@ -2755,6 +2755,7 @@ class API(base.Base):
         Make the RPC call to create/update a config workload.
         """
         try:
+            config_workload = None
             if context.is_admin is False:
                 raise wlm_exceptions.AdminRequired()
 
@@ -2854,7 +2855,7 @@ class API(base.Base):
             return config_workload
         except Exception as ex:
             LOG.exception(ex)
-            if config_workload:
+            if config_workload is not None:
                 self.db.config_workload_update(context,
                           {'status': 'error', 'error_msg': str(ex.message)})
                 workload_utils.upload_config_workload_db_entry(context)
