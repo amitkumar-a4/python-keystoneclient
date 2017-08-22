@@ -1274,9 +1274,9 @@ def delete_vm_networks(cntx, restored_net_resources):
 def restore_vm_security_groups(cntx, db, restore):
 
     def match_rule_values(rule1, rule2):
-        #Removing id, security_group_id and remote_group_id
+        #Removing id, security_group_id, tenant_id and remote_group_id,
         #from rules as values for this will not match
-        for  key in ['id', 'security_group_id','remote_group_id']:
+        for  key in ['id', 'tenant_id', 'security_group_id','remote_group_id']:
              rule1.pop(key,None)
              rule2.pop(key,None)
         matched_items = set(rule1.items()) & set(rule2.items())
