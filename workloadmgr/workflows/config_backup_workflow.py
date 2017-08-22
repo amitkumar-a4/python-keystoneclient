@@ -54,20 +54,20 @@ class ConfigBackupWorkflow(object):
                          %(self._store['backup_id'], str(self._store['params']['controller_hosts'])))
             else:
                 LOG.warning("No controoller nodes to backup.")
-    
+
             # Add task to backup Database
             self._config_backup.add(config_backup_tasks.CopyConfigFiles(name="BackupDatabase_" + db_host,
                                                                         rebind={'backup_id': 'backup_id', 'host': db_host,
                                                                                 'target': 'database', 'params': 'params'}))
             LOG.info("Database backup task added: backup_id: %s, host: %s"\
                      %(self._store['backup_id'], db_host))
-    
+ 
             self._postbackup = lf.Flow(self._name + "#PostBackup")
     
             # Add task for retention policy
             self._postbackup.add(config_backup_tasks.ApplyRetentionPolicy(name="RetentionPolicy_" +
                                                                                self._store['backup_id']))
-    
+
             self._flow = lf.Flow('ConfigBackuplf')
             self._flow.add(self._config_backup, self._postbackup)
         except Exception as ex:

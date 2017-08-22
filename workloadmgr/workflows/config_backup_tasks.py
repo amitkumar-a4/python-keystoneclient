@@ -4,6 +4,7 @@
 #
 
 import time
+import copy
 import cPickle as pickle
 
 from itertools import cycle
@@ -153,10 +154,10 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
 
     for controller_host, trusted_node in nodes:
         compute_host = trusted_nodes[trusted_node]['hostname']
-        params['remote_host_creds'] = trusted_nodes[trusted_node]
+        params['remote_host_creds'] = copy.deepcopy(trusted_nodes[trusted_node])
         params['remote_host_creds']['hostname'] = controller_host
         LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,compute_host))
-        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_host,
+        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + controller_host,
                                  rebind={'backup_id': 'backup_id',
                                          'host': compute_host,
                                          'target': target,
