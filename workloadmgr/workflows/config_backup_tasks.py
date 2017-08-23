@@ -4,7 +4,6 @@
 #
 
 import time
-import copy
 import cPickle as pickle
 
 from itertools import cycle
