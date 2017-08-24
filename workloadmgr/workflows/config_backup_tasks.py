@@ -48,6 +48,12 @@ class CopyConfigFiles(task.Task):
         target_host = host
         target_host_data = 'config_data'
         if target == 'controller':
+            nodes = params['nodes']
+            for i in range(len(nodes)):
+                if nodes[i][1] == host:
+                    params['remote_host_creds']  = {'hostname':nodes[i][0]}
+                    nodes.pop(i)
+                    break
             remote_node = params['remote_host_creds']['hostname']
             target_host_data = 'config_data for remote node: %s' % (remote_node)
         elif target == 'database':
@@ -145,20 +151,19 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
     """
     flow = uf.Flow("copyconfigfilesremotehostuf")
     trusted_nodes = params['trusted_nodes']
+    trusted_nodes = [trusted_node['hostname'] for trusted_node in trusted_nodes.values()]
     target = 'controller'
 
-    nodes = zip(controller_nodes, cycle(trusted_nodes.keys())) \
-        if len(controller_nodes) > len(trusted_nodes.keys()) \
+    nodes = zip(controller_nodes,cycle(trusted_nodes)) \
+        if len(controller_nodes) > len(trusted_nodes) \
         else zip(controller_nodes, trusted_nodes)
 
+    params['nodes'] = nodes
     for controller_host, trusted_node in nodes:
-        compute_host = trusted_nodes[trusted_node]['hostname']
-        params['remote_host_creds'] = trusted_nodes[trusted_node]
-        params['remote_host_creds']['hostname'] = controller_host
-        LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,compute_host))
-        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + compute_host,
+        LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,trusted_node))
+        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + controller_host,
                                  rebind={'backup_id': 'backup_id',
-                                         'host': compute_host,
+                                         'host': trusted_node,
                                          'target': target,
                                          'params': 'params'
                                          }))

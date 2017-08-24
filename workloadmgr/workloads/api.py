@@ -2754,9 +2754,13 @@ class API(base.Base):
         """
         Make the RPC call to create/update a config workload.
         """
+        def _raise_ex(exception):
+            exception.config_workload = True
+            raise exception
+
         try:
             if context.is_admin is False:
-                raise wlm_exceptions.AdminRequired()
+                _raise_ex(wlm_exceptions.AdminRequired())
 
             AUDITLOG.log(context, 'Config workload update Requested', None)
 
@@ -2767,7 +2771,7 @@ class API(base.Base):
                 #When user configuring for the first time
                 if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
                     message = "Database credentials are required to configure config backup."
-                    raise wlm_exceptions.ErrorOccurred(reason=message)
+                    _raise_ex(wlm_exceptions.ErrorOccurred(reason=message))
 
                 controller_nodes = workload_utils.get_controller_nodes(context)
                 compute_nodes = workload_utils.get_compute_nodes(context)
@@ -2779,6 +2783,7 @@ class API(base.Base):
                 if len(list(set(controller_nodes))) != len(set(compute_nodes)):
                     message = "To backup controller nodes, please provide list of trusted " \
                        "compute nodes, which has password less access to controller nodes."
+                    _raise_ex(wlm_exceptions.ErrorOccurred(reason=message))
 
             metadata = {}
             if 'databases' in services_to_backup:
@@ -2854,7 +2859,7 @@ class API(base.Base):
             return config_workload
         except Exception as ex:
             LOG.exception(ex)
-            if config_workload:
+            if not hasattr(ex,'config_workload') and  config_workload :
                 self.db.config_workload_update(context,
                           {'status': 'error', 'error_msg': str(ex.message)})
                 workload_utils.upload_config_workload_db_entry(context)
