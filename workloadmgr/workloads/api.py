@@ -2780,6 +2780,7 @@ class API(base.Base):
                 if len(list(set(controller_nodes))) != len(set(compute_nodes)):
                     message = "To backup controller nodes, please provide list of trusted " \
                        "compute nodes, which has password less access to controller nodes."
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
 
             metadata = {}
             if 'databases' in services_to_backup:
