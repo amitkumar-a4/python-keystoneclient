@@ -409,11 +409,13 @@ class RestoreVolumeFromImage(task.Task):
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
         volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
         az = ''
+
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
         availability_zone = get_availability_zone(instance_options,
                                                   volume_id=volume_id,
                                                   az=az)
+
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
                                                 volume_description,
@@ -633,7 +635,6 @@ class RestoreSANVolume(task.Task):
         az = ''
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
-
         availability_zone = get_availability_zone(instance_options,
                                                   volume_id=volume_id,
                                                   az=az)
@@ -716,7 +717,6 @@ class RestoreInstanceFromVolume(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })        
-
         availability_zone = get_availability_zone(instance_options)
 
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
@@ -808,7 +808,6 @@ class RestoreInstanceFromImage(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })  
-       
         availability_zone = get_availability_zone(instance_options)
     
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
