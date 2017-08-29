@@ -190,31 +190,27 @@ def change_service_password():
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/workloadmgr/workloadmgr.conf')
         service_tenant_name = Config.get('keystone_authtoken','admin_tenant_name')
-        auth_uri = Config.get('keystone_authtoken','auth_uri')
-        service_tenant_domain_id = Config.get('keystone_authtoken','project_domain_id')
-        service_user_domain_id = Config.get('keystone_authtoken','user_domain_id')
-        service_password = config_inputs['oldpassword']
-        keystone_auth_version = Config.get('DEFAULT', 'keystone_auth_version')
+        data = {}
+        data['admin_username'] = 'triliovault'
+        data['admin_password'] = config_inputs['oldpassword']
+        data['admin_tenant_name'] = Config.get('keystone_authtoken','admin_tenant_name')
+        data['keystone_admin_url'] = Config.get('keystone_authtoken','auth_url')
+        data['keystone_public_url'] = Config.get('keystone_authtoken','auth_uri')
+        data['domain_name'] = Config.get('keystone_authtoken','user_domain_id')
+        if data['domain_name'] == '':
+           data['domain_name'] = 'default'
 
         # first authenticate old credentials to make sure the
         # user is genuine
-        if keystone_auth_version == '3':
-            auth = password.Password(auth_url=auth_uri,
-                                     username='triliovault',
-                                     password=service_password,
-                                     user_domain_id=service_user_domain_id,
-                                     project_name=service_tenant_name,
-                                     domain_id=service_tenant_domain_id,
-                                    )
-        else:
-            auth = password.Password(auth_url=auth_uri,
-                                     username='triliovault',
-                                     password=service_password,
-                                     project_name=service_tenant_name,
-                                    )
-        sess = session.Session(auth=auth, verify=SSL_VERIFY)
-        keystone = client.Client(session=sess, auth_url=auth_uri, insecure=SSL_INSECURE)
-
+      
+        global config_data
+        config_data = data
+ 
+        try:
+            keystone, tenants = _validate_keystone_client_and_version(is_admin_url=False)
+        except Exception as e:
+               raise Exception( "KeystoneError:Unable to connect to keystone Public URL "+e.message  )
+ 
         keystone.users.update_own_password(service_password,
                                            config_inputs['newpassword'])
 
