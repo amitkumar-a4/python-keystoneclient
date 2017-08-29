@@ -2776,7 +2776,8 @@ class API(base.Base):
                 #If controller node is other than compute node then we need
                 #trusted hosts which cab take backup from controller nodes. 
                 controller_nodes.extend(compute_nodes)
-                if len(list(set(controller_nodes))) != len(set(compute_nodes)):
+                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0) and\
+                   len(list(set(controller_nodes))) != len(set(compute_nodes)):
                     message = "To backup controller nodes, please provide list of trusted " \
                        "compute nodes, which has password less access to controller nodes."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
