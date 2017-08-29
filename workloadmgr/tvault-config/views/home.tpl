@@ -15,6 +15,9 @@
 	function warnResetPassword() {
 	   return confirm("Do you want to reset password?");
 	}
+	function warnUpdateServiceAccount() {
+	   return confirm("Do you want to update TrilioVault service account password?");
+	}
 	</script>
 	
 </head>
@@ -61,15 +64,17 @@
         <!-- Example row of columns -->
         <div class="row">
             <div>
-                <a href="/configure">Configuration</a>
+                <a href="/configure" data-toggle="tooltip" title="Configure TrilioVault appliance">Configure Appliance</a>
             	<br><br>
-            	<a href="/reinitialize" onclick='return warnReinitialize(this)';>Reinitialize</a>                       
+            	<a href="/reinitialize" onclick='return warnReinitialize(this)'; data-toggle="tooltip" title="Reinitialize TriliVault mysql database">Reinitialize TrilioVault Database</a>
                 <br><br>
-            	<a href="/reset_password" onclick='return warnResetPassword(this)';>Reset Password</a>                       
+            	<a href="/reset_password" onclick='return warnResetPassword(this)'; data-toggle="tooltip" title="Reset TrilioVault configurator password">Reset Configurator Password</a>
                 <br><br>
-                <a href="/services">Services</a>
+            	<a href="/update_service_account_password" onclick='return warnUpdateServiceAccount(this)'; data-toggle="tooltip" title="Reset TrilioVault service account password in Keystone">Update TrilioVault Service Password</a>
+                <br><br>
+                <a href="/services" data-toggle="tooltip" title="Workloadmgr services running on TrilioVault appliance">Workloadmgr Services</a>
             	<br><br>
-                <a href="/logs">Logs</a>
+                <a href="/logs" data-toggle="tooltip" title="Download Logs on TrilioVault appliance ">TrilioVault Logs</a>
             	<br><br>
                 <a href="/troubleshooting">Troubleshooting</a>
             	<br>              	                
