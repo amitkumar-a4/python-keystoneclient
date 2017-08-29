@@ -98,11 +98,13 @@ def get_availability_zone(instance_options, volume_id=None, az=None):
               else:
                    availability_zone = None
               break
-    elif volume_id is not None and az is not None:
+    elif volume_id is not None and az is not None and az != '':
          return az
     else:
         # else find the mapping for VM
-        if instance_options and 'availability_zone' in instance_options and \
+        if volume_id is not None and az == '':
+           availability_zone = None
+        elif instance_options and 'availability_zone' in instance_options and \
             instance_options['availability_zone'] != '':
             availability_zone = instance_options['availability_zone'] 
         else:
@@ -409,11 +411,9 @@ class RestoreVolumeFromImage(task.Task):
         az = ''
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
-        
         availability_zone = get_availability_zone(instance_options,
                                                   volume_id=volume_id,
                                                   az=az)
-
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
                                                 volume_description,
@@ -633,7 +633,7 @@ class RestoreSANVolume(task.Task):
         az = ''
         if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
            az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
- 
+
         availability_zone = get_availability_zone(instance_options,
                                                   volume_id=volume_id,
                                                   az=az)
@@ -718,7 +718,7 @@ class RestoreInstanceFromVolume(task.Task):
                                             })        
 
         availability_zone = get_availability_zone(instance_options)
-    
+
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
 
         self.volume_service = volume_service = cinder.API()
@@ -808,7 +808,7 @@ class RestoreInstanceFromImage(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })  
-        
+       
         availability_zone = get_availability_zone(instance_options)
     
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
