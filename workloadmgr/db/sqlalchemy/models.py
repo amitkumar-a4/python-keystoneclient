@@ -25,7 +25,7 @@ FLAGS = flags.FLAGS
 BASE = declarative_base()
 
 
-DB_VERSION = '2.4.56'
+DB_VERSION = '2.4.57'
 
 
 class WorkloadsBase(object):
