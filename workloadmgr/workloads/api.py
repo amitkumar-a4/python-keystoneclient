@@ -226,7 +226,6 @@ def parse_license_text(licensetext,
 
 def validate_license_key(licensekey, func_name, compute_nodes=-1,
                          capacity_utilized=-1, virtual_machines=-1):
-    licensekey =  parse_license_text(licensekey)
     if 'Compute Nodes' in licensekey['Licensed For']:
         if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
             raise wlm_exceptions.InvalidLicense(
@@ -286,28 +285,26 @@ class check_license(object):
         The __call__ method is not called until the
         decorated function is called.
         """
-        self.licensekey = license_list(args[0], args[1])
+        admin_context = wlm_context.get_admin_context()
+        license_key = args[0].license_list(admin_context)
 
-        parsed =  parse_license_text(self.licensekey)
         kwargs = {}
-        if 'Compute Nodes' in parsed['Licensed For']:
+        if 'Compute Nodes' in license_key['Licensed For']:
             compute_service = nova.API(production=True)
             services = compute_service.service_list(args[1])
-            kwargs['compute_nodes'] = len([service.binary if 'contego' in \
-                                           service.binary for service in services])
-        elif 'Virtual Machines' in parsed['Licensed For']:
-            admin_context = wlm_context.get_admin_context()
-            kwargs['virtual_machines'] = len(self.db.workload_vms_all(admin_context))
-        elif ' Backup Capacity' in parsed['Licensed For']:
+            kwargs['compute_nodes'] = len([service.binary for service in services \
+                                           if 'contego' in service.binary])
+        elif 'Virtual Machines' in license_key['Licensed For']:
+            kwargs['virtual_machines'] = len(args[0].db.workload_vms_all(admin_context))
+        elif ' Backup Capacity' in license_key['Licensed For']:
             kwargs['capacity_utilized'] = 200 * 1024 ** 4
 
         try:
-            validate_license_key(self.licensekey, f.func_name, **kwargs)
+            validate_license_key(license_key, self.f.func_name, **kwargs)
+            return self.f(*args)
         except Exception as ex:
             LOG.exception(ex)
-
-        self.f(*args)
-
+            raise
 
 def upload_settings(func):
    def upload_settings_wrapper(*args, **kwargs):
