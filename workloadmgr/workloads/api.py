@@ -291,9 +291,13 @@ class check_license(object):
         parsed =  parse_license_text(self.licensekey)
         kwargs = {}
         if 'Compute Nodes' in parsed['Licensed For']:
-            kwargs['compute_nodes'] = 9
+            compute_service = nova.API(production=True)
+            services = compute_service.service_list(args[1])
+            kwargs['compute_nodes'] = len([service.binary if 'contego' in \
+                                           service.binary for service in services])
         elif 'Virtual Machines' in parsed['Licensed For']:
-            kwargs['virtual_machines'] = 20
+            admin_context = wlm_context.get_admin_context()
+            kwargs['virtual_machines'] = len(self.db.workload_vms_all(admin_context))
         elif ' Backup Capacity' in parsed['Licensed For']:
             kwargs['capacity_utilized'] = 200 * 1024 ** 4
 

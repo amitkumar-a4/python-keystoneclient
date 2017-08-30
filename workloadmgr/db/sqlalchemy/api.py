@@ -846,6 +846,23 @@ def workload_vms_get(context, workload_id, **kwargs):
     
     return workload_vms
 
+@require_admin_context
+def workload_vms_all(context, **kwargs):
+    session = kwargs.get('session') or get_session()
+    try:
+        query = model_query(context, models.WorkloadVMs,
+                            session=session, read_deleted="no")\
+                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                       .filter(models.WorkloadVMs.status != None)\
+
+        #TODO(gbasava): filter out deleted workload_vms if context disallows it
+        workload_vms = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.WorkloadVMsNotFound()
+    
+    return workload_vms
+
 @require_context
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     session = kwargs.get('session') or get_session()
