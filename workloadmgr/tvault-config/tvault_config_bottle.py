@@ -2345,6 +2345,16 @@ def configure_service():
                      'auth_url = ' + config_data['keystone_admin_url'].\
                      strip("v3").strip("v2.0"),
                      starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'password = ',
+                     'password = ' + config_data['workloadmgr_user_password'],
+                     starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_password = ',
+                     'admin_password = ' + config_data['workloadmgr_user_password'],
+                     starts_with=True)
+
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
                      'auth_uri = ' + config_data['keystone_public_url'],
                      starts_with=True)
