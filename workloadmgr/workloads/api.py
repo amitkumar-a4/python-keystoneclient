@@ -297,7 +297,7 @@ class check_license(object):
         elif 'Virtual Machines' in license_key['Licensed For']:
             kwargs['virtual_machines'] = len(args[0].db.workload_vms_all(admin_context))
         elif ' Backup Capacity' in license_key['Licensed For']:
-            kwargs['capacity_utilized'] = 200 * 1024 ** 4
+            kwargs['capacity_utilized'] = args[0].get_storage_usage(admin_context)['storage_usage'][0]['total_utilization']
 
         try:
             validate_license_key(license_key, self.f.func_name, **kwargs)
