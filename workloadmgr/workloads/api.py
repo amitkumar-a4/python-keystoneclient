@@ -236,8 +236,8 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
     if datetime.now() > datetime.strptime(licensekey['LicenseExpiryDate'], "%Y-%m-%d"):
         raise wlm_exceptions.InvalidLicense(
             message="License expired. License expriration date '%s'. "
-                    "Today is '%s'" % (datetime.now().strftime("%Y-%m-%d"),
-                    licensekey['LicenseExpiryDate']))
+                    "Today is '%s'" % (licensekey['LicenseExpiryDate'],
+                    datetime.now().strftime("%Y-%m-%d")))
 
     if ' Backup Capacity' in licensekey['Licensed For'] and \
         func_name in ('workload_snapshot'):
@@ -291,7 +291,7 @@ class check_license(object):
         kwargs = {}
         if 'Compute Nodes' in license_key['Licensed For']:
             compute_service = nova.API(production=True)
-            services = compute_service.service_list(args[1])
+            services = compute_service.services_list(args[1])
             kwargs['compute_nodes'] = len([service.binary for service in services \
                                            if 'contego' in service.binary])
         elif 'Virtual Machines' in license_key['Licensed For']:
@@ -848,6 +848,7 @@ class API(base.Base):
                                                     kwargs=kwargs)
 
     @autolog.log_method(logger=Logger)
+    @create_trust
     @check_license
     def workload_modify(self, context, workload_id, workload):
         """

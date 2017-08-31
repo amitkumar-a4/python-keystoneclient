@@ -173,7 +173,7 @@ def workload_vms_get(context, workload_id, **kwargs):
     return IMPL.workload_vms_get(context, workload_id, **kwargs)
 
 def workload_vms_all(context, **kwargs):
-    return IMPL.workload_vms_get(context, **kwargs)
+    return IMPL.workload_vms_all(context, **kwargs)
 
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     return IMPL.workload_vm_get_by_id(context, vm_id, **kwargs)
