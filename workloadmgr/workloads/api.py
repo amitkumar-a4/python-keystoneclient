@@ -286,18 +286,22 @@ class check_license(object):
         decorated function is called.
         """
         admin_context = wlm_context.get_admin_context()
-        license_key = args[0].license_list(admin_context)
+        apiclass = args[0]
+        context = args[1]
+        license_key = apiclass.license_list(admin_context)
 
         kwargs = {}
         if 'Compute Nodes' in license_key['Licensed For']:
             compute_service = nova.API(production=True)
-            services = compute_service.services_list(args[1])
+            services = compute_service.services_list(context)
             kwargs['compute_nodes'] = len([service.binary for service in services \
                                            if 'contego' in service.binary])
         elif 'Virtual Machines' in license_key['Licensed For']:
-            kwargs['virtual_machines'] = len(args[0].db.workload_vms_all(admin_context))
+            kwargs['virtual_machines'] = len(apiclass.db.workload_vms_all(admin_context))
         elif ' Backup Capacity' in license_key['Licensed For']:
-            kwargs['capacity_utilized'] = args[0].get_storage_usage(admin_context)['storage_usage'][0]['total_utilization']
+            storage_usage = apiclass.get_storage_usage(admin_context)
+            total_utilization = storage_usage['storage_usage'][0]['total_utilization']
+            kwargs['capacity_utilized'] = total_utilization
 
         try:
             validate_license_key(license_key, self.f.func_name, **kwargs)
