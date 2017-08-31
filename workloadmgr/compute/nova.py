@@ -536,12 +536,11 @@ class API(base.Base):
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
     def services_list(self, context, **kwargs):
-        url = CONF.nova_production_endpoint_template.replace('%(project_id)s', 'ad44cc39a212497fb1f8b80a654c4ec7')
-        url = url.replace("/v2.1/", "/v2/")
         novaclient = nova_client.Client(CONF.nova_admin_username,
                                         CONF.nova_admin_password,
-                                        project_id='ad44cc39a212497fb1f8b80a654c4ec7',
-                                        auth_url=url,
+                                        project_id=CONF.neutron_admin_tenant_name,
+                                        region_name=CONF.nova_production_region_name,
+                                        auth_url=CONF.nova_admin_auth_url,
                                         domain_name=CONF.domain_name,
                                         insecure=CONF.nova_api_insecure,
                                         timeout=CONF.nova_url_timeout)
