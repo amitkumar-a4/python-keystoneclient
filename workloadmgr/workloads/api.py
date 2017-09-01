@@ -297,7 +297,7 @@ class check_license(object):
             kwargs['compute_nodes'] = len([service.binary for service in services \
                                            if 'contego' in service.binary])
         elif 'Virtual Machines' in license_key['Licensed For']:
-            kwargs['virtual_machines'] = len(apiclass.db.workload_vms_all(admin_context))
+            kwargs['virtual_machines'] = len(apiclass.db.workload_vms_get(admin_context, None))
         elif ' Backup Capacity' in license_key['Licensed For']:
             storage_usage = apiclass.get_storage_usage(admin_context)
             total_utilization = storage_usage['storage_usage'][0]['total_utilization']
