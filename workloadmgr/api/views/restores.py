@@ -3,6 +3,8 @@
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
+import cPickle as pickle
+
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.api import common
 
@@ -125,11 +127,13 @@ class ViewBuilder(common.ViewBuilder):
         d['error_msg'] =  restore['error_msg']
         d['time_taken'] = restore['time_taken']
 
+        d['restore_options'] = pickle.loads(str(restore.get('pickle', '(d.')))
+
         if hasattr(restore, 'metadata') or 'metadata' in restore:
             d['metadata'] = restore['metadata'] 
         else:
-            d['metadata'] = []   
-        return {'restore': d}        
+            d['metadata'] = []
+        return {'restore': d}
 
     def _list_view(self, func, request, restores):
         """Provide a view for a list of restores."""

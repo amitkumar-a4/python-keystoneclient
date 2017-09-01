@@ -458,7 +458,10 @@ class RestoredVMResourceWithNameNotFound(NotFound):
 class RestoredVMResourceWithIdNotFound(NotFound):
     message = _("RestoredVMResource %(id)s is not be found.")
 
-    
+class InvalidRestoreOptions(Invalid):
+    message = _("Invalid restore options.")
+
+
 class SwiftConnectionFailed(WorkloadMgrException):
     message = _("Connection to swift failed") + ": %(reason)s"
 
@@ -531,3 +534,9 @@ class UserNotFound(NotFound):
 class RoleNotFound(NotFound):
     message = _("User %(user_id)s does not have role '%(role_name)s' on "
                 "project %(project_id)s")
+
+class ConfigWorkloadNotFound(NotFound):
+    message = _("Config Workload %(id)s could not be found.")
+
+class ConfigBackupNotFound(NotFound):
+    message = _("Config backup %(backup_id)s could not be found.")

@@ -104,6 +104,24 @@ class FilterScheduler(driver.Scheduler):
 
         self.workloads_rpcapi.snapshot_restore(context, host, restore_id)
 
+    def schedule_config_backup(self, context, request_spec, filter_properties):
+        weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
+    
+        if not weighed_host:
+            raise exception.NoValidHost(reason="")
+        host = weighed_host.obj.host
+        backup_id = request_spec['backup_id']
+    
+        updated_backup = driver.config_backup_update_db(context, backup_id, host)
+        self._post_select_populate_filter_properties(filter_properties,
+                                                     weighed_host.obj)
+    
+        # context is not serializable
+        if filter_properties:
+            filter_properties.pop('context', None)
+    
+        self.workloads_rpcapi.config_backup(context, host, backup_id)
+
     def _post_select_populate_filter_properties(self, filter_properties,
                                                 host_state):
         """Add additional information to the filter properties after a host has

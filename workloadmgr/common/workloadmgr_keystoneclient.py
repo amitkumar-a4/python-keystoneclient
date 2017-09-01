@@ -120,7 +120,7 @@ class KeystoneClientBase(object):
                tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
                context.project_id = project_id
         auth_url=CONF.keystone_endpoint_url
-        if auth_url.find('v3') != -1:
+        if CONF.keystone_auth_version == '3':
            username=CONF.get('nova_admin_username')
            password=CONF.get('nova_admin_password')
            if username == 'triliovault':

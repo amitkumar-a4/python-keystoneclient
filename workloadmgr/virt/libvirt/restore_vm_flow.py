@@ -38,6 +38,7 @@ from workloadmgr.volume import cinder
 from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.workloads import workload_utils
+from workloadmgr.workflows import vmtasks_openstack
 
 from workloadmgr.vault import vault
 
@@ -45,6 +46,7 @@ from workloadmgr import utils
 from workloadmgr import flags
 from workloadmgr import autolog
 from workloadmgr import exception
+from workloadmgr.workflows.vmtasks import FreezeVM, ThawVM
 
 
 restore_vm_opts = [
@@ -55,7 +57,10 @@ restore_vm_opts = [
     cfg.StrOpt('nfs_volume_type_substr',
                default='nfs,netapp',
                help='Dir where the nfs volume is mounted for restore'),                   
-
+    cfg.IntOpt('progress_tracking_update_interval',
+               default=600,
+               help='Number of seconds to wait for progress tracking file '
+                    'updated before we call contego crash'),
     ]
 
 LOG = logging.getLogger(__name__)
@@ -81,15 +86,35 @@ def is_supported_backend(volume_type):
     return True
 
 
-def get_availability_zone(instance_options):
-    if instance_options and 'availability_zone' in instance_options:
-        availability_zone = instance_options['availability_zone']
-    else:   
-        if CONF.default_production_availability_zone == 'None':
-            availability_zone = None
+def get_availability_zone(instance_options, volume_id=None, az=None):
+    # find the mapping for volume
+    if volume_id is not None and 'vdisks' in instance_options and len(instance_options['vdisks']) > 0:
+       for vdisk in instance_options['vdisks']:
+           if vdisk['id'] == volume_id:
+              if 'availability_zone' in vdisk and vdisk['availability_zone'] != '':
+                 availability_zone = vdisk.get('availability_zone')
+              elif az is not None:
+                   availability_zone = az
+              else:
+                   availability_zone = None
+              break
+    elif volume_id is not None and az is not None and az != '':
+         return az
+    else:
+        # else find the mapping for VM
+        if volume_id is not None and az == '':
+           availability_zone = None
+        elif instance_options and 'availability_zone' in instance_options and \
+            instance_options['availability_zone'] != '':
+            availability_zone = instance_options['availability_zone'] 
         else:
-            availability_zone = CONF.default_production_availability_zone
+            if CONF.default_production_availability_zone == 'None':
+                availability_zone = None
+            else:
+                availability_zone = CONF.default_production_availability_zone
 
+    if availability_zone == '':
+       return None
     return availability_zone
 
 
@@ -382,13 +407,20 @@ class RestoreVolumeFromImage(task.Task):
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        az = ''
 
-        availability_zone = get_availability_zone(instance_options)
+        if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+           az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+        availability_zone = get_availability_zone(instance_options,
+                                                  volume_id=volume_id,
+                                                  az=az)
+
         self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
                                                 volume_name,
                                                 volume_description,
-                                                image_id=image_id, volume_type=volume_type)
-                                                #availability_zone=availability_zone)
+                                                image_id=image_id, volume_type=volume_type,
+                                                availability_zone=availability_zone)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -457,18 +489,25 @@ class RestoreNFSVolume(task.Task):
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        az = ''
+        if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+           az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+        
+        availability_zone = get_availability_zone(instance_options,
+                                                  volume_id=volume_id,
+                                                  az=az)
 
         progressmsg = _('Restoring NFS Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
-        availability_zone = get_availability_zone(instance_options)
         
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type)
-                                                     #availability_zone=availability_zone)
+                                                     volume_type = volume_type,
+                                                     availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -592,18 +631,24 @@ class RestoreSANVolume(task.Task):
         volume_size = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_size')
         volume_name = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_name')
         volume_description = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_description')
+        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
+        az = ''
+        if db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+           az = db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+        availability_zone = get_availability_zone(instance_options,
+                                                  volume_id=volume_id,
+                                                  az=az)
 
         progressmsg = _('Restoring SAN Volume ' + volume_name + ' from snapshot ' + snapshot_obj.id)
         LOG.debug(progressmsg)
         db.restore_update(self.cntx,  restore_id, {'progress_msg': progressmsg, 'status': 'uploading' })             
 
-        availability_zone = get_availability_zone(instance_options)
         self.restored_volume = volume_service.create(self.cntx, 
                                                      volume_size,
                                                      volume_name,
                                                      volume_description, 
-                                                     volume_type = volume_type)
-                                                     #availability_zone=availability_zone)
+                                                     volume_type = volume_type,
+                                                     availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -672,9 +717,8 @@ class RestoreInstanceFromVolume(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })        
-
         availability_zone = get_availability_zone(instance_options)
-    
+
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
 
         self.volume_service = volume_service = cinder.API()
@@ -764,7 +808,6 @@ class RestoreInstanceFromImage(task.Task):
                                             {'progress_msg': 'Creating Instance: '+ restored_instance_name,
                                              'status': 'restoring'
                                             })  
-        
         availability_zone = get_availability_zone(instance_options)
     
         restored_compute_flavor = compute_service.get_flavor_by_id(self.cntx, restored_compute_flavor_id)
@@ -910,6 +953,7 @@ class CopyBackupImageToVolume(task.Task):
                 restored_file_path,
                 progress_tracking_file_path,
                 image_overlay_file_path,
+                vm_resource_id,
                 volume_id = None, volume_type = None,
                 image_id = None, image_type = None):
         return self.execute_with_log(context, restored_instance_id, 
@@ -918,7 +962,8 @@ class CopyBackupImageToVolume(task.Task):
                                      restore_id, restore_type,
                                      restored_file_path,
                                      image_overlay_file_path,
-                                     progress_tracking_file_path)
+                                     progress_tracking_file_path,
+                                     vm_resource_id)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -930,7 +975,8 @@ class CopyBackupImageToVolume(task.Task):
                          restore_id, restore_type,
                          restored_file_path, 
                          image_overlay_file_path,
-                         progress_tracking_file_path):
+                         progress_tracking_file_path,
+                         vm_resource_id):
  
         # Call into contego to copy the data from backend to volume
         compute_service = nova.API(production=True)
@@ -951,6 +997,7 @@ class CopyBackupImageToVolume(task.Task):
 
         basestat = os.stat(progress_tracking_file_path)
         basetime = time.time()
+        snapshot_vm_resource = db.snapshot_vm_resource_get(cntx, vm_resource_id)
         while True:
             try:
                 time.sleep(10)
@@ -971,10 +1018,10 @@ class CopyBackupImageToVolume(task.Task):
                     if progstat.st_mtime > basestat.st_mtime:
                         basestat = progstat
                         basetime = time.time()
-                    elif time.time() - basetime > 600:
-                        raise Exception("No update to %s modified time for last 10 minutes. "
+                    elif time.time() - basetime > CONF.progress_tracking_update_interval:
+                        raise Exception("No update to %s modified time for last %d minutes. "
                                         "Contego may have errored. Aborting Operation" % 
-                                        progress_tracking_file_path)
+                                        (progress_tracking_file_path, CONF.progress_tracking_update_interval/60))
                 else:
                     # For swift based backup media
                     async_task_status = compute_service.vast_async_task_status(cntx, 
@@ -995,7 +1042,7 @@ class CopyBackupImageToVolume(task.Task):
                             break;
 
                 copied_size_incremental = int(float(percentage) * \
-                                                   image_info.virtual_size/100)
+                                              snapshot_vm_resource.restore_size/100)
                 restore_obj = db.restore_update(cntx, restore_id,
                                            {'uploaded_size_incremental': copied_size_incremental - \
                                                                    prev_copied_size_incremental})
@@ -1098,7 +1145,7 @@ class PowerOnInstance(task.Task):
                     raise Exception(_("Error creating instance " + \
                                         restored_instance_id))
             now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=4):
+            if (now - start_time) > datetime.timedelta(minutes=5):
                 raise exception.ErrorOccurred(reason='Timeout waiting for '\
                                            'the instance to boot from volume')                   
 
@@ -1314,6 +1361,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                              vm_resource_id=snapshot_vm_resource.id, 
                                               )))
         elif db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
@@ -1322,6 +1370,7 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
                                               restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
                                               progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
                                               image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                              vm_resource_id=snapshot_vm_resource.id, 
                                               )))            
     return flow
 
@@ -1343,6 +1392,16 @@ def AssignFloatingIPFlow(context):
 
     flow = lf.Flow("assignfloatingiplf")
     flow.add(AssignFloatingIP("AssignFloatingIP"))
+
+    return flow
+
+def FreezeNThawFlow(context):
+
+    flow = lf.Flow("freezenthawlf")
+    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
+                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
 
     return flow
 
@@ -1377,8 +1436,9 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     restored_security_group_ids = {}
     vm_id = instance['vm_id']
-    for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
-        restored_security_group_ids[pit_id] = restored_security_group_id
+    if restored_security_groups:
+        for pit_id, restored_security_group_id in restored_security_groups[vm_id].iteritems():
+            restored_security_group_ids[pit_id] = restored_security_group_id
 
     # remove items that cannot be jsoned
     restore_dict = dict(restore.iteritems())
@@ -1481,6 +1541,10 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     # Assign floating IP address
     childflow = AssignFloatingIPFlow(cntx)
+    if childflow:
+        _restorevmflow.add(childflow)
+
+    childflow = FreezeNThawFlow(cntx)
     if childflow:
         _restorevmflow.add(childflow)
 

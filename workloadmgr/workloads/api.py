@@ -1,5 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
+
 # Copyright (c) 2014 TrilioData, Inc.
 # All Rights Reserved.
 
@@ -17,6 +18,7 @@ import time
 import uuid
 import zlib
 import functools
+import re
 
 from M2Crypto import DSA
 
@@ -61,6 +63,7 @@ from workloadmgr import policy
 from workloadmgr.db.sqlalchemy import models
 from workloadmgr.db.sqlalchemy.session import get_session
 from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClient
+from tzlocal import get_localzone
 workload_lock = threading.Lock()
 
 FLAGS = flags.FLAGS
@@ -74,7 +77,8 @@ AUDITLOG = auditlog.getAuditLogger()
 def _snapshot_create_callback(*args, **kwargs):
     try:
         arg_str = autolog.format_args(args, kwargs)
-        LOG.info(_("_snapshot_create_callback Enter - " + arg_str))
+        callback_obj = kwargs.get('callback_obj', 'snapshot')
+        LOG.info(_("_%s_create_callback Enter - "%(callback_obj) + arg_str))
 
         from workloadmgr.workloads import API
         workloadmgrapi = API()
@@ -83,13 +87,18 @@ def _snapshot_create_callback(*args, **kwargs):
         user_id = kwargs['user_id']
         project_id = kwargs['project_id']
         tenantcontext = nova._get_tenant_context(kwargs)
-
         workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
         # TODO: Make sure workload is in a created state
+        if callback_obj == 'snapshot':
+            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+        else:
+            workload = workloadmgrapi.get_config_workload(tenantcontext)
+
         if workload['status'] == 'error':
-            LOG.info(_("Workload %(display_name)s is in error state. Cannot schedule snapshot operation") % workload)
-            LOG.info(_("_snapshot_create_callback Exit"))
+            LOG.info(_("Workload %s is in error state. Cannot schedule %s operation")
+                     % (workload['display_name'] if callback_obj == 'snapshot' else 'config_workload', callback_obj))
+            LOG.info(_("_%s_create_callback Exit")%(callback_obj))
             return
 
         # wait for 5 minutes until the workload changes state to available
@@ -99,57 +108,64 @@ def _snapshot_create_callback(*args, **kwargs):
                 break
             time.sleep(30)
             count += 1
-            workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+            if callback_obj == 'snapshot':
+                workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
+            else:
+                workload = workloadmgrapi.get_config_workload(tenantcontext)
 
         # if workload hasn't changed the status to available
         if workload['status'] != 'available':
             LOG.info(
-                _("Workload %(display_name)s is not in available state. Cannot schedule snapshot operation") % workload)
-            LOG.info(_("_snapshot_create_callback Exit"))
+                _("Workload %s is not in available state. Cannot schedule %s operation")
+                % (workload['display_name'] if callback_obj == 'snapshot' else 'config_workload', callback_obj))
+            LOG.info(_("_%s_create_callback Exit") %(callback_obj))
             return
 
-        # determine if the workload need to be full snapshot or incremental
-        # the last full snapshot
-        # if the last full snapshot is over policy based number of days, do a full backup
-        snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
-                                                                           project_id, workload_id)
-        jobscheduler = workload['jobschedule']
+        if callback_obj == 'snapshot':
+            # determine if the workload need to be full snapshot or incremental
+            # the last full snapshot
+            # if the last full snapshot is over policy based number of days, do a full backup
+            snapshots = workloadmgrapi.db.snapshot_get_all_by_project_workload(tenantcontext,
+                                                                               project_id, workload_id)
+            jobscheduler = workload['jobschedule']
 
-        #
-        # if fullbackup_interval is -1, never take full backups
-        # if fullbackup_interval is 0, always take full backups
-        # if fullbackup_interval is +ve follow the interval
-        #
-        jobscheduler['fullbackup_interval'] = \
-            'fullbackup_interval' in jobscheduler and \
-            jobscheduler['fullbackup_interval'] or "-1"
+            #
+            # if fullbackup_interval is -1, never take full backups
+            # if fullbackup_interval is 0, always take full backups
+            # if fullbackup_interval is +ve follow the interval
+            #
+            jobscheduler['fullbackup_interval'] = \
+                'fullbackup_interval' in jobscheduler and \
+                jobscheduler['fullbackup_interval'] or "-1"
 
-        snapshot_type = "incremental"
-        if int(jobscheduler['fullbackup_interval']) == 0:
-            snapshot_type = "full"
-        elif int(jobscheduler['fullbackup_interval']) < 0:
             snapshot_type = "incremental"
-        elif int(jobscheduler['fullbackup_interval']) > 0:
-            # check full backup policy here
-            num_of_incr_in_current_chain = 0
-            for snap in snapshots:
-                if snap.snapshot_type == 'full':
-                    break;
-                else:
-                    num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
-
-            if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+            if int(jobscheduler['fullbackup_interval']) == 0:
                 snapshot_type = "full"
+            elif int(jobscheduler['fullbackup_interval']) < 0:
+                snapshot_type = "incremental"
+            elif int(jobscheduler['fullbackup_interval']) > 0:
+                # check full backup policy here
+                num_of_incr_in_current_chain = 0
+                for snap in snapshots:
+                    if snap.snapshot_type == 'full':
+                        break;
+                    else:
+                        num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
 
-            if snapshots.__len__ == 0:
-                snapshot_type = 'full'
+                if num_of_incr_in_current_chain >= int(jobscheduler['fullbackup_interval']):
+                    snapshot_type = "full"
 
-        snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
+                if snapshots.__len__ == 0:
+                    snapshot_type = 'full'
+
+            snapshot = workloadmgrapi.workload_snapshot(tenantcontext, workload_id, snapshot_type, "jobscheduler", None)
+        else:
+            config_backup = workloadmgrapi.config_backup(tenantcontext, "jobscheduler", "No description")
     except Exception as ex:
-        LOG.exception(_("Error creating a snapshot for workload %s") % workload_id)
+        LOG.exception(_("Error creating a %s for workload %s") % (callback_obj,
+                workload_id if callback_obj=='snapshot' else 'config_backup'))
 
-    LOG.info(_("_snapshot_create_callback Exit"))
-
+    LOG.info(_("_%s_create_callback Exit") %(callback_obj))
 
 def create_trust(func):
     def trust_create_wrapper(*args, **kwargs):
@@ -242,11 +258,15 @@ class API(base.Base):
         if not hasattr(self, "_jobstore"):
             self._jobstore = SQLAlchemyJobStore(engine=self._engine)
 
+        if not hasattr(self, "_config_jobstore"):
+            self._config_jobstore = SQLAlchemyJobStore(engine=self._engine)
+
         super(API, self).__init__(db_driver)
 
         if not hasattr(self, "_scheduler"):
             self._scheduler = Scheduler()
             self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
+            self._scheduler.add_jobstore(self._config_jobstore, 'config_jobstore')
 
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
@@ -254,11 +274,21 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
     def search(self, context, data):
-        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'])
-        if len(vm_found) == 0:
-           msg = _('vm_id not existing with this tenant')
+        if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
+           msg = _('Provide valid linux filepath to search')
            raise wlm_exceptions.Invalid(reason=msg)
-        workload = self.db.workload_get(context, vm_found[0].workload_id)
+        vm_found = self.db.workload_vm_get_by_id(context, data['vm_id'], read_deleted='yes', workloads_filter='deleted')
+        if len(vm_found) == 0:
+           #Check in snapshot vms
+           vm_found = self.db.snapshot_vm_get(context, data['vm_id'], None)
+           if vm_found is None:
+              msg = _('vm_id not existing with this tenant')
+              raise wlm_exceptions.Invalid(reason=msg)
+           snapshot = self.db.snapshot_get(context, vm_found.snapshot_id)
+           workload_id = snapshot.workload_id
+        else:
+             workload_id = vm_found[0].workload_id
+        workload = self.db.workload_get(context, workload_id)
         if workload['status'] != 'available':
            msg = _('Vm workload is not in available state to perform search')
            raise wlm_exceptions.Invalid(reason=msg)
@@ -267,6 +297,21 @@ class API(base.Base):
         if len(search_list) > 0:
            msg = _('Search with this vm_id already in exceution')
            raise wlm_exceptions.Invalid(reason=msg)
+        if data['date_from'] != '':
+           try:
+                datetime.strptime(data['date_from'], '%Y-%m-%dT%H:%M:%S')
+           except:
+                  msg = _("Please provide "\
+                          "valid date_from in Format YYYY-MM-DDTHH:MM:SS")
+                  raise wlm_exceptions.Invalid(reason=msg)
+
+           if data['date_to'] != '':
+              try:
+                   datetime.strptime(data['date_to'], '%Y-%m-%dT%H:%M:%S')
+              except:
+                      msg = _("Please provide "\
+                          "valid date_to in Format YYYY-MM-DDTHH:MM:SS")
+                      raise wlm_exceptions.Invalid(reason=msg)
         if type(data['snapshot_ids']) is list:
            data['snapshot_ids'] = ",".join(data['snapshot_ids'])
         options = {'vm_id': data['vm_id'],
@@ -276,6 +321,8 @@ class API(base.Base):
                    'snapshot_ids': data['snapshot_ids'],
                    'start': data['start'],
                    'end': data['end'],
+                   'date_from': data['date_from'],
+                   'date_to': data['date_to'],
                    'status': 'executing',}
         search = self.db.file_search_create(context, options)
         self.scheduler_rpcapi.file_search(context, FLAGS.scheduler_topic, search['id'])
@@ -446,6 +493,16 @@ class API(base.Base):
 
         return workload_dict
 
+    def convert_date_time_zone(self, jobschedule):
+        if 'timezone' in jobschedule:
+               date_time = utils.get_local_time(jobschedule['start_date']+" "+jobschedule['start_time'], 
+                           "%m/%d/%Y %I:%M %p", "%m/%d/%Y %I:%M %p", jobschedule['timezone']).split(" ")
+               jobschedule['start_date'] = date_time[0]
+               jobschedule['start_time'] = date_time[1]+" "+date_time[2]
+               jobschedule['appliance_timezone'] = get_localzone().zone
+               return jobschedule
+        return jobschedule
+    
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
     def workload_show(self, context, workload_id):
@@ -523,7 +580,6 @@ class API(base.Base):
                 timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
                 workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
                 break
-
         return workload_dict
 
     @autolog.log_method(logger=Logger)
@@ -594,6 +650,8 @@ class API(base.Base):
                 msg = _('Invalid workload type')
                 raise wlm_exceptions.Invalid(reason=msg)
 
+            jobschedule = self.convert_date_time_zone(jobschedule)
+
             if not 'hostnames' in metadata:
                 metadata['hostnames'] = json.dumps([])
 
@@ -657,7 +715,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def workload_add_scheduler_job(self, jobschedule, workload, context=context):
+    def workload_add_scheduler_job(self, jobschedule, workload, context=context, is_config_backup=False):
         if self._scheduler.running is True:
            if jobschedule and len(jobschedule): 
               if 'enabled' in jobschedule and jobschedule['enabled']:                                       
@@ -673,15 +731,27 @@ class API(base.Base):
                            user_domain_id = context.user_domain
                  else:
                       user_domain_id = 'default'
-                 self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
+                 kwargs={'workload_id':workload.id,
+                         'user_id': context.user_id,
+                         'project_id':context.project_id,
+                         'user_domain_id':user_domain_id,
+                         'user':context.user,
+                         'tenant':context.tenant}
+                 if is_config_backup:
+                    kwargs['callback_obj'] = 'config_backup'
+                    hours = int(jobschedule['interval'].split('hr')[0])
+                    start_time = jobschedule['start_time']
+                    self._scheduler.add_interval_job(_snapshot_create_callback,
+                                                    hours = hours,
+                                                    start_time = start_time,
+                                                    jobstore='config_jobstore',
+                                                    kwargs=kwargs)
+                 else:
+                     kwargs['callback_obj'] = 'snapshot'
+                     self._scheduler.add_workloadmgr_job(_snapshot_create_callback, 
                                                     jobschedule,
-                                                    jobstore='jobscheduler_store',
-                                                    kwargs={'workload_id': workload.id,
-                                                            'user_id': workload.user_id,
-                                                            'project_id': workload.project_id,
-                                                            'user_domain_id': user_domain_id,
-                                                            'user': context.user,
-                                                            'tenant': context.tenant})
+                                                    jobstore='jobscheduler_store', 
+                                                    kwargs=kwargs)
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
@@ -740,13 +810,16 @@ class API(base.Base):
 
            if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
               pause_workload = True
+              
            if workload['jobschedule']['enabled'] == True and \
-              workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
+              workloadobj['jobschedule']['enabled'] == workload['jobschedule']['enabled'] and \
+              workloadobj['jobschedule']['interval'] != workload['jobschedule']['interval']:
+              pause_workload = True
               unpause_workload = True
-           options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)
 
-        if 'instances' in workload and workload['instances']:
-
+           workload['jobschedule'] = self.convert_date_time_zone(workload['jobschedule'])
+           options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)    
+        if  'instances' in workload and workload['instances']:
             compute_service = nova.API(production=True)
             instances = workload['instances']
             instances_with_name = compute_service.get_servers(context)
@@ -819,11 +892,14 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def workload_delete(self, context, workload_id):
+    def workload_delete(self, context, workload_id, database_only=False):
         """
         Delete a workload. No RPC call is made
         """
         try:
+            if context.is_admin is False and database_only is True:
+                raise wlm_exceptions.AdminRequired()
+
             workload = self.workload_get(context, workload_id)
             display_name = workload['display_name']
             AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Requested', workload)
@@ -831,6 +907,7 @@ class API(base.Base):
                 msg = _("Workload status must be 'available' or 'error'")
                 raise wlm_exceptions.InvalidState(reason=msg)
 
+            '''
             workloads = self.db.workload_get_all(context)
             for workload in workloads:
                 if workload.deleted:
@@ -847,20 +924,41 @@ class API(base.Base):
                                             msg = _(
                                                 'Operation not allowed since this workload is a member of a composite workflow')
                                             raise wlm_exceptions.InvalidState(reason=msg)
-
-            snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
-            if len(snapshots) > 0:
-                msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
-                raise wlm_exceptions.InvalidState(reason=msg)
-
+            '''
             # First unschedule the job
             jobs = self._scheduler.get_jobs()
             for job in jobs:
                 if job.kwargs['workload_id'] == workload_id:
                     self._scheduler.unschedule_job(job)
                     break
-            self.db.workload_update(context, workload_id, {'status': 'deleting'})
-            self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
+            
+            if database_only is True:
+                self.db.workload_update(context, workload_id, {'status': 'deleting'})
+
+                #Remove workload entry from workload_vm's
+                compute_service = nova.API(production=True)
+                workload_vms = self.db.workload_vms_get(context, workload_id)
+                for vm in workload_vms:
+                    compute_service.delete_meta(context, vm.vm_id,
+                                                ["workload_id", 'workload_name'])
+                    self.db.workload_vms_delete(context, vm.vm_id, workload_id)
+
+                #Remove all snapshots from workload
+                snapshots = self.db.snapshot_get_all_by_workload(context, workload_id)
+                for snapshot in snapshots:
+                    workload_utils.snapshot_delete(context, snapshot.id, database_only)
+                    self.db.snapshot_update(context, snapshot.id, {'status': 'deleted'})
+                self.db.workload_delete(context, workload_id)
+
+            else:
+                snapshots = self.db.snapshot_get_all_by_project_workload(context, context.project_id, workload_id)
+                if len(snapshots) > 0:
+                    msg = _('This workload contains snapshots. Please delete all snapshots and try again..')
+                    raise wlm_exceptions.InvalidState(reason=msg)
+
+                self.db.workload_update(context, workload_id, {'status': 'deleting'})
+                self.workloads_rpcapi.workload_delete(context, workload['host'], workload_id)
+
             AUDITLOG.log(context, 'Workload \'' + display_name + '\' Delete Submitted', workload)
         except Exception as ex:
             LOG.exception(ex)
@@ -955,6 +1053,7 @@ class API(base.Base):
                                                upgrade)
         except Exception as ex:
             LOG.exception(ex)
+            raise ex
 
         AUDITLOG.log(context, 'Import Workloads Completed', None)
         return workloads
@@ -1455,6 +1554,7 @@ class API(base.Base):
 
         self._scheduler = Scheduler()
         self._scheduler.add_jobstore(self._jobstore, 'jobscheduler_store')
+        self._scheduler.add_jobstore(self._config_jobstore, 'config_jobstore')
         self._scheduler.start()
         setting = {u'category': "job_scheduler",
                    u'name': "global-job-scheduler",
@@ -1629,6 +1729,7 @@ class API(base.Base):
                 snapshot_vm['metadata'] = metadata
                 snapshot_vm['nics'] = []
                 snapshot_vm['vdisks'] = []
+                snapshot_vm['security_group'] = []
                 snapshot_vm_resources = self.db.snapshot_vm_resources_get(context, snapshot_vm_obj.vm_id, snapshot_id)
                 snapshot_vm_common_resources = self.db.snapshot_vm_resources_get(context, snapshot_id, snapshot_id)
                 for snapshot_vm_resource in snapshot_vm_resources:
@@ -1643,11 +1744,10 @@ class API(base.Base):
                                                  }
                     """ security group """
                     if snapshot_vm_resource.resource_type == 'security_group':
-                        snapshot_vm['security_group'] = {
-                            'name': self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
-                            'security_group_type': self.db.get_metadata_value(snapshot_vm_resource.metadata,
-                                                                              'security_group_type'),
-                            }
+                        if self.db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in (True, '1', None):
+                            snapshot_vm['security_group'].append( {'name' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
+                                                                   'security_group_type' : self.db.get_metadata_value(snapshot_vm_resource.metadata, 'security_group_type') })
+                            
                     """ nics """
                     if snapshot_vm_resource.resource_type == 'nic':
                         vm_nic_snapshot = self.db.vm_network_resource_snap_get(context, snapshot_vm_resource.id)
@@ -1694,6 +1794,14 @@ class API(base.Base):
                                                                               'volume_type')
                             vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,
                                                                                     'volume_mountpoint')
+          
+                           vdisk['volume_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_id')
+                           vdisk['volume_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_name')
+                           vdisk['volume_size'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_size')
+                           vdisk['volume_type'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_type')
+                           vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_mountpoint')
+                           if self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+                              vdisk['availability_zone'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
 
                         snapshot_vm['vdisks'].append(vdisk)
                 snapshot_vms.append(snapshot_vm)
@@ -1772,6 +1880,27 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
+    def _validate_restore_options(self, options):
+        if options.get('type', "") != "openstack":
+            msg = _("'type' field in options is not set to 'openstack'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if 'openstack' not in options:
+            msg = _("'openstack' field is not in options")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) not in ('inplace', 'selective', 'oneclick'):
+            msg = _("'restore_type' field must be one of 'inplace', 'selective', 'oneclick'")
+            raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+        if options.get("restore_type", None) in ('inplace', 'selective'):
+        # If instances is not available should we restore entire snapshot?
+            if 'instances' not in options['openstack']:
+                msg = _("'instances' field is not in found " \
+                        "in options['instances']")
+                raise wlm_exceptions.InvalidRestoreOptions(message=msg)
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     @wrap_check_policy
     def snapshot_restore(self, context, snapshot_id, test, name, description, options):
@@ -1780,11 +1909,14 @@ class API(base.Base):
         Make the RPC call to restore a snapshot.
         """
         try:
+            self._validate_restore_options(options)
+
             snapshot = self.snapshot_get(context, snapshot_id)
             workload = self.workload_get(context, snapshot['workload_id'])
             workload_display_name = workload['display_name']
             snapshot_display_name = snapshot['display_name']
             snapshot_snapshot_type = snapshot['snapshot_type']
+
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
                 snapshot_display_name = local_time + ' (' + snapshot['display_name'] + ')'
@@ -1798,6 +1930,10 @@ class API(base.Base):
                          snapshot_display_name + '\' Restore \'' + \
                          restore_display_name + '\' Create Requested', snapshot)
 
+            if snapshot['status'] != 'available':
+                msg = _('Snapshot status must be available')
+                raise wlm_exceptions.InvalidState(reason=msg)
+
             try:
                 workload_lock.acquire()
                 if workload['status'].lower() != 'available':
@@ -1806,11 +1942,6 @@ class API(base.Base):
                 self.db.workload_update(context, workload['id'], {'status': 'locked'})
             finally:
                 workload_lock.release()
-
-            if snapshot['status'] != 'available':
-                msg = _('Snapshot status must be available')
-                raise wlm_exceptions.InvalidState(reason=msg)
-
             self.db.snapshot_update(context, snapshot_id, {'status': 'restoring'})
 
             restore_type = "restore"
@@ -1846,7 +1977,7 @@ class API(base.Base):
             return restore
         except Exception as ex:
             LOG.exception(ex)
-            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+            raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
@@ -2383,7 +2514,7 @@ class API(base.Base):
     @wrap_check_policy
     def trust_delete(self, context, name):
 
-        trust = self.db.setting_get(context, name)
+        trust = self.db.setting_get(context, name, get_hidden=True)
         if trust.type != "trust_id":
             msg = _("No trust record by name %s" % name)
             raise wlm_exceptions.Invalid(reason=msg)
@@ -2479,7 +2610,7 @@ class API(base.Base):
                    u'type': "license_key",}
         created_license = []
         try:
-            settings = self.db.setting_get_all(context)
+            settings =  self.db.setting_get_all(context, get_hidden=True)
             created_license.append(self.db.setting_create(context, setting))
 
             for setting in settings:
@@ -2496,8 +2627,8 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
     def license_list(self, context):
-
-        settings = self.db.setting_get_all(context)
+      
+        settings =  self.db.setting_get_all(context, get_hidden=True)
 
         license = [t for t in settings if t.type == "license_key"]
 
@@ -2610,6 +2741,7 @@ class API(base.Base):
             keystone_client = KeystoneClient(context)
 
             reassigned_workloads = []
+            failed_workloads = []
             projects = keystone_client.client.get_project_list_for_import(context)
             tenant_list = [project.id for project in projects]
             for tenant_map in tenant_maps:
@@ -2689,7 +2821,8 @@ class API(base.Base):
                     if workload_to_import:
                         vault.update_workload_db(context, workload_to_import, new_tenant_id, user_id)
                         imported_workloads = self.import_workloads(context, workload_to_import, True)
-                        reassigned_workloads.extend(imported_workloads)
+                        reassigned_workloads.extend(imported_workloads['workloads']['imported_workloads'])
+                        failed_workloads.extend(imported_workloads['workloads']['failed_workloads'])
 
                     if workload_to_update:
                         jobscheduler_map = vault.update_workload_db(context, workload_to_update, new_tenant_id, user_id)
@@ -2697,8 +2830,228 @@ class API(base.Base):
                                                   jobscheduler_map, new_tenant_id, user_id)
                         reassigned_workloads.extend(updated_workloads)
 
-            return reassigned_workloads
+            return {'workloads':{'reassigned_workloads': reassigned_workloads, 'failed_workloads': failed_workloads}}
 
         except Exception as ex:
             LOG.exception(ex)
             raise ex
+
+    @autolog.log_method(logger=Logger)
+    def config_workload(self,context, jobschedule, services_to_backup):
+        """
+        Make the RPC call to create/update a config workload.
+        """
+        try:
+            if context.is_admin is False:
+                raise wlm_exceptions.AdminRequired()
+
+            AUDITLOG.log(context, 'Config workload update Requested', None)
+
+            try:
+                existing_config_workload = self.db.config_workload_get(context)
+            except Exception as ex:
+                existing_config_workload = None
+                #When user configuring for the first time
+                if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
+                    message = "Database credentials are required to configure config backup."
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
+
+                controller_nodes = workload_utils.get_controller_nodes(context)
+                compute_nodes = workload_utils.get_compute_nodes(context)
+                compute_nodes = [compute_node.host for compute_node in compute_nodes]
+
+                #If controller node is other than compute node then we need
+                #trusted hosts which cab take backup from controller nodes. 
+                controller_nodes.extend(compute_nodes)
+                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0) and\
+                   len(list(set(controller_nodes))) != len(set(compute_nodes)):
+                    message = "To backup controller nodes, please provide list of trusted " \
+                       "compute nodes, which has password less access to controller nodes."
+                    raise wlm_exceptions.ErrorOccurred(reason=message)
+
+            metadata = {}
+            if 'databases' in services_to_backup:
+               # Validate database creds
+               workload_utils.validate_database_creds(context, services_to_backup['databases']) 
+               metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
+
+            if 'trusted_nodes' in services_to_backup:
+               # Validate trusted_host creds
+               workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
+               metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
+
+            metadata['services_to_backup'] = pickle.dumps(services_to_backup)
+
+            backup_target, path = vault.get_settings_backup_target()
+            # Create new OpenStack workload
+            if existing_config_workload is None:
+                backup_target, path = vault.get_settings_backup_target()
+                options = {
+                    'id': vault.CONF.cloud_unique_id,
+                    'user_id': context.user_id,
+                    'project_id': context.project_id,
+                    'host': socket.gethostname(),
+                    'status': 'creating',
+                    'metadata': metadata,
+                    'jobschedule': pickle.dumps(jobschedule),
+                    'backup_media_target': backup_target.backup_endpoint,
+                }
+                config_workload = self.db.config_workload_update(context, options)
+            else:
+                #Update existing config workload
+                options = {}
+                options['metadata'] = metadata
+                if len(jobschedule):
+                    options['jobschedule'] = pickle.dumps(jobschedule)
+                    config_workload = self.db.config_workload_update(context, options)
+                    
+                    existing_joschedule = pickle.loads(str(existing_config_workload.get('jobschedule')))
+                    existing_scheduler_status = False
+                    if str(existing_joschedule.get('enabled')).lower() == 'true':
+                        existing_scheduler_status = True
+        
+                    if str(jobschedule['enabled']).lower() == 'true':
+                        if existing_scheduler_status is True:
+                            #Case when scheduler is updated with some new values
+                            #Need to update scheduler with new values so that it
+                            #reflect changes instantly.
+                            job = self._scheduler.get_config_backup_job()
+                            if job is not None:
+                                self._scheduler.unschedule_config_backup_job(job)
+        
+                        # Add to scheduler jobs
+                        self.workload_add_scheduler_job(jobschedule, config_workload, context, is_config_backup=True)
+        
+                    if str(jobschedule['enabled']).lower() == 'false':
+                        if existing_scheduler_status is True:
+                            # Remove from scheduler jobs
+                            job = self._scheduler.get_config_backup_job()
+                            if job is not None:
+                                self._scheduler.unschedule_config_backup_job(job)
+                        else:
+                            LOG.warning("Config workload is already disabled.")
+                else:
+                    config_workload = self.db.config_workload_update(context, options)
+ 
+            self.db.config_workload_update(context,
+                                    {
+                                     'status': 'available',
+                                     'error_msg': None,
+                                    })
+            workload_utils.upload_config_workload_db_entry(context)
+            AUDITLOG.log(context, 'Config workload update submitted.', config_workload)
+            return config_workload
+        except Exception as ex:
+            LOG.exception(ex)
+            if config_workload in locals():
+                self.db.config_workload_update(context,
+                          {'status': 'error', 'error_msg': str(ex.message)})
+                workload_utils.upload_config_workload_db_entry(context)
+            raise ex
+
+    @autolog.log_method(logger=Logger)
+    def get_config_workload(self, context):
+        try:
+            try:
+                config_workload = self.db.config_workload_get(context)
+            except wlm_exceptions.ConfigWorkloadNotFound as ex:
+                raise ex
+
+            config_workload_dict = dict(config_workload.iteritems())
+
+            config_workload_dict['jobschedule'] = pickle.loads(str(config_workload.jobschedule))
+            config_workload_dict['jobschedule']['enabled'] = False
+            config_workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
+            # find the job object based on config_workload_id
+            job = self._scheduler.get_config_backup_job()
+            if job is not None:
+                config_workload_dict['jobschedule']['enabled'] = True
+                timedelta = job.compute_next_run_time(datetime.now()) - datetime.now()
+                config_workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
+            return config_workload_dict
+        except Exception as ex:
+            LOG.exception(ex)
+            raise ex
+
+    @autolog.log_method(logger=Logger)
+    def config_backup(self, context, name, description):
+        """
+        Make the RPC call to backup OpenStack configuration.
+        """
+        try:
+            try:
+                config_workload = self.db.config_workload_get(context)
+            except wlm_exceptions.ConfigWorkloadNotFound as ex:
+                message = 'OpenStack config backup is not configured. First configure it.'
+                raise wlm_exceptions.ErrorOccurred(reason=message)
+
+            if config_workload['status'].lower() != 'available':
+                message = "Config workload is not available. " \
+                          "Please wait for other backup to complete."
+                raise wlm_exceptions.InvalidState(reason=message)
+            self.db.config_workload_update(context, {'status': 'locked'})
+
+            AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Requested', None)
+            
+            options = {'config_workload_id': vault.CONF.cloud_unique_id,
+                       'user_id': context.user_id,
+                       'project_id': context.project_id,
+                       'display_name': name,
+                       'display_description': description,
+                       'start_date': time.strftime("%x"),
+                       'status': 'creating',}
+
+            backup = self.db.config_backup_create(context, options)
+            self.db.config_backup_update(context, backup.id,
+                                    {
+                                     'progress_msg': 'Config backup operation is scheduled',
+                                     'status': 'starting'
+                                     })
+            self.scheduler_rpcapi.config_backup(context, FLAGS.scheduler_topic, backup['id'], request_spec={})
+            AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Submitted.', backup)
+            return backup
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+
+    @autolog.log_method(logger=Logger)
+    def get_config_backups(self, context, backup_id=None):
+        """
+        Return list/single of backups.
+        """
+        try:
+            if backup_id:
+                backups = self.db.config_backup_get(context, backup_id)
+            else:
+                backups = self.db.config_backup_get_all(context)
+            return backups
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
+
+    @autolog.log_method(logger=Logger)
+    def config_backup_delete(self, context, backup_id):
+        """
+        Delete a config backup.
+        """
+        try:
+            config_backup = self.get_config_backups(context, backup_id)
+            config_workload = self.get_config_workload(context)
+            backup_display_name = config_backup['display_name']
+
+            AUDITLOG.log(context, 'Config backup ' + backup_display_name + 
+                         ' Delete Requested', config_backup)
+            if config_backup['status'] not in ['available', 'error']:
+                msg = _("Config backup status must be 'available' or 'error'.")
+                raise wlm_exceptions.InvalidState(reason=msg)
+
+            backup = self.db.config_backup_update(context, backup_id, {'status': 'deleting'})
+            workload_utils.config_backup_delete(context, backup_id)
+
+            AUDITLOG.log(context,
+                         'OpenStack cofig backup  ' + backup_display_name + ' Delete Submited',
+                          config_backup)
+            return backup
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))

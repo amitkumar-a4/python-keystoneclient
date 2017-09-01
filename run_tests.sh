@@ -217,6 +217,8 @@ then
         wrapper=${with_venv}
       fi
     fi
+    cp /usr/lib/python2.7/dist-packages/libvirt.py .venv/lib/python2.7/site-packages/
+    cp /usr/lib/python2.7/dist-packages/libvirtmod.so .venv/lib/python2.7/site-packages/
   fi
 fi
 

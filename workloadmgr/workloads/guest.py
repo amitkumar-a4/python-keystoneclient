@@ -11,7 +11,7 @@ os.setuid(uid)
 
 def f(data):
     g = guestfs.GuestFS(python_return_dict=True)
-    drives = data.split(',')
+    drives = data.split(',,')
     filepath = drives[0]
     drives.pop(0)
     snapshot_id = drives[0]
@@ -32,13 +32,19 @@ def f(data):
                continue
         val = g.glob_expand(filepath)
         disk = {}
+        root = root.replace('s', 'v')
         disk[root] = val
         if len(val) > 0:
            for path in val:
-               disk[path] = g.stat(path)
+               try:
+                   disk[path] = g.stat(path)
+               except Exception as ex:
+                      disk[path] = ex.message
         lt_drives.append(disk)
         g.umount_all()
     dt[snapshot_id] = lt_drives   
+    if len(drives) == 0:
+       dt[snapshot_id] = 'Snapshot VM deleted'
     g.close()
     return dt
 

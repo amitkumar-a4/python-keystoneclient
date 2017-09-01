@@ -117,6 +117,9 @@ wlm_vault_opts = [
     cfg.StrOpt('triliovault_user_domain_id',
                default='default',
                help='triliovault user domain name'),
+    cfg.StrOpt('keystone_auth_version',
+               default='2.0',
+               help='Keystone authentication version'),
     cfg.IntOpt('workload_full_backup_factor',
                default=50,
                help='The size of full backup compared to actual resource size in percentage'),
@@ -406,13 +409,13 @@ def to_abs():
         return new_function
     return wrap
 
-
 class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
         if CONF.vault_storage_type == 'nfs':
            base64encode = base64.b64encode(backupendpoint)
            mountpath = os.path.join(CONF.vault_data_directory,
                                  base64encode)
+           self.umount_backup_target_swift()
            fileutils.ensure_tree(mountpath)
            self.__mountpath = mountpath
            super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
@@ -424,7 +427,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
              mountpath = CONF.vault_data_directory
              self.__mountpath = mountpath
              super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
-                                                         mountpath=mountpath)  
+                                                         mountpath=mountpath)
 
     def get_progress_tracker_directory(self, tracker_metadata):
         """
@@ -483,7 +486,17 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         workload_path = os.path.join(self.mount_path,
             'workload_%s' % (workload_metadata['workload_id']))
         return workload_path
-
+ 
+    @ensure_mounted()
+    def get_config_workload_path(self):
+        config_workload_path = os.path.join(self.mount_path, CONF.cloud_unique_id, 'config_workload')
+        return config_workload_path
+ 
+    def get_config_backup_path(self, backup_id):
+        workload_path = self.get_config_workload_path()
+        backup_path = os.path.join(workload_path, 'backup_%s' % (backup_id))
+        return backup_path
+ 
     def get_snapshot_path(self, snapshot_metadata):                 
         workload_path = self.get_workload_path(snapshot_metadata)
         snapshot_path = os.path.join(workload_path,
@@ -539,6 +552,13 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             restore_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
         return restore_vm_disk_resource_staging_path
 
+    def remove_directory(self, path):
+        try:
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+        except Exception as ex:
+            raise ex
+
     ##
     # backup target capabilities
     ##
@@ -588,6 +608,19 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                       for line in f.readlines() if line.split()[1] == mountpath]
 
         return len(mounts) and mounts[0].get(mountpath, None) == nfsshare
+
+    def umount_backup_target_swift(self):
+        try:
+            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            subprocess.check_call(command, shell=False)
+        except Exception as ex:
+               pass
+
+        try:
+            command = ['sudo', 'umount', '-f', CONF.vault_data_directory]
+            subprocess.call(command, shell=False)
+        except Exception as exception:
+            pass
 
     @autolog.log_method(logger=Logger) 
     def umount_backup_target(self):
@@ -657,7 +690,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             values = stdout.split('\n')[1].split()
 
             total_capacity = int(values[1]) * 1024
-            total_utilization = int(values[2]) * 1024
+            # Used entry in df command is not reliable indicator. Hence we use
+            # size - available as total utilization
+            total_utilization = total_capacity - int(values[3]) * 1024
 
             try:
                 stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=True)
@@ -756,8 +791,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def workload_delete(self, context, workload_metadata):
         try:
             workload_path = self.get_workload_path(workload_metadata)
-            if os.path.isdir(workload_path):
-                shutil.rmtree(workload_path)
+            self.remove_directory(workload_path)
         except Exception as ex:
             LOG.exception(ex)  
 
@@ -765,8 +799,15 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
-            if os.path.isdir(snapshot_path):
-                shutil.rmtree(snapshot_path)
+            self.remove_directory(snapshot_path)
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
+    def config_backup_delete(self, context, backup_id):
+        try:
+            backup_path = self.get_config_backup_path(backup_id)
+            self.remove_directory(backup_path)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -797,6 +838,18 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
         super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
+
+    def _delete_path(path):
+        retry = 0
+        while os.path.isdir(backup_path):
+            try:
+                command = ['rm', '-rf', backup_path]
+                subprocess.check_call(command, shell=False)
+            except:
+                pass
+            retry += 1
+            if retry >= 1:
+                break
 
     @autolog.log_method(logger=Logger)
     def get_progress_tracker_directory(self, tracker_metadata):
@@ -858,16 +911,15 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
-            retry = 0
-            while os.path.isdir(snapshot_path):
-               try:
-                   command = ['rm', '-rf', snapshot_path]
-                   subprocess.check_call(command, shell=False)
-               except:
-                       pass
-               retry += 1
-               if retry >= 1:
-                  break
+            _delete_path(snapshot_path)
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
+    def config_backup_delete(self, context, backup_id):
+        try:
+            backup_path = self.get_config_backup_path(backup_id)
+            _delete_path(backup_path)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -982,6 +1034,13 @@ def get_workloads(context):
         workloads += backup_target.get_workloads(context)
 
     return workloads
+
+def validate_workload(workload_url):
+    if os.path.isdir(workload_url) and os.path.exists(os.path.join(workload_url, "workload_db")):
+        return True
+    else:
+        return False
+
 
 def get_all_workload_transfers(context):
     transfers = []
@@ -1138,6 +1197,25 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
 
     except Exception as ex:
         LOG.exception(ex)
+
+def create_backup_directory(context, services, backup_directory_path):
+    try:
+        fileutils.ensure_tree(backup_directory_path)
+        for service,config_path in  services.iteritems():
+            service_name = service
+            fileutils.ensure_tree(os.path.join(backup_directory_path,service_name))
+    except Exception as ex:
+        LOG.exception(ex)
+
+def get_directory_size(path):
+    try:
+        cmd = ['du', '-shb', path]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        out, err = p.communicate()
+        return out.split('\t')[0]
+    except Exception as ex:
+        LOG.exception(ex)
+
 
 """
 if __name__ == '__main__':

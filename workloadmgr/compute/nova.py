@@ -214,26 +214,34 @@ def _get_tenant_context(context):
 
     trust = _get_trusts(user_id, tenant_id)
     if len(trust):
-        trust_id = trust[0].value
-        context = wlm_context.RequestContext(
-            username=CONF.keystone_authtoken.admin_user,
-            password=CONF.keystone_authtoken.admin_password,
-            trust_id=trust_id,
-            tenant_id=tenant_id,
-            trustor_user_id=user_id,
-            user_domain_id=CONF.triliovault_user_domain_id,
-            is_admin=False)
+        try:
+            trust_id = trust[0].value
+            context = wlm_context.RequestContext(
+                username=CONF.keystone_authtoken.admin_user,
+                password=CONF.keystone_authtoken.admin_password,
+                trust_id=trust_id,
+                tenant_id=tenant_id,
+                trustor_user_id=user_id,
+                user_domain_id=CONF.triliovault_user_domain_id,
+                is_admin=False)
 
-        clients.initialise()
-        client_plugin = clients.Clients(context)
-        kclient = client_plugin.client("keystone")
-        context.auth_token = kclient.auth_token
-        context.user_id = user_id
-        if user != 'NA' and not hasattr(context, 'user'):
-           context.user = user
-        if tenant != 'NA' and not hasattr(context, 'tenant'):
-           context.tenant = tenant
+            clients.initialise()
+            client_plugin = clients.Clients(context)
+            kclient = client_plugin.client("keystone")
+            context.auth_token = kclient.auth_token
+            context.user_id = user_id
+            if user != 'NA' and getattr(context, 'user', None) == None:
+               context.user = user
+            if tenant != 'NA' and getattr(context, 'tenant', None) == None:
+               context.tenant = tenant
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_("token cannot be created using saved "
+                                "trust id for user %s, tenant %s") %
+                                (user_id, tenant_id))
     else:
+         LOG.info(_("Could not find any saved trust ids. Trying "
+                    "admin credentials to generate token"))
          try:
             httpclient = client.HTTPClient(
                 user=CONF.nova_admin_username,
@@ -251,13 +259,14 @@ def _get_tenant_context(context):
             context = wlm_context.RequestContext(
                 user_id=user_id, project_id=tenant_id,
                 is_admin=True, auth_token=httpclient.auth_token)
-            if user != 'NA' and not hasattr(context, 'user'):
+            if user != 'NA' and getattr(context, 'user', None) == None:
                context.user = user
-            if tenant != 'NA' and not hasattr(context, 'tenant'):
+            if tenant != 'NA' and getattr(context, 'tenant', None) == None:
                context.tenant = tenant
          except Exception:
             with excutils.save_and_reraise_exception():
-                LOG.exception(_("_get_auth_token() failed"))
+                LOG.exception(_("_get_auth_token() with admin credentials failed. "
+                                "Perhaps admin is not member of tenant %s") % tenant_id)
 
     return context
 
@@ -1137,3 +1146,42 @@ class API(base.Base):
         """
         client = kwargs['client']
         return client.contego.vast_commit_image(server=server, params=params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def vast_config_backup(self, context, backup_id, params, **kwargs):
+        """
+        Backup OpenStack config files.
+        :param services: services for which configuration and database need to backup.
+        """
+        client = kwargs['client']
+        return client.contego.vast_config_backup(backup_id, params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def validate_database_creds(self, context, params, **kwargs):
+        """
+        Validate database credentials.
+        :param : database credentials which need to be validate.
+        """
+        client = kwargs['client']
+        return client.contego.validate_database_creds(CONF.cloud_unique_id, params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def validate_trusted_nodes(self, context, params, **kwargs):
+        """
+        validate a trusted node whether it has access to controller node or not.
+        :param : trusted_node hostname.
+        """
+        client = kwargs['client']
+        return client.contego.validate_trusted_nodes(CONF.cloud_unique_id, params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def get_controller_nodes(self, context, **kwargs):
+        """
+        Get list of controller nodes.
+        """
+        client = kwargs['client']
+        return client.contego.get_controller_nodes(CONF.cloud_unique_id)

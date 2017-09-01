@@ -52,6 +52,10 @@ def get_settings(context=None, get_hidden=False):
 
 def set_settings(context, new_settings):                           
     """set settings"""
+    from workloadmgr import workloads as workloadAPI
+    @workloadAPI.api.upload_settings
+    def upload_settings(name, context):
+        pass
     try:
         persisted_setting_objs = db.setting_get_all(context)
         for name, value in new_settings.iteritems():
@@ -67,6 +71,7 @@ def set_settings(context, new_settings):
                                             'user_id': context.user_id,
                                             'project_id': context.project_id,                                             
                                             'status': 'available'})
+        upload_settings(name, context)
         return get_settings() 
     except Exception as ex:
         LOG.exception(ex)

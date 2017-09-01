@@ -188,6 +188,9 @@ contego_vault_opts = [
     cfg.StrOpt('vault_swift_password',
                default='password',
                help='Swift password'),
+    cfg.StrOpt('region_name_for_services',
+                default='RegionOne',
+                help='Swift Region Name'),
     cfg.StrOpt('vault_swift_domain_id',
                default='default',
                help='Swift domain id'),
@@ -216,6 +219,9 @@ contego_vault_opts = [
                default='/etc/nova/rootwrap.conf',
                metavar='PATH',
                help='rootwrap config file'),
+    cfg.StrOpt('keystone_auth_version',
+               default='2.0',
+               help='keystone auth version'),
 ]
 
 CONF = cfg.CONF
@@ -234,7 +240,7 @@ except:
 
 options = {'sync_to': None,'verbose': 1,'header': [],'auth_version': u'1.0',
            'os_options': {u'project_name': None,
-                          u'region_name': 'RegionOne',
+                          u'region_name': None,
                           u'user_domain_name': None,
                           u'endpoint_type': None,
                           u'object_storage_url': None,
@@ -273,9 +279,8 @@ if CONF.vault_swift_auth_version == 'TEMPAUTH':
     options['user'] = CONF.vault_swift_username
     options['key'] = CONF.vault_swift_password
 else:
-    options['auth_version'] = '2.0'
-    if 'v3' in CONF.vault_swift_auth_url:
-       options['auth_version'] = '3'
+    options['auth_version'] = CONF.keystone_auth_version
+    if options['auth_version'] == '3':
        if CONF.vault_swift_domain_id != "":
           options['os_options']['user_domain_id'] = CONF.vault_swift_domain_id
           options['os_options']['domain_id'] = CONF.vault_swift_domain_id
@@ -291,6 +296,7 @@ else:
     options['os_user_domain_id'] = CONF.vault_swift_domain_id
     options['os_tenant_name'] = CONF.vault_swift_tenant
     options['os_project_name'] = CONF.vault_swift_tenant
+    options['os_region_name'] = CONF.region_name_for_services
 
     # needed to create Connection object
     options['authurl'] = CONF.vault_swift_auth_url
@@ -1514,7 +1520,8 @@ def main(mountpoint, cacheroot):
                       repository=SwiftRepository(cacheroot))
     FUSE(tvaultplugin, mountpoint,
          nothreads=True, foreground=True, nonempty=True,
-         big_writes=True, direct_io=True)
+         big_writes=True, direct_io=True, allow_other=True)
 
 if __name__ == '__main__':
+    fuse_conf()
     main(CONF.vault_data_directory, CONF.vault_data_directory_old )

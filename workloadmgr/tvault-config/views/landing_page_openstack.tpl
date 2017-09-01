@@ -5,45 +5,122 @@
 		
 	<!-- Optional theme -->
 	<link rel="stylesheet" href="css/bootstrap-theme.min.css">
+        <link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
 	
-	<script src="js/jquery-1.11.0.min.js"></script>
-	<!-- Latest compiled and minified JavaScript -->
-	<script src="js/bootstrap.min.js"></script>
 </head>
 
 <body>
-    <div class="container">
-        <img width="200" class="center-block" src="images/triliovault-logo2.png">
-    </div>
-    <div>
-        <div class="container">
-        <br>
-            <h1 class="center-block text-center">Welcome to TrilioVault landing page. TrilioVault provides tenant driven data protection for the OpenStack Cloud. <br /> Version {{ version }}</h1>
-        <br>
-        </div>
+<style>
 
+.fixed {
+    position: fixed;
+}
+
+/* sidebar */
+.bs-docs-sidebar {
+    padding-left: 20px;
+    margin-top: 40px;
+    margin-bottom: 20px;
+}
+
+/* all links */
+.bs-docs-sidebar .nav>li>a {
+    color: #999;
+    border-left: 2px solid transparent;
+    padding: 4px 20px;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* nested links */
+.bs-docs-sidebar .nav .nav>li>a {
+    padding-top: 1px;
+    padding-bottom: 1px;
+    padding-left: 30px;
+    font-size: 12px;
+}
+
+/* active & hover links */
+.bs-docs-sidebar .nav>.active>a, 
+.bs-docs-sidebar .nav>li>a:hover, 
+.bs-docs-sidebar .nav>li>a:focus {
+    color: #563d7c;                 
+    text-decoration: none;          
+    background-color: transparent;  
+    border-left-color: #563d7c; 
+}
+/* all active links */
+.bs-docs-sidebar .nav>.active>a, 
+.bs-docs-sidebar .nav>.active:hover>a,
+.bs-docs-sidebar .nav>.active:focus>a {
+    font-weight: 700;
+}
+/* nested active links */
+.bs-docs-sidebar .nav .nav>.active>a, 
+.bs-docs-sidebar .nav .nav>.active:hover>a,
+.bs-docs-sidebar .nav .nav>.active:focus>a {
+    font-weight: 500;
+}
+</style>
+
+<div class="navbar navbar-default navbar-fixed-top">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="http://www.trilio.io">
+                <img height="35" width="150" src="images/triliovault-logo2.png">
+            </a>
+        </div>
     </div>
+</div>
 
     <div class="container">
         <!-- Example row of columns -->
         <div class="row">
-            <div>
-                <h2>Deployment</h2>
+            <!--Nav Bar -->
+            <nav class="col-xs-3 bs-docs-sidebar">
+                <ul id="sidebar" class="nav nav-stacked fixed">
+                    <li class='active'>
+                        <a href="#GroupA">Deployment</a>
+                    </li>
+                    <li>
+                        <a href="#GroupB">Configuration</a>
+                        <ul class="nav nav-stacked">
+                            <li><a href="#GroupBSub1">Appliance</a></li>
+                            <li><a href="#GroupBSub2">Controller and Compute Nodes</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#GroupC">Horizon Plugin</a>
+                    </li>
+                    <li>
+                        <a href="#GroupD">TrilioVault CLI</a>
+                    </li>
+                    <li>
+                        <a href="#GroupE">Ansible Scripts</a>
+                    </li>
+                    <li>
+                        <a href="#GroupF">Documentation</a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="col-xs-9">
+                <h3 id="GroupA">Deployment</h3>
+                <p>Welcome to TrilioVault landing page. TrilioVault provides tenant driven data protection for OpenStack Clouds. <br /> Version {{ version }}</p>
                 <ol>
-                    <img src="images/triliovault-overview-openstack-thumb.png" width=auto height=auto style="padding-top:23px;" onmouseover="showtrail('auto','auto','images/triliovault-overview-openstack.png');" onmouseout="hidetrail();" />
+                    <img src="images/triliovault-overview-openstack-thumb.png" width=80%  height=40% style="padding-top:23px;" onmouseover="showtrail('auto','auto','images/triliovault-overview-openstack.png');" onmouseout="hidetrail();" />
                     <br>
                 </ol>
-                <h2>Configuration</h2>
+                <h3 id="GroupB">Configuration</h3>
                 <ol>
-                    <li>Configure tVault Appliance( Controller or Additional Node)
+                    <li id="GroupBSub1">Configure TrilioVault Appliance (Controller or Additional Node)
                         <br>
                         <br>
                         <div class="well">
-                            <a href="/home" target="_blank">http://floating-ipaddress-of-tvault-vm/home</a>
+                            <a href="/home" target="_blank">http://floating-ipaddress-of-triliovault-vm/home</a>
                         </div>
                     </li>
                     
-                    <li>Configure OS Controller and Compute Nodes
+                    <li"GroupBSub2">Configure OS Controller and Compute Nodes
                         <br>
                         <br>
                         <div class="well">
@@ -77,7 +154,7 @@
                     -->
                     
                 </ol>
-                <h2>Dashboard</h2>
+                <h3 id="GroupC">Dashboard</h3>
                 <ol>
                     <li>Configure Horizon Plugin
                         <br>
@@ -108,7 +185,7 @@
                     </div>
                     -->
                 </ol>
-                <h2>Cli</h2>
+                <h3 id="GroupD">Cli</h3>
                 <ol>
                     <div class="well">
                         <script>document.write("easy_install http://" + window.location.host + ":8081/packages/pip-7.1.2.tar.gz")</script>
@@ -117,7 +194,7 @@
                     </div>
                 </ol>                
                 
-                <h2>Ansible Scripts</h2>
+                <h3 id="GroupE">Ansible Scripts</h3>
                 <ol>
                     <div class="well">
                         <b>Download Ansible Scripts <a href="/tvault-ansible-scripts.tar.gz">tvault-ansible-scripts-{{version}}.tar.gz</a></b><br>
@@ -125,7 +202,7 @@
                     </div>
                 </ol>
 
-                <h2>TrilioVault Documentation</h2>
+                <h3 id="GroupF">TrilioVault Documentation</h3>
                 <ol>
                     <div class="well">
                         <b>Product Documentation Portal 
@@ -135,7 +212,7 @@
                     </div>
                 </ol>
 
-                <h2>Support</h2>
+                <h3 id="GroupH">Support</h3>
                 <ol>
                     <div class="well"><a>support@triliodata.com</a>
                     </div>
@@ -144,9 +221,16 @@
         </div>
     </div>
     <hr>
-
-
-
     <!-- /container -->
-
 </body>
+
+<script src="js/jquery-1.11.0.min.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="js/bootstrap.min.js"></script>
+
+<script>
+$('body').scrollspy({
+    target: '.bs-docs-sidebar',
+    offset: 40
+});
+</script>
