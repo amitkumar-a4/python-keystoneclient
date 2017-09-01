@@ -12,6 +12,7 @@ from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import exception
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClientBase
 import cPickle as pickle
 
 workloads_manager_opts = [
@@ -737,7 +738,7 @@ def get_controller_nodes(context):
 def get_compute_nodes(context, host=None):
     try:
         contego_nodes = []
-        nova_client = nova.novaclient(context, production=True)
+        nova_client = KeystoneClientBase(context).nova_client
         nova_services = nova_client.services.list(host=host)
         for nova_service in nova_services:
             if nova_service.binary.find('contego') != -1:

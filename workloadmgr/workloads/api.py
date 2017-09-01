@@ -2868,7 +2868,8 @@ class API(base.Base):
                 #If controller node is other than compute node then we need
                 #trusted hosts which cab take backup from controller nodes. 
                 controller_nodes.extend(compute_nodes)
-                if len(list(set(controller_nodes))) != len(set(compute_nodes)):
+                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0) and\
+                   len(list(set(controller_nodes))) != len(set(compute_nodes)):
                     message = "To backup controller nodes, please provide list of trusted " \
                        "compute nodes, which has password less access to controller nodes."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
@@ -2947,7 +2948,7 @@ class API(base.Base):
             return config_workload
         except Exception as ex:
             LOG.exception(ex)
-            if config_workload in locals():
+            if 'config_workload' in locals():
                 self.db.config_workload_update(context,
                           {'status': 'error', 'error_msg': str(ex.message)})
                 workload_utils.upload_config_workload_db_entry(context)
