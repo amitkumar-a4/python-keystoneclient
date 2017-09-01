@@ -2837,14 +2837,12 @@ class API(base.Base):
             raise ex
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
     def config_workload(self,context, jobschedule, services_to_backup):
         """
         Make the RPC call to create/update a config workload.
         """
         try:
-            if context.is_admin is False:
-                raise wlm_exceptions.AdminRequired()
-
             AUDITLOG.log(context, 'Config workload update Requested', None)
 
             try:
@@ -2950,6 +2948,7 @@ class API(base.Base):
             raise ex
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
     def get_config_workload(self, context):
         try:
             try:
@@ -2974,6 +2973,7 @@ class API(base.Base):
             raise ex
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
     def config_backup(self, context, name, description):
         """
         Make the RPC call to backup OpenStack configuration.
@@ -3015,6 +3015,7 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
     def get_config_backups(self, context, backup_id=None):
         """
         Return list/single of backups.
@@ -3030,6 +3031,7 @@ class API(base.Base):
             raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
     def config_backup_delete(self, context, backup_id):
         """
         Delete a config backup.
