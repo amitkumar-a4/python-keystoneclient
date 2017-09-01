@@ -211,7 +211,7 @@ def change_service_password():
         except Exception as e:
                raise Exception( "KeystoneError:Unable to connect to keystone Public URL "+e.message  )
  
-        keystone.users.update_own_password(service_password,
+        keystone.users.update_own_password(config_inputs['oldpassword'],
                                            config_inputs['newpassword'])
 
         """Change service account password"""
