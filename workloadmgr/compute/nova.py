@@ -535,19 +535,6 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def services_list(self, context, **kwargs):
-        novaclient = nova_client.Client(CONF.nova_admin_username,
-                                        CONF.nova_admin_password,
-                                        project_id=CONF.neutron_admin_tenant_name,
-                                        region_name=CONF.nova_production_region_name,
-                                        auth_url=CONF.nova_admin_auth_url,
-                                        domain_name=CONF.domain_name,
-                                        insecure=CONF.nova_api_insecure,
-                                        timeout=CONF.nova_url_timeout)
-        return novaclient.services.list()
-
-    @synchronized(novalock)
-    @exception_handler(ignore_exception=False)
     def get_security_group_by_id(self, context, secid, admin=False, **kwargs):
         """
         Get the security group given the name

@@ -292,7 +292,7 @@ class check_license(object):
 
         kwargs = {}
         if 'Compute Nodes' in license_key['Licensed For']:
-            kwargs['compute_nodes'] = workload_utils.get_compute_nodes(context)
+            kwargs['compute_nodes'] = len(workload_utils.get_compute_nodes(context))
         elif 'Virtual Machines' in license_key['Licensed For']:
             kwargs['virtual_machines'] = len(apiclass.db.workload_vms_get(admin_context, None))
         elif ' Backup Capacity' in license_key['Licensed For']:
