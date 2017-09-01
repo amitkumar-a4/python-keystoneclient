@@ -2856,7 +2856,7 @@ class API(base.Base):
             return config_workload
         except Exception as ex:
             LOG.exception(ex)
-            if config_workload in locals():
+            if 'config_workload' in locals():
                 self.db.config_workload_update(context,
                           {'status': 'error', 'error_msg': str(ex.message)})
                 workload_utils.upload_config_workload_db_entry(context)
