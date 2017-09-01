@@ -865,26 +865,30 @@ def _register_service():
                else:
                     config_data['trustee_role'] = rolenames.pop(0)
 
-            if wlm_user == None:
-                if keystone.version == 'v3':
-                   wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
-                                                    password=config_data['workloadmgr_user_password'],
-                                                    email='workloadmgr@trilio.io',
-                                                    domain=config_data['triliovault_user_domain_id'],
-                                                    default_project=config_data['service_tenant_id'],
-                                                    enabled=True)
-                   keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
-                                        project=config_data['service_tenant_id'])
+            if keystone.version == 'v3':
+                if wlm_user is None:
+                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
+                                                     password=config_data['workloadmgr_user_password'],
+                                                     email='workloadmgr@trilio.io',
+                                                     domain=config_data['triliovault_user_domain_id'],
+                                                     default_project=config_data['service_tenant_id'],
+                                                     enabled=True)
+                    keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
+                                         project=config_data['service_tenant_id'])
                 else:
-                     wlm_user = keystone.users.create(config_data['workloadmgr_user'],
-                                                 config_data['workloadmgr_user_password'],
-                                                 'workloadmgr@trilio.io',
-                                                 tenant_id=config_data['service_tenant_id'],
-                                                 enabled=True)
-                     keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+                    keystone.users.update(wlm_user, password=config_data['workloadmgr_user_password'])
+            
             else:
-                keystone.users.update_password(wlm_user,
-                                               config_data['workloadmgr_user_password'])
+                if wlm_user is None:
+                    wlm_user = keystone.users.create(config_data['workloadmgr_user'],
+                                                     config_data['workloadmgr_user_password'],
+                                                     'workloadmgr@trilio.io',
+                                                     tenant_id=config_data['service_tenant_id'],
+                                                     enabled=True)
+                    keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+                else:
+                    keystone.users.update_password(wlm_user,
+                                           config_data['workloadmgr_user_password'])
 
             config_data['cloud_unique_id'] = wlm_user.id
 
@@ -2341,6 +2345,16 @@ def configure_service():
                      'auth_url = ' + config_data['keystone_admin_url'].\
                      strip("v3").strip("v2.0"),
                      starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'password = ',
+                     'password = ' + config_data['workloadmgr_user_password'],
+                     starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_password = ',
+                     'admin_password = ' + config_data['workloadmgr_user_password'],
+                     starts_with=True)
+
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
                      'auth_uri = ' + config_data['keystone_public_url'],
                      starts_with=True)
