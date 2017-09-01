@@ -37,6 +37,12 @@
         "workload:remove_node": "rule:admin_api",
         "workload:add_node": "rule:admin_api",
 		
-        "workload:get_auditlog": "rule:admin_api"
+        "workload:get_auditlog": "rule:admin_api",
+	
+	"workload:config_workload": "rule:admin_api",
+        "workload:get_config_workload": "rule:admin_api",
+        "workload:config_backup": "rule:admin_api",
+	"workload:get_config_backups": "rule:admin_api",
+	"workload:config_backup_delete": "rule:admin_api",
 
 }
