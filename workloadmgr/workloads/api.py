@@ -292,10 +292,7 @@ class check_license(object):
 
         kwargs = {}
         if 'Compute Nodes' in license_key['Licensed For']:
-            compute_service = nova.API(production=True)
-            services = compute_service.services_list(context)
-            kwargs['compute_nodes'] = len([service.binary for service in services \
-                                           if 'contego' in service.binary])
+            kwargs['compute_nodes'] = workload_utils.get_compute_nodes(context)
         elif 'Virtual Machines' in license_key['Licensed For']:
             kwargs['virtual_machines'] = len(apiclass.db.workload_vms_get(admin_context, None))
         elif ' Backup Capacity' in license_key['Licensed For']:
