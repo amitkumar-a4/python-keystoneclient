@@ -223,8 +223,14 @@ def check_policy(context, action):
         'project_id': context.project_id,
         'user_id': context.user_id,
     }
-
-    _action = 'workload:%s' % action
+    if 'workload' in action:
+       _action = 'snapshot:%s' % action
+    elif 'snapshot' in action:
+        _action = 'snapshot:%s' % action
+    elif 'restore' in action:
+          _action = 'restore:%s' % action
+    else:
+         _action = 'snapshot:%s' % action
     policy.enforce(context, _action, target)
 
 class API(base.Base):
@@ -1795,13 +1801,13 @@ class API(base.Base):
                             vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,
                                                                                     'volume_mountpoint')
           
-                           vdisk['volume_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_id')
-                           vdisk['volume_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_name')
-                           vdisk['volume_size'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_size')
-                           vdisk['volume_type'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_type')
-                           vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_mountpoint')
-                           if self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
-                              vdisk['availability_zone'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
+                            vdisk['volume_id'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_id')
+                            vdisk['volume_name'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_name')
+                            vdisk['volume_size'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_size')
+                            vdisk['volume_type'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_type')
+                            vdisk['volume_mountpoint'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'volume_mountpoint')
+                            if self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone'):
+                               vdisk['availability_zone'] = self.db.get_metadata_value(snapshot_vm_resource.metadata,'availability_zone')
 
                         snapshot_vm['vdisks'].append(vdisk)
                 snapshot_vms.append(snapshot_vm)
