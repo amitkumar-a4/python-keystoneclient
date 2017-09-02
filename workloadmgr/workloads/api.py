@@ -226,12 +226,6 @@ def parse_license_text(licensetext,
 
 def validate_license_key(licensekey, func_name, compute_nodes=-1,
                          capacity_utilized=-1, virtual_machines=-1):
-    if 'Compute Nodes' in licensekey['Licensed For']:
-        if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
-            raise wlm_exceptions.InvalidLicense(
-                message="Number of compute nodes '%d' exceeded the licensed number of "
-                        "compute nodes '%d'" % (compute_nodes,
-                        int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
 
     if datetime.now() > datetime.strptime(licensekey['LicenseExpiryDate'], "%Y-%m-%d"):
         raise wlm_exceptions.InvalidLicense(
@@ -239,8 +233,19 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
                     "Today is '%s'" % (licensekey['LicenseExpiryDate'],
                     datetime.now().strftime("%Y-%m-%d")))
 
-    if ' Backup Capacity' in licensekey['Licensed For'] and \
-        func_name in ('workload_snapshot'):
+    if 'Compute Nodes' in licensekey['Licensed For']:
+        if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
+            raise wlm_exceptions.InvalidLicense(
+                message="Number of compute nodes '%d' exceeded the licensed number of "
+                        "compute nodes '%d'" % (compute_nodes,
+                        int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
+        else:
+            message = "Number of compute nodes deployed '%d' " \
+                      "against the licensed number of " \
+                      "compute nodes '%d'" % (compute_nodes,
+                      int(licensekey['Licensed For'].split(' Compute Nodes')[0]))
+
+    if ' Backup Capacity' in licensekey['Licensed For']:
         capacity_licensed_str = licensekey['Licensed For'].split(' Backup Capacity')[0]
 
         if 'PB' in capacity_licensed_str:
@@ -257,18 +262,29 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
             capacity_utilized_str = 'NA'
 
         if capacity_utilized > capacity_licensed:
-            raise wlm_exceptions.InvalidLicense(
-                message="Backup capacity exceeded. Licensed capacity '%s' "
-                        "Used capacity '%s'" % (capacity_licensed_str, 
-                        capacity_utilized_str))
+            if func_name in ('workload_snapshot', None):
+                raise wlm_exceptions.InvalidLicense(
+                    message="Backup capacity exceeded. Licensed capacity '%s' "
+                            "Used capacity '%s'" % (capacity_licensed_str, 
+                            capacity_utilized_str))
+            else:
+                message = "Used capacity %s. Licensed capacity '%s' " \
+                          % (capacity_utilized_str, capacity_utilized_str)
 
-    if 'Virtual Machines' in licensekey['Licensed For'] and \
-        func_name in ('workload_create', 'workload_modify'):
-        if virtual_machines > int(licensekey['Licensed For'].split(' Virtual Machines')[0]):
-            raise wlm_exceptions.InvalidLicense(
-                message="Number of virtual machines '%d' exceeded the licensed number of "
-                        "virtual machines '%d'" % (virtual_machines,
-                        int(licensekey['Licensed For'].split(' Virtual Machines')[0])))
+    if 'Virtual Machines' in licensekey['Licensed For']:
+        if func_name in ('workload_create', 'workload_modify', None):
+            if virtual_machines > int(licensekey['Licensed For'].split(' Virtual Machines')[0]):
+                raise wlm_exceptions.InvalidLicense(
+                    message="Number of virtual machines '%d' exceeded the licensed number of "
+                            "virtual machines '%d'" % (virtual_machines,
+                            int(licensekey['Licensed For'].split(' Virtual Machines')[0])))
+            else:
+                message = "Number of virtual machines '%d' protected " \
+                          "vs the licensed number of " \
+                          "virtual machines '%d'" % (virtual_machines,
+                          int(licensekey['Licensed For'].split(' Virtual Machines')[0]))
+
+    return message
 
 
 class check_license(object):
@@ -285,23 +301,11 @@ class check_license(object):
         The __call__ method is not called until the
         decorated function is called.
         """
-        admin_context = wlm_context.get_admin_context()
         apiclass = args[0]
         context = args[1]
-        license_key = apiclass.license_list(admin_context)
-
-        kwargs = {}
-        if 'Compute Nodes' in license_key['Licensed For']:
-            kwargs['compute_nodes'] = len(workload_utils.get_compute_nodes(context))
-        elif 'Virtual Machines' in license_key['Licensed For']:
-            kwargs['virtual_machines'] = len(apiclass.db.workload_vms_get(admin_context, None))
-        elif ' Backup Capacity' in license_key['Licensed For']:
-            storage_usage = apiclass.get_storage_usage(admin_context)
-            total_utilization = storage_usage['storage_usage'][0]['total_utilization']
-            kwargs['capacity_utilized'] = total_utilization
-
         try:
-            validate_license_key(license_key, self.f.func_name, **kwargs)
+            apiclass.get_usage_and_validate_against_license(
+                context, method=self.f.func_name)
             return self.f(*args)
         except Exception as ex:
             LOG.exception(ex)
@@ -2640,6 +2644,27 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+    @autolog.log_method(logger=Logger)
+    def get_usage_and_validate_against_license(self, context, method=None):
+        admin_context = wlm_context.get_admin_context()
+        license_key = self.license_list(admin_context)
+
+        kwargs = {}
+        if 'Compute Nodes' in license_key['Licensed For']:
+            kwargs['compute_nodes'] = len(workload_utils.get_compute_nodes(context))
+        elif 'Virtual Machines' in license_key['Licensed For']:
+            kwargs['virtual_machines'] = len(self.db.workload_vms_get(admin_context, None))
+        elif ' Backup Capacity' in license_key['Licensed For']:
+            storage_usage = self.get_storage_usage(admin_context)
+            total_utilization = storage_usage['storage_usage'][0]['total_utilization']
+            kwargs['capacity_utilized'] = total_utilization
+
+        try:
+            return validate_license_key(license_key, method, **kwargs)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
  
     @autolog.log_method(logger=Logger)
     def get_orphaned_workloads_list(self, context, migrate_cloud=None):

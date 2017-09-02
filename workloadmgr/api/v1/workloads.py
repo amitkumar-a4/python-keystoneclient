@@ -905,6 +905,25 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))  
 
+    def license_check(self, req):
+        """Verify license check."""
+        try:
+            context = req.environ['workloadmgr.context']
+            message = self.workload_api.get_usage_and_validate_against_license(context)
+            return {'message' : message}
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))  
+
     def get_orphaned_workloads_list(self, req, path_info=None ):
         try:
             context = req.environ['workloadmgr.context']
