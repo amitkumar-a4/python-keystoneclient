@@ -213,6 +213,9 @@ def wrap_check_policy(func):
     @functools.wraps(func)
     def wrapped(self, context, *args, **kwargs):
         check_policy(context, func.__name__)
+        context.project_only = 'yes'
+        if 'snapshot' in func.__name__:
+           context.project_only = 'no'
         return func(self, context, *args, **kwargs)
 
     return wrapped
@@ -1683,7 +1686,7 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
     def snapshot_get(self, context, snapshot_id):
-        rv = self.db.snapshot_get(context, snapshot_id, project_only='yes')
+        rv = self.db.snapshot_get(context, snapshot_id, project_only=context.project_only)
         snapshot_details = dict(rv.iteritems())
         snapshot_vms = []
         try:
@@ -1715,7 +1718,7 @@ class API(base.Base):
                 if snapshot_vm_resource.resource_pit_id == pit_id:
                     return snapshot_vm_resource
 
-        rv = self.db.snapshot_show(context, snapshot_id, project_only='yes')
+        rv = self.db.snapshot_show(context, snapshot_id, project_only=context.project_only)
         if rv is None:
             msg = _("Not found snapshot or operation not allowed")
             wlm_exceptions.ErrorOccurred(reason=msg)
@@ -2160,7 +2163,7 @@ class API(base.Base):
         rv = self.db.restore_get(context, restore_id)
         restore_details = dict(rv.iteritems())
 
-        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes", project_only='yes')
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes", project_only=context.project_only)
         restore_details.setdefault('workload_id', snapshot.workload_id)
 
         restore_details['snapshot_details'] = dict(snapshot.iteritems())
@@ -2189,7 +2192,7 @@ class API(base.Base):
         rv = self.db.restore_show(context, restore_id)
         restore_details = dict(rv.iteritems())
 
-        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes", project_only='yes')
+        snapshot = self.db.snapshot_get(context, rv.snapshot_id, read_deleted="yes", project_only=context.project_only)
         restore_details.setdefault('workload_id', snapshot.workload_id)
 
         restore_details['snapshot_details'] = dict(snapshot.iteritems())
