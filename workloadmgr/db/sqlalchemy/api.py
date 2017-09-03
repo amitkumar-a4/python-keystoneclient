@@ -150,9 +150,9 @@ def model_query(context, *args, **kwargs):
     else:
         raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
     if context:
-        if project_only and is_user_context(context):
+        if project_only and project_only == 'yes' and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
-        elif project_only:
+        elif project_only and project_only == 'yes':
              query = query.filter_by(project_id=context.project_id)
     if 'get_hidden' in kwargs:     
         if kwargs.get('get_hidden', False) == False:

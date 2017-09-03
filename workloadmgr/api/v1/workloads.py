@@ -666,9 +666,6 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             host, ip = None, None
-                        
-            if context.is_admin is False:
-                raise wlm_exceptions.AdminRequired()
                 
             if ('QUERY_STRING' in req.environ) :
                 qs=parse_qs(req.environ['QUERY_STRING'])                

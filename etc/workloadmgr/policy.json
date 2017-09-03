@@ -1,13 +1,48 @@
 {
-    "context_is_admin": [["role:admin"]],
-    "admin_or_owner":  [["is_admin:True"], ["project_id:%(project_id)s"]],
-    "default": [["rule:admin_or_owner"]],
-    "admin_api": [["is_admin:True"]],
-    "workload:create": [],
-    "workload:list": [],
-    "workload:prepare": [],
-    "workload:execute": [],
-    "snapshot:create": [],
-    "snapshot:list": [],
-    "snapshot:restore": []
+        "context_is_admin": [["role:admin"]],
+        "admin_or_owner":  [["is_admin:True"], ["project_id:%(project_id)s"]],
+        "default": [["rule:admin_or_owner"]],
+        "admin_api": [["is_admin:True"]],
+
+        "workload:get_contego_status": "rule:admin_api",
+        "workload:workload_get_all_by_admin": "rule:admin_api",
+        "workload:get_storage_usage": "rule:admin_api",
+
+        "workload:get_import_workloads_list": "rule:admin_api",
+        "workload:import_workloads": "rule:admin_api",
+
+        "workload:get_orphaned_workloads_list": "rule:admin_api",
+        "workload:workloads_reassign": "rule:admin_api",
+
+        "workload:workload_disable_global_job_scheduler": "rule:admin_api",
+        "workload:workload_enable_global_job_scheduler": "rule:admin_api",
+        "workload:workload_ensure_global_job_scheduler": "rule:admin_api",
+
+        "workload:license_create": "rule:admin_api",
+        "workload:license_list": "rule:admin_api",
+
+        "workload:trust_create": "rule:admin_api",
+        "workload:trust_delete": "rule:admin_api",
+        "workload:trust_list": "rule:admin_api",
+        "workload:trust_get": "rule:admin_api",
+
+
+        "workload:settings_create": "rule:admin_api",
+        "workload:settings_update": "rule:admin_api",
+        "workload:setting_delete": "rule:admin_api",
+        "workload:setting_get": "rule:admin_api",
+        "workload:settings_get": "rule:admin_api",
+
+        "workload:get_nodes": "rule:admin_api",
+        "workload:remove_node": "rule:admin_api",
+        "workload:add_node": "rule:admin_api",
+
+        "snapshot:snapshot_delete": "rule:admin_api",
+
+        "workload:get_auditlog": "rule:admin_api",
+        "workload:config_workload": "rule:admin_api",
+        "workload:get_config_workload": "rule:admin_api",
+        "workload:config_backup": "rule:admin_api",
+        "workload:get_config_backups": "rule:admin_api",
+        "workload:config_backup_delete": "rule:admin_api"
 }
