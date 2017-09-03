@@ -190,6 +190,130 @@ def create_trust(func):
 
     return trust_create_wrapper
 
+def parse_license_text(licensetext,
+                       public_key=vault.CONF.triliovault_public_key):
+    dsa = DSA.load_pub_key(public_key)
+    if not dsa.check_key():
+        raise wlm_exceptions.InternalError(
+            "Invalid TrilioVault public key ",
+            "Cannot validate license")
+
+    if not "License Key" in licensetext:
+        raise wlm_exceptions.InvalidLicense(
+            message="Cannot find License Key in license key")
+
+    try:
+        licensekey = licensetext[licensetext.find("License Key") + len("License Key"):].lstrip().rstrip()
+        license_pair_base64 = licensekey[0:licensekey.find('X02')]
+        license_pair = base64.b64decode(license_pair_base64)
+        ord_len = license_pair.find('\r')
+        license_text_len = ord(license_pair[0:ord_len].decode('UTF-32BE'))
+        license_text = license_pair[ord_len:license_text_len+ord_len]
+        license_signature = license_pair[ord_len+license_text_len:]
+
+        if dsa.verify_asn1(sha1(license_text).digest(), license_signature):
+            properties_text = zlib.decompress(license_text[5:])
+            license = {}
+            for line in properties_text.split('\n'):
+                if len(line.split("=")) != 2:
+                    continue
+                license[line.split("=")[0].strip()] = line.split("=")[1].lstrip().rstrip()
+
+            return license
+        else:
+            raise wlm_exceptions.InvalidLicense(
+                message="Cannot verify the license signature")
+    except:
+        raise wlm_exceptions.InvalidLicense(
+            message="Cannot verify the license signature")
+
+
+def validate_license_key(licensekey, func_name, compute_nodes=-1,
+                         capacity_utilized=-1, virtual_machines=-1):
+
+    if datetime.now() > datetime.strptime(licensekey['LicenseExpiryDate'], "%Y-%m-%d"):
+        raise wlm_exceptions.InvalidLicense(
+            message="License expired. License expriration date '%s'. "
+                    "Today is '%s'" % (licensekey['LicenseExpiryDate'],
+                    datetime.now().strftime("%Y-%m-%d")))
+
+    if 'Compute Nodes' in licensekey['Licensed For']:
+        if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
+            raise wlm_exceptions.InvalidLicense(
+                message="Number of compute nodes '%d' exceeded the licensed number of "
+                        "compute nodes '%d'" % (compute_nodes,
+                        int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
+        else:
+            message = "Number of compute nodes deployed '%d' " \
+                      "against the licensed number of " \
+                      "compute nodes '%d'" % (compute_nodes,
+                      int(licensekey['Licensed For'].split(' Compute Nodes')[0]))
+
+    if ' Backup Capacity' in licensekey['Licensed For']:
+        capacity_licensed_str = licensekey['Licensed For'].split(' Backup Capacity')[0]
+
+        if 'PB' in capacity_licensed_str:
+            capacity_licensed = int(capacity_licensed_str.split(' PB')[0]) * 1024 ** 5
+            capacity_utilized_str = str(capacity_utilized / 1024 ** 5) + " PB"
+        elif 'TB' in capacity_licensed_str:
+            capacity_licensed = int(capacity_licensed_str.split(' TB')[0]) * 1024 ** 4
+            capacity_utilized_str = str(capacity_utilized / 1024 ** 4) + " TB"
+        elif 'GB' in capacity_licensed_str:
+            capacity_licensed = int(capacity_licensed_str.split(' GB')[0]) * 1024 ** 3
+            capacity_utilized_str = str(capacity_utilized / 1024 ** 3) + " GB"
+        else:
+            capacity_licensed = capacity_utilized
+            capacity_utilized_str = 'NA'
+
+        if capacity_utilized > capacity_licensed:
+            if func_name in ('workload_snapshot', None):
+                raise wlm_exceptions.InvalidLicense(
+                    message="Backup capacity exceeded. Licensed capacity '%s' "
+                            "Used capacity '%s'" % (capacity_licensed_str, 
+                            capacity_utilized_str))
+            else:
+                message = "Used capacity %s. Licensed capacity '%s' " \
+                          % (capacity_utilized_str, capacity_utilized_str)
+
+    if 'Virtual Machines' in licensekey['Licensed For']:
+        if func_name in ('workload_create', 'workload_modify', None):
+            if virtual_machines > int(licensekey['Licensed For'].split(' Virtual Machines')[0]):
+                raise wlm_exceptions.InvalidLicense(
+                    message="Number of virtual machines '%d' exceeded the licensed number of "
+                            "virtual machines '%d'" % (virtual_machines,
+                            int(licensekey['Licensed For'].split(' Virtual Machines')[0])))
+            else:
+                message = "Number of virtual machines '%d' protected " \
+                          "vs the licensed number of " \
+                          "virtual machines '%d'" % (virtual_machines,
+                          int(licensekey['Licensed For'].split(' Virtual Machines')[0]))
+
+    return message
+
+
+class check_license(object):
+
+    def __init__(self, f):
+        """
+        If there are no decorator arguments, the function
+        to be decorated is passed to the constructor.
+        """
+        self.f = f
+
+    def __call__(self, *args):
+        """
+        The __call__ method is not called until the
+        decorated function is called.
+        """
+        apiclass = args[0]
+        context = args[1]
+        try:
+            apiclass.get_usage_and_validate_against_license(
+                context, method=self.f.func_name)
+            return self.f(*args)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
 
 def upload_settings(func):
     def upload_settings_wrapper(*args, **kwargs):
@@ -599,6 +723,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @create_trust
+    @check_license
     @wrap_check_policy
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
@@ -763,6 +888,8 @@ class API(base.Base):
                                                     kwargs=kwargs)
 
     @autolog.log_method(logger=Logger)
+    @create_trust
+    @check_license
     @wrap_check_policy
     def workload_modify(self, context, workload_id, workload):
         """
@@ -1606,6 +1733,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @create_trust
+    @check_license
     @wrap_check_policy
     def workload_snapshot(self, context, workload_id, snapshot_type, name, description):
 
@@ -1619,10 +1747,11 @@ class API(base.Base):
                 snapshot_display_name = '\'' + name + '\''
             else:
                 snapshot_display_name = '\'' + 'Undefined' + '\''
-            AUDITLOG.log(context, 'Workload \'' + workload[
-                'display_name'] + '\' ' + snapshot_type + ' Snapshot ' + snapshot_display_name + ' Create Requested',
-                         workload)
-
+                
+            AUDITLOG.log(context,'Workload \'' + workload['display_name'] + \
+                         '\' ' + snapshot_type + ' Snapshot ' + \
+                         snapshot_display_name + ' Create Requested', workload)
+        
             workloads = self.db.workload_get_all(context)
             for workload in workloads:
                 if workload.deleted:
@@ -2570,43 +2699,6 @@ class API(base.Base):
     @wrap_check_policy
     def license_create(self, context, license_text):
 
-        def parse_license_text(licensetext,
-                               public_key=vault.CONF.triliovault_public_key):
-            dsa = DSA.load_pub_key(public_key)
-            if not dsa.check_key():
-                raise wlm_exceptions.InternalError(
-                    "Invalid TrilioVault public key ",
-                    "Cannot validate license")
-
-            if not "License Key" in licensetext:
-                raise wlm_exceptions.InvalidLicense(
-                    message="Cannot find License Key in license key")
-
-            try:
-                licensekey = licensetext[licensetext.find("License Key") + len("License Key"):].lstrip().rstrip()
-                license_pair_base64 = licensekey[0:licensekey.find('X02')]
-                license_pair = base64.b64decode(license_pair_base64)
-                ord_len = license_pair.find('\r')
-                license_text_len = ord(license_pair[0:ord_len].decode('UTF-32BE'))
-                license_text = license_pair[ord_len:license_text_len + ord_len]
-                license_signature = license_pair[ord_len + license_text_len:]
-
-                if dsa.verify_asn1(sha1(license_text).digest(), license_signature):
-                    properties_text = zlib.decompress(license_text[5:])
-                    license = {}
-                    for line in properties_text.split('\n'):
-                        if len(line.split("=")) != 2:
-                            continue
-                        license[line.split("=")[0].strip()] = line.split("=")[1].lstrip().rstrip()
-
-                    return license
-                else:
-                    raise wlm_exceptions.InvalidLicense(
-                        message="Cannot verify the license signature")
-            except:
-                raise wlm_exceptions.InvalidLicense(
-                    message="Cannot verify the license signature")
-
         license_json = json.dumps(parse_license_text(license_text))
         setting = {u'category': "license",
                    u'name': "license-%s" % str(uuid.uuid4()),
@@ -2645,6 +2737,27 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+    @autolog.log_method(logger=Logger)
+    def get_usage_and_validate_against_license(self, context, method=None):
+        admin_context = wlm_context.get_admin_context()
+        license_key = self.license_list(admin_context)
+
+        kwargs = {}
+        if 'Compute Nodes' in license_key['Licensed For']:
+            kwargs['compute_nodes'] = len(workload_utils.get_compute_nodes(context))
+        elif 'Virtual Machines' in license_key['Licensed For']:
+            kwargs['virtual_machines'] = len(self.db.workload_vms_get(admin_context, None))
+        elif ' Backup Capacity' in license_key['Licensed For']:
+            storage_usage = self.get_storage_usage(admin_context)
+            total_utilization = storage_usage['storage_usage'][0]['total_utilization']
+            kwargs['capacity_utilized'] = total_utilization
+
+        try:
+            return validate_license_key(license_key, method, **kwargs)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
  
     @autolog.log_method(logger=Logger)
     @wrap_check_policy

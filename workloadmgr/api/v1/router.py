@@ -173,6 +173,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workloads'],
                        action='license_list',
                        conditions={"method": ['GET']})
+
+        #workload license
+        mapper.connect("workloads_license_check",
+                       "/{project_id}/workloads/metrics/license_check",
+                       controller=self.resources['workloads'],
+                       action='license_check',
+                       conditions={"method": ['GET']})
        
         #Test email configuration
         mapper.connect("test_email",
