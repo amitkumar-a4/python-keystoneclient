@@ -666,9 +666,6 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             host, ip = None, None
-                        
-            if context.is_admin is False:
-                raise wlm_exceptions.AdminRequired()
                 
             if ('QUERY_STRING' in req.environ) :
                 qs=parse_qs(req.environ['QUERY_STRING'])                
@@ -892,6 +889,25 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             license = self.workload_api.license_list(context)
             return {'license' : license}
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))  
+
+    def license_check(self, req):
+        """Verify license check."""
+        try:
+            context = req.environ['workloadmgr.context']
+            message = self.workload_api.get_usage_and_validate_against_license(context)
+            return {'message' : message}
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

@@ -150,9 +150,9 @@ def model_query(context, *args, **kwargs):
     else:
         raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
     if context:
-        if project_only and is_user_context(context):
+        if project_only and project_only == 'yes' and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
-        elif project_only:
+        elif project_only and project_only == 'yes':
              query = query.filter_by(project_id=context.project_id)
     if 'get_hidden' in kwargs:     
         if kwargs.get('get_hidden', False) == False:
@@ -832,11 +832,17 @@ def workload_vms_update(context, id, values, purge_metadata=False):
 def workload_vms_get(context, workload_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = model_query(context, models.WorkloadVMs,
-                            session=session, read_deleted="no")\
-                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
-                       .filter_by(workload_id=workload_id)\
-                       .filter(models.WorkloadVMs.status != None)\
+        if workload_id:
+            query = model_query(context, models.WorkloadVMs,
+                                session=session, read_deleted="no")\
+                           .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                           .filter_by(workload_id=workload_id)\
+                           .filter(models.WorkloadVMs.status != None)
+        else:
+            query = model_query(context, models.WorkloadVMs,
+                                session=session, read_deleted="no")\
+                           .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                           .filter(models.WorkloadVMs.status != None)
 
         #TODO(gbasava): filter out deleted workload_vms if context disallows it
         workload_vms = query.all()
@@ -845,6 +851,7 @@ def workload_vms_get(context, workload_id, **kwargs):
         raise exception.WorkloadVMsNotFound(workload_id = workload_id)
     
     return workload_vms
+
 
 @require_context
 def workload_vm_get_by_id(context, vm_id, **kwargs):
