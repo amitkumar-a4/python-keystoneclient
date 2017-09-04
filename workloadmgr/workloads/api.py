@@ -238,18 +238,17 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
                     datetime.now().strftime("%Y-%m-%d")))
 
     if 'Compute Nodes' in licensekey['Licensed For']:
+        message = "Number of compute nodes deployed '%d' " \
+                  "against the licensed number of " \
+                  "compute nodes '%d'" % (compute_nodes,
+                  int(licensekey['Licensed For'].split(' Compute Nodes')[0]))
         if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
             raise wlm_exceptions.InvalidLicense(
                 message="Number of compute nodes '%d' exceeded the licensed number of "
                         "compute nodes '%d'" % (compute_nodes,
                         int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
-        else:
-            message = "Number of compute nodes deployed '%d' " \
-                      "against the licensed number of " \
-                      "compute nodes '%d'" % (compute_nodes,
-                      int(licensekey['Licensed For'].split(' Compute Nodes')[0]))
 
-    if ' Backup Capacity' in licensekey['Licensed For']:
+    elif ' Backup Capacity' in licensekey['Licensed For']:
         capacity_licensed_str = licensekey['Licensed For'].split(' Backup Capacity')[0]
 
         if 'PB' in capacity_licensed_str:
@@ -266,27 +265,25 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
             capacity_utilized_str = 'NA'
 
         if capacity_utilized > capacity_licensed:
+            message = "Used capacity %s. Licensed capacity '%s' " \
+                      % (capacity_utilized_str, capacity_utilized_str)
             if func_name in ('workload_snapshot', None):
                 raise wlm_exceptions.InvalidLicense(
                     message="Backup capacity exceeded. Licensed capacity '%s' "
                             "Used capacity '%s'" % (capacity_licensed_str, 
                             capacity_utilized_str))
-            else:
-                message = "Used capacity %s. Licensed capacity '%s' " \
-                          % (capacity_utilized_str, capacity_utilized_str)
 
-    if 'Virtual Machines' in licensekey['Licensed For']:
+    elif 'Virtual Machines' in licensekey['Licensed For']:
+        message = "Number of virtual machines '%d' protected " \
+                  "vs the licensed number of " \
+                  "virtual machines '%d'" % (virtual_machines,
+                  int(licensekey['Licensed For'].split(' Virtual Machines')[0]))
         if func_name in ('workload_create', 'workload_modify', None):
             if virtual_machines > int(licensekey['Licensed For'].split(' Virtual Machines')[0]):
                 raise wlm_exceptions.InvalidLicense(
                     message="Number of virtual machines '%d' exceeded the licensed number of "
                             "virtual machines '%d'" % (virtual_machines,
                             int(licensekey['Licensed For'].split(' Virtual Machines')[0])))
-            else:
-                message = "Number of virtual machines '%d' protected " \
-                          "vs the licensed number of " \
-                          "virtual machines '%d'" % (virtual_machines,
-                          int(licensekey['Licensed For'].split(' Virtual Machines')[0]))
 
     return message
 
