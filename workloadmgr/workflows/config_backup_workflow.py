@@ -30,8 +30,8 @@ class ConfigBackupWorkflow(object):
             self._store['compute'] = 'compute'
             self._store['controller'] = 'controller'
             self._store['database'] = 'database'
-    
-            db_host = self._store['params']['compute_hosts'][0]
+   
+            db_host = self._store['params']['trusted_nodes'].values()[0]['hostname']
     
             # Config backup workflow to backup Compute, Controler and Database
             self._config_backup = lf.Flow(self._name + "#ConfigBackup")

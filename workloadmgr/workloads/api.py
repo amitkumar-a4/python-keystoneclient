@@ -2769,29 +2769,29 @@ class API(base.Base):
                     message = "Database credentials are required to configure config backup."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
-                controller_nodes = workload_utils.get_controller_nodes(context)
-                compute_nodes = workload_utils.get_compute_nodes(context)
-                compute_nodes = [compute_node.host for compute_node in compute_nodes]
-
-                #If controller node is other than compute node then we need
-                #trusted hosts which cab take backup from controller nodes. 
-                controller_nodes.extend(compute_nodes)
-                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0) and\
-                   len(list(set(controller_nodes))) != len(set(compute_nodes)):
-                    message = "To backup controller nodes, please provide list of trusted " \
-                       "compute nodes, which has password less access to controller nodes."
+                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0):
+                    message = "To backup controller nodes and database, please provide list of trusted " \
+                        "compute nodes, which has password less access to controller nodes."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
             metadata = {}
-            if 'databases' in services_to_backup:
-               # Validate database creds
-               workload_utils.validate_database_creds(context, services_to_backup['databases']) 
-               metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
-
             if 'trusted_nodes' in services_to_backup:
                # Validate trusted_host creds
                workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
                metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
+
+            if 'databases' in services_to_backup:
+               # Validate database creds
+               if 'trusted_nodes' in services_to_backup:
+                   trusted_nodes = services_to_backup['trusted_nodes']
+               else:
+                   for metadata in existing_config_workload.metadata:
+                       if metadata.key == 'trusted_nodes':
+                           trusted_nodes =  pickle.loads(str(metadata.value))
+                           break
+
+               workload_utils.validate_database_creds(context, services_to_backup['databases'], trusted_nodes)
+               metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
 
             metadata['services_to_backup'] = pickle.dumps(services_to_backup)
 
