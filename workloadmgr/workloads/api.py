@@ -264,9 +264,9 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
             capacity_licensed = capacity_utilized
             capacity_utilized_str = 'NA'
 
+        message = "Used capacity %s. Licensed capacity '%s' " \
+                  % (capacity_utilized_str, capacity_licensed_str)
         if capacity_utilized > capacity_licensed:
-            message = "Used capacity %s. Licensed capacity '%s' " \
-                      % (capacity_utilized_str, capacity_utilized_str)
             if func_name in ('workload_snapshot', None):
                 raise wlm_exceptions.InvalidLicense(
                     message="Backup capacity exceeded. Licensed capacity '%s' "
