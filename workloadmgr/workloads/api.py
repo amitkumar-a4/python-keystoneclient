@@ -830,7 +830,7 @@ class API(base.Base):
             #                              'retention_policy_type': 'Number of Snapshots to Keep',
             #                              'retention_policy_value': '30'}
             try:
-                self.workload_add_scheduler_job(jobschedule, workload, context)
+                self.workload_add_scheduler_job(context, jobschedule, workload)
             except Exception as ex:
                 LOG.exception(ex)
 
@@ -846,7 +846,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def workload_add_scheduler_job(self, jobschedule, workload, context=context, is_config_backup=False):
+    def workload_add_scheduler_job(self, context, jobschedule, workload, is_config_backup=False):
         if self._scheduler.running is True:
            if jobschedule and len(jobschedule): 
               if 'enabled' in jobschedule and jobschedule['enabled']:                                       
@@ -1631,7 +1631,7 @@ class API(base.Base):
                     raise wlm_exceptions.InvalidState(reason=msg)
             jobschedule = pickle.loads(str(workload['jobschedule']))
             if len(jobschedule) >= 1:
-                self.workload_add_scheduler_job(jobschedule, workload, context)
+                self.workload_add_scheduler_job(context, jobschedule, workload)
             AUDITLOG.log(context, 'Workload \'' + workload['display_name'] + '\' Resume Submitted', workload)
 
     @autolog.log_method(logger=Logger)
@@ -3037,7 +3037,7 @@ class API(base.Base):
                                 self._scheduler.unschedule_config_backup_job(job)
         
                         # Add to scheduler jobs
-                        self.workload_add_scheduler_job(jobschedule, config_workload, context, is_config_backup=True)
+                        self.workload_add_scheduler_job(context, jobschedule, config_workload, is_config_backup=True)
         
                     if str(jobschedule['enabled']).lower() == 'false':
                         if existing_scheduler_status is True:
