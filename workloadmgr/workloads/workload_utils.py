@@ -664,18 +664,19 @@ def config_backup_delete(context, backup_id):
         LOG.exception(ex)
 
 @autolog.log_method(logger=Logger)
-def validate_database_creds(context, databases):
+def validate_database_creds(context, databases, trusted_nodes):
     try:
         #Look for contego node, which is up
         host = None
-        compute_nodes = get_compute_nodes(context)
-        for compute_node in compute_nodes:
-            if compute_node.state == 'up':
-                host = compute_node.host
-                break
+        for node, trusted_node in trusted_nodes.iteritems():
+            compute_nodes = get_compute_nodes(context, host=trusted_node['hostname'])
+            for compute_node in compute_nodes:
+                if compute_node.state == 'up':
+                    host = compute_node.host
+                    break
 
         if host is None:
-            message = "No contego node is up for validating database credentials."
+            message = "No trusted node is up for validating database credentials."
             raise exception.ErrorOccurred(reason=message)
 
         compute_service = nova.API(production=True)
