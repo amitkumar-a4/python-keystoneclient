@@ -768,8 +768,8 @@ class API(base.Base):
                             raise wlm_exceptions.Invalid(reason=msg)
                         instance['instance-name'] = instance_with_name.name
                         if instance_with_name.metadata:
-			    instance['metadata'] = instance_with_name.metadata
-                            if 'imported_from_vcenter' in instance_with_name.metadata and \
+			   instance['metadata'] = instance_with_name.metadata
+                           if 'imported_from_vcenter' in instance_with_name.metadata and \
                                             instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
                                 source_platform = "vmware"
                         break
