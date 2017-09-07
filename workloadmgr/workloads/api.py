@@ -2986,8 +2986,8 @@ class API(base.Base):
 
             if 'databases' in services_to_backup:
                # Validate database creds
-               if 'trusted_nodes' in services_to_backup:
-                   trusted_nodes = services_to_backup['trusted_nodes']
+               if 'trusted_nodes' in metadata:
+                   trusted_nodes =  pickle.loads(str(metadata['trusted_nodes']))
                else:
                    for metadata in existing_config_workload.metadata:
                        if metadata.key == 'trusted_nodes':
