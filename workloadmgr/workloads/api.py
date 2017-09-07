@@ -180,11 +180,19 @@ def create_trust(func):
                             args[0].trust_delete(context, t.name)
 
             # create new trust if the trust is not created
-            if not args[0].trust_list(context):
+            trusts = args[0].trust_list(context)
+            if not trusts:
                 args[0].trust_create(context, vault.CONF.trustee_role)
+            else:
+                 keystone_client = KeystoneClient(context)
+                 if keystone_client.client.check_user_role(context.project_id, context.user_id) is False:
+                    for t in trusts:
+                        args[0].trust_delete(context, t.name)
+                    raise Exception("User role not assigned trustee_role")
         except Exception as ex:
             LOG.exception(ex)
-            LOG.error(_("trust is not enabled. Falling back to old mechanism"))
+            LOG.error(_("trust is broken, assign valid trustee role"))
+            args[1].trust_failed = 'yes'
 
         return func(*args, **kwargs)
 
@@ -760,8 +768,8 @@ class API(base.Base):
                             raise wlm_exceptions.Invalid(reason=msg)
                         instance['instance-name'] = instance_with_name.name
                         if instance_with_name.metadata:
-                            instance['metadata'] = instance_with_name.metadata
-                            if 'imported_from_vcenter' in instance_with_name.metadata and \
+			   instance['metadata'] = instance_with_name.metadata
+                           if 'imported_from_vcenter' in instance_with_name.metadata and \
                                             instances_with_name[0].metadata['imported_from_vcenter'] == 'True':
                                 source_platform = "vmware"
                         break
@@ -807,6 +815,8 @@ class API(base.Base):
                           'status': 'available',
                           'metadata': instance.get('metadata', {})}
                 vm = self.db.workload_vms_create(context, values)
+            if hasattr(context, 'trust_failed'):
+               raise wlm_exceptions.Invalid(reason=_('Trust broken: Cannot perform backups operations'))
             self.workloads_rpcapi.workload_create(context,
                                                   workload['host'],
                                                   workload['id'])
@@ -841,7 +851,7 @@ class API(base.Base):
             if workload:
                 self.db.workload_update(context, workload['id'],
                                         {'status': 'error',
-                                         'error_msg': str(ex.message)})
+                                         'error_msg': ex.kwargs['reason'] if hasattr(ex, 'kwargs') and 'reason' in ex.kwargs else {}})
             raise
 
     @autolog.log_method(logger=Logger)
@@ -1789,6 +1799,8 @@ class API(base.Base):
                        'status': 'creating',
                        'metadata': metadata,}
             snapshot = self.db.snapshot_create(context, options)
+            if hasattr(context, 'trust_failed'):
+               raise wlm_exceptions.Invalid(reason=_('Trust broken: Cannot perform backups operations'))
             snapshot_display_name = snapshot['display_name']
             if snapshot_display_name == 'User-Initiated' or snapshot_display_name == 'jobscheduler':
                 local_time = self.get_local_time(context, snapshot['created_at'])
@@ -1806,6 +1818,10 @@ class API(base.Base):
             self.scheduler_rpcapi.workload_snapshot(context, FLAGS.scheduler_topic, snapshot['id'])
             return snapshot
         except Exception as ex:
+            if 'snapshot' in locals():
+                self.db.workload_update(context,snapshot.workload_id,{'status': 'available'})
+                self.db.snapshot_update(context,snapshot.id,{'status': 'error', 'error_msg': \
+                     ex.kwargs['reason'] if hasattr(ex, 'kwargs') and 'reason' in ex.kwargs else {}})
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason=ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
@@ -2092,7 +2108,8 @@ class API(base.Base):
                       'host': '',
                       'status': 'restoring',}
             restore = self.db.restore_create(context, values)
-
+            if hasattr(context, 'trust_failed'):
+               raise wlm_exceptions.Invalid(reason=_('Trust broken: Cannot perform backups operations'))
             self.db.restore_update(context,
                                    restore.id,
                                    {'progress_percent': 0,
@@ -2111,6 +2128,11 @@ class API(base.Base):
                          restore_display_name + '\' Create Submitted', restore)
             return restore
         except Exception as ex:
+            if 'restore' in locals():
+               self.db.workload_update(context,workload['id'],{'status': 'available'})
+               self.db.snapshot_update(context,snapshot_id,{'status': 'available'})
+               self.db.restore_update(context,restore.id,{'status': 'error', 'error_msg': \
+                ex.kwargs['reason'] if hasattr(ex, 'kwargs') and 'reason' in ex.kwargs else {}})
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(reason = ex.message % (ex.kwargs if hasattr(ex, 'kwargs') else {}))
 
