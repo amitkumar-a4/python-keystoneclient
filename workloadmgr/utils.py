@@ -1586,3 +1586,29 @@ def get_local_time(record_time, input_format, output_format, tz):
             LOG.exception(ex)
             return record_time
 
+def human2bytes(s):
+    """
+    Attempts to guess the string format based on default symbols
+    set and return the corresponding bytes as an integer.
+    When unable to recognize the format ValueError is raised.
+    """
+    try:
+        size_symbols = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+        init = s
+        num = ""
+        while s and s[0:1].isdigit() or s[0:1] == '.':
+            num += s[0]
+            s = s[1:]
+        num = float(num)
+        letter = s.strip()
+        letter = letter.upper()
+        if letter not in size_symbols:
+            raise ValueError("can't interpret %r" % init)
+
+        prefix = {size_symbols[0]:1}
+        for i, s in enumerate(size_symbols[1:]):
+            prefix[s] = 1 << (i+1)*10
+        return int(num * prefix[letter])
+    except Exception as ex:
+        LOG.exception(ex)
+        return init

@@ -1209,10 +1209,10 @@ def create_backup_directory(context, services, backup_directory_path):
 
 def get_directory_size(path):
     try:
-        cmd = ['du', '-shb', path]
+        cmd = ['du', '-sch', path]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         out, err = p.communicate()
-        return out.split('\t')[0]
+        return utils.human2bytes(out.split('\t')[0])
     except Exception as ex:
         LOG.exception(ex)
 
