@@ -46,12 +46,35 @@ transparent = true;
                 'nextSelector': '.btn-next',
                 'previousSelector': '.btn-previous',
 
-                onNext: function(tab, navigation, index) {
+                onNext: function(tab, navigation, index) {                       
                 	var $valid = $('.wizard-card form').valid();
                 	if(!$valid) {
                 		$validator.focusInvalid();
                 		return false;
                 	}
+                        if(index == 2 && Invalid == true) {
+                            elm = document.getElementsByName("keystone-admin-url")[0]
+                            validate_keystone_url("validate_keystone_url?url="+elm.value, elm)
+                            elm = document.getElementsByName("keystone-public-url")[0]
+                            validate_keystone_url("validate_keystone_url?url="+elm.value, elm)
+                            elm = document.getElementsByName("admin-tenant-name")[0]
+                            validate_keystone_credentials(elm)
+                            elm = document.getElementsByName("domain-name")[0]
+                            validate_keystone_credentials(elm)
+                            return false
+                        }
+                        else if(index == 5 && Invalid == true) {
+                             elms = document.getElementsByName("backup_target_type")
+                             for(var i = 0; i < elms.length; i++) { 
+                                   if(elms[i].checked) {
+                                       elm = elms[i]
+                                   }
+                             }
+                             if(typeof elm != 'undefined' && elm.value == 'SWIFT') {
+                                 validate_swift_credentials(elm)
+                                 return false
+                             }
+                        }
                 },
 
                 onInit : function(tab, navigation, index){
@@ -79,7 +102,7 @@ transparent = true;
                 onTabShow: function(tab, navigation, index) {
                     var $total = navigation.find('li').length;
                     var $current = index+1;
-
+                    Invalid = true
                     var $wizard = navigation.closest('.wizard-card');
 
                     // If it's the last tab then hide the last button and show the finish instead
