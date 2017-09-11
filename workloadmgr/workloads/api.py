@@ -361,6 +361,8 @@ def check_policy(context, action):
         _action = 'snapshot:%s' % action
     elif 'restore' in action:
           _action = 'restore:%s' % action
+    elif 'filesearch' in action:
+          _action = 'filesearch:%s' % action
     else:
          _action = 'snapshot:%s' % action
     policy.enforce(context, _action, target)
