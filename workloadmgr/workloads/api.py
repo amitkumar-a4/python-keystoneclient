@@ -251,10 +251,11 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
                   "compute nodes '%d'" % (compute_nodes,
                   int(licensekey['Licensed For'].split(' Compute Nodes')[0]))
         if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
-            raise wlm_exceptions.InvalidLicense(
-                message="Number of compute nodes '%d' exceeded the licensed number of "
-                        "compute nodes '%d'" % (compute_nodes,
-                        int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
+            if func_name in ('workload_create', None):
+                raise wlm_exceptions.InvalidLicense(
+                    message="Number of compute nodes '%d' exceeded the licensed number of "
+                            "compute nodes '%d'" % (compute_nodes,
+                            int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
 
     elif ' Backup Capacity' in licensekey['Licensed For']:
         capacity_licensed_str = licensekey['Licensed For'].split(' Backup Capacity')[0]
@@ -286,7 +287,7 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
                   "vs the licensed number of " \
                   "virtual machines '%d'" % (virtual_machines,
                   int(licensekey['Licensed For'].split(' Virtual Machines')[0]))
-        if func_name in ('workload_create', 'workload_modify', None):
+        if func_name in ('workload_create', None):
             if virtual_machines > int(licensekey['Licensed For'].split(' Virtual Machines')[0]):
                 raise wlm_exceptions.InvalidLicense(
                     message="Number of virtual machines '%d' exceeded the licensed number of "
@@ -897,7 +898,6 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @create_trust
-    @check_license
     @wrap_check_policy
     def workload_modify(self, context, workload_id, workload):
         """
