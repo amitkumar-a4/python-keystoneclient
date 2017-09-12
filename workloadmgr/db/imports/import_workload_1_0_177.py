@@ -94,6 +94,17 @@ import_map = [
      'getter_method_params' : ['id']
      },]
 
+def read_file(file_name):
+    try:
+        with open(file_name, 'r') as file_obj:
+            file_data = file_obj.read()
+        if len(file_data) > 0:
+            return file_data
+        else:
+            raise exception.ErrorOccurred(reason=("File: %s is empty.")%(file_name))
+    except Exception as ex:
+        LOG.exception(ex)
+        
 def project_id_exists(cntx, project_id):
     """clients.initialise()
     client_plugin = clients.Clients(context)
@@ -113,15 +124,17 @@ def check_tenant(cntx, workload_path, upgrade):
     Check for given worlkoad tenant whether it exist with-in the cloud or not.
     '''
     try:
-        workload_values = json.loads( open(os.path.join(workload_path, 'workload_db'), 'r').read() )
-        tenant_id = workload_values.get('tenant_id', None)
-        tenant_id = workload_values.get('project_id', tenant_id)
-        if project_id_exists(cntx, tenant_id):
-            return True
-        else:
-            raise exception.InvalidRequest(
-                  reason=("Workload %s tenant %s does not belong to this cloud" %
-                         (workload_values['id'], tenant_id)))
+        workload_data = read_file(os.path.join(workload_path, 'workload_db'))
+        if workload_data is not None and len(workload_data) > 0:
+            workload_values = json.loads(workload_data)
+            tenant_id = workload_values.get('tenant_id', None)
+            tenant_id = workload_values.get('project_id', tenant_id)
+            if project_id_exists(cntx, tenant_id):
+                return True
+            else:
+                raise exception.InvalidRequest(
+                      reason=("Workload %s tenant %s does not belong to this cloud" %
+                             (workload_values['id'], tenant_id)))
     except Exception as ex:
            LOG.exception(ex)
 
@@ -170,8 +183,9 @@ def import_settings(cntx, new_version, upgrade=True):
 
 def update_backup_media_target(file_path, backup_endpoint):
     try:
-        with open(file_path, 'r') as file_db:
-            file_data = file_db.read()
+        file_data = read_file(file_path)
+        if file_data is None or len(file_data) <= 0:
+            return
         json_obj = json.loads(file_data)
 
         #This case is for config_workload
@@ -376,11 +390,11 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
 
         # Creating a map for each workload with workload_backup_media_size.
         for snap in db_files_map['snapshot_db']:
-            with open(snap, 'r') as snapshot_file:
-                snapshot = snapshot_file.read()
-            snapshot_json = json.loads(snapshot)
-            if snapshot_json['snapshot_type'] == 'full':
-                workload_backup_media_size[snapshot_json['workload_id']] = snapshot_json['size']
+            file_data = read_file(snap)
+            if file_data is not None and len(file_data) > 0:
+                snapshot_json = json.loads(file_data)
+                if snapshot_json['snapshot_type'] == 'full':
+                    workload_backup_media_size[snapshot_json['workload_id']] = snapshot_json['size']
 
         # Iterate over each file for a resource in all NFS mounts
         # and create a single db file for that.
@@ -388,17 +402,17 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
             db_json = []
 
             for file_name in files:
-                with open(file_name, 'r') as file_db:
-                    file_data = file_db.read()
-                json_obj = json.loads(file_data)
+                file_data = read_file(file_name)
+                if file_data is not None and len(file_data) > 0:
+                    json_obj = json.loads(file_data)
 
-                if db == 'workload_db':
-                    # In case of workload updating each object with
-                    # "workload_backup_media_size" and "backup_media_target"
-                    json_obj = update_workload_metadata(json_obj)
-                db_json.append(json_obj)
+                    if db == 'workload_db':
+                        # In case of workload updating each object with
+                        # "workload_backup_media_size" and "backup_media_target"
+                        json_obj = update_workload_metadata(json_obj)
+                    db_json.append(json_obj)
 
-            pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
+                pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
         return failed_workloads
     except Exception as ex:
         LOG.exception(ex)
