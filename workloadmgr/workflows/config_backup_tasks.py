@@ -43,6 +43,7 @@ class CopyConfigFiles(task.Task):
         compute_service = nova.API(production=True)
         config_workload = db.config_workload_get(cntx)
         backend_endpoint = config_workload.backup_media_target
+        nodes = params['nodes']
         params = copy.deepcopy(params)
         params['host'] = host
         params['target'] = target
@@ -50,7 +51,6 @@ class CopyConfigFiles(task.Task):
         target_host = host
         target_host_data = 'config_data'
         if target == 'controller':
-            nodes = params['nodes']
             for i in range(len(nodes)):
                 if nodes[i][1] == host:
                     params['remote_host_creds']  = {'hostname':nodes[i][0]}
