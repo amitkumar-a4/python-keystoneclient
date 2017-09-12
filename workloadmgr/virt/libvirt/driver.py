@@ -583,7 +583,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
         while True:
               try:
-                  time.sleep(10)
+                  if CONF.vault_storage_type == 'nfs':
+                      time.sleep(10)
+                  else:
+                      time.sleep(120)
                   async_task_status = {}
                   if progress_tracking_file_path:
                      try:
