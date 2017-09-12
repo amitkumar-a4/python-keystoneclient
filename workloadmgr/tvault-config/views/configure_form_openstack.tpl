@@ -31,6 +31,7 @@
 
 <script type="text/javascript">
 IsV3 = false
+Invalid = true
 function validate_swift_credentials(inputelement) {
     public_url = $('[name="keystone-public-url"]')[0].value
     project_name = $('[name="admin-tenant-name"]')[0].value
@@ -42,9 +43,10 @@ function validate_swift_credentials(inputelement) {
     swift_username = $('[name="swift-username"]')[0].value
     swift_password = $('[name="swift-password"]')[0].value
     obj = $("#configure_openstack input[name='swift-auth-version']:checked")
-    if (inputelement.name != 'swift-auth-version' || inputelement == 'custom') {
+    inputelement = obj
+    /*if (inputelement.name != 'swift-auth-version' || inputelement == 'custom') {
        inputelement = obj
-    }
+    }*/
     swift_auth_version = obj.val()
     $.ajax({
         url: "validate_swift_credentials?public_url="+public_url+"&project_name="+project_name+"&username="+username+"&password="+password+"&domain_id="+domain_id+
@@ -69,6 +71,8 @@ function validate_swift_credentials(inputelement) {
         success: function(result) {
            $($(inputelement).parent()[0]).addClass("has-success")
            options = ""
+           Invalid = false
+           $('[name="next"]').trigger( "click" );
         }
     });
 }
@@ -100,7 +104,7 @@ function hideshowstorages() {
      $($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');
      obj = $("#configure_openstack input[name='swift-auth-version']:checked")
      setSwiftRequired(obj.attr('checked'), obj.val())
-     validate_swift_credentials('custom')
+     //validate_swift_credentials('custom')
   }
 }
 
@@ -303,14 +307,14 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Keystone Admin Url<i class="fa fa-spinner fa-spin hidden" id="adminurl-spinner" style="font-size:15px"></i></label>
-    	                                                <input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="text" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
+    	                                                <input name="keystone-admin-url" {{'value=' + keystone_admin_url if defined('keystone_admin_url') else ''}} onblur='setRequired(this.value);' type="text" required="" placeholder="http://keystonehost:35357/v2.0" class="form-control" aria-describedby="adminurl_helpblock">
                                                         <span id="adminurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Keystone Url (Public/Internal)<i class="fa fa-spinner fa-spin hidden" id="publicurl-spinner" style="font-size:15px"></i></label>
-    	                                                <input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);if (validate_url_versions()) validate_keystone_url("validate_keystone_url?url="+this.value, this)' type="text" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
+    	                                                <input name="keystone-public-url" {{'value=' + keystone_public_url if defined('keystone_public_url') else ''}} onblur='setRequired(this.value);' type="text" required="" placeholder="http://keystonehost:5000/v2.0" class="form-control" aria-describedby="publicurl_helpblock">
                                                         <span id="publicurl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
@@ -329,7 +333,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
     	                                            <div class="form-group">
     	                                                <label class="control-label">Admin Tenant<i class="fa fa-spinner fa-spin hidden" id="password-spinner" style="font-size:15px"></i></label>
-    	                                                <input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur='validate_keystone_credentials(this)'  aria-describedby="cred_helpblock">
+    	                                                <input name="admin-tenant-name" {{'value=' + admin_tenant_name if defined('admin_tenant_name') else ''}} type="text" required="" placeholder="admin" class="form-control" onblur=''  aria-describedby="cred_helpblock">
                                                         <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
@@ -342,7 +346,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
                                                         <label class="control-label">Domain ID</label>
-                                                        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control" onblur='validate_keystone_credentials(this)'>
+                                                        <input name="domain-name" {{'value=' + domain_name if defined('domain_name') else ''}} type="text" placeholder="default" class="form-control" onblur=''>
                                                         <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
@@ -436,9 +440,9 @@ function setSwiftRequired(checked, val) {
                                                 </label>
                                                 <label class="radio-inline">
                                                 %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
                                                 %else:
-                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');validate_swift_credentials(this)">SWIFT
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
                                                 %end 
                                                 </label>
                                                 <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
@@ -486,13 +490,13 @@ function setSwiftRequired(checked, val) {
 		                                             <div class="panel-body">
                                                                  <div class="input-group">
                                                                     %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
                                                                     %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
                                                                     %else:
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);validate_swift_credentials(this)">  KEYSTONE &nbsp;&nbsp;
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
                                                                     <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
                                                                     %end 
                                                                     <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
@@ -507,7 +511,7 @@ function setSwiftRequired(checked, val) {
                                                                  </div><br>
                                                                  <div class="input-group" id="swift-password-div">
                                                                      <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
-                                                                     <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="validate_swift_credentials(this)">
+                                                                     <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="">
                                                                      <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                  </div><br>
 	 	                                             </div>
@@ -690,6 +694,8 @@ function validate_keystone_credentials(inputelement) {
                options += "<option value="+ value +" selected>"+ value + "</option>"
            });
            document.getElementsByName("trustee-role")[0].innerHTML = options
+           Invalid = false
+           $('[name="next"]').trigger( "click" );
         }
     });
 }

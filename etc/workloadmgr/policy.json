@@ -20,6 +20,7 @@
 
         "workload:license_create": "rule:admin_api",
         "workload:license_list": "rule:admin_api",
+        "workload:license_check": "rule:admin_api",
 
         "workload:trust_create": "rule:admin_api",
         "workload:trust_delete": "rule:admin_api",
@@ -44,5 +45,32 @@
         "workload:get_config_workload": "rule:admin_api",
         "workload:config_backup": "rule:admin_api",
         "workload:get_config_backups": "rule:admin_api",
-        "workload:config_backup_delete": "rule:admin_api"
+        "workload:config_backup_delete": "rule:admin_api",
+
+        "workload:workload_unlock": "rule:admin_or_owner",
+        "workload:workload_type_show": "rule:admin_or_owner",
+        "workload:workload_type_get_all": "rule:admin_or_owner",
+        "workload:workload_snapshot": "rule:admin_or_owner",
+        "workload:workload_show": "rule:admin_or_owner",
+        "workload:workload_reset": "rule:admin_or_owner",
+        "workload:workload_modify": "rule:admin_or_owner",
+        "workload:workload_get_all": "rule:admin_or_owner",
+        "workload:workload_delete": "rule:admin_or_owner",
+        "workload:workload_create": "rule:admin_or_owner",
+        "workload:workload_enable_global_job_scheduler": "rule:admin_or_owner",
+        "workload:workload_disable_global_job_scheduler": "rule:admin_or_owner",
+
+        "snapshot:snapshot_restore": "rule:admin_or_owner",
+        "snapshot:mounted_list": "rule:admin_or_owner",
+        "snapshot:snapshot_mount": "rule:admin_or_owner",
+        "snapshot:snapshot_get_all": "rule:admin_or_owner",
+        "snapshot:snapshot_dismount": "rule:admin_or_owner",
+        "snapshot:snapshot_cancel": "rule:admin_or_owner",
+
+        "restore:restore_show": "rule:admin_or_owner",
+        "restore:restore_get_all": "rule:admin_or_owner",
+        "restore:restore_delete": "rule:admin_or_owner",
+        "restore:restore_cancel": "rule:admin_or_owner",
+
+        "filesearch:search": "rule:admin_or_owner"
 }

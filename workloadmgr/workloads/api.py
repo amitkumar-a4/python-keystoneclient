@@ -361,6 +361,8 @@ def check_policy(context, action):
         _action = 'snapshot:%s' % action
     elif 'restore' in action:
           _action = 'restore:%s' % action
+    elif 'filesearch' in action:
+          _action = 'filesearch:%s' % action
     else:
          _action = 'snapshot:%s' % action
     policy.enforce(context, _action, target)
@@ -855,7 +857,6 @@ class API(base.Base):
             raise
 
     @autolog.log_method(logger=Logger)
-    @wrap_check_policy
     def workload_add_scheduler_job(self, context, jobschedule, workload, is_config_backup=False):
         if self._scheduler.running is True:
            if jobschedule and len(jobschedule): 

@@ -3,6 +3,7 @@
 # Copyright (C) 2014 Trilio Data, Inc. All Rights Reserved.
 #
 
+import copy
 import time
 import cPickle as pickle
 
@@ -42,6 +43,7 @@ class CopyConfigFiles(task.Task):
         compute_service = nova.API(production=True)
         config_workload = db.config_workload_get(cntx)
         backend_endpoint = config_workload.backup_media_target
+        params = copy.deepcopy(params)
         params['host'] = host
         params['target'] = target
 
@@ -62,7 +64,8 @@ class CopyConfigFiles(task.Task):
         metadata = {
             'resource_id': host + '_' + str(int(time.time())),
             'backend_endpoint': backend_endpoint,
-            'snapshot_id': backup_id
+            'snapshot_id': backup_id,
+            'host': host
         }
         params['metadata'] = metadata
 
