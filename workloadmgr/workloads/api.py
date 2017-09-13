@@ -730,9 +730,9 @@ class API(base.Base):
         return workloads
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
     @create_trust
     @check_license
-    @wrap_check_policy
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
@@ -952,9 +952,12 @@ class API(base.Base):
                                                               or workload['jobschedule']['enabled'] == 'false':
                 workload['jobschedule']['enabled'] = False
 
-           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
+           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled'] and workloadobj['jobschedule']['enabled'] == True:
               pause_workload = True
-              
+
+           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled'] and workload['jobschedule']['enabled'] == True:
+              unpause_workload = True            
+  
            if workload['jobschedule']['enabled'] == True and \
               workloadobj['jobschedule']['enabled'] == workload['jobschedule']['enabled'] and \
               workloadobj['jobschedule']['interval'] != workload['jobschedule']['interval']:
