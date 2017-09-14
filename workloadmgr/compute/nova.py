@@ -236,6 +236,7 @@ def _get_tenant_context(context):
                context.tenant = tenant
         except Exception:
             with excutils.save_and_reraise_exception():
+                LOG.info(_("Assign valid trustee role to tenant %s") % tenant_id)
                 LOG.exception(_("token cannot be created using saved "
                                 "trust id for user %s, tenant %s") %
                                 (user_id, tenant_id))
@@ -267,6 +268,7 @@ def _get_tenant_context(context):
             with excutils.save_and_reraise_exception():
                 LOG.exception(_("_get_auth_token() with admin credentials failed. "
                                 "Perhaps admin is not member of tenant %s") % tenant_id)
+                LOG.info(_("Assign valid trustee role to tenant %s") % tenant_id)
 
     return context
 
