@@ -730,9 +730,9 @@ class API(base.Base):
         return workloads
 
     @autolog.log_method(logger=Logger)
-    @wrap_check_policy
     @create_trust
     @check_license
+    @wrap_check_policy
     def workload_create(self, context, name, description, workload_type_id,
                         source_platform, instances, jobschedule, metadata,
                         availability_zone=None):
@@ -744,7 +744,6 @@ class API(base.Base):
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
-            workload = None
             # TODO(giri): optimize this lookup
 
             if len(instances) == 0:
@@ -851,7 +850,7 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            if workload:
+            if 'workload' in locals():
                 self.db.workload_update(context, workload['id'],
                                         {'status': 'error',
                                          'error_msg': ex.kwargs['reason'] if hasattr(ex, 'kwargs') and 'reason' in ex.kwargs else {}})
