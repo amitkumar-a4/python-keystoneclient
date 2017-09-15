@@ -154,7 +154,6 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
     """
     flow = uf.Flow("copyconfigfilesremotehostuf")
     compute_nodes = params['compute_hosts']
-    #trusted_nodes = [trusted_node['hostname'] for trusted_node in trusted_nodes.values()]
     target = 'controller'
 
     nodes = zip(controller_nodes,cycle(compute_nodes)) \

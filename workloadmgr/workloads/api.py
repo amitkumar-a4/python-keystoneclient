@@ -3143,7 +3143,7 @@ class API(base.Base):
             if config_workload['status'].lower() != 'available':
                 message = "Config workload is not available. " \
                           "Please wait for other backup to complete."
-                #raise wlm_exceptions.InvalidState(reason=message)
+                raise wlm_exceptions.InvalidState(reason=message)
             self.db.config_workload_update(context, {'status': 'locked'})
 
             AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Requested', None)

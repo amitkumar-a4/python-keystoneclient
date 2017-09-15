@@ -1802,9 +1802,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #If contego and controller node are same then remove from controller
             for controller_node in controller_nodes:
                 if controller_node in contego_nodes:
-                    pass
-                    #TODO uncomment
-                    #controller_nodes.remove(controller_node)
+                    controller_nodes.remove(controller_node)
 
             backup_endpoint = config_workload['backup_media_target']
 
