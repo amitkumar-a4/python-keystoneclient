@@ -16,7 +16,6 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import config_workload as config_workload_views
 from workloadmgr.api.views import config_backup as config_backup_views
-from workloadmgr.utils import encrypt
 
 LOG = logging.getLogger(__name__)
 
@@ -60,7 +59,6 @@ class ConfigWorkloadController(wsgi.Controller):
                     raise ex
 
             if config_data.get('authorized_key', None) is not None:
-                #config_data['authorized_key'] = encrypt(config_data['authorized_key'])
                 config_data['authorized_key'] = config_data['authorized_key']
 
             existing_jobschedule = None

@@ -1758,11 +1758,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Backup OpenStack configuration
         """
         try:
-            #import pdb;pdb.set_trace()
-            services_to_backup = None
-            databases = None
-            trusted_nodes = None
-   
             backup = self.db.config_backup_update(context, backup_id,
                                                {'host': self.host})
             #Get list of services, database and remote nodes to backup
