@@ -2980,47 +2980,64 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def config_workload(self,context, jobschedule, services_to_backup):
+    def config_workload(self,context, jobschedule, config_data):
         """
         Make the RPC call to create/update a config workload.
         """
         try:
             AUDITLOG.log(context, 'Config workload update Requested', None)
+            def _get_matadata(metadata, key):
+                for meta in metadata:
+                    if meta.key == key:
+                        if key == 'authorized_key':
+                            return metadata.value
+                        else:
+                            return  pickle.loads(str(metadata.value))
 
             try:
                 existing_config_workload = self.db.config_workload_get(context)
             except Exception as ex:
                 existing_config_workload = None
                 #When user configuring for the first time
-                if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
+                if config_data.has_key('databases') is False or len(config_data['databases'].keys()) == 0:
                     message = "Database credentials are required to configure config backup."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
-                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0):
-                    message = "To backup controller nodes and database, please provide list of trusted " \
-                        "compute nodes, which has password less access to controller nodes."
+                #import pdb;pdb.set_trace()
+                #for key in ['trusted_user', 'authorized_key']:
+                if ('trusted_user' not in config_data or 'authorized_key' not in config_data) or\
+                    str(config_data['trusted_user'].get('username', None)).lower() == 'none':
+                    message = "To backup controller nodes and database, please provide trusted user and " \
+                              "authorized_key, which will be used to connect with controller nodes."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
             metadata = {}
-            if 'trusted_nodes' in services_to_backup:
-               # Validate trusted_host creds
-               workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
-               metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
+            #import pdb;pdb.set_trace()
+            # Validate trusted_user and authorized_key
+            if ('trusted_user' in config_data or 'authorized_key' in config_data):
+                trusted_user =  _get_matadata(existing_config_workload.metadata, 'trusted_user') \
+                                if config_data.get('trusted_user', None) is None else config_data.get('trusted_user')
+                if 'authorized_key' in config_data:
+                    authorized_key = vault.get_key_file(config_data['authorized_key'], temp=True)
+                else:
+                    authorized_key = _get_matadata(existing_config_workload.metadata, 'authorized_key')    
+                trust_creds = {'trusted_user': trusted_user, 'authorized_key': authorized_key}
+                #workload_utils.validate_trusted_user_and_key(context, trust_creds)
+                trust_creds['authorized_key'] = vault.get_key_file(config_data['authorized_key'])
+                if 'trusted_user' in config_data:
+                    metadata['trusted_user'] = pickle.dumps(config_data.pop('trusted_user'))
+                if 'authorized_key' in config_data:
+                    metadata['authorized_key'] = trust_creds['authorized_key']
 
-            if 'databases' in services_to_backup:
-               # Validate database creds
-               if 'trusted_nodes' in metadata:
-                   trusted_nodes =  pickle.loads(str(metadata['trusted_nodes']))
-               else:
-                   for metadata in existing_config_workload.metadata:
-                       if metadata.key == 'trusted_nodes':
-                           trusted_nodes =  pickle.loads(str(metadata.value))
-                           break
+            if 'databases' in config_data:
+               import pdb;pdb.set_trace()
+               if 'trust_creds' not in locals():
+                   trusted_user = _get_matadata(existing_config_workload.metadata, 'trusted_user')
+                   authorized_key = _get_matadata(existing_config_workload.metadata, 'authorized_key')
+               #workload_utils.validate_database_creds(context, config_data['databases'], trust_creds)
+               metadata['databases'] = pickle.dumps(config_data.pop('databases'))
 
-               workload_utils.validate_database_creds(context, services_to_backup['databases'], trusted_nodes)
-               metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
-
-            metadata['services_to_backup'] = pickle.dumps(services_to_backup)
+            metadata['services_to_backup'] = pickle.dumps(config_data.pop('services_to_backup'))
 
             backup_target, path = vault.get_settings_backup_target()
             # Create new OpenStack workload
@@ -3130,7 +3147,7 @@ class API(base.Base):
             if config_workload['status'].lower() != 'available':
                 message = "Config workload is not available. " \
                           "Please wait for other backup to complete."
-                raise wlm_exceptions.InvalidState(reason=message)
+                #raise wlm_exceptions.InvalidState(reason=message)
             self.db.config_workload_update(context, {'status': 'locked'})
 
             AUDITLOG.log(context, 'OpenStack configuration backup ' + name + ' Create Requested', None)

@@ -31,22 +31,23 @@ class ConfigBackupWorkflow(object):
             self._store['controller'] = 'controller'
             self._store['database'] = 'database'
    
-            db_host = self._store['params']['trusted_nodes'].values()[0]['hostname']
+            import pdb;pdb.set_trace()
+            db_host = self._store['params']['compute_hosts'][0]
     
             # Config backup workflow to backup Compute, Controler and Database
             self._config_backup = lf.Flow(self._name + "#ConfigBackup")
     
             # Add task to backup compute nodes
+            '''
             self._config_backup.add(config_backup_tasks.UnorderedCopyConfigFiles
                                     (self._store['backup_id'], self._store['params']['compute_hosts'],
                                      'compute', self._store['params']))
             LOG.info("Compute node backup task added: backup_id: %s, compute_hosts: %s"\
                   %(self._store['backup_id'], str(self._store['params']['compute_hosts'])))
-    
+
             # Add task to backup controller nodes only
             # if user has provided list of trusted nodes
-            if len(self._store['params']['controller_hosts']) > 0 and \
-                            len(self._store['params']['trusted_nodes'].keys()) > 0:
+            if len(self._store['params']['controller_hosts']) > 0 :
                 self._config_backup.add(config_backup_tasks.UnorderedCopyConfigFilesFromRemoteHost
                                         (self._store['backup_id'], self._store['params']['controller_hosts'],
                                          'controller', self._store['params']))
@@ -54,14 +55,15 @@ class ConfigBackupWorkflow(object):
                          %(self._store['backup_id'], str(self._store['params']['controller_hosts'])))
             else:
                 LOG.warning("No controoller nodes to backup.")
-    
+            '''
+
             # Add task to backup Database
             self._config_backup.add(config_backup_tasks.CopyConfigFiles(name="BackupDatabase_" + db_host,
                                                                         rebind={'backup_id': 'backup_id', 'host': db_host,
                                                                                 'target': 'database', 'params': 'params'}))
             LOG.info("Database backup task added: backup_id: %s, host: %s"\
                      %(self._store['backup_id'], db_host))
-    
+
             self._postbackup = lf.Flow(self._name + "#PostBackup")
     
             # Add task for retention policy

@@ -16,6 +16,7 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import config_workload as config_workload_views
 from workloadmgr.api.views import config_backup as config_backup_views
+from workloadmgr.utils import encrypt
 
 LOG = logging.getLogger(__name__)
 
@@ -36,18 +37,18 @@ class ConfigWorkloadController(wsgi.Controller):
         """Update config workload"""
         try:
             if not self.is_valid_body(body, 'jobschedule') or \
-                            self.is_valid_body(body, 'services_to_backup') is False:
+                            self.is_valid_body(body, 'config_data') is False:
                 raise exc.HTTPBadRequest()
 
             context = req.environ['workloadmgr.context']
 
             jobschedule = body['jobschedule']
-            services_to_backup = body['services_to_backup']
+            config_data = body['config_data']
 
             # Validate database creds
-            if services_to_backup.get('databases', None) is not None:
+            if config_data.get('databases', None) is not None:
                 try:
-                    for database, database_config in services_to_backup.get('databases').iteritems():
+                    for database, database_config in config_data.get('databases').iteritems():
                         #Validate existance of required keys and their values
                         for required_key in ['host', 'user', 'password']:
                             if required_key not in database_config:
@@ -57,6 +58,10 @@ class ConfigWorkloadController(wsgi.Controller):
                                 raise wlm_exceptions.ErrorOccurred(reason=required_key + " can not be None.")
                 except Exception as  ex:
                     raise ex
+
+            if config_data.get('authorized_key', None) is not None:
+                #config_data['authorized_key'] = encrypt(config_data['authorized_key'])
+                config_data['authorized_key'] = config_data['authorized_key']
 
             existing_jobschedule = None
             try:
@@ -100,7 +105,7 @@ class ConfigWorkloadController(wsgi.Controller):
 
             try:
                 config_workload = self.workload_api.config_workload(context,
-                                                                    jobschedule, services_to_backup)
+                                                                    jobschedule, config_data)
             except Exception as error:
                 raise exc.HTTPServerError(explanation=unicode(error))
 

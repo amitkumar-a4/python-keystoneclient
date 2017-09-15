@@ -1758,6 +1758,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Backup OpenStack configuration
         """
         try:
+            #import pdb;pdb.set_trace()
             services_to_backup = None
             databases = None
             trusted_nodes = None
@@ -1772,8 +1773,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     services_to_backup = pickle.loads(str(metadata['value'])) 
                 elif metadata['key'] == 'databases':
                     databases = pickle.loads(str(metadata['value']))
-                elif metadata['key'] == 'trusted_nodes':
-                    trusted_nodes = pickle.loads(str(metadata['value']))
+                elif metadata['key'] == 'trusted_user':
+                    trusted_user = pickle.loads(str(metadata['value']))
+                elif metadata['key'] == 'authorized_key':
+                    authorized_key = metadata['value']
 
             controller_nodes = []
             contego_nodes = []
@@ -1799,7 +1802,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #If contego and controller node are same then remove from controller
             for controller_node in controller_nodes:
                 if controller_node in contego_nodes:
-                    controller_nodes.remove(controller_node)
+                    pass
+                    #TODO uncomment
+                    #controller_nodes.remove(controller_node)
 
             backup_endpoint = config_workload['backup_media_target']
 
@@ -1828,8 +1833,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     
             params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
                       'backend_endpoint': config_workload['backup_media_target'], 'backup_id': backup_id,
-                      'databases': databases, 'trusted_nodes': trusted_nodes, 'compute_hosts': contego_nodes,
-                      'controller_hosts': controller_nodes
+                      'databases': databases, 'trusted_user': trusted_user, 'compute_hosts': contego_nodes,
+                      'controller_hosts': controller_nodes, 'authorized_key': authorized_key
                       }
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])

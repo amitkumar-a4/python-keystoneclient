@@ -24,6 +24,7 @@ import time
 import pytz
 import paramiko
 import ConfigParser
+import base64
 from xml.dom import minidom
 from xml.parsers import expat
 from xml import sax
@@ -37,6 +38,7 @@ from eventlet import event
 from eventlet.green import subprocess
 from eventlet import greenthread
 from eventlet import pools
+from Crypto.Cipher import AES
 
 from workloadmgr import exception
 from workloadmgr import flags
@@ -1586,3 +1588,19 @@ def get_local_time(record_time, input_format, output_format, tz):
             LOG.exception(ex)
             return record_time
 
+def encrypt(data, decrypt=False):
+    """
+    Encryt/Decrypt given data string 
+    """
+    try:
+
+        secret_key = '52T8FVYZJse'
+        cipher = AES.new(secret_key, AES.MODE_ECB)
+        if decrypt is False:
+            encrypted_data = base64.b64encode(cipher.encrypt(data))
+            return encrypted_data
+        else:
+            decrypted_data = cipher.decrypt(base64.b64decode(data))
+            return decrypted_data
+    except Exception as ex:
+        raise ex
