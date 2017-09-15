@@ -55,7 +55,7 @@ class ConfigWorkloadController(wsgi.Controller):
                                 raise wlm_exceptions.ErrorOccurred(reason="Database"
                                       "credentials should have host, user and password.")
                             if str(database_config[required_key]).lower() == 'none':
-                                raise wlm_exceptions.ErrorOccurred(reason=required_key + " can not be None.")
+                                raise wlm_exceptions.ErrorOccurred(reason="Database " + required_key + " can not be None.")
                 except Exception as  ex:
                     raise ex
 
