@@ -91,6 +91,10 @@ CONF.register_opts(nova_opts)
 LOG = logging.getLogger(__name__)
 
 novalock = Lock()
+
+class ObjectDummy(object):
+    pass
+
 def synchronized(lock):
     '''Synchronization decorator.'''
     def wrap(f):
@@ -239,7 +243,10 @@ def _get_tenant_context(context):
         except Exception:
             with excutils.save_and_reraise_exception():
                 msg = _("Assign valid trustee role to tenant %s") % tenant_id
-                workloadAPI.api.AUDITLOG.log(context, msg, None)
+                cntx = ObjectDummy()
+                cntx.user_id = user_id
+                cntx.project_id = project_id
+                workloadAPI.api.AUDITLOG.log(cntx, msg, None)
                 LOG.info(msg)
                 LOG.exception(_("token cannot be created using saved "
                                 "trust id for user %s, tenant %s") %
@@ -272,8 +279,12 @@ def _get_tenant_context(context):
             with excutils.save_and_reraise_exception():
                 LOG.exception(_("_get_auth_token() with admin credentials failed. "
                                 "Perhaps admin is not member of tenant %s") % tenant_id)
+                cntx = ObjectDummy()
+                cntx.user_id = user_id
+                cntx.project_id = project_id
                 msg = _("Assign valid trustee role to tenant %s") % tenant_id
-                workloadAPI.api.AUDITLOG.log(context, msg, None)
+                workloadAPI.api.AUDITLOG.log(cntx, msg, None)
+                LOG.info(msg)
 
     return context
 
