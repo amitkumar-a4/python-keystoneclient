@@ -245,7 +245,7 @@ def _get_tenant_context(context):
                 msg = _("Assign valid trustee role to tenant %s") % tenant_id
                 cntx = ObjectDummy()
                 cntx.user_id = user_id
-                cntx.project_id = project_id
+                cntx.project_id = tenant_id
                 workloadAPI.api.AUDITLOG.log(cntx, msg, None)
                 LOG.info(msg)
                 LOG.exception(_("token cannot be created using saved "
@@ -281,7 +281,7 @@ def _get_tenant_context(context):
                                 "Perhaps admin is not member of tenant %s") % tenant_id)
                 cntx = ObjectDummy()
                 cntx.user_id = user_id
-                cntx.project_id = project_id
+                cntx.project_id = tenant_id
                 msg = _("Assign valid trustee role to tenant %s") % tenant_id
                 workloadAPI.api.AUDITLOG.log(cntx, msg, None)
                 LOG.info(msg)
