@@ -581,6 +581,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 nodes = self.workload_api.get_nodes(context)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return nodes
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -647,6 +648,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 storages_usage = self.workload_api.get_storage_usage(context)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return storages_usage
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -682,6 +684,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 compute_contego_records = self.workload_api.get_contego_status(context, host, ip)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return compute_contego_records
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -711,6 +714,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return recentactivities
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -751,6 +755,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 auditlog = self.workload_api.get_auditlog(context, time_in_minutes, start_range, end_range)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return auditlog
         except exc.HTTPNotFound as error:
             LOG.exception(error)
