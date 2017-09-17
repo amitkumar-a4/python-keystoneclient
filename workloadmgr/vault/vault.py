@@ -693,7 +693,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             # Used entry in df command is not reliable indicator. Hence we use
             # size - available as total utilization
             total_utilization = total_capacity - int(values[3]) * 1024
-
+            """
             try:
                 stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=True)
                 if stderr != '':
@@ -704,7 +704,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                 total_utilization = int(du_values[0])
             except Exception as ex:
                 LOG.exception(ex)
-
+            """
         except Exception as ex:
             LOG.exception(ex)
 
