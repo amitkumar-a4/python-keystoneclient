@@ -925,7 +925,7 @@ def _register_service():
     if config_data['enable_tls'] == 'on':
         wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
     else:
-        wlm_url = 'http://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
+        wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
 
     if keystone.version == 'v3':
        keystone.endpoints.create(region=config_data['region_name'],
