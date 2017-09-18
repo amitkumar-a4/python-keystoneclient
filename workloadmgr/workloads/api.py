@@ -357,7 +357,7 @@ def check_policy(context, action):
         'user_id': context.user_id,
     }
     if 'workload' in action:
-       _action = 'snapshot:%s' % action
+       _action = 'workload:%s' % action
     elif 'snapshot' in action:
         _action = 'snapshot:%s' % action
     elif 'restore' in action:
@@ -365,7 +365,7 @@ def check_policy(context, action):
     elif 'filesearch' in action:
           _action = 'filesearch:%s' % action
     else:
-         _action = 'snapshot:%s' % action
+         _action = 'workload:%s' % action
     policy.enforce(context, _action, target)
 
 class API(base.Base):
@@ -2621,7 +2621,6 @@ class API(base.Base):
         return tasks
 
     @autolog.log_method(logger=Logger)
-    @wrap_check_policy
     def get_local_time(self, context, record_time):
         """
         Convert and return the date and time - from GMT to local time
