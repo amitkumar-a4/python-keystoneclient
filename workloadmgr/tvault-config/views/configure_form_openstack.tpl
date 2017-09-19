@@ -350,20 +350,6 @@ function setSwiftRequired(checked, val) {
                                                         <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
-                                                <div class="col-sm-5">
-                                                    <div class="form-group">
-                                                         <label class="control-label">Trustee Role</label>
-                                                         <select name="trustee-role" id="trustee-role" class="form-control">
-                                                            %for role in roles:
-                                                                %if role==trustee_role:
-                                                                    <option value="{{role}}" selected>{{role}}</option>
-                                                                %else:
-                                                                    <option value="{{role}}">{{role}}</option>
-                                                                %end
-                                                            %end
-                                                         </select>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -383,6 +369,22 @@ function setSwiftRequired(checked, val) {
     	                                                <input id='confirmpassword' name="triliovault-password2" type="password" required="" placeholder="" class="form-control" onkeyup="validatepasswords(); return false;">
                                                     </div>
                                                 </div>
+                                            </div>
+                                            <div class="col-sm-12">
+                                            <div class="col-sm-5">
+                                                    <div class="form-group">
+                                                         <label class="control-label">Trustee Role</label>
+                                                         <select name="trustee-role" id="trustee-role" class="form-control">
+                                                            %for role in roles:
+                                                                %if role==trustee_role:
+                                                                    <option value="{{role}}" selected>{{role}}</option>
+                                                                %else:
+                                                                    <option value="{{role}}">{{role}}</option>
+                                                                %end
+                                                            %end
+                                                         </select>
+                                                    </div>
+                                            </div>
                                             </div>
                                             <div class="col-sm-12">
                                                 <span id="confirmMessage" class="confirmMessage"></span>
