@@ -2893,7 +2893,7 @@ def configure_openstack():
         config_data['keystone_public_protocol'] = parse_result.scheme
         
         config_data['workloadmgr_user'] = 'triliovault'
-        config_data['workloadmgr_user_password'] = config_inputs['triliovault-password1']
+        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'
