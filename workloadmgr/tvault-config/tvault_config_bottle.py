@@ -790,8 +790,8 @@ def _authenticate_with_keystone():
                                                       region=config_data['region_name']).publicurl
         parse_result = urlparse(wlm_public_url)
         
-        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
-        config_data['rabbit_host'] = parse_result.hostname
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+        config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 
 def _register_service():
