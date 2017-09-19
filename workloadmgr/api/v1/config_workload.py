@@ -36,27 +36,30 @@ class ConfigWorkloadController(wsgi.Controller):
         """Update config workload"""
         try:
             if not self.is_valid_body(body, 'jobschedule') or \
-                            self.is_valid_body(body, 'services_to_backup') is False:
+                            self.is_valid_body(body, 'config_data') is False:
                 raise exc.HTTPBadRequest()
 
             context = req.environ['workloadmgr.context']
 
             jobschedule = body['jobschedule']
-            services_to_backup = body['services_to_backup']
+            config_data = body['config_data']
 
             # Validate database creds
-            if services_to_backup.get('databases', None) is not None:
+            if config_data.get('databases', None) is not None:
                 try:
-                    for database, database_config in services_to_backup.get('databases').iteritems():
+                    for database, database_config in config_data.get('databases').iteritems():
                         #Validate existance of required keys and their values
                         for required_key in ['host', 'user', 'password']:
                             if required_key not in database_config:
                                 raise wlm_exceptions.ErrorOccurred(reason="Database"
                                       "credentials should have host, user and password.")
                             if str(database_config[required_key]).lower() == 'none':
-                                raise wlm_exceptions.ErrorOccurred(reason=required_key + " can not be None.")
+                                raise wlm_exceptions.ErrorOccurred(reason="Database " + required_key + " can not be None.")
                 except Exception as  ex:
                     raise ex
+
+            if config_data.get('authorized_key', None) is not None:
+                config_data['authorized_key'] = config_data['authorized_key']
 
             existing_jobschedule = None
             try:
@@ -100,7 +103,7 @@ class ConfigWorkloadController(wsgi.Controller):
 
             try:
                 config_workload = self.workload_api.config_workload(context,
-                                                                    jobschedule, services_to_backup)
+                                                                    jobschedule, config_data)
             except Exception as error:
                 raise exc.HTTPServerError(explanation=unicode(error))
 
