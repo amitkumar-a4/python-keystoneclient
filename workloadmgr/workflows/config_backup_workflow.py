@@ -31,14 +31,12 @@ class ConfigBackupWorkflow(object):
             self._store['controller'] = 'controller'
             self._store['database'] = 'database'
    
-            import pdb;pdb.set_trace()
             db_host = self._store['params']['compute_hosts'][0]
     
             # Config backup workflow to backup Compute, Controler and Database
             self._config_backup = lf.Flow(self._name + "#ConfigBackup")
-    
+   
             # Add task to backup compute nodes
-            '''
             self._config_backup.add(config_backup_tasks.UnorderedCopyConfigFiles
                                     (self._store['backup_id'], self._store['params']['compute_hosts'],
                                      'compute', self._store['params']))
@@ -55,7 +53,6 @@ class ConfigBackupWorkflow(object):
                          %(self._store['backup_id'], str(self._store['params']['controller_hosts'])))
             else:
                 LOG.warning("No controoller nodes to backup.")
-            '''
 
             # Add task to backup Database
             self._config_backup.add(config_backup_tasks.CopyConfigFiles(name="BackupDatabase_" + db_host,

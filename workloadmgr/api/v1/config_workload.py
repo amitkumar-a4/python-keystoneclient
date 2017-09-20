@@ -16,7 +16,6 @@ from workloadmgr.openstack.common import log as logging
 from workloadmgr import workloads as workloadAPI
 from workloadmgr.api.views import config_workload as config_workload_views
 from workloadmgr.api.views import config_backup as config_backup_views
-from workloadmgr.utils import encrypt
 
 LOG = logging.getLogger(__name__)
 
@@ -55,12 +54,11 @@ class ConfigWorkloadController(wsgi.Controller):
                                 raise wlm_exceptions.ErrorOccurred(reason="Database"
                                       "credentials should have host, user and password.")
                             if str(database_config[required_key]).lower() == 'none':
-                                raise wlm_exceptions.ErrorOccurred(reason=required_key + " can not be None.")
+                                raise wlm_exceptions.ErrorOccurred(reason="Database " + required_key + " can not be None.")
                 except Exception as  ex:
                     raise ex
 
             if config_data.get('authorized_key', None) is not None:
-                #config_data['authorized_key'] = encrypt(config_data['authorized_key'])
                 config_data['authorized_key'] = config_data['authorized_key']
 
             existing_jobschedule = None

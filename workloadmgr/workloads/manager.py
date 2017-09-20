@@ -1758,11 +1758,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Backup OpenStack configuration
         """
         try:
-            #import pdb;pdb.set_trace()
-            services_to_backup = None
-            databases = None
-            trusted_nodes = None
-   
             backup = self.db.config_backup_update(context, backup_id,
                                                {'host': self.host})
             #Get list of services, database and remote nodes to backup
@@ -1802,9 +1797,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             #If contego and controller node are same then remove from controller
             for controller_node in controller_nodes:
                 if controller_node in contego_nodes:
-                    pass
-                    #TODO uncomment
-                    #controller_nodes.remove(controller_node)
+                    controller_nodes.remove(controller_node)
 
             backup_endpoint = config_workload['backup_media_target']
 

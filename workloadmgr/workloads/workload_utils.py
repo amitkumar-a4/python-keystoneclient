@@ -165,7 +165,6 @@ def upload_config_workload_db_entry(cntx):
 
 def upload_config_backup_db_entry(cntx, backup_id):
     try:
-        #import pdb;pdb.set_trace()
         config_db = db.config_backup_get(cntx, backup_id)
         config_workload_db = db.config_workload_get(cntx)
         backup_endpoint = config_workload_db['backup_media_target']
@@ -665,16 +664,22 @@ def config_backup_delete(context, backup_id):
         LOG.exception(ex)
 
 @autolog.log_method(logger=Logger)
-def validate_database_creds(context, databases, trust_creds):
+def get_compute_host(context):
     try:
         #Look for contego node, which is up
         compute_nodes = get_compute_nodes(context, up_only=True)
         if len(compute_nodes) > 0:
-            host = compute_nodes[0].host
+            return compute_nodes[0].host
         else:
-            message = "No contego node is up for validate database credentials."
+            message = "No compute node is up for validate database credentials."
             raise exception.ErrorOccurred(reason=message)
+    except Exception as ex:
+        raise ex
 
+@autolog.log_method(logger=Logger)
+def validate_database_creds(context, databases, trust_creds):
+    try:
+        host = get_compute_host(context)
         compute_service = nova.API(production=True)
         params = {'host':host, 'databases':databases, 'trust_creds': trust_creds}
         status = compute_service.validate_database_creds(context, params)
@@ -689,17 +694,9 @@ def validate_database_creds(context, databases, trust_creds):
 @autolog.log_method(logger=Logger)
 def validate_trusted_user_and_key(context, trust_creds):
     try:
-        #Look for contego node, which is up
-        compute_nodes = get_compute_nodes(context, up_only=True)
-        if len(compute_nodes) > 0:
-            host = compute_nodes[0].host
-        else:
-            message = "No contego node is up for validate trusted user and authorize key."
-            raise exception.ErrorOccurred(reason=message)
-
+        host = get_compute_host(context)
         compute_service = nova.API(production=True)
         params = {'host':host, 'trust_creds': trust_creds}
-        #TODO Try to show list of failed node/ Delete temp file as well
 
         status = compute_service.validate_trusted_user_and_key(context, params)
         if status['result'] != "success":
