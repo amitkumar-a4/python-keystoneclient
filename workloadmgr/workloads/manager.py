@@ -1758,10 +1758,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         Backup OpenStack configuration
         """
         try:
-            services_to_backup = None
-            databases = None
-            trusted_nodes = None
-   
             backup = self.db.config_backup_update(context, backup_id,
                                                {'host': self.host})
             #Get list of services, database and remote nodes to backup
@@ -1772,8 +1768,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     services_to_backup = pickle.loads(str(metadata['value'])) 
                 elif metadata['key'] == 'databases':
                     databases = pickle.loads(str(metadata['value']))
-                elif metadata['key'] == 'trusted_nodes':
-                    trusted_nodes = pickle.loads(str(metadata['value']))
+                elif metadata['key'] == 'trusted_user':
+                    trusted_user = pickle.loads(str(metadata['value']))
+                elif metadata['key'] == 'authorized_key':
+                    authorized_key = metadata['value']
 
             controller_nodes = []
             contego_nodes = []
@@ -1828,8 +1826,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
     
             params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
                       'backend_endpoint': config_workload['backup_media_target'], 'backup_id': backup_id,
-                      'databases': databases, 'trusted_nodes': trusted_nodes, 'compute_hosts': contego_nodes,
-                      'controller_hosts': controller_nodes
+                      'databases': databases, 'trusted_user': trusted_user, 'compute_hosts': contego_nodes,
+                      'controller_hosts': controller_nodes, 'authorized_key': authorized_key
                       }
             context_dict = dict([('%s' % key, value)
                               for (key, value) in context.to_dict().iteritems()])
