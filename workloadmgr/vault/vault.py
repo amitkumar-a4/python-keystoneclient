@@ -1216,6 +1216,21 @@ def get_directory_size(path):
     except Exception as ex:
         LOG.exception(ex)
 
+def get_key_file(key_data, temp=False):
+    try:
+        backup_target, path = get_settings_backup_target()
+        config_workload_path = backup_target.get_config_workload_path()
+        if temp is True:
+            file_path = os.path.join(config_workload_path, "authorized_key_temp")
+        else:
+            file_path = os.path.join(config_workload_path, "authorized_key")
+        backup_target.put_object(file_path, key_data)
+        os.chmod(file_path, 0644)
+        return file_path
+    except Exception as ex:
+        LOG.exception(ex)
+        raise ex
+
 
 """
 if __name__ == '__main__':

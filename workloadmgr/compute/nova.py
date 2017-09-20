@@ -1187,13 +1187,13 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
-    def validate_trusted_nodes(self, context, params, **kwargs):
+    def validate_trusted_user_and_key(self, context, params, **kwargs):
         """
-        validate a trusted node whether it has access to controller node or not.
-        :param : trusted_node hostname.
+        validate trusted user and private key for connecting with controller node.
+        :param : trusted_user and priivate_key.
         """
         client = kwargs['client']
-        return client.contego.validate_trusted_nodes(CONF.cloud_unique_id, params)
+        return client.contego.validate_trusted_user_and_key(CONF.cloud_unique_id, params)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
