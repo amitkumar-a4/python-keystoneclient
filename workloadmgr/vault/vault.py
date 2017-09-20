@@ -1220,13 +1220,11 @@ def get_key_file(key_data, temp=False):
     try:
         backup_target, path = get_settings_backup_target()
         config_workload_path = backup_target.get_config_workload_path()
-        fileutils.ensure_tree(config_workload_path)
         if temp is True:
             file_path = os.path.join(config_workload_path, "authorized_key_temp")
         else:
             file_path = os.path.join(config_workload_path, "authorized_key")
-        with open(file_path, 'w') as key_file:
-            key_file.write(key_data)
+        backup_target.put_object(file_path, key_data)
         os.chmod(file_path, 0644)
         return file_path
     except Exception as ex:
