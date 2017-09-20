@@ -3027,10 +3027,7 @@ class API(base.Base):
                     metadata['authorized_key'] = trust_creds['authorized_key']
 
             if 'databases' in config_data:
-               if 'trust_creds' not in locals():
-                   trusted_user = _get_matadata(existing_config_workload.metadata, 'trusted_user')
-                   authorized_key = _get_matadata(existing_config_workload.metadata, 'authorized_key')
-               workload_utils.validate_database_creds(context, config_data['databases'], trust_creds)
+               workload_utils.validate_database_creds(context, config_data['databases'])
                metadata['databases'] = pickle.dumps(config_data.pop('databases'))
 
             metadata['services_to_backup'] = pickle.dumps(config_data.pop('services_to_backup'))
