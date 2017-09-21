@@ -9,6 +9,7 @@ specific flows
 
 """
 
+import copy
 import uuid
 import time
 import cPickle as pickle
@@ -1295,11 +1296,28 @@ def restore_vm_security_groups(cntx, db, restore):
             vm_security_group_rule_values = pickle.loads(
                 str(vm_security_group_rule.pickle))
             found = False
+            vm_security_group_rule_values.pop('description')
+            vm_security_group_rule_values.pop('updated_at')
+            vm_security_group_rule_values.pop('created_at')
+            vm_security_group_rule_values.pop('id')
+            vm_security_group_rule_values.pop('project_id')
+            vm_security_group_rule_values.pop('tenant_id')
+            vm_security_group_rule_values.pop('revision_number')
+            vm_security_group_rule_values.pop('security_group_id')
+
             for rule in existinggroup['security_group_rules']:
-                if vm_security_group_rule_values['id'] == rule['id']:
-                    found = True
-                    break
-                elif match_rule_values(dict(vm_security_group_rule_values),dict(rule)) is True:
+                rule = copy.deepcopy(rule)
+
+                rule.pop('description')
+                rule.pop('updated_at')
+                rule.pop('created_at')
+                rule.pop('id')
+                rule.pop('project_id')
+                rule.pop('tenant_id')
+                rule.pop('revision_number')
+                rule.pop('security_group_id')
+
+                if match_rule_values(dict(vm_security_group_rule_values),dict(rule)) is True:
                     found = True
                     break
             if found is False:
