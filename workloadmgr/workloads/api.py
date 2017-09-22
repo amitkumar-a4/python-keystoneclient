@@ -2997,7 +2997,11 @@ class API(base.Base):
 
             try:
                 existing_config_workload = self.db.config_workload_get(context)
-            except Exception as ex:
+                if existing_config_workload['status'].lower() == 'locked':
+                    message = "Config workload is not available. " \
+                          "Please wait for config backup to complete."
+                    raise wlm_exceptions.InvalidState(reason=message)
+            except wlm_exceptions.ConfigWorkloadNotFound:
                 existing_config_workload = None
                 #When user configuring for the first time
                 if config_data.has_key('databases') is False or len(config_data['databases'].keys()) == 0:
