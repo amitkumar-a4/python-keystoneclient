@@ -782,6 +782,10 @@ class WorkloadMgrsController(wsgi.Controller):
                get_hidden = escape(get_hidden)                
                if get_hidden.lower() == 'true':
                   get_hidden = True
+               get_smtp_settings = var.get('get_smtp_settings',[''])[0]
+               get_smtp_settings = escape(get_smtp_settings)
+               if get_smtp_settings.lower() == 'true':
+                  get_smtp_settings = True
             Config = ConfigParser.RawConfigParser()
             Config.read('/var/triliovault/settings/workloadmgr-settings.conf')
             settings = None            
@@ -790,7 +794,7 @@ class WorkloadMgrsController(wsgi.Controller):
             if (body and 'page_size' in body['settings']):
                 settings = self.workload_api.setting_get(context,'page_size')                
             if not settings:
-                settings = settings_module.get_settings(context, get_hidden)
+                settings = settings_module.get_settings(context, get_hidden, get_smtp_settings)
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
