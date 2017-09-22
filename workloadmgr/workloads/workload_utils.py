@@ -699,7 +699,7 @@ def validate_trusted_user_and_key(context, trust_creds):
 
         status = compute_service.validate_trusted_user_and_key(context, params)
         if status['result'] != "success":
-            message = "Please verify, using given trusted user and private key not able to connect with controller node."
+            message = "Please verify, given trusted user should have passwordless sudo access using given private key."
             raise exception.ErrorOccurred(reason=message)
         else:
             return True
