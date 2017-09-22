@@ -1225,7 +1225,7 @@ def get_key_file(key_data, temp=False):
         else:
             file_path = os.path.join(config_workload_path, "authorized_key")
         backup_target.put_object(file_path, key_data)
-        os.chmod(file_path, 0644)
+        os.chmod(file_path, 0o600)
         return file_path
     except Exception as ex:
         LOG.exception(ex)
