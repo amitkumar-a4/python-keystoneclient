@@ -16,16 +16,16 @@
 
         "workload:workload_disable_global_job_scheduler": "rule:admin_api",
         "workload:workload_enable_global_job_scheduler": "rule:admin_api",
-        "workload:workload_ensure_global_job_scheduler": "rule:admin_api",
-        "workload:workload_get_global_job_scheduler": "rule:admin_api",
+        "workload:workload_ensure_global_job_scheduler": "rule:admin_or_owner",
+        "workload:workload_get_global_job_scheduler": "rule:admin_or_owner",
 
         "workload:license_create": "rule:admin_api",
         "workload:license_list": "rule:admin_api",
         "workload:license_check": "rule:admin_api",
 
-        "workload:trust_create": "rule:admin_api",
-        "workload:trust_delete": "rule:admin_api",
-        "workload:trust_list": "rule:admin_api",
+        "workload:trust_create": "rule:admin_or_owner",
+        "workload:trust_delete": "rule:admin_or_owner",
+        "workload:trust_list": "rule:admin_or_owner",
         "workload:trust_get": "rule:admin_api",
 
         "workload:settings_create": "rule:admin_or_owner",
