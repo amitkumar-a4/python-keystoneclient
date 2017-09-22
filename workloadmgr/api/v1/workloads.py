@@ -775,6 +775,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             get_hidden = False
+            get_smtp_settings = False
             if ('QUERY_STRING' in req.environ) :
                qs=parse_qs(req.environ['QUERY_STRING'])
                var = parse_qs(req.environ['QUERY_STRING'])
