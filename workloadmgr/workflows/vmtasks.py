@@ -128,12 +128,15 @@ class RestoreSecurityGroups(task.Task):
         self.security_groups = None
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
-        if target_platform == 'openstack':
-            self.security_groups =  vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
-        else:
-            self.security_groups =  vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
+        try:
+            if target_platform == 'openstack':
+                self.security_groups =  vmtasks_openstack.restore_vm_security_groups(cntx, db, restore)
+            else:
+                self.security_groups =  vmtasks_vcloud.restore_vm_security_groups(cntx, db, restore)
+            return self.security_groups
+        except:
+            pass
 
-        return self.security_groups
 
     @autolog.log_method(Logger, 'RestoreSecurityGroups.revert') 
     def revert_with_log(self, *args, **kwargs):
