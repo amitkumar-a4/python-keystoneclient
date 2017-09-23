@@ -1286,7 +1286,7 @@ def restore_vm_security_groups(cntx, db, restore):
         else:
             return False
 
-    def security_group_inside_check(vm_security_group_rule_snaps, existinggroup):
+    def security_group_inside_check(cntx, vm_security_group_rule_snaps, existinggroup):
         existinggroup = network_service.security_group_get(cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
            len(existinggroup['security_group_rules']):
@@ -1295,7 +1295,9 @@ def restore_vm_security_groups(cntx, db, restore):
         for vm_security_group_rule in vm_security_group_rule_snaps:
             vm_security_group_rule_values = pickle.loads(
                 str(vm_security_group_rule.pickle))
+
             found = False
+            remote_group_id = None
             'description' in vm_security_group_rule_values and vm_security_group_rule_values.pop('description')
             'updated_at' in vm_security_group_rule_values and vm_security_group_rule_values.pop('updated_at')
             'created_at' in vm_security_group_rule_values and vm_security_group_rule_values.pop('created_at')
@@ -1304,6 +1306,21 @@ def restore_vm_security_groups(cntx, db, restore):
             'tenant_id' in vm_security_group_rule_values and vm_security_group_rule_values.pop('tenant_id')
             'revision_number' in vm_security_group_rule_values and vm_security_group_rule_values.pop('revision_number')
             'security_group_id' in vm_security_group_rule_values and vm_security_group_rule_values.pop('security_group_id')
+
+            if vm_security_group_rule_values.get('remote_group_id', None):
+                remote_group_id = vm_security_group_rule_values.get('remote_group_id')
+                snapshot_vm_resources = db.snapshot_resources_get(
+                    cntx, restore['snapshot_id'])
+                remote_group_rule_snaps = None
+                for snapshot_vm_resource in snapshot_vm_resources:
+                    if snapshot_vm_resource.resource_type == 'security_group':
+                        if snapshot_vm_resource.resource_name == remote_group_id:
+                            remote_group_rule_snaps = db.vm_security_group_rule_snaps_get(
+                                cntx, snapshot_vm_resource.id)
+                            break
+                vm_security_group_rule_values.pop('remote_group_id')
+                if remote_group_rule_snaps is None:
+                    return False
 
             for rule in existinggroup['security_group_rules']:
                 rule = copy.deepcopy(rule)
@@ -1317,9 +1334,26 @@ def restore_vm_security_groups(cntx, db, restore):
                 'revision_number' in rule and rule.pop('revision_number')
                 'security_group_id' in rule and rule.pop('security_group_id')
 
+                # remote_group_id xor rule.get('remote_group_id', None)
+                if bool(remote_group_id) != bool(rule.get('remote_group_id', None)):
+                    continue
+
+                if rule.get('remote_group_id', None):
+                    rule_remote_group_id = rule.get('remote_group_id')
+                    rule_remote_group = network_service.security_group_get(
+                        cntx, rule_remote_group_id)
+                    rule.pop('remote_group_id')
+
+                    if rule_remote_group_id != existinggroup['id']:
+                        if not security_group_inside_check(
+                            cntx,remote_group_rule_snaps,
+                            rule_remote_group):
+                            continue
+
                 if match_rule_values(dict(vm_security_group_rule_values),dict(rule)) is True:
                     found = True
                     break
+
             if found is False:
                 return False
 
@@ -1335,13 +1369,12 @@ def restore_vm_security_groups(cntx, db, restore):
             if snapshot_vm_resource.resource_name == secgrp['id']:
                 existinggroup = secgrp
                 break
-            else:
-
-                if security_group_inside_check(vm_security_group_rule_snaps, secgrp) is True:
+            elif security_group_inside_check(cntx, vm_security_group_rule_snaps, secgrp) is True:
                     return secgrp['id']
 
         if existinggroup is not None and \
-           security_group_inside_check(vm_security_group_rule_snaps, existinggroup) is True:
+           security_group_inside_check(cntx, vm_security_group_rule_snaps,
+                                       existinggroup) is True:
             return existinggroup['id']
         else:
             return None
