@@ -1325,13 +1325,9 @@ def restore_vm_security_groups(cntx, db, restore):
             for rule in existinggroup['security_group_rules']:
                 rule = copy.deepcopy(rule)
 
-                'description' in rule and rule.pop('description')
-                'updated_at' in rule and rule.pop('updated_at')
-                'created_at' in rule and rule.pop('created_at')
                 'id' in rule and rule.pop('id')
                 'project_id' in rule and rule.pop('project_id')
                 'tenant_id' in rule and rule.pop('tenant_id')
-                'revision_number' in rule and rule.pop('revision_number')
                 'security_group_id' in rule and rule.pop('security_group_id')
 
                 # remote_group_id xor rule.get('remote_group_id', None)
