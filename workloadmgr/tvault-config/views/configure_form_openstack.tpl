@@ -29,6 +29,12 @@
 
 <script src="js/bootstrap-tagsinput.min.js"></script>
 
+<style>
+.bootstrap-tagsinput > span {
+text-transform: initial;
+}
+</style>
+
 <script type="text/javascript">
 IsV3 = false
 Invalid = true
