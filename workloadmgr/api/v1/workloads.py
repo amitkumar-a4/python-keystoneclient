@@ -916,7 +916,7 @@ class WorkloadMgrsController(wsgi.Controller):
         """Verify license check."""
         try:
             context = req.environ['workloadmgr.context']
-            message = self.workload_api.get_usage_and_validate_against_license(context)
+            message = self.workload_api.license_check(context)
             return {'message' : message}
         except exc.HTTPNotFound as error:
             LOG.exception(error)
