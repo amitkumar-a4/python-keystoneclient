@@ -1252,6 +1252,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)
 
             for snap in snapshots_to_delete:
+                db.snapshot_update(context, snap.id, {'metadata': {'deleted_by': 'retention'}})
                 workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
 
         except Exception as ex:
