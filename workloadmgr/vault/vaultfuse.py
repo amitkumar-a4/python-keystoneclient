@@ -834,6 +834,8 @@ class SwiftRepository(ObjectRepository):
             d['st_mtime'] = int(st['headers']['x-timestamp'].split('.')[0])
             d['st_nlink'] = 1
             d['st_mode'] = 33261
+            if prefix is not None and 'authorized_key_temp' in prefix:
+                d['st_mode'] = 33152
             d['st_size'] = int(st['headers']['content-length'])
             if (d['st_size'] == 0 and container == '') or (d['st_size'] == 0 and prefix is None) or \
                 (d['st_size'] == 0 and prefix == ''):

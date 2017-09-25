@@ -2759,6 +2759,15 @@ class API(base.Base):
         return json.loads(license[0].value)
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def license_check(self, context, method=None):
+        try:
+            return self.get_usage_and_validate_against_license(self, context, method)
+        except Exception as ex:
+               LOG.exception(ex)
+               raise ex
+
+    @autolog.log_method(logger=Logger)
     def get_usage_and_validate_against_license(self, context, method=None):
         admin_context = wlm_context.get_admin_context()
         license_key = self.license_list(admin_context)
