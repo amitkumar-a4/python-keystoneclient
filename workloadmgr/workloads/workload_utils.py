@@ -244,7 +244,6 @@ def delete_if_chain(context, snapshot, snapshots_to_delete):
         for snap_chain in snap_chains:
             if snap_chain.issubset(snapshots_to_delete_ids):
                 for snap in snap_chain:
-                    db.snapshot_update(context, snap, {'metadata': {'deleted_by': 'retention'}})
                     db.snapshot_delete(context, snap)
                 for snap in snap_chain:
                     _remove_data(context, snap)                    
@@ -552,12 +551,10 @@ def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_o
 
     all_disks_deleted, some_disks_deleted = _snapshot_disks_deleted(snap)
     if some_disks_deleted:
-        db.snapshot_update(cntx, snap.id, {'metadata': {'deleted_by': 'retention'}})
         db.snapshot_delete(cntx, snap.id)
     if all_disks_deleted: 
         db.snapshot_delete(cntx, snap.id)
-        db.snapshot_update(cntx, snap.id, {'data_deleted':True,
-                       'metadata': {'deleted_by': 'retention'}})
+        db.snapshot_update(cntx, snap.id, {'data_deleted':True})
         try:
             LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % ( snap.display_name, 
                                                                                     snap.id,
@@ -572,7 +569,6 @@ def common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_o
 
 
 def common_apply_retention_snap_delete(cntx, snap, workload_obj):
-    db.snapshot_update(cntx, snap.id, {'metadata': {'deleted_by': 'retention'}})
     db.snapshot_delete(cntx, snap.id)
     backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                             'backup_media_target')
