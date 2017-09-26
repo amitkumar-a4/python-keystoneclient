@@ -87,7 +87,6 @@ def _snapshot_create_callback(*args, **kwargs):
         user_id = kwargs['user_id']
         project_id = kwargs['project_id']
         tenantcontext = nova._get_tenant_context(kwargs)
-        workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
         # TODO: Make sure workload is in a created state
         if callback_obj == 'snapshot':
@@ -2758,6 +2757,15 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def license_check(self, context, method=None):
+        try:
+            return self.get_usage_and_validate_against_license(self, context, method)
+        except Exception as ex:
+               LOG.exception(ex)
+               raise ex
 
     @autolog.log_method(logger=Logger)
     def get_usage_and_validate_against_license(self, context, method=None):

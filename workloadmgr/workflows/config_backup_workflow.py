@@ -43,8 +43,7 @@ class ConfigBackupWorkflow(object):
             LOG.info("Compute node backup task added: backup_id: %s, compute_hosts: %s"\
                   %(self._store['backup_id'], str(self._store['params']['compute_hosts'])))
 
-            # Add task to backup controller nodes only
-            # if user has provided list of trusted nodes
+            # Add task to backup controller nodes 
             if len(self._store['params']['controller_hosts']) > 0 :
                 self._config_backup.add(config_backup_tasks.UnorderedCopyConfigFilesFromRemoteHost
                                         (self._store['backup_id'], self._store['params']['controller_hosts'],
