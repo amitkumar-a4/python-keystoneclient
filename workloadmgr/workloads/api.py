@@ -2762,7 +2762,7 @@ class API(base.Base):
     @wrap_check_policy
     def license_check(self, context, method=None):
         try:
-            return self.get_usage_and_validate_against_license(self, context, method)
+            return self.get_usage_and_validate_against_license(context, method)
         except Exception as ex:
                LOG.exception(ex)
                raise ex
