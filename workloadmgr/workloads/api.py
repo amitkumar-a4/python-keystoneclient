@@ -87,7 +87,6 @@ def _snapshot_create_callback(*args, **kwargs):
         user_id = kwargs['user_id']
         project_id = kwargs['project_id']
         tenantcontext = nova._get_tenant_context(kwargs)
-        workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
         # TODO: Make sure workload is in a created state
         if callback_obj == 'snapshot':
@@ -251,10 +250,11 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
                   "compute nodes '%d'" % (compute_nodes,
                   int(licensekey['Licensed For'].split(' Compute Nodes')[0]))
         if compute_nodes > int(licensekey['Licensed For'].split(' Compute Nodes')[0]):
-            raise wlm_exceptions.InvalidLicense(
-                message="Number of compute nodes '%d' exceeded the licensed number of "
-                        "compute nodes '%d'" % (compute_nodes,
-                        int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
+            if func_name in ('workload_create', None):
+                raise wlm_exceptions.InvalidLicense(
+                    message="Number of compute nodes '%d' exceeded the licensed number of "
+                            "compute nodes '%d'" % (compute_nodes,
+                            int(licensekey['Licensed For'].split(' Compute Nodes')[0])))
 
     elif ' Backup Capacity' in licensekey['Licensed For']:
         capacity_licensed_str = licensekey['Licensed For'].split(' Backup Capacity')[0]
@@ -286,7 +286,7 @@ def validate_license_key(licensekey, func_name, compute_nodes=-1,
                   "vs the licensed number of " \
                   "virtual machines '%d'" % (virtual_machines,
                   int(licensekey['Licensed For'].split(' Virtual Machines')[0]))
-        if func_name in ('workload_create', 'workload_modify', None):
+        if func_name in ('workload_create', None):
             if virtual_machines > int(licensekey['Licensed For'].split(' Virtual Machines')[0]):
                 raise wlm_exceptions.InvalidLicense(
                     message="Number of virtual machines '%d' exceeded the licensed number of "
@@ -356,7 +356,7 @@ def check_policy(context, action):
         'user_id': context.user_id,
     }
     if 'workload' in action:
-       _action = 'snapshot:%s' % action
+       _action = 'workload:%s' % action
     elif 'snapshot' in action:
         _action = 'snapshot:%s' % action
     elif 'restore' in action:
@@ -364,7 +364,7 @@ def check_policy(context, action):
     elif 'filesearch' in action:
           _action = 'filesearch:%s' % action
     else:
-         _action = 'snapshot:%s' % action
+         _action = 'workload:%s' % action
     policy.enforce(context, _action, target)
 
 class API(base.Base):
@@ -743,7 +743,6 @@ class API(base.Base):
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
-            workload = None
             # TODO(giri): optimize this lookup
 
             if len(instances) == 0:
@@ -850,7 +849,7 @@ class API(base.Base):
             return workload
         except Exception as ex:
             LOG.exception(ex)
-            if workload:
+            if 'workload' in locals():
                 self.db.workload_update(context, workload['id'],
                                         {'status': 'error',
                                          'error_msg': ex.kwargs['reason'] if hasattr(ex, 'kwargs') and 'reason' in ex.kwargs else {}})
@@ -897,7 +896,6 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @create_trust
-    @check_license
     @wrap_check_policy
     def workload_modify(self, context, workload_id, workload):
         """
@@ -952,9 +950,12 @@ class API(base.Base):
                                                               or workload['jobschedule']['enabled'] == 'false':
                 workload['jobschedule']['enabled'] = False
 
-           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled']:
+           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled'] and workloadobj['jobschedule']['enabled'] == True:
               pause_workload = True
-              
+
+           if workloadobj['jobschedule']['enabled'] != workload['jobschedule']['enabled'] and workload['jobschedule']['enabled'] == True:
+              unpause_workload = True            
+  
            if workload['jobschedule']['enabled'] == True and \
               workloadobj['jobschedule']['enabled'] == workload['jobschedule']['enabled'] and \
               workloadobj['jobschedule']['interval'] != workload['jobschedule']['interval']:
@@ -2619,7 +2620,6 @@ class API(base.Base):
         return tasks
 
     @autolog.log_method(logger=Logger)
-    @wrap_check_policy
     def get_local_time(self, context, record_time):
         """
         Convert and return the date and time - from GMT to local time
@@ -2757,6 +2757,15 @@ class API(base.Base):
             raise Exception("No licenses added to TrilioVault")
 
         return json.loads(license[0].value)
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def license_check(self, context, method=None):
+        try:
+            return self.get_usage_and_validate_against_license(self, context, method)
+        except Exception as ex:
+               LOG.exception(ex)
+               raise ex
 
     @autolog.log_method(logger=Logger)
     def get_usage_and_validate_against_license(self, context, method=None):
@@ -2980,47 +2989,61 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def config_workload(self,context, jobschedule, services_to_backup):
+    def config_workload(self,context, jobschedule, config_data):
         """
         Make the RPC call to create/update a config workload.
         """
         try:
             AUDITLOG.log(context, 'Config workload update Requested', None)
+            def _get_matadata(metadata, key):
+                for meta in metadata:
+                    if meta.key == key:
+                        if key == 'authorized_key':
+                            return metadata.value
+                        else:
+                            return  pickle.loads(str(metadata.value))
 
             try:
                 existing_config_workload = self.db.config_workload_get(context)
-            except Exception as ex:
+                if existing_config_workload['status'].lower() == 'locked':
+                    message = "Config workload is not available. " \
+                          "Please wait for config backup to complete."
+                    raise wlm_exceptions.InvalidState(reason=message)
+            except wlm_exceptions.ConfigWorkloadNotFound:
                 existing_config_workload = None
                 #When user configuring for the first time
-                if services_to_backup.has_key('databases') is False or len(services_to_backup['databases'].keys()) == 0:
+                if config_data.has_key('databases') is False or len(config_data['databases'].keys()) == 0:
                     message = "Database credentials are required to configure config backup."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
-                if ('trusted_nodes' not in services_to_backup or len(services_to_backup['trusted_nodes'].keys()) == 0):
-                    message = "To backup controller nodes and database, please provide list of trusted " \
-                        "compute nodes, which has password less access to controller nodes."
+                if ('trusted_user' not in config_data or 'authorized_key' not in config_data) or\
+                    str(config_data['trusted_user'].get('username', None)).lower() == 'none':
+                    message = "To backup controller nodes and database, please provide trusted user and " \
+                              "authorized_key, which will be used to connect with controller nodes."
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
             metadata = {}
-            if 'trusted_nodes' in services_to_backup:
-               # Validate trusted_host creds
-               workload_utils.validate_trusted_nodes(context, services_to_backup['trusted_nodes'])
-               metadata['trusted_nodes'] = pickle.dumps(services_to_backup.pop('trusted_nodes'))
+            # Validate trusted_user and authorized_key
+            if ('trusted_user' in config_data or 'authorized_key' in config_data):
+                trusted_user =  _get_matadata(existing_config_workload.metadata, 'trusted_user') \
+                                if config_data.get('trusted_user', None) is None else config_data.get('trusted_user')
+                if 'authorized_key' in config_data:
+                    authorized_key = vault.get_key_file(config_data['authorized_key'], temp=True)
+                else:
+                    authorized_key = _get_matadata(existing_config_workload.metadata, 'authorized_key')    
+                trust_creds = {'trusted_user': trusted_user, 'authorized_key': authorized_key}
+                workload_utils.validate_trusted_user_and_key(context, trust_creds)
+                trust_creds['authorized_key'] = vault.get_key_file(config_data['authorized_key'])
+                if 'trusted_user' in config_data:
+                    metadata['trusted_user'] = pickle.dumps(config_data.pop('trusted_user'))
+                if 'authorized_key' in config_data:
+                    metadata['authorized_key'] = trust_creds['authorized_key']
 
-            if 'databases' in services_to_backup:
-               # Validate database creds
-               if 'trusted_nodes' in metadata:
-                   trusted_nodes =  pickle.loads(str(metadata['trusted_nodes']))
-               else:
-                   for metadata in existing_config_workload.metadata:
-                       if metadata.key == 'trusted_nodes':
-                           trusted_nodes =  pickle.loads(str(metadata.value))
-                           break
+            if 'databases' in config_data:
+               workload_utils.validate_database_creds(context, config_data['databases'])
+               metadata['databases'] = pickle.dumps(config_data.pop('databases'))
 
-               workload_utils.validate_database_creds(context, services_to_backup['databases'], trusted_nodes)
-               metadata['databases'] = pickle.dumps(services_to_backup.pop('databases'))
-
-            metadata['services_to_backup'] = pickle.dumps(services_to_backup)
+            metadata['services_to_backup'] = pickle.dumps(config_data.pop('services_to_backup'))
 
             backup_target, path = vault.get_settings_backup_target()
             # Create new OpenStack workload

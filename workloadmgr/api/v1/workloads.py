@@ -581,6 +581,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 nodes = self.workload_api.get_nodes(context)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return nodes
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -647,6 +648,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 storages_usage = self.workload_api.get_storage_usage(context)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return storages_usage
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -682,6 +684,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 compute_contego_records = self.workload_api.get_contego_status(context, host, ip)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return compute_contego_records
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -711,6 +714,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return recentactivities
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -751,6 +755,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 auditlog = self.workload_api.get_auditlog(context, time_in_minutes, start_range, end_range)
             except Exception as ex:
                 LOG.exception(ex)
+                raise ex
             return auditlog
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -770,6 +775,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             get_hidden = False
+            get_smtp_settings = False
             if ('QUERY_STRING' in req.environ) :
                qs=parse_qs(req.environ['QUERY_STRING'])
                var = parse_qs(req.environ['QUERY_STRING'])
@@ -777,6 +783,10 @@ class WorkloadMgrsController(wsgi.Controller):
                get_hidden = escape(get_hidden)                
                if get_hidden.lower() == 'true':
                   get_hidden = True
+               get_smtp_settings = var.get('get_smtp_settings',[''])[0]
+               get_smtp_settings = escape(get_smtp_settings)
+               if get_smtp_settings.lower() == 'true':
+                  get_smtp_settings = True
             Config = ConfigParser.RawConfigParser()
             Config.read('/var/triliovault/settings/workloadmgr-settings.conf')
             settings = None            
@@ -785,7 +795,7 @@ class WorkloadMgrsController(wsgi.Controller):
             if (body and 'page_size' in body['settings']):
                 settings = self.workload_api.setting_get(context,'page_size')                
             if not settings:
-                settings = settings_module.get_settings(context, get_hidden)
+                settings = settings_module.get_settings(context, get_hidden, get_smtp_settings)
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
@@ -906,7 +916,7 @@ class WorkloadMgrsController(wsgi.Controller):
         """Verify license check."""
         try:
             context = req.environ['workloadmgr.context']
-            message = self.workload_api.get_usage_and_validate_against_license(context)
+            message = self.workload_api.license_check(context)
             return {'message' : message}
         except exc.HTTPNotFound as error:
             LOG.exception(error)

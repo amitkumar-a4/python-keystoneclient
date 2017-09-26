@@ -664,23 +664,23 @@ def config_backup_delete(context, backup_id):
         LOG.exception(ex)
 
 @autolog.log_method(logger=Logger)
-def validate_database_creds(context, databases, trusted_nodes):
+def get_compute_host(context):
     try:
         #Look for contego node, which is up
-        host = None
-        for node, trusted_node in trusted_nodes.iteritems():
-            compute_nodes = get_compute_nodes(context, host=trusted_node['hostname'])
-            for compute_node in compute_nodes:
-                if compute_node.state == 'up':
-                    host = compute_node.host
-                    break
-
-        if host is None:
-            message = "No trusted node is up for validating database credentials."
+        compute_nodes = get_compute_nodes(context, up_only=True)
+        if len(compute_nodes) > 0:
+            return compute_nodes[0].host
+        else:
+            message = "No compute node is up for validate database credentials."
             raise exception.ErrorOccurred(reason=message)
+    except Exception as ex:
+        raise ex
 
+@autolog.log_method(logger=Logger)
+def validate_database_creds(context, databases):
+    try:
         compute_service = nova.API(production=True)
-        params = {'host':host, 'databases':databases}
+        params = {'databases':databases}
         status = compute_service.validate_database_creds(context, params)
         if status['result'] != "success":
             message = "Please verify given database credentials."
@@ -691,38 +691,18 @@ def validate_database_creds(context, databases, trusted_nodes):
         raise ex
 
 @autolog.log_method(logger=Logger)
-def validate_trusted_nodes(context, trusted_node):
+def validate_trusted_user_and_key(context, trust_creds):
     try:
+        host = get_compute_host(context)
         compute_service = nova.API(production=True)
+        params = {'host':host, 'trust_creds': trust_creds}
 
-        controller_nodes = get_controller_nodes(context)
-        for node,node_creds in trusted_node.iteritems():
-            host = node_creds['hostname']
-            compute_nodes = get_compute_nodes(context, host=host)
-            #Verify there is a compute node with this host
-            if len(compute_nodes) != 0:
-               #Verify node is up.
-               found = False
-               for compute_node in compute_nodes:
-                   if compute_node.state == 'up':
-                      found = True
-                      break
-
-               if found is False:
-                   message = "Contego data mover is not installed on compute " \
-                   "node: %s or node is not up." %host
-                   raise exception.ErrorOccurred(reason=message)
-            else:
-                message = "No compute node found with hostname: %s" %host
-                raise exception.ErrorOccurred(reason=message)
-
-            params = {'controller_nodes': controller_nodes, 'node_creds': node_creds}
-            status = compute_service.validate_trusted_nodes(context, params)
-            if status['result'] != "success":
-                message = "Please verify, Given trusted nodes doesn't have access to controller nodes."
-                raise exception.ErrorOccurred(reason=message)
-            else:
-                return True
+        status = compute_service.validate_trusted_user_and_key(context, params)
+        if status['result'] != "success":
+            message = "Please verify, given trusted user should have passwordless sudo access using given private key."
+            raise exception.ErrorOccurred(reason=message)
+        else:
+            return True
     except Exception as ex:
         raise ex
 
@@ -736,14 +716,20 @@ def get_controller_nodes(context):
         raise ex
 
 @autolog.log_method(logger=Logger)
-def get_compute_nodes(context, host=None):
+def get_compute_nodes(context, host=None, up_only=False):
     try:
         contego_nodes = []
         nova_client = KeystoneClientBase(context).nova_client
         nova_services = nova_client.services.list(host=host)
         for nova_service in nova_services:
-            if nova_service.binary.find('contego') != -1:
-                contego_nodes.append(nova_service)
+            if up_only is True:
+               if nova_service.binary.find('contego') != -1 and nova_service.state == 'up':
+                   contego_nodes.append(nova_service)
+            else:
+                if nova_service.binary.find('contego') != -1:
+                    contego_nodes.append(nova_service)
         return contego_nodes
     except Exception as ex:
         raise ex
+
+

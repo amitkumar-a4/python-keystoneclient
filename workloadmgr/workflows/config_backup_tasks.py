@@ -43,6 +43,7 @@ class CopyConfigFiles(task.Task):
         compute_service = nova.API(production=True)
         config_workload = db.config_workload_get(cntx)
         backend_endpoint = config_workload.backup_media_target
+        nodes = params.get('nodes',[])
         params = copy.deepcopy(params)
         params['host'] = host
         params['target'] = target
@@ -50,13 +51,12 @@ class CopyConfigFiles(task.Task):
         target_host = host
         target_host_data = 'config_data'
         if target == 'controller':
-            nodes = params['nodes']
             for i in range(len(nodes)):
                 if nodes[i][1] == host:
-                    params['remote_host_creds']  = {'hostname':nodes[i][0]}
+                    params['remote_host']  = {'hostname':nodes[i][0]}
                     nodes.pop(i)
                     break
-            remote_node = params['remote_host_creds']['hostname']
+            remote_node = params['remote_host']['hostname']
             target_host_data = 'config_data for remote node: %s' % (remote_node)
         elif target == 'database':
             target_host_data = 'database'
@@ -141,7 +141,7 @@ def UnorderedCopyConfigFiles(backup_id, hosts, target, params):
 
 def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, params):
     """
-    If list of controller nodes is more than trusted compute nodes 
+    If list of controller nodes is more than compute nodes 
     then pairing each controller node to compute nodes in  cycle
     For ex:
     cont nodes = node1, node2, node3, node4
@@ -149,24 +149,23 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
     In this case pairing would be 
     (node1, comp1) (node2, comp2)(node3, comp1)(node4, comp2)
 
-    if we have controller nodes less than or equal to trusted
+    if we have controller nodes less than or equal to
     computed nodes then there would be one to one pairing
     """
     flow = uf.Flow("copyconfigfilesremotehostuf")
-    trusted_nodes = params['trusted_nodes']
-    trusted_nodes = [trusted_node['hostname'] for trusted_node in trusted_nodes.values()]
+    compute_nodes = params['compute_hosts']
     target = 'controller'
 
-    nodes = zip(controller_nodes,cycle(trusted_nodes)) \
-        if len(controller_nodes) > len(trusted_nodes) \
-        else zip(controller_nodes, trusted_nodes)
+    nodes = zip(controller_nodes,cycle(compute_nodes)) \
+        if len(controller_nodes) > len(compute_nodes) \
+        else zip(controller_nodes, compute_nodes)
 
     params['nodes'] = nodes
-    for controller_host, trusted_node in nodes:
-        LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,trusted_node))
+    for controller_host, compute_node in nodes:
+        LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,compute_node))
         flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + controller_host,
                                  rebind={'backup_id': 'backup_id',
-                                         'host': trusted_node,
+                                         'host': compute_node,
                                          'target': target,
                                          'params': 'params'
                                          }))
