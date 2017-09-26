@@ -87,7 +87,6 @@ def _snapshot_create_callback(*args, **kwargs):
         user_id = kwargs['user_id']
         project_id = kwargs['project_id']
         tenantcontext = nova._get_tenant_context(kwargs)
-        workload = workloadmgrapi.workload_get(tenantcontext, workload_id)
 
         # TODO: Make sure workload is in a created state
         if callback_obj == 'snapshot':
