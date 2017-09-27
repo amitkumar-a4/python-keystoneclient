@@ -93,17 +93,6 @@ import_map = [
      'getter_method' : 'config_backup_get',
      'getter_method_params' : ['id']
      },]
-
-def read_file(file_name):
-    try:
-        with open(file_name, 'r') as file_obj:
-            file_data = file_obj.read()
-        if len(file_data) > 0:
-            return file_data
-        else:
-            raise exception.ErrorOccurred(reason=("File: %s is empty.")%(file_name))
-    except Exception as ex:
-        LOG.exception(ex)
         
 def project_id_exists(cntx, project_id):
     """clients.initialise()
@@ -124,7 +113,7 @@ def check_tenant(cntx, workload_path, upgrade):
     Check for given worlkoad tenant whether it exist with-in the cloud or not.
     '''
     try:
-        workload_data = read_file(os.path.join(workload_path, 'workload_db'))
+        workload_data = vault.read_file(os.path.join(workload_path, 'workload_db'))
         if workload_data is not None and len(workload_data) > 0:
             workload_values = json.loads(workload_data)
             tenant_id = workload_values.get('tenant_id', None)
@@ -183,7 +172,7 @@ def import_settings(cntx, new_version, upgrade=True):
 
 def update_backup_media_target(file_path, backup_endpoint):
     try:
-        file_data = read_file(file_path)
+        file_data = vault.read_file(file_path)
         if file_data is None or len(file_data) <= 0:
             return
         json_obj = json.loads(file_data)
@@ -390,7 +379,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
 
         # Creating a map for each workload with workload_backup_media_size.
         for snap in db_files_map['snapshot_db']:
-            file_data = read_file(snap)
+            file_data = vault.read_file(snap)
             if file_data is not None and len(file_data) > 0:
                 snapshot_json = json.loads(file_data)
                 if snapshot_json['snapshot_type'] == 'full':
@@ -402,7 +391,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
             db_json = []
 
             for file_name in files:
-                file_data = read_file(file_name)
+                file_data = vault.read_file(file_name)
                 if file_data is not None and len(file_data) > 0:
                     json_obj = json.loads(file_data)
 

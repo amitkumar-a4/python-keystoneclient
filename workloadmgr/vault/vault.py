@@ -1216,6 +1216,16 @@ def get_directory_size(path):
     except Exception as ex:
         LOG.exception(ex)
 
+def read_file(file_name):
+    try:
+        with open(file_name, 'r') as file_obj:
+            file_data = file_obj.read()
+        if len(file_data) > 0:
+            return file_data
+        else:
+            raise exception.ErrorOccurred(reason=("File: %s is empty.")%(file_name))
+    except Exception as ex:
+        LOG.exception(ex)
 
 """
 if __name__ == '__main__':
