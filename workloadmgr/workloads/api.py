@@ -2999,9 +2999,9 @@ class API(base.Base):
                 for meta in metadata:
                     if meta.key == key:
                         if key == 'authorized_key':
-                            return metadata.value
+                            return meta.value
                         else:
-                            return  pickle.loads(str(metadata.value))
+                            return  pickle.loads(str(meta.value))
 
             try:
                 existing_config_workload = self.db.config_workload_get(context)
@@ -3030,14 +3030,15 @@ class API(base.Base):
                 if 'authorized_key' in config_data:
                     authorized_key = vault.get_key_file(config_data['authorized_key'], temp=True)
                 else:
-                    authorized_key = _get_matadata(existing_config_workload.metadata, 'authorized_key')    
+                    authorized_key = _get_matadata(existing_config_workload.metadata, 'authorized_key')
+
                 trust_creds = {'trusted_user': trusted_user, 'authorized_key': authorized_key}
                 workload_utils.validate_trusted_user_and_key(context, trust_creds)
-                trust_creds['authorized_key'] = vault.get_key_file(config_data['authorized_key'])
                 if 'trusted_user' in config_data:
                     metadata['trusted_user'] = pickle.dumps(config_data.pop('trusted_user'))
                 if 'authorized_key' in config_data:
-                    metadata['authorized_key'] = trust_creds['authorized_key']
+                    os.remove(authorized_key)
+                    metadata['authorized_key'] = vault.get_key_file(config_data['authorized_key'])
 
             if 'databases' in config_data:
                workload_utils.validate_database_creds(context, config_data['databases'])
