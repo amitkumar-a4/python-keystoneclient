@@ -1231,7 +1231,6 @@ def get_key_file(key_data, temp=False):
         LOG.exception(ex)
         raise ex
 
-
 """
 if __name__ == '__main__':
     nfsbackend = 
