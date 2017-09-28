@@ -189,30 +189,36 @@ def change_service_password():
 
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/workloadmgr/workloadmgr.conf')
+        old_password = Config.get('keystone_authtoken','admin_password')
+        if config_inputs['oldpassword'] != old_password:
+           raise Exception("Enter you valid current password")
         service_tenant_name = Config.get('keystone_authtoken','admin_tenant_name')
         data = {}
-        data['admin_username'] = 'triliovault'
-        data['admin_password'] = config_inputs['oldpassword']
-        data['admin_tenant_name'] = Config.get('keystone_authtoken','admin_tenant_name')
+        data['admin_username'] = Config.get('DEFAULT', 'nova_admin_username')
+        data['admin_password'] = Config.get('DEFAULT', 'nova_admin_password')
+        data['admin_tenant_name'] = Config.get('DEFAULT', 'neutron_admin_tenant_name')
         data['keystone_admin_url'] = Config.get('keystone_authtoken','auth_url')
         data['keystone_public_url'] = Config.get('keystone_authtoken','auth_uri')
-        data['domain_name'] = Config.get('keystone_authtoken','user_domain_id')
+        data['domain_name'] = Config.get('DEFAULT', 'domain_name')
+    
         if data['domain_name'] == '':
            data['domain_name'] = 'default'
 
         # first authenticate old credentials to make sure the
         # user is genuine
-      
         global config_data
         config_data = data
- 
         try:
             keystone, tenants = _validate_keystone_client_and_version(is_admin_url=False)
         except Exception as e:
                raise Exception( "KeystoneError:Unable to connect to keystone Public URL "+e.message  )
- 
-        keystone.users.update_own_password(config_inputs['oldpassword'],
-                                           config_inputs['newpassword'])
+
+        for user in keystone.users.list(): 
+            if user.name == 'triliovault':
+               if keystone.version == 'v3':
+                  keystone.users.update(user, password=config_inputs['newpassword'])
+               else:
+                    keystone.users.update_password(user, config_inputs['newpassword'])
 
         """Change service account password"""
         Config = ConfigParser.RawConfigParser()
@@ -594,7 +600,7 @@ def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
                                     domain_id=config_data['domain_name'],
                                     )
         else:
-              auth = password.Password(auth_url=auth_url,
+             auth = password.Password(auth_url=auth_url,
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
                                     project_name=config_data['admin_tenant_name'],
@@ -784,8 +790,8 @@ def _authenticate_with_keystone():
                                                       region=config_data['region_name']).publicurl
         parse_result = urlparse(wlm_public_url)
         
-        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
-        config_data['rabbit_host'] = parse_result.hostname
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+        config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 
 def _register_service():
@@ -919,7 +925,7 @@ def _register_service():
     if config_data['enable_tls'] == 'on':
         wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
     else:
-        wlm_url = 'http://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
+        wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
 
     if keystone.version == 'v3':
        keystone.endpoints.create(region=config_data['region_name'],
@@ -2887,7 +2893,10 @@ def configure_openstack():
         config_data['keystone_public_protocol'] = parse_result.scheme
         
         config_data['workloadmgr_user'] = 'triliovault'
-        config_data['workloadmgr_user_password'] = config_inputs['triliovault-password1']
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        old_password = Config.get('keystone_authtoken','admin_password')
+        config_data['workloadmgr_user_password'] = old_password
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'

@@ -46,6 +46,7 @@ from workloadmgr.decorators import retry
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
+
 nova_opts = [
     cfg.StrOpt('nova_admin_auth_url',
                default='http://localhost:5000/v2.0',
@@ -90,6 +91,10 @@ CONF.register_opts(nova_opts)
 LOG = logging.getLogger(__name__)
 
 novalock = Lock()
+
+class ObjectDummy(object):
+    pass
+
 def synchronized(lock):
     '''Synchronization decorator.'''
     def wrap(f):
@@ -174,6 +179,7 @@ def _get_trusts(user_id, tenant_id):
 
 
 def _get_tenant_context(context):
+    from workloadmgr import workloads as workloadAPI
     if type(context) is dict:
        user_id = context['user_id']
        tenant_id = context['project_id']
@@ -236,6 +242,12 @@ def _get_tenant_context(context):
                context.tenant = tenant
         except Exception:
             with excutils.save_and_reraise_exception():
+                msg = _("Assign valid trustee role to tenant %s") % tenant_id
+                cntx = ObjectDummy()
+                cntx.user_id = user_id
+                cntx.project_id = tenant_id
+                workloadAPI.api.AUDITLOG.log(cntx, msg, None)
+                LOG.info(msg)
                 LOG.exception(_("token cannot be created using saved "
                                 "trust id for user %s, tenant %s") %
                                 (user_id, tenant_id))
@@ -267,6 +279,12 @@ def _get_tenant_context(context):
             with excutils.save_and_reraise_exception():
                 LOG.exception(_("_get_auth_token() with admin credentials failed. "
                                 "Perhaps admin is not member of tenant %s") % tenant_id)
+                cntx = ObjectDummy()
+                cntx.user_id = user_id
+                cntx.project_id = tenant_id
+                msg = _("Assign valid trustee role to tenant %s") % tenant_id
+                workloadAPI.api.AUDITLOG.log(cntx, msg, None)
+                LOG.info(msg)
 
     return context
 
@@ -1169,13 +1187,13 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
-    def validate_trusted_nodes(self, context, params, **kwargs):
+    def validate_trusted_user_and_key(self, context, params, **kwargs):
         """
-        validate a trusted node whether it has access to controller node or not.
-        :param : trusted_node hostname.
+        validate trusted user and private key for connecting with controller node.
+        :param : trusted_user and priivate_key.
         """
         client = kwargs['client']
-        return client.contego.validate_trusted_nodes(CONF.cloud_unique_id, params)
+        return client.contego.validate_trusted_user_and_key(CONF.cloud_unique_id, params)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)

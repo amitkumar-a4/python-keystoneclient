@@ -693,7 +693,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             # Used entry in df command is not reliable indicator. Hence we use
             # size - available as total utilization
             total_utilization = total_capacity - int(values[3]) * 1024
-
+            """
             try:
                 stdout, stderr = utils.execute('du', '-shb', mountpath, run_as_root=True)
                 if stderr != '':
@@ -704,7 +704,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                 total_utilization = int(du_values[0])
             except Exception as ex:
                 LOG.exception(ex)
-
+            """
         except Exception as ex:
             LOG.exception(ex)
 
@@ -1215,6 +1215,21 @@ def get_directory_size(path):
         return int(out.split('\t')[0]) * 1024
     except Exception as ex:
         LOG.exception(ex)
+
+def get_key_file(key_data, temp=False):
+    try:
+        backup_target, path = get_settings_backup_target()
+        config_workload_path = backup_target.get_config_workload_path()
+        if temp is True:
+            file_path = os.path.join(config_workload_path, "authorized_key_temp")
+        else:
+            file_path = os.path.join(config_workload_path, "authorized_key")
+        backup_target.put_object(file_path, key_data)
+        os.chmod(file_path, 0o600)
+        return file_path
+    except Exception as ex:
+        LOG.exception(ex)
+        raise ex
 
 """
 if __name__ == '__main__':

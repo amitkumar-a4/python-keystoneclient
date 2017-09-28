@@ -29,6 +29,12 @@
 
 <script src="js/bootstrap-tagsinput.min.js"></script>
 
+<style>
+.bootstrap-tagsinput > span {
+text-transform: initial;
+}
+</style>
+
 <script type="text/javascript">
 IsV3 = false
 Invalid = true
@@ -220,7 +226,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="icon-circle">
                                                     <i class="ti-ticket"></i>
                                                 </div>
-                                                TrilioVault Credentials
+                                                TrilioVault Trustee Role
                                             </a>
                                         </li>
                                         <li>
@@ -350,27 +356,13 @@ function setSwiftRequired(checked, val) {
                                                         <span id="cred_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                     </div>
                                                 </div>
-                                                <div class="col-sm-5">
-                                                    <div class="form-group">
-                                                         <label class="control-label">Trustee Role</label>
-                                                         <select name="trustee-role" id="trustee-role" class="form-control">
-                                                            %for role in roles:
-                                                                %if role==trustee_role:
-                                                                    <option value="{{role}}" selected>{{role}}</option>
-                                                                %else:
-                                                                    <option value="{{role}}">{{role}}</option>
-                                                                %end
-                                                            %end
-                                                         </select>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="tab-pane" id="triliovaultcredentials">
-                                        <h5 class="info-text"> TrilioVault Service Credentials </h5>
+                                        <h5 class="info-text"> TrilioVault Trustee Role </h5>
                                         <div class="row">
-                                            <div class="col-sm-12">
+                                            <!--div class="col-sm-12">
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Password</label>
@@ -383,6 +375,22 @@ function setSwiftRequired(checked, val) {
     	                                                <input id='confirmpassword' name="triliovault-password2" type="password" required="" placeholder="" class="form-control" onkeyup="validatepasswords(); return false;">
                                                     </div>
                                                 </div>
+                                            </div-->
+                                            <div class="col-sm-12">
+                                            <div class="col-sm-5">
+                                                    <div class="form-group">
+                                                         <label class="control-label">Trustee Role</label>
+                                                         <select name="trustee-role" id="trustee-role" class="form-control">
+                                                            %for role in roles:
+                                                                %if role==trustee_role:
+                                                                    <option value="{{role}}" selected>{{role}}</option>
+                                                                %else:
+                                                                    <option value="{{role}}">{{role}}</option>
+                                                                %end
+                                                            %end
+                                                         </select>
+                                                    </div>
+                                            </div>
                                             </div>
                                             <div class="col-sm-12">
                                                 <span id="confirmMessage" class="confirmMessage"></span>
