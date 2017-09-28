@@ -31,6 +31,7 @@ DBSession = get_session()
 workloads = []
 workload_backup_endpoint = {}
 workload_backup_media_size = {}
+vault_backend = None
 
 import_map = [
     {'file': 'workload_db',
@@ -113,7 +114,7 @@ def check_tenant(cntx, workload_path, upgrade):
     Check for given worlkoad tenant whether it exist with-in the cloud or not.
     '''
     try:
-        workload_data = vault.read_file(os.path.join(workload_path, 'workload_db'))
+        workload_data = vault_backend.get_object(os.path.join(workload_path, 'workload_db'))
         if workload_data is not None and len(workload_data) > 0:
             workload_values = json.loads(workload_data)
             tenant_id = workload_values.get('tenant_id', None)
@@ -172,7 +173,7 @@ def import_settings(cntx, new_version, upgrade=True):
 
 def update_backup_media_target(file_path, backup_endpoint):
     try:
-        file_data = vault.read_file(file_path)
+        file_data = vault_backend.get_object(file_path)
         if file_data is None or len(file_data) <= 0:
             return
         json_obj = json.loads(file_data)
@@ -256,6 +257,8 @@ def get_workload_url(context, workload_ids, upgrade):
         backup_target = None
         try:
             backup_target = vault.get_backup_target(backup_endpoint)
+            if vault_backend is None:
+               vault_backend = backup_target 
 
             #importing config backup only when user has not specified any workload id
             if len(workload_ids) == 0:
@@ -379,7 +382,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
 
         # Creating a map for each workload with workload_backup_media_size.
         for snap in db_files_map['snapshot_db']:
-            file_data = vault.read_file(snap)
+            file_data = vault_backend.get_object(snap)
             if file_data is not None and len(file_data) > 0:
                 snapshot_json = json.loads(file_data)
                 if snapshot_json['snapshot_type'] == 'full':
@@ -391,7 +394,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
             db_json = []
 
             for file_name in files:
-                file_data = vault.read_file(file_name)
+                file_data = vault_backend.get_object(file_name)
                 if file_data is not None and len(file_data) > 0:
                     json_obj = json.loads(file_data)
 
