@@ -255,6 +255,7 @@ def get_workload_url(context, workload_ids, upgrade):
 
     for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
         backup_target = None
+        global vault_backend
         try:
             backup_target = vault.get_backup_target(backup_endpoint)
             if vault_backend is None:
