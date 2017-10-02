@@ -46,6 +46,7 @@ transparent = true;
                 'nextSelector': '.btn-next',
                 'previousSelector': '.btn-previous',
 
+
                 onNext: function(tab, navigation, index) {                       
                 	var $valid = $('.wizard-card form').valid();
                 	if(!$valid) {
@@ -76,11 +77,15 @@ transparent = true;
                              }
                         }
                 },
-
                 onInit : function(tab, navigation, index){
 
                   //check number of tabs and fill the entire row
-                  var $total = navigation.find('li').length;
+                  var $total = 0
+                  navigation.find('li').each(function (){
+                         if($(this).css("display") == "block"){
+                             $total = $total + 1
+                         }
+                  });
                   $width = 100/$total;
 
                   navigation.find('li').css('width',$width + '%');
@@ -100,7 +105,12 @@ transparent = true;
                 },
 
                 onTabShow: function(tab, navigation, index) {
-                    var $total = navigation.find('li').length;
+                    var $total = 0
+                    navigation.find('li').each(function (){
+                         if($(this).css("display") == "block"){
+                             $total = $total + 1
+                         }
+                    });
                     var $current = index+1;
                     Invalid = true
                     var $wizard = navigation.closest('.wizard-card');
