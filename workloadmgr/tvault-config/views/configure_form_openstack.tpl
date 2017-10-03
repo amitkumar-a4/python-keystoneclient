@@ -272,11 +272,11 @@ function setSwiftRequired(checked, val) {
                                             <div class="col-sm-12">
                                                 <div class="form-group">
 	                                        %if 'nodetype' in locals() and nodetype == 'additional':
-		                                    <input name = "nodetype" type="radio"  value="controller" onclick='$("#import-tab")[0].style.display=""'>  Controller Node
-		                                    <input name = "nodetype" type="radio"  value="additional" checked onclick='$("#import-tab")[0].style.display="none"'>   Additional Node <br><br>
+		                                    <input name = "nodetype" type="radio"  value="controller" onclick='$("#import-tab")[0].style.display="";$("#certificate-tab")[0].style.display="";$("#import")[0].style.display="";$("#certificate")[0].style.display=""';>  Controller Node
+		                                    <input name = "nodetype" type="radio"  value="additional" checked onclick='$("#import-tab")[0].style.display="none";$("#certificate-tab")[0].style.display="none";$("#import")[0].style.display="none";$("#certificate")[0].style.display="none";'>   Additional Node <br><br>
 	                                        %else:
-		                                    <input name = "nodetype" type="radio"  value="controller" checked onclick='$("#import-tab")[0].style.display=""'>  Controller Node
-		                                    <input name = "nodetype" type="radio"  value="additional" onclick='$("#import-tab")[0].style.display="none"'>   Additional Node <br><br>
+		                                    <input name = "nodetype" type="radio"  value="controller" checked onclick='$("#import-tab")[0].style.display="";$("#certificate-tab")[0].style.display="";$("#import")[0].style.display="";$("#certificate")[0].style.display=""'>  Controller Node
+		                                    <input name = "nodetype" type="radio"  value="additional" onclick='$("#import-tab")[0].style.display="none";$("#certificate-tab")[0].style.display="none";$("#import")[0].style.display="none";$("#certificate")[0].style.display="none";'>   Additional Node <br><br>
 	                                        %end  
                                                 </div>
                                             </div>
